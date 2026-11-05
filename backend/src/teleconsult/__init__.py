@@ -1,0 +1,1 @@
+"""Teleconsult modular monolith."""

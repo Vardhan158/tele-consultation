@@ -1,0 +1,11 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "build image, sign it, attach SBOM, require environment approval before prod"
+      # Record release version, approver, change ticket and outcome (see docs/runbooks).

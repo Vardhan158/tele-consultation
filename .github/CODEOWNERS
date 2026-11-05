@@ -1,0 +1,8 @@
+# Security-sensitive paths require review from the security/privacy owners. Replace team names.
+/backend/src/teleconsult/kernel/            @your-org/security-reviewers
+/backend/src/teleconsult/modules/identity/  @your-org/security-reviewers
+/backend/src/teleconsult/modules/records/   @your-org/security-reviewers
+/backend/src/teleconsult/modules/consent/   @your-org/security-reviewers
+/backend/src/teleconsult/modules/audit/     @your-org/security-reviewers
+/backend/migrations/                        @your-org/security-reviewers
+/infra/                                     @your-org/platform-reviewers

@@ -1,0 +1,448 @@
+[importlinter]
+root_package = teleconsult
+include_external_packages = True
+
+[importlinter:contract:kernel-is-independent]
+name = Kernel must not import modules or adapters
+type = forbidden
+source_modules = teleconsult.kernel
+forbidden_modules =
+    teleconsult.modules
+    teleconsult.adapters
+
+[importlinter:contract:modules-not-adapters]
+name = Modules depend on ports, never on adapters
+type = forbidden
+source_modules = teleconsult.modules
+forbidden_modules = teleconsult.adapters
+
+[importlinter:contract:untrusted-worker-no-db]
+name = Untrusted worker has no database or business-module access
+type = forbidden
+source_modules = teleconsult.worker_untrusted
+forbidden_modules =
+    teleconsult.kernel.db
+    teleconsult.modules
+    sqlalchemy
+    asyncpg
+    psycopg
+
+[importlinter:contract:public-api-only-identity]
+name = Only api.py of identity may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.identity.routes
+    teleconsult.modules.identity.service
+    teleconsult.modules.identity.domain
+    teleconsult.modules.identity.models
+    teleconsult.modules.identity.repo
+    teleconsult.modules.identity.permissions
+    teleconsult.modules.identity.events
+    teleconsult.modules.identity.schemas
+    teleconsult.modules.identity.ports
+
+[importlinter:contract:layers-identity]
+name = Layering inside identity: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.identity.routes
+    teleconsult.modules.identity.service
+    teleconsult.modules.identity.repo
+
+[importlinter:contract:public-api-only-tenancy]
+name = Only api.py of tenancy may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.tenancy.routes
+    teleconsult.modules.tenancy.service
+    teleconsult.modules.tenancy.domain
+    teleconsult.modules.tenancy.models
+    teleconsult.modules.tenancy.repo
+    teleconsult.modules.tenancy.permissions
+    teleconsult.modules.tenancy.events
+    teleconsult.modules.tenancy.schemas
+    teleconsult.modules.tenancy.ports
+
+[importlinter:contract:layers-tenancy]
+name = Layering inside tenancy: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.tenancy.routes
+    teleconsult.modules.tenancy.service
+    teleconsult.modules.tenancy.repo
+
+[importlinter:contract:public-api-only-directory]
+name = Only api.py of directory may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.directory.routes
+    teleconsult.modules.directory.service
+    teleconsult.modules.directory.domain
+    teleconsult.modules.directory.models
+    teleconsult.modules.directory.repo
+    teleconsult.modules.directory.permissions
+    teleconsult.modules.directory.events
+    teleconsult.modules.directory.schemas
+    teleconsult.modules.directory.ports
+
+[importlinter:contract:layers-directory]
+name = Layering inside directory: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.directory.routes
+    teleconsult.modules.directory.service
+    teleconsult.modules.directory.repo
+
+[importlinter:contract:public-api-only-scheduling]
+name = Only api.py of scheduling may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.scheduling.routes
+    teleconsult.modules.scheduling.service
+    teleconsult.modules.scheduling.domain
+    teleconsult.modules.scheduling.models
+    teleconsult.modules.scheduling.repo
+    teleconsult.modules.scheduling.permissions
+    teleconsult.modules.scheduling.events
+    teleconsult.modules.scheduling.schemas
+    teleconsult.modules.scheduling.ports
+
+[importlinter:contract:layers-scheduling]
+name = Layering inside scheduling: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.scheduling.routes
+    teleconsult.modules.scheduling.service
+    teleconsult.modules.scheduling.repo
+
+[importlinter:contract:public-api-only-consultation]
+name = Only api.py of consultation may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.consultation.routes
+    teleconsult.modules.consultation.service
+    teleconsult.modules.consultation.domain
+    teleconsult.modules.consultation.models
+    teleconsult.modules.consultation.repo
+    teleconsult.modules.consultation.permissions
+    teleconsult.modules.consultation.events
+    teleconsult.modules.consultation.schemas
+    teleconsult.modules.consultation.ports
+
+[importlinter:contract:layers-consultation]
+name = Layering inside consultation: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.consultation.routes
+    teleconsult.modules.consultation.service
+    teleconsult.modules.consultation.repo
+
+[importlinter:contract:public-api-only-records]
+name = Only api.py of records may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.records.routes
+    teleconsult.modules.records.service
+    teleconsult.modules.records.domain
+    teleconsult.modules.records.models
+    teleconsult.modules.records.repo
+    teleconsult.modules.records.permissions
+    teleconsult.modules.records.events
+    teleconsult.modules.records.schemas
+    teleconsult.modules.records.ports
+
+[importlinter:contract:layers-records]
+name = Layering inside records: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.records.routes
+    teleconsult.modules.records.service
+    teleconsult.modules.records.repo
+
+[importlinter:contract:public-api-only-consent]
+name = Only api.py of consent may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.consent.routes
+    teleconsult.modules.consent.service
+    teleconsult.modules.consent.domain
+    teleconsult.modules.consent.models
+    teleconsult.modules.consent.repo
+    teleconsult.modules.consent.permissions
+    teleconsult.modules.consent.events
+    teleconsult.modules.consent.schemas
+    teleconsult.modules.consent.ports
+
+[importlinter:contract:layers-consent]
+name = Layering inside consent: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.consent.routes
+    teleconsult.modules.consent.service
+    teleconsult.modules.consent.repo
+
+[importlinter:contract:public-api-only-payments]
+name = Only api.py of payments may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.payments.routes
+    teleconsult.modules.payments.service
+    teleconsult.modules.payments.domain
+    teleconsult.modules.payments.models
+    teleconsult.modules.payments.repo
+    teleconsult.modules.payments.permissions
+    teleconsult.modules.payments.events
+    teleconsult.modules.payments.schemas
+    teleconsult.modules.payments.ports
+
+[importlinter:contract:layers-payments]
+name = Layering inside payments: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.payments.routes
+    teleconsult.modules.payments.service
+    teleconsult.modules.payments.repo
+
+[importlinter:contract:public-api-only-notifications]
+name = Only api.py of notifications may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.notifications.routes
+    teleconsult.modules.notifications.service
+    teleconsult.modules.notifications.domain
+    teleconsult.modules.notifications.models
+    teleconsult.modules.notifications.repo
+    teleconsult.modules.notifications.permissions
+    teleconsult.modules.notifications.events
+    teleconsult.modules.notifications.schemas
+    teleconsult.modules.notifications.ports
+
+[importlinter:contract:layers-notifications]
+name = Layering inside notifications: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.notifications.routes
+    teleconsult.modules.notifications.service
+    teleconsult.modules.notifications.repo
+
+[importlinter:contract:public-api-only-reporting]
+name = Only api.py of reporting may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.support_access
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.reporting.routes
+    teleconsult.modules.reporting.service
+    teleconsult.modules.reporting.domain
+    teleconsult.modules.reporting.models
+    teleconsult.modules.reporting.repo
+    teleconsult.modules.reporting.permissions
+    teleconsult.modules.reporting.events
+    teleconsult.modules.reporting.schemas
+    teleconsult.modules.reporting.ports
+
+[importlinter:contract:layers-reporting]
+name = Layering inside reporting: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.reporting.routes
+    teleconsult.modules.reporting.service
+    teleconsult.modules.reporting.repo
+
+[importlinter:contract:public-api-only-support_access]
+name = Only api.py of support_access may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.audit
+forbidden_modules =
+    teleconsult.modules.support_access.routes
+    teleconsult.modules.support_access.service
+    teleconsult.modules.support_access.domain
+    teleconsult.modules.support_access.models
+    teleconsult.modules.support_access.repo
+    teleconsult.modules.support_access.permissions
+    teleconsult.modules.support_access.events
+    teleconsult.modules.support_access.schemas
+    teleconsult.modules.support_access.ports
+
+[importlinter:contract:layers-support_access]
+name = Layering inside support_access: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.support_access.routes
+    teleconsult.modules.support_access.service
+    teleconsult.modules.support_access.repo
+
+[importlinter:contract:public-api-only-audit]
+name = Only api.py of audit may be imported by other modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    teleconsult.modules.identity
+    teleconsult.modules.tenancy
+    teleconsult.modules.directory
+    teleconsult.modules.scheduling
+    teleconsult.modules.consultation
+    teleconsult.modules.records
+    teleconsult.modules.consent
+    teleconsult.modules.payments
+    teleconsult.modules.notifications
+    teleconsult.modules.reporting
+    teleconsult.modules.support_access
+forbidden_modules =
+    teleconsult.modules.audit.routes
+    teleconsult.modules.audit.service
+    teleconsult.modules.audit.domain
+    teleconsult.modules.audit.models
+    teleconsult.modules.audit.repo
+    teleconsult.modules.audit.permissions
+    teleconsult.modules.audit.events
+    teleconsult.modules.audit.schemas
+    teleconsult.modules.audit.ports
+
+[importlinter:contract:layers-audit]
+name = Layering inside audit: routes -> service -> repo
+type = layers
+layers =
+    teleconsult.modules.audit.routes
+    teleconsult.modules.audit.service
+    teleconsult.modules.audit.repo

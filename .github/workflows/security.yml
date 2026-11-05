@@ -1,0 +1,22 @@
+name: security
+on: [pull_request, push]
+jobs:
+  scans:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: astral-sh/setup-uv@v3
+      - name: SAST (bandit)
+        run: cd backend && uv sync --frozen && uv run bandit -r src -ll
+      - name: Dependency vulnerabilities
+        run: cd backend && uv run pip-audit
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+      - name: Container scan (build then scan)
+        run: |
+          docker build -t teleconsult:ci backend
+          # add trivy or grype step here and fail on critical/high
+      - name: SBOM
+        run: echo "generate SBOM (e.g. CycloneDX / Syft) and attach to the release"
+      # TODO: add DAST against pre-production after deploy.
