@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,6 +14,10 @@ class PatientCreate(BaseModel):
 class PatientResponse(PatientCreate):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    date_of_birth: datetime | None = None
+    preferred_language: str | None = None
+    address: str | None = None
+    emergency_contact: str | None = None
 
 
 class DoctorResponse(BaseModel):
@@ -73,7 +78,7 @@ class ConsentResponse(ConsentCreate):
 class PatientProfileUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=160, pattern=r"^[A-Za-z\s.'-]+$")
     date_of_birth: datetime | None = None
-    phone: str | None = Field(default=None, min_length=7, max_length=32, pattern=r"^\+?[0-9\s().-]{7,32}$")
+    phone: str | None = Field(default=None, min_length=10, max_length=10, pattern=r"^[6-9]\d{9}$")
     preferred_language: str | None = Field(default=None, min_length=2, max_length=32)
     address: str | None = Field(default=None, max_length=500)
     emergency_contact: str | None = Field(default=None, max_length=160)

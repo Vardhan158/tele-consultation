@@ -67,7 +67,8 @@ class MongoDatabase:
                     )
                 return {"enabled": True, "supported": True}
             except Exception as exc:
-                await session.abort_transaction()
+                if session.in_transaction:
+                    await session.abort_transaction()
                 return {"enabled": True, "supported": False, "reason": type(exc).__name__}
 
 

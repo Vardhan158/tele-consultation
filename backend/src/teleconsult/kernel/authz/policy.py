@@ -46,7 +46,7 @@ async def get_principal(request: Request) -> Principal:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
         role = user.get("role", "patient")
         permissions = {
-            "notification:read", "notification:retry", "patient:profile:read", "appointment:read",
+            "patient:profile:read", "patient:profile:write", "notification:read", "notification:retry", "appointment:read",
             "records:read", "prescription:read", "followup:read", "support:read",
             "payment:read", "payment:create", "payment:verify", "payment:refund",
             "directory:read", "appointment:create", "appointment:write",

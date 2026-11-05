@@ -19,7 +19,7 @@ export default function Sidebar({ activeTab, onSelectTab, mobileOpen, onCloseMob
   const isDoctor = patient?.role === 'doctor';
   const isAdmin = patient?.role === 'clinic_admin';
   const navigation = isAdmin ? [
-    { id: 'clinic-approvals', label: 'Doctor approvals', icon: 'verified' },
+    { id: 'clinic-admin', label: 'Clinic administrator', icon: 'admin_panel_settings' },
   ] : isDoctor ? [
     { id: 'doctor-dashboard', label: 'Dashboard', icon: 'grid_view' },
     { id: 'doctor-appointments', label: 'Appointments', icon: 'calendar_month' },

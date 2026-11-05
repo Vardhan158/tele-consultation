@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
 import { patientApi } from '../../lib/api';
 
+function calculateAge(dateOfBirth) {
+  if (!dateOfBirth) return '';
+  const [year, month, day] = String(dateOfBirth).slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return '';
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const birthdayPassed = today.getMonth() + 1 > month || (today.getMonth() + 1 === month && today.getDate() >= day);
+  if (!birthdayPassed) age -= 1;
+  return age >= 0 ? age : '';
+}
+
 // Shared validator is intentionally exported for form tests and validation reuse.
 // eslint-disable-next-line react-refresh/only-export-components
 export function validateProfileField(field, value) {
@@ -22,15 +33,8 @@ export function validateProfileField(field, value) {
     case 'phone':
       {
       if (!val) return 'Mobile number is required.';
-      if (/[A-Za-z#*^%$@!~`_=+{}|;<>?]/.test(val)) {
-        return 'Mobile number must not contain letters or special symbols.';
-      }
-      const digitsOnly = val.replace(/\D/g, '');
-      if (digitsOnly.length < 7 || digitsOnly.length > 15) {
-        return 'Mobile number must have between 7 and 15 digits (e.g. +91 98765 43210).';
-      }
-      if (!/^\+?[0-9\s().-]{7,25}$/.test(val)) {
-        return 'Please enter a valid phone number format.';
+      if (!/^[6-9]\d{9}$/.test(val)) {
+        return 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
       }
       return '';
       }
@@ -48,14 +52,16 @@ export function validateProfileField(field, value) {
       return '';
     case 'zip_code':
       if (val) {
-        if (/[^A-Za-z0-9 -]/.test(val)) return 'ZIP code cannot contain symbols.';
-        if (!/^[A-Za-z0-9 -]{3,10}$/.test(val)) return 'ZIP code must be 3–10 alphanumeric characters (e.g. 94115).';
+        if (!/^\d{5,6}$/.test(val)) return 'ZIP code must contain 5 or 6 digits.';
       }
       return '';
     case 'street_address':
       if (val && !/^[A-Za-z0-9\s,.'#/ -]{3,120}$/.test(val)) {
         return 'Please enter a valid street address.';
       }
+      return '';
+    case 'pronouns':
+      if (val && val.length > 60) return 'Pronouns must be 60 characters or fewer.';
       return '';
     case 'date_of_birth':
       if (val) {
@@ -91,19 +97,19 @@ export default function ProfileScreen({ onNavigate, initialSection = 'personal' 
           setProfile((prev) => ({
             ...prev,
             ...p,
-            first_name: p.full_name ? p.full_name.split(' ')[0] : (prev.first_name || 'Emma'),
-            last_name: p.full_name ? p.full_name.split(' ').slice(1).join(' ') : (prev.last_name || 'Mitchell'),
-            patient_id: p.patient_id || (p.id ? `KC-${p.id.toString().slice(0, 5).toUpperCase()}` : (prev.patient_id || 'KC-20481')),
-            email: p.email || prev.email || 'emma.mitchell@example.com',
-            phone: p.phone || prev.phone || '+1 (415) 555-0142',
-            date_of_birth: p.date_of_birth || prev.date_of_birth || '1992-03-14',
-            age_display: p.age_display || prev.age_display || 'March 14, 1992 · 34 years',
-            primary_care_provider: p.primary_care_provider || prev.primary_care_provider || 'Dr. Sarah Chen, MD',
-            member_since: p.member_since || prev.member_since || 'November 2026',
-            allergies: p.allergies || prev.allergies || 'Penicillin · Rash',
-            preferred_language: p.preferred_language || prev.preferred_language || 'English (US)',
-            emergency_contact: p.emergency_contact || prev.emergency_contact || 'James Mitchell · Spouse (+1 415 555-0199)',
-            last_reviewed: p.last_reviewed || prev.last_reviewed || 'Oct 29, 2026',
+            first_name: p.full_name ? p.full_name.split(' ')[0] : '',
+            last_name: p.full_name ? p.full_name.split(' ').slice(1).join(' ') : '',
+            patient_id: p.patient_id || (p.id ? `KC-${p.id.toString().slice(0, 5).toUpperCase()}` : ''),
+            email: p.email || '',
+            phone: p.phone || '',
+            date_of_birth: p.date_of_birth || '',
+            age_display: p.date_of_birth ? `${String(p.date_of_birth).slice(0, 10)} · ${calculateAge(p.date_of_birth)} years` : '',
+            primary_care_provider: p.primary_care_provider || '',
+            member_since: p.member_since || '',
+            allergies: p.allergies || '',
+            preferred_language: p.preferred_language || '',
+            emergency_contact: p.emergency_contact || '',
+            last_reviewed: p.last_reviewed || '',
           }));
         }
         if (c) setConsents(c);
@@ -149,6 +155,7 @@ export default function ProfileScreen({ onNavigate, initialSection = 'personal' 
       'last_name',
       'email',
       'phone',
+      'pronouns',
       'city',
       'state',
       'zip_code',
@@ -182,16 +189,19 @@ export default function ProfileScreen({ onNavigate, initialSection = 'personal' 
         full_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
         email: profile.email,
         phone: profile.phone,
+        date_of_birth: profile.date_of_birth || undefined,
+        preferred_language: profile.preferred_language || undefined,
+        emergency_contact: profile.emergency_contact || undefined,
         address: `${profile.street_address || ''}, ${profile.city || ''}, ${profile.state || ''} ${profile.zip_code || ''}`.trim(),
       });
       setIsSaved(true);
       setIsErrorToast(false);
       setSaveMessage('Profile changes saved successfully.');
       setTimeout(() => setSaveMessage(''), 4000);
-    } catch {
-      setIsSaved(true);
-      setIsErrorToast(false);
-      setSaveMessage('Profile changes saved locally.');
+    } catch (error) {
+      setIsSaved(false);
+      setIsErrorToast(true);
+      setSaveMessage(error?.message || 'Unable to save profile changes.');
       setTimeout(() => setSaveMessage(''), 4000);
     }
   };
@@ -349,21 +359,21 @@ export default function ProfileScreen({ onNavigate, initialSection = 'personal' 
                   <div>
                     <span className="text-[#577877] block text-[11px]">Date of birth</span>
                     <span className="font-semibold text-[#162623] mt-0.5 block">
-                      {profile.age_display || (profile.date_of_birth ? `${profile.date_of_birth} · 34 years` : 'March 14, 1992 · 34 years')}
+                      {profile.date_of_birth ? `${String(profile.date_of_birth).slice(0, 10)} · ${calculateAge(profile.date_of_birth)} years` : 'Date of birth not provided'}
                     </span>
                   </div>
 
                   <div>
                     <span className="text-[#577877] block text-[11px]">Primary care provider</span>
                     <span className="font-semibold text-[#162623] mt-0.5 block">
-                      {profile.primary_care_provider || 'Dr. Sarah Chen, MD'}
+                      {profile.primary_care_provider || 'Not provided'}
                     </span>
                   </div>
 
                   <div>
                     <span className="text-[#577877] block text-[11px]">Member since</span>
                     <span className="font-semibold text-[#162623] mt-0.5 block">
-                      {profile.member_since || 'November 2026'}
+                      {profile.member_since || 'Not available'}
                     </span>
                   </div>
                 </div>
@@ -371,7 +381,7 @@ export default function ProfileScreen({ onNavigate, initialSection = 'personal' 
                 <div className="pt-2">
                   <button
                     type="button"
-                    onClick={() => alert('Photo upload dialog opened.')}
+                    onClick={() => setSaveMessage('Photo upload is not available yet.')}
                     className="btn-secondary w-full text-xs font-semibold !py-2.5 rounded-xl cursor-pointer"
                   >
                     Change photo
@@ -511,10 +521,13 @@ export default function ProfileScreen({ onNavigate, initialSection = 'personal' 
                     </label>
                     <input
                       type="tel"
-                      inputMode="tel"
-                      placeholder="+91 98765 43210"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[6-9][0-9]{9}"
+                      title="Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9."
+                      placeholder="9876543210"
                       value={profile.phone || ''}
-                      onChange={(e) => handleChange('phone', e.target.value)}
+                      onChange={(e) => handleChange('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
                       onBlur={() => handleBlur('phone')}
                       className={getInputClass('phone')}
                     />
@@ -590,8 +603,10 @@ export default function ProfileScreen({ onNavigate, initialSection = 'personal' 
                         type="text"
                         inputMode="text"
                         placeholder="e.g. 94115"
-                        value={profile.zip_code || ''}
-                        onChange={(e) => handleChange('zip_code', e.target.value)}
+                      value={profile.zip_code || ''}
+                      inputMode="numeric"
+                      maxLength={6}
+                      onChange={(e) => handleChange('zip_code', e.target.value.replace(/\D/g, '').slice(0, 6))}
                         onBlur={() => handleBlur('zip_code')}
                         className={getInputClass('zip_code')}
                       />

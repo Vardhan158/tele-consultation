@@ -5,7 +5,7 @@ from dataclasses import dataclass
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "patient": frozenset({"patient:read:self", "patient:write:self", "appointment:create:self"}),
     "doctor": frozenset({"doctor:read:self", "doctor:write:self", "clinical:read:authorized"}),
-    "clinic_admin": frozenset({"clinic:doctor:read", "clinic:doctor:approve"}),
+    "clinic_admin": frozenset({"clinic:doctor:read", "clinic:doctor:approve", "clinic:settings:write", "clinic:appointments:read", "clinic:appointments:write", "clinic:patients:read", "clinic:reports:read", "clinic:audit:read"}),
     "platform_support": frozenset({"support:read:scoped"}),
     "security_operations": frozenset({"security:audit:read"}),
 }

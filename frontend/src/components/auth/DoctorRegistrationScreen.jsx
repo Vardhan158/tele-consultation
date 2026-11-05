@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { doctorApi } from '../../lib/api';
+import './DoctorRegistrationScreen.css';
 
 export default function DoctorRegistrationScreen({ onBack }) {
   const [form, setForm] = useState({ full_name: '', email: '', mobile_number: '', password: '', specialty: '', clinic_name: '', registration_number: '', experience_years: '0', qualifications: '', languages: '' });

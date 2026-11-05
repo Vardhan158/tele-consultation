@@ -24,7 +24,7 @@ import DoctorPatientsScreen from './components/screens/DoctorPatientsScreen';
 import DoctorAvailabilityScreen from './components/screens/DoctorAvailabilityScreen';
 import DoctorSettingsScreen from './components/screens/DoctorSettingsScreen';
 import DoctorConsultationScreen from './components/screens/DoctorConsultationScreen';
-import ClinicApprovalsScreen from './components/screens/ClinicApprovalsScreen';
+import ClinicAdminScreen from './components/screens/ClinicAdminScreen';
 
 const PATH_TO_TAB = {
   '/dashboard': 'dashboard',
@@ -47,7 +47,7 @@ const PATH_TO_TAB = {
   '/doctor/availability': 'doctor-availability',
   '/doctor/settings': 'doctor-settings',
   '/doctor/consultation': 'doctor-consultation',
-  '/clinic/approvals': 'clinic-approvals',
+  '/clinic/admin': 'clinic-admin',
 };
 
 const TAB_TO_PATH = Object.fromEntries(Object.entries(PATH_TO_TAB).map(([path, tab]) => [tab, path]));
@@ -94,7 +94,11 @@ export default function App() {
   if (!authenticated) {
     if (entryMode === 'landing') return <LandingScreen onSignIn={() => setEntryMode('login')} onRegister={() => setEntryMode('register')} onDoctorRegister={() => setEntryMode('doctor-register')} />;
     if (entryMode === 'doctor-register') return <DoctorRegistrationScreen onBack={() => setEntryMode('landing')} />;
-    return <AuthScreen onBack={() => setEntryMode('landing')} initialMode={entryMode} onAuthenticated={() => setAuthenticated(true)} />;
+    return <AuthScreen onBack={() => setEntryMode('landing')} initialMode={entryMode} onAuthenticated={async () => {
+      setAuthenticated(true);
+      const current = await authApi.me().catch(() => null);
+      if (current?.authenticated) setPatient(current);
+    }} />;
   }
 
   const signOut = async () => {
@@ -105,7 +109,7 @@ export default function App() {
   const isDoctor = patient?.role === 'doctor';
   const renderScreen = () => {
     if (patient?.role === 'clinic_admin') {
-      return <ClinicApprovalsScreen />;
+      return <ClinicAdminScreen />;
     }
     if (isDoctor) {
       switch (activeTab) {
@@ -153,7 +157,7 @@ export default function App() {
   };
 
   return (
-    <Layout activeTab={patient?.role === 'clinic_admin' ? 'clinic-approvals' : isDoctor ? activeTab : activeTab} onSelectTab={handleNavigate} onSignOut={signOut} patient={patient}>
+    <Layout activeTab={patient?.role === 'clinic_admin' ? 'clinic-admin' : activeTab} onSelectTab={handleNavigate} onSignOut={signOut} patient={patient}>
       {renderScreen()}
     </Layout>
   );

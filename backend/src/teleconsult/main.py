@@ -30,6 +30,7 @@ from teleconsult.modules.records.patient_routes import router as records_router
 from teleconsult.modules.records.clinical_routes import router as clinical_router, clinician_router
 from teleconsult.modules.support_access.patient_routes import router as support_router
 from teleconsult.modules.scheduling.admin_routes import router as scheduling_admin_router
+from teleconsult.modules.tenancy.clinic_admin_routes import router as clinic_admin_router
 from teleconsult.config.routes import router as config_router
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.tenancy.context import set_tenant
@@ -139,6 +140,7 @@ def create_app() -> FastAPI:
     app.include_router(clinician_router)
     app.include_router(support_router)
     app.include_router(scheduling_admin_router)
+    app.include_router(clinic_admin_router)
     app.include_router(config_router)
     # Versioned API contract. The module-native paths above remain available
     # for local compatibility while clients migrate to /api/v1.
