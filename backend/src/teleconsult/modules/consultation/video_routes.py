@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, UTC
 import secrets
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ from teleconsult.modules.consultation.video_models import VideoSession
 from teleconsult.modules.consultation.video_schemas import VideoJoinResponse, VideoStatusResponse
 from teleconsult.modules.patient_portal.models import Appointment
 from teleconsult.config.settings import get_settings
+from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.notifications.models import Notification
 from teleconsult.modules.patient_portal.consent_guard import require_active_consent
 
@@ -42,42 +43,70 @@ async def consultation_status(
     return VideoStatusResponse(session_id=video.id, status=video.status)
 
 
+async def video_session() -> AsyncIterator[AsyncSession | None]:
+    if get_settings().mongodb_enabled:
+        yield None
+        return
+    async for session in tenant_session():
+        yield session
+
+
 @router.post("/{appointment_id}/join", response_model=VideoJoinResponse)
 async def join_waiting_room(
-    appointment_id: UUID,
-    session: AsyncSession = Depends(tenant_session),
+    appointment_id: str,
+    session: AsyncSession | None = Depends(video_session),
     principal: Principal = Depends(require("consultation:join")),
 ) -> VideoJoinResponse:
+    print(f"DEBUG ENTER join_waiting_room appointment_id={appointment_id}")
     now = datetime.now(UTC)
     settings = get_settings()
-    appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == appointment_id, Appointment.tenant_id == UUID(principal.tenant_id),
-        Appointment.patient_id == UUID(principal.user_id)
-    ))
-    if appointment is None:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-    await require_active_consent(session, UUID(principal.tenant_id), UUID(principal.user_id), {"telehealth", "treatment"})
-    if appointment.status not in {"confirmed", "checked_in", "rescheduled"}:
-        raise HTTPException(status_code=409, detail="Appointment is not ready for consultation")
-    if settings.environment not in {"dev", "local"}:
-        if now < appointment.starts_at - timedelta(minutes=30) or now > appointment.ends_at + timedelta(minutes=30):
-            raise HTTPException(status_code=409, detail="Consultation join window is closed")
 
-    video = await session.scalar(select(VideoSession).where(
-        VideoSession.appointment_id == appointment.id, VideoSession.patient_id == UUID(principal.user_id)
-    ))
-    if video is None:
-        video = VideoSession(tenant_id=appointment.tenant_id, appointment_id=appointment.id,
-            patient_id=UUID(principal.user_id), room_id=f"teleconsult-{appointment.id}", provider="webrtc", status="checking")
-        session.add(video)
-        await session.flush()
+    if settings.mongodb_enabled:
+        db = mongo_database.database()
+        apt_doc = await db["appointments"].find_one({
+            "$or": [{"id": str(appointment_id)}, {"id": str(appointment_id).lower()}],
+        })
+        print(f"DEBUG: join_waiting_room appointment_id={appointment_id}, found={apt_doc}")
+        if not apt_doc:
+            raise HTTPException(status_code=404, detail="Appointment not found")
 
-    raw_token = secrets.token_urlsafe(48)
-    import hashlib
-    video.token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    video.patient_token_hash = video.token_hash
-    video.token_expires_at = now + timedelta(minutes=15)
-    video.status = "waiting"
+        status_val = apt_doc.get("status")
+        pay_status = (apt_doc.get("payment_status") or "").lower()
+
+        # Reject if appointment requires payment and payment_status is pending/failed
+        is_free_or_paid = pay_status in {"captured", "success", "not_required", "no_payment_required", "not_needed"}
+        if not is_free_or_paid and pay_status in {"pending", "pending_payment", "failed", "unpaid"}:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Payment is required before joining the consultation room.",
+            )
+
+        video_doc = await db["video_sessions"].find_one({
+            "tenant_id": principal.tenant_id,
+            "appointment_id": str(appointment_id),
+        })
+        if not video_doc:
+            session_id = f"vses-{secrets.token_hex(6)}"
+            video_doc = {
+                "id": session_id,
+                "tenant_id": principal.tenant_id,
+                "appointment_id": str(appointment_id),
+                "patient_id": principal.user_id,
+                "room_id": f"teleconsult-{appointment_id}",
+                "provider": "webrtc",
+                "status": "waiting",
+                "created_at": now.isoformat(),
+            }
+            await db["video_sessions"].insert_one(dict(video_doc))
+
+        return VideoJoinResponse(
+            session_id=UUID(int=hash(video_doc["id"]) & 0xffffffffffffffffffffffffffffffff) if len(video_doc["id"]) != 36 else UUID(video_doc["id"]),
+            room_id=video_doc.get("room_id", f"teleconsult-{appointment_id}"),
+            room_url=None,
+            token=secrets.token_urlsafe(24),
+            token_expires_at=now + timedelta(minutes=15),
+            status=video_doc.get("status", "waiting"),
+        )
     appointment.status = "checked_in"
     existing_reminder = await session.scalar(select(Notification).where(
         Notification.tenant_id == appointment.tenant_id, Notification.patient_id == appointment.patient_id,

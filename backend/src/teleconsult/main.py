@@ -155,6 +155,7 @@ def create_app() -> FastAPI:
     app.include_router(directory_router)
     app.include_router(scheduling_router)
     app.include_router(consultation_router)
+    app.include_router(video_router)
     app.include_router(consent_router)
     app.include_router(payments_router)
     app.include_router(notifications_router)
