@@ -22,7 +22,8 @@ async def test_duplicate_and_concurrent_block_date_requests() -> None:
         )
         assert login_res.status_code == 200, f"Login failed: {login_res.text}"
 
-        test_date = f"2029-12-{secrets.randbelow(20) + 10:02d}"
+        rand_y = secrets.randbelow(5) + 2032
+        test_date = f"{rand_y}-{secrets.randbelow(11) + 1:02d}-{secrets.randbelow(20) + 1:02d}"
 
         # 2. First block submission -> 200 OK
         res1 = await client.post(
@@ -40,7 +41,7 @@ async def test_duplicate_and_concurrent_block_date_requests() -> None:
         assert res2.json()["detail"] == "This clinic date is already blocked."
 
         # 4. Concurrent duplicate submissions -> Only 1 succeeds, rest get 409
-        concurrent_date = f"2030-01-{secrets.randbelow(20) + 10:02d}"
+        concurrent_date = f"{rand_y + 1}-{secrets.randbelow(11) + 1:02d}-{secrets.randbelow(20) + 1:02d}"
 
         async def send_block():
             return await client.post(

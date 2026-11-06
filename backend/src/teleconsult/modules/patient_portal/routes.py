@@ -102,12 +102,9 @@ async def patient_session() -> AsyncIterator[AsyncSession | None]:
         yield session
 
 
-def public_tenant_id() -> UUID:
+def public_tenant_id() -> str:
     """Return the explicitly configured tenant used for public directory reads."""
-    try:
-        return UUID(get_settings().default_tenant_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=503, detail="Public directory tenant is not configured") from exc
+    return get_settings().default_tenant_id
 
 
 @public_router.get("/doctors", response_model=list[DoctorResponse])

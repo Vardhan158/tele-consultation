@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     database_url: str = ""
     migration_database_url: str = ""
     tenancy_mode: TenancyMode = TenancyMode.POOLED
-    default_tenant_id: str = "00000000-0000-0000-0000-000000000001"
+    default_tenant_id: str = "1"
     auth_method: str = "password"
     payment_mode: str = "clinic_specific"
     intake_policy: str = "clinic_configured"
