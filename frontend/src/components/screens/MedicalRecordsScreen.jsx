@@ -121,9 +121,10 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const [isUploading, setIsUploading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
+  const uploadSectionRef = useRef(null);
 
   const [selectedFileName, setSelectedFileName] = useState('');
-  const [selectedFileType, setSelectedFileType] = useState('Imaging report');
+  const [selectedFileType, setSelectedFileType] = useState('Clinical document');
   const [selectedFileObj, setSelectedFileObj] = useState(null);
   const [isTooLarge, setIsTooLarge] = useState(false);
   const fileInputRef = useRef(null);
@@ -197,6 +198,11 @@ export default function MedicalRecordsScreen({ onNavigate }) {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
+  };
+
+  const focusUploadSection = () => {
+    uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => fileInputRef.current?.focus(), 400);
   };
 
   const handleFileChange = (e) => {
@@ -276,8 +282,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
           <button
             type="button"
-            onClick={handleBrowseFiles}
-            className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0"
+            onClick={focusUploadSection}
+            className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-[#295255] hover:bg-[#1f4143] text-white flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0"
           >
             <span className="material-symbols-outlined text-base">upload</span>
             <span>Upload a record</span>
@@ -466,7 +472,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           <div className="lg:col-span-4 space-y-5">
 
             {/* CARD 1: Add a health record matching Screenshot */}
-            <div className="care-card p-6 sm:p-7 rounded-2xl bg-white border border-[#577877]/15 space-y-4">
+            <div ref={uploadSectionRef} className="care-card p-6 sm:p-7 rounded-2xl bg-white border border-[#577877]/15 space-y-4">
               <h3 className="text-base font-bold text-[#162623]">
                 Add a health record
               </h3>
@@ -554,13 +560,6 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                 >
                   {isUploading ? 'Uploading...' : 'Upload record'}
                 </button>
-              </div>
-
-              {/* Shared with your care team Badge */}
-              <div className="pt-1">
-                <span className="inline-block text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#E8F3F3] text-[#295255]">
-                  Shared with your care team
-                </span>
               </div>
 
               {/* Footnote */}

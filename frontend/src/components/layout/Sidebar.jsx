@@ -42,7 +42,7 @@ export default function Sidebar({ activeTab, onSelectTab, mobileOpen, onCloseMob
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex flex-col flex-1 overflow-y-auto px-4 py-5 relative z-10">
+        <div className="flex flex-col flex-1 overflow-y-auto px-4 py-5 relative z-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {/* Logo & Brand matching brand palette */}
           <div className="flex items-center justify-between pb-6">
             <div

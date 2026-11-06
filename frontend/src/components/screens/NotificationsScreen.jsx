@@ -411,7 +411,7 @@ export default function NotificationsScreen({ onNavigate }) {
             {prefSaveSuccess && (
               <div className="p-3 bg-[#E6F4EA] border border-[#137333]/20 rounded-xl text-xs text-[#137333] font-medium flex items-center gap-2">
                 <span className="material-symbols-outlined text-sm">check_circle</span>
-                <span>Preferences updated successfully!</span>
+                <span>Changes saved successfully!</span>
               </div>
             )}
 
@@ -488,7 +488,7 @@ export default function NotificationsScreen({ onNavigate }) {
                 }}
                 className="btn-primary !px-5 !py-2 rounded-xl text-xs font-semibold cursor-pointer"
               >
-                Save preferences
+                Save changes
               </button>
             </div>
           </div>

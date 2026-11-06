@@ -63,6 +63,9 @@ export default function DashboardScreen({ onNavigate }) {
   const today = new Date();
   const greeting = today.getHours() < 12 ? 'Good morning' : today.getHours() < 18 ? 'Good afternoon' : 'Good evening';
   const todayLabel = today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const activePrescription = prescriptions[0];
+  const prescriptionLabel = activePrescription?.medication_name || activePrescription?.name || 'No active prescriptions';
+  const careProviderName = nextVisit?.doctor?.full_name || summaries[0]?.doctor_name || 'your care team';
 
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
@@ -82,7 +85,7 @@ export default function DashboardScreen({ onNavigate }) {
               {greeting}{firstName ? `, ${firstName}` : ''}
             </h1>
             <p className="mt-1 text-sm text-[#577877]">
-              Wednesday, November 4, 2026 · Your health plan is on schedule.
+              {todayLabel} · Your health plan is on schedule.
             </p>
           </div>
 
@@ -94,14 +97,6 @@ export default function DashboardScreen({ onNavigate }) {
             >
               <span className="material-symbols-outlined !text-white text-lg">add_circle</span>
               Book New Visit
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('medical-records')}
-              className="btn-secondary"
-            >
-              <span className="material-symbols-outlined !text-[#295255] text-lg">upload_file</span>
-              Upload Record
             </button>
           </div>
         </div>
@@ -171,7 +166,7 @@ export default function DashboardScreen({ onNavigate }) {
         ) : (
           <div className="care-card p-6 sm:p-8 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#162623]">No appointments today</h2>
+              <h2 className="text-xl font-bold text-[#162623]">No upcoming appointments</h2>
               <p className="text-sm text-[#577877] mt-1">
                 Schedule a consultation with an approved clinic specialist.
               </p>
@@ -237,7 +232,7 @@ export default function DashboardScreen({ onNavigate }) {
             <div>
               <p className="text-3xl font-bold text-[#162623]">{prescriptions.length}</p>
               <p className="text-sm font-medium text-[#162623] mt-1">Active Prescriptions</p>
-              <p className="text-xs text-[#577877] mt-0.5">Telmisartan 40mg · 2 Refills left</p>
+              <p className="text-xs text-[#577877] mt-0.5">{prescriptionLabel}</p>
             </div>
           </div>
 
@@ -298,7 +293,7 @@ export default function DashboardScreen({ onNavigate }) {
                 />
               </div>
               <p className="text-xs text-[#577877]">
-                Consistent tracking helps Dr. Chen optimize your medication dosage during today's visit.
+                Consistent tracking helps {careProviderName} support your care plan.
               </p>
             </div>
 

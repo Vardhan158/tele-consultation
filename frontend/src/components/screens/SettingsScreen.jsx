@@ -6,13 +6,15 @@ export default function SettingsScreen({ onNavigate }) {
 
   // Form State
   const [email, setEmail] = useState('');
+  const [emailVerified, setEmailVerified] = useState(false);
   const [twoStepEnabled, setTwoStepEnabled] = useState(false);
   const [emailReminders, setEmailReminders] = useState(true);
   const [smsReminders, setSmsReminders] = useState(true);
   const [wellnessUpdates, setWellnessUpdates] = useState(false);
   const [language, setLanguage] = useState('English (US)');
-  const [timeZone, setTimeZone] = useState('UTC');
+  const [timeZone, setTimeZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   // Modals & Feedback
@@ -21,20 +23,27 @@ export default function SettingsScreen({ onNavigate }) {
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [tempEmail, setTempEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [sessionSignedOut, setSessionSignedOut] = useState(false);
+  const [closureStatus, setClosureStatus] = useState('');
+  const [closureSubmitting, setClosureSubmitting] = useState(false);
+  const [savedPreferences, setSavedPreferences] = useState(null);
 
   useEffect(() => {
     settingsApi.get()
       .then((settings) => {
         setEmail(settings.email || '');
+        setEmailVerified(Boolean(settings.email_verified));
         setTempEmail(settings.email || '');
         setEmailReminders(settings.email_reminders);
         setSmsReminders(settings.sms_reminders);
         setWellnessUpdates(settings.wellness_updates);
-        setLanguage(settings.language);
-        setTimeZone(settings.time_zone);
+        setLanguage(settings.language === 'en' ? 'English (US)' : settings.language || 'English (US)');
+        setTimeZone(settings.time_zone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+        setClosureStatus(settings.privacy?.closure_request?.status || '');
+        setSavedPreferences({ emailReminders: settings.email_reminders, smsReminders: settings.sms_reminders, wellnessUpdates: settings.wellness_updates, language: settings.language === 'en' ? 'English (US)' : settings.language || 'English (US)', timeZone: settings.time_zone || 'UTC' });
       })
       .catch((err) => setError(err.message || 'Unable to load your settings.'))
       .finally(() => setLoading(false));
@@ -42,37 +51,62 @@ export default function SettingsScreen({ onNavigate }) {
 
   const handleSavePreferences = async () => {
     setError('');
+    setSaving(true);
     try {
       await settingsApi.update({ email_reminders: emailReminders, sms_reminders: smsReminders, wellness_updates: wellnessUpdates, language, time_zone: timeZone });
+      setSavedPreferences({ emailReminders, smsReminders, wellnessUpdates, language, timeZone });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       setError(err.message || 'Unable to save your preferences.');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleUpdateEmail = (e) => {
     e.preventDefault();
     if (tempEmail.trim()) {
-      setEmail(tempEmail);
+      setEmail(tempEmail.trim());
       setShowEmailModal(false);
-      handleSavePreferences();
     }
   };
 
   const handleUpdatePassword = (e) => {
     e.preventDefault();
-    if (newPassword && newPassword === confirmPassword) {
-      setShowPasswordModal(false);
-      setNewPassword('');
-      setConfirmPassword('');
-      handleSavePreferences();
+    if (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword) return;
+    settingsApi.changePassword({ current_password: currentPassword, new_password: newPassword })
+      .then(() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000); })
+      .catch((err) => setError(err.message || 'Unable to change your password.'));
+  };
+
+  const handleSignOutOtherDevices = async () => {
+    try {
+      const sessions = await settingsApi.sessions();
+      await Promise.all((sessions || []).slice(1).map((session) => settingsApi.revokeSession(session.id)));
+      setSessionSignedOut(true);
+    } catch (err) {
+      setError(err.message || 'Unable to sign out other devices.');
     }
   };
 
-  const handleSignOutOtherDevices = () => {
-    setSessionSignedOut(true);
-    setTimeout(() => setSessionSignedOut(false), 3500);
+  const preferencesChanged = !savedPreferences || emailReminders !== savedPreferences.emailReminders || smsReminders !== savedPreferences.smsReminders || wellnessUpdates !== savedPreferences.wellnessUpdates || language !== savedPreferences.language || timeZone !== savedPreferences.timeZone;
+
+  const handleClosureRequest = async () => {
+    if (closureStatus === 'pending' || closureSubmitting) return;
+    setClosureSubmitting(true);
+    setError('');
+    try {
+      const updated = await settingsApi.requestDeletion();
+      setClosureStatus(updated?.status || 'pending');
+      setShowClosureModal(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (err) {
+      setError(err.message || 'Unable to submit your closure request.');
+    } finally {
+      setClosureSubmitting(false);
+    }
   };
 
   return (
@@ -95,10 +129,11 @@ export default function SettingsScreen({ onNavigate }) {
           <button
             type="button"
             onClick={handleSavePreferences}
-            className="self-start sm:self-auto bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 rounded-xl font-medium text-xs sm:text-sm shadow-sm transition flex items-center gap-2 cursor-pointer"
+            disabled={!preferencesChanged || saving || loading}
+            className="self-start sm:self-auto bg-[#295255] hover:bg-[#1f4143] disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl font-medium text-xs sm:text-sm shadow-sm transition flex items-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-base">check</span>
-            <span>Save preferences</span>
+            <span>Save changes</span>
           </button>
         </div>
 
@@ -106,7 +141,12 @@ export default function SettingsScreen({ onNavigate }) {
         {saveSuccess && (
           <div className="p-3.5 bg-[#E6F4EA] border border-[#137333]/20 rounded-xl text-xs sm:text-sm text-[#137333] font-medium flex items-center gap-2 animate-in fade-in">
             <span className="material-symbols-outlined text-lg">check_circle</span>
-            <span>Preferences saved successfully to your patient profile.</span>
+            <span>Changes saved successfully!</span>
+          </div>
+        )}
+        {closureStatus === 'pending' && (
+          <div className="p-3.5 bg-[#E8F3F3] border border-[#295255]/20 rounded-xl text-xs sm:text-sm text-[#295255] font-medium">
+            <span className="font-bold">Account closure request submitted.</span> Your request has been received and is pending review. You can continue accessing your account until the closure process is completed, subject to your account status.
           </div>
         )}
 
@@ -173,7 +213,7 @@ export default function SettingsScreen({ onNavigate }) {
 
                   <div className="flex items-center gap-2.5">
                     <span className="bg-[#E6F4EA] text-[#137333] text-xs font-medium px-2.5 py-0.5 rounded-full">
-                      Email status unavailable
+                      {emailVerified ? 'Email verified' : 'Email not verified'}
                     </span>
                     <button
                       type="button"
@@ -192,7 +232,7 @@ export default function SettingsScreen({ onNavigate }) {
                   <div>
                     <span className="text-xs text-[#577877] block">Password</span>
                     <span className="text-sm font-semibold text-[#162623] mt-0.5 block">
-                      Password change date unavailable
+                      Password protected
                     </span>
                   </div>
 
@@ -381,6 +421,7 @@ export default function SettingsScreen({ onNavigate }) {
                       <option value="Central Time (US & Canada)">Central Time (US & Canada)</option>
                       <option value="Eastern Time (US & Canada)">Eastern Time (US & Canada)</option>
                       <option value="UTC / Greenwich Mean Time">UTC / Greenwich Mean Time</option>
+                      <option value="Asia/Kolkata">Asia/Kolkata</option>
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-3 text-[#577877] text-base pointer-events-none">
                       expand_more
@@ -561,12 +602,17 @@ export default function SettingsScreen({ onNavigate }) {
             </div>
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div>
+                <label className="text-xs font-semibold text-[#162623] block mb-1">Current password</label>
+                <input type="password" required minLength={8} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255]" />
+              </div>
+              <div>
                 <label className="text-xs font-semibold text-[#162623] block mb-1">
                   New password
                 </label>
                 <input
                   type="password"
                   required
+                  minLength={8}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255]"
@@ -619,7 +665,7 @@ export default function SettingsScreen({ onNavigate }) {
               </button>
             </div>
             <p className="text-xs text-[#577877] leading-relaxed">
-              In accordance with state and federal healthcare record retention laws, medical charts and consultation records must be retained for at least 7 years. You will still receive an export copy of your health records.
+              Your request will be reviewed under Kaizentrix Care’s applicable records-retention and privacy policy. Your account and medical records will not be deleted immediately, and you can continue accessing your account while the request is pending.
             </p>
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
@@ -631,13 +677,11 @@ export default function SettingsScreen({ onNavigate }) {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowClosureModal(false);
-                  alert('Your account closure request has been submitted to the patient records privacy team.');
-                }}
-                className="bg-[#DC2626] hover:bg-[#B91C1C] text-white px-5 py-2 rounded-xl text-xs font-semibold cursor-pointer"
+                onClick={handleClosureRequest}
+                disabled={closureStatus === 'pending' || closureSubmitting}
+                className="bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl text-xs font-semibold cursor-pointer"
               >
-                Submit closure request
+                {closureSubmitting ? 'Submitting…' : closureStatus === 'pending' ? 'Request pending' : 'Submit closure request'}
               </button>
             </div>
           </div>

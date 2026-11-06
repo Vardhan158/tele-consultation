@@ -150,12 +150,8 @@ export default function PrescriptionsScreen({ onNavigate, initialTab = 'active' 
   const [selectedRx, setSelectedRx] = useState(null);
   const [refillModalRx, setRefillModalRx] = useState(null);
   const [showPharmacyModal, setShowPharmacyModal] = useState(false);
-  const [pharmacy, setPharmacy] = useState({
-    name: 'Pine Street Pharmacy',
-    address: '2100 Pine Street',
-    cityStateZip: 'San Francisco, CA 94115',
-    phone: '(415) 555-0198',
-  });
+  const [pharmacy, setPharmacy] = useState(null);
+  const [verifiedAllergies] = useState([]);
   const [toastMessage, setToastMessage] = useState('');
 
   const handleDownloadMedList = () => {
@@ -163,14 +159,13 @@ export default function PrescriptionsScreen({ onNavigate, initialTab = 'active' 
       'Kaizentrix Care - Active Medication List',
       'Patient: Emma Mitchell (ID: KC-20481)',
       `Generated: November 4, 2026`,
-      'Pharmacy: ' + pharmacy.name + ' - ' + pharmacy.phone,
+      ...(pharmacy ? [`Pharmacy: ${pharmacy.name} - ${pharmacy.phone}`] : []),
       '--------------------------------------------------',
       ...activeMedicationsList.map(
         (med) =>
           `• ${med.name} (${med.strength})\n  Sig: ${med.instructions}\n  Prescriber: ${med.prescriber} | Refills: ${med.refills}\n`
       ),
       '--------------------------------------------------',
-      'Allergy Notice: Penicillin (Rash)',
     ].join('\n');
 
     const blob = new Blob([listText], { type: 'text/plain;charset=utf-8' });
@@ -205,7 +200,7 @@ export default function PrescriptionsScreen({ onNavigate, initialTab = 'active' 
 
   const handleConfirmRefill = () => {
     if (refillModalRx) {
-      setToastMessage(`Refill request for ${refillModalRx.name} submitted to ${pharmacy.name}.`);
+      setToastMessage(`Refill request for ${refillModalRx.name} submitted to your care team.`);
       setRefillModalRx(null);
       setTimeout(() => setToastMessage(''), 4500);
     }
@@ -315,6 +310,13 @@ export default function PrescriptionsScreen({ onNavigate, initialTab = 'active' 
             {/* TAB: ACTIVE MEDICATIONS (Matches Screenshot 17) */}
             {currentMode === 'prescriptions' && activeSubTab === 'active' && (
               <>
+                {activeMedicationsList.length === 0 && (
+                  <div className="care-card min-h-72 rounded-2xl bg-white border border-[#577877]/15 flex flex-col items-center justify-center text-center p-8">
+                    <span className="material-symbols-outlined !text-[#295255] text-4xl">medication</span>
+                    <h3 className="mt-4 text-xl font-bold text-[#162623]">No active prescriptions</h3>
+                    <p className="mt-2 max-w-md text-sm text-[#577877]">Prescriptions issued by your clinician will appear here.</p>
+                  </div>
+                )}
                 {activeMedicationsList.map((med) => (
                   <div
                     key={med.id}
@@ -538,7 +540,7 @@ export default function PrescriptionsScreen({ onNavigate, initialTab = 'active' 
           <div className="lg:col-span-4 space-y-5">
 
             {/* CARD 1: Your pharmacy matching Screenshot */}
-            <div className="care-card p-6 sm:p-7 rounded-2xl bg-white border border-[#577877]/15 space-y-4">
+            {pharmacy && <div className="care-card p-6 sm:p-7 rounded-2xl bg-white border border-[#577877]/15 space-y-4">
               <h3 className="text-base font-bold text-[#162623]">
                 Your pharmacy
               </h3>
@@ -571,10 +573,10 @@ export default function PrescriptionsScreen({ onNavigate, initialTab = 'active' 
                   Update pharmacy
                 </button>
               </div>
-            </div>
+            </div>}
 
-            {/* CARD 2: Allergy on record Alert Box matching Screenshot */}
-            <div className="p-5 rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] flex items-start gap-3">
+            {/* Allergy information is intentionally hidden until verified patient data is available. */}
+            {verifiedAllergies.length > 0 && <div className="p-5 rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] flex items-start gap-3">
               <span className="material-symbols-outlined !text-[#D97706] text-lg shrink-0 mt-0.5">
                 info
               </span>
@@ -584,7 +586,7 @@ export default function PrescriptionsScreen({ onNavigate, initialTab = 'active' 
                   Penicillin · Rash. Tell your clinician if your allergies or reactions have changed.
                 </p>
               </div>
-            </div>
+            </div>}
 
             {/* CARD 3: Need a refill? matching Screenshot */}
             <div className="care-card p-6 sm:p-7 rounded-2xl bg-white border border-[#577877]/15 space-y-2">

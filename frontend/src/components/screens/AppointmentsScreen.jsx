@@ -44,6 +44,7 @@ function formatDbAppointment(apt) {
     status: statusLabel,
     rawStatus: apt.status,
     fee: feeFull,
+    paymentStatus: apt.payment_status || 'unknown',
     cardLast4: '4242',
     starts_at: apt.starts_at,
     ends_at: apt.ends_at,
@@ -227,6 +228,9 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   const [activeTab, setActiveTab] = useState('upcoming');
 
   const [dbAppointments, setDbAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  const [appointmentsError, setAppointmentsError] = useState('');
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [consultationRoom, setConsultationRoom] = useState(null);
   const [consultationError, setConsultationError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('Waiting for doctor');
@@ -235,13 +239,16 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   const mediaStreamRef = useRef(null);
 
   const fetchAppointments = async () => {
+    setAppointmentsLoading(true);
+    setAppointmentsError('');
     try {
       const items = await patientApi.appointments();
-      if (Array.isArray(items) && items.length > 0) {
-        setDbAppointments(items.map(formatDbAppointment));
-      }
-    } catch {
-      // Fallback
+      setDbAppointments(Array.isArray(items) ? items.map(formatDbAppointment) : []);
+    } catch (err) {
+      setAppointmentsError(err.message || 'Unable to load appointments. Please try again.');
+      setDbAppointments([]);
+    } finally {
+      setAppointmentsLoading(false);
     }
   };
 
@@ -249,6 +256,11 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
     // The async request synchronizes this screen with the API.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAppointments();
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 30000);
+    return () => clearInterval(timer);
   }, []);
 
   const activeUpcomingList = dbAppointments.length > 0
@@ -260,6 +272,11 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   const activeCancelledList = dbAppointments.length > 0
     ? dbAppointments.filter((a) => a.rawStatus === 'cancelled')
     : [];
+  const joinableAppointment = activeUpcomingList.find((apt) => {
+    if (!apt.starts_at || !['confirmed', 'checked_in', 'rescheduled'].includes(apt.rawStatus)) return false;
+    const startsAt = new Date(apt.starts_at).getTime();
+    return currentTime >= startsAt - 10 * 60 * 1000 && currentTime <= startsAt + 30 * 60 * 1000;
+  });
 
   const appointmentHistoryData = dbAppointments.length > 0
     ? dbAppointments.map((a) => ({
@@ -2479,13 +2496,43 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
           })}
         </div>
 
+        {appointmentsError && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center justify-between gap-4">
+            <span>{appointmentsError}</span>
+            <button type="button" onClick={fetchAppointments} className="font-semibold underline">Try again</button>
+          </div>
+        )}
+
         {/* Main 2-Column Content Layout matching Screenshot */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
           {/* Left Column (8 cols): Appointment Feed Cards */}
           <div className="lg:col-span-8 space-y-5">
 
-            {activeTab === 'upcoming' && (
+            {appointmentsLoading && (
+              <div className="care-card min-h-64 flex items-center justify-center p-8 text-sm text-[#577877]">
+                Loading your appointments…
+              </div>
+            )}
+
+            {!appointmentsLoading && !appointmentsError && activeTab === 'upcoming' && activeUpcomingList.length === 0 && (
+              <div className="care-card min-h-72 flex flex-col items-center justify-center text-center p-8">
+                <span className="material-symbols-outlined !text-[#295255] text-4xl">calendar_month</span>
+                <h2 className="mt-4 text-xl font-bold text-[#162623]">No upcoming appointments</h2>
+                <p className="mt-2 max-w-md text-sm text-[#577877]">Book a consultation with an approved clinician to get started.</p>
+                <button type="button" onClick={() => onNavigate('find-doctors')} className="btn-primary mt-5 rounded-xl">Book appointment</button>
+              </div>
+            )}
+
+            {!appointmentsLoading && !appointmentsError && activeTab === 'past' && activePastList.length === 0 && (
+              <div className="care-card min-h-64 flex items-center justify-center p-8 text-center text-sm text-[#577877]">No past appointments yet.</div>
+            )}
+
+            {!appointmentsLoading && !appointmentsError && activeTab === 'cancelled' && activeCancelledList.length === 0 && (
+              <div className="care-card min-h-64 flex items-center justify-center p-8 text-center text-sm text-[#577877]">No cancelled appointments.</div>
+            )}
+
+            {!appointmentsLoading && activeTab === 'upcoming' && activeUpcomingList.length > 0 && (
               <>
                 {activeUpcomingList.map((apt) => (
                   <div
@@ -2573,7 +2620,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
 
                       <div className="text-right">
                         <span className="text-xs font-semibold text-[#295255]">
-                          Paid · {apt.fee}
+                          {apt.paymentStatus === 'paid' ? 'Paid' : apt.paymentStatus === 'pending' ? 'Payment pending' : 'Payment status unavailable'} · {apt.fee}
                         </span>
                       </div>
                     </div>
@@ -2679,6 +2726,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
           <div className="lg:col-span-4 space-y-4">
 
             {/* Card 1: Before your appointment matching Screenshot */}
+            {activeTab === 'upcoming' && activeUpcomingList.length > 0 && (
             <div className="care-card p-6 sm:p-7 space-y-4">
               <h3 className="text-base font-bold text-[#162623]">
                 Before your appointment
@@ -2712,8 +2760,10 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                 </button>
               </div>
             </div>
+            )}
 
             {/* Card 2: Joining your video visit matching Screenshot */}
+            {joinableAppointment && (
             <div className="p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3">
               <span className="material-symbols-outlined !text-[#295255] text-lg shrink-0 mt-0.5">
                 info
@@ -2728,7 +2778,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                 <div className="pt-1">
                   <button
                     type="button"
-                    onClick={() => handleJoinWaitingRoom(detailAppointment)}
+                    onClick={() => handleJoinWaitingRoom(joinableAppointment)}
                     className="btn-primary !px-4 !py-2 text-xs rounded-xl font-semibold shadow-2xs w-full flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-sm">videocam</span>
@@ -2737,6 +2787,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Card 3: Looking for a past visit? matching Screenshot */}
             <div className="care-card p-6 sm:p-7 space-y-3">

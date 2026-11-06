@@ -65,8 +65,29 @@ async def send_verification_email(email: str, code: str) -> None:
     settings = get_settings()
     await send_brevo_email(
         email,
-        "Verify your Kaizentrix Care account",
-        f"Your verification code is {code}. It expires in 10 minutes.",
+        "Your Kaizentrix Care verification code",
+        f"Kaizentrix Care\n\nVerify your account\n\nUse the verification code below to finish creating your patient portal account:\n\n{code}\n\nThis code expires in 10 minutes. If you did not request this code, you can safely ignore this email.\n\nKaizentrix Care Patient Portal\nConnected care, thoughtfully delivered.",
+        f"""
+        <div style=\"margin:0;background:#F0F5F7;padding:40px 16px;font-family:Arial,sans-serif;color:#162623;\">
+          <div style=\"max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #d9e5e7;border-radius:16px;overflow:hidden;\">
+            <div style=\"background:#295255;padding:24px 32px;color:#ffffff;\">
+              <div style=\"font-size:20px;font-weight:700;\">Kaizentrix Care</div>
+              <div style=\"margin-top:4px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:.8;\">Patient Portal</div>
+            </div>
+            <div style=\"padding:32px;\">
+              <div style=\"font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#577877;\">Account verification</div>
+              <h1 style=\"margin:10px 0 12px;font-size:26px;line-height:1.25;\">Verify your account</h1>
+              <p style=\"margin:0;color:#577877;font-size:15px;line-height:1.6;\">Use the verification code below to finish creating your patient portal account.</p>
+              <div style=\"margin:24px 0;padding:20px;text-align:center;background:#E8F3F3;border:1px solid #c9dfdf;border-radius:12px;\">
+                <div style=\"font-size:12px;color:#577877;\">Your verification code</div>
+                <div style=\"margin-top:8px;font-size:32px;letter-spacing:8px;font-weight:700;color:#295255;\">{code}</div>
+              </div>
+              <p style=\"margin:0;font-size:13px;line-height:1.6;color:#577877;\"><strong style=\"color:#162623;\">Expires in 10 minutes.</strong> If you did not request this code, you can safely ignore this email.</p>
+            </div>
+            <div style=\"padding:18px 32px;background:#F8FAFB;border-top:1px solid #e5eef0;color:#577877;font-size:12px;line-height:1.5;\">Connected care, thoughtfully delivered.</div>
+          </div>
+        </div>
+        """,
     )
 
 
@@ -78,7 +99,7 @@ async def send_recovery_email(email: str, token: str) -> None:
     )
 
 
-async def send_brevo_email(email: str, subject: str, text: str) -> None:
+async def send_brevo_email(email: str, subject: str, text: str, html: str | None = None) -> None:
     settings = get_settings()
     sender = settings.brevo_sender_email or settings.email_from
     if not settings.brevo_api_key or not sender:
@@ -87,6 +108,7 @@ async def send_brevo_email(email: str, subject: str, text: str) -> None:
     payload = {
         "sender": {"name": settings.brevo_sender_name, "email": sender},
         "to": [{"email": email}], "subject": subject, "textContent": text,
+        **({"htmlContent": html} if html else {}),
     }
     timeout = aiohttp.ClientTimeout(total=15)
     async with aiohttp.ClientSession(timeout=timeout) as client:

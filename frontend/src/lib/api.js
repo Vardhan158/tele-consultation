@@ -32,8 +32,13 @@ export const patientApi = {
   consents: () => apiRequest('/patient/consents'),
   grantConsent: (consent) => apiRequest('/patient/consents', { method: 'POST', body: JSON.stringify(consent) }),
   withdrawConsent: (id) => apiRequest(`/patient/consents/${id}/withdraw`, { method: 'POST' }),
-  doctors: (specialty, language) =>
-    apiRequest(`/patient/doctors?${new URLSearchParams({ ...(specialty ? { specialty } : {}), ...(language ? { language } : {}) })}`),
+  doctors: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
+    });
+    return apiRequest(`/patient/doctors${params.toString() ? `?${params}` : ''}`);
+  },
   availability: (doctorId) => apiRequest(`/patient/doctors/${doctorId}/availability`),
   createProfile: (profile) => apiRequest('/patient/profile', { method: 'POST', body: JSON.stringify(profile) }),
   bookAppointment: (appointment) =>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { paymentApi, loadRazorpayScript } from '../../lib/api';
+import { patientApi, paymentApi, loadRazorpayScript } from '../../lib/api';
 
 // eslint-disable-next-line no-unused-vars
 const defaultTransactionsList = [
@@ -77,7 +77,7 @@ const defaultCheckoutApt = {
 export default function PaymentsScreen({ onNavigate, navParams }) {
   // 'receipt' (Matches Screenshot 10) | 'checkout' (Matches Screenshot 9) | 'billing' (Matches Screenshot 8)
   const [userView, setUserView] = useState(null);
-  const view = userView ?? (navParams?.view || 'receipt');
+  const view = userView ?? (navParams?.view || 'billing');
   const setView = (v) => setUserView(v);
 
   const [dbTransactions, setDbTransactions] = useState([]);
@@ -85,19 +85,19 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
 
   useEffect(() => {
-    paymentApi.list()
-      .then((items) => {
+    Promise.all([paymentApi.list(), patientApi.appointments()])
+      .then(([items, appointmentItems]) => {
         if (Array.isArray(items) && items.length > 0) {
           const formatted = items.map((t) => ({
             id: t.id,
             receiptId: `KC-RC-${t.id.slice(0, 4).toUpperCase()}`,
             date: t.created_at ? new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Nov 12, 2026',
-            doctor: 'Dr. Sarah Chen',
-            specialty: 'Internal medicine',
+            doctor: appointmentItems.find((appointment) => appointment.id === t.appointment_id)?.doctor?.full_name || 'Clinician unavailable',
+            specialty: appointmentItems.find((appointment) => appointment.id === t.appointment_id)?.doctor?.specialty || 'Specialty unavailable',
             amount: `$${(t.amount_paise / 100).toFixed(2)}`,
             status: t.status === 'success' ? 'Paid' : t.status === 'refunded' ? 'Refunded' : t.status,
             method: 'Visa •••• 4242',
-            description: 'Telehealth video consultation',
+            description: appointmentItems.find((appointment) => appointment.id === t.appointment_id)?.reason || 'Telehealth consultation',
           }));
           setDbTransactions(formatted);
         }
@@ -158,6 +158,12 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  const hasVerifiedReceipt = Boolean(navParams?.appointment || paymentSuccessData);
+  const paidTransactions = dbTransactions.filter((item) => item.status === 'Paid');
+  const pendingTransactions = dbTransactions.filter((item) => !['Paid', 'Refunded'].includes(item.status));
+  const refundedTransactions = dbTransactions.filter((item) => item.status === 'Refunded');
+  const paidTotal = paidTransactions.reduce((sum, item) => sum + Number(item.amount.replace(/[^0-9.]/g, '')) || 0, 0);
+  const refundedTotal = refundedTransactions.reduce((sum, item) => sum + Number(item.amount.replace(/[^0-9.]/g, '')) || 0, 0);
 
   const handleProcessPayment = async () => {
     setIsProcessingPayment(true);
@@ -247,6 +253,18 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
   // VIEW 1: PAYMENT RECEIPT VIEW (Matches User Screenshot 10)
   // ========================================================
   if (view === 'receipt') {
+    if (!hasVerifiedReceipt) {
+      return (
+        <div className="w-full min-h-[calc(100vh-4rem)] bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623] flex items-center justify-center">
+          <div className="w-full max-w-2xl rounded-2xl bg-white border border-[#577877]/15 p-8 sm:p-12 text-center shadow-sm">
+            <span className="material-symbols-outlined !text-[#295255] text-5xl">receipt_long</span>
+            <h1 className="mt-4 text-2xl font-bold">No payment receipt available</h1>
+            <p className="mt-2 text-sm text-[#577877]">A receipt will appear here after a payment is verified for an appointment.</p>
+            <button type="button" onClick={() => setView('billing')} className="btn-primary mt-6 rounded-xl">View payment history</button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
         <div className="mx-auto max-w-7xl space-y-6">
@@ -914,10 +932,10 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               </span>
             </div>
             <p className="text-3xl font-bold text-[#162623] tracking-tight">
-              $0.00
+              {`$${pendingTransactions.reduce((sum, item) => sum + Number(item.amount.replace(/[^0-9.]/g, '')) || 0, 0).toFixed(2)}`}
             </p>
             <p className="text-xs text-[#577877]">
-              You're all up to date
+              {pendingTransactions.length ? `${pendingTransactions.length} payment${pendingTransactions.length === 1 ? '' : 's'} need attention` : 'No outstanding payments'}
             </p>
           </div>
 
@@ -932,10 +950,10 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               </span>
             </div>
             <p className="text-3xl font-bold text-[#162623] tracking-tight">
-              $630.00
+              {`$${paidTotal.toFixed(2)}`}
             </p>
             <p className="text-xs text-[#577877]">
-              8 consultations in 2026
+              {paidTransactions.length} verified payment{paidTransactions.length === 1 ? '' : 's'}
             </p>
           </div>
 
@@ -950,10 +968,10 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               </span>
             </div>
             <p className="text-3xl font-bold text-[#162623] tracking-tight">
-              $0.00
+              {`$${refundedTotal.toFixed(2)}`}
             </p>
             <p className="text-xs text-[#577877]">
-              No pending refunds
+              {refundedTransactions.length ? `${refundedTransactions.length} refund${refundedTransactions.length === 1 ? '' : 's'} recorded` : 'No recorded refunds'}
             </p>
           </div>
 
@@ -1109,7 +1127,8 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           {activeBillingTab === 'methods' && (
             <div className="space-y-4 pt-2">
               <h3 className="text-sm font-bold text-[#162623]">Cards on File</h3>
-              <div className="p-4 rounded-xl border border-[#577877]/20 bg-[#F0F5F7]/30 flex items-center justify-between">
+              <p className="rounded-xl border border-dashed border-[#577877]/25 bg-[#F0F5F7]/30 p-5 text-center text-xs text-[#577877]">No saved payment methods are available for this account.</p>
+              <div className="hidden p-4 rounded-xl border border-[#577877]/20 bg-[#F0F5F7]/30 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="px-2.5 py-1 rounded bg-[#EBF5F5] text-[#295255] font-bold text-xs tracking-wider border border-[#295255]/20">
                     VISA
@@ -1131,7 +1150,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               <button
                 type="button"
                 onClick={() => setShowManageCard(true)}
-                className="btn-secondary !px-4 !py-2 text-xs font-semibold rounded-xl flex items-center gap-2"
+                className="hidden btn-secondary !px-4 !py-2 text-xs font-semibold rounded-xl flex items-center gap-2"
               >
                 <span className="material-symbols-outlined !text-[#295255] text-base">add</span>
                 <span>Add payment method</span>
@@ -1146,19 +1165,19 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
                   <span className="text-[#577877] block text-[11px]">Legal Name</span>
-                  <p className="font-semibold text-[#162623]">Emma Mitchell</p>
+                  <p className="font-semibold text-[#577877]">Not available</p>
                 </div>
                 <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
                   <span className="text-[#577877] block text-[11px]">Billing Address</span>
-                  <p className="font-semibold text-[#162623]">2148 Pine Street, Apt 3, San Francisco, CA 94115</p>
+                  <p className="font-semibold text-[#577877]">Not available</p>
                 </div>
                 <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
                   <span className="text-[#577877] block text-[11px]">HSA / FSA Eligibility</span>
-                  <p className="font-semibold text-[#1E7E34]">Eligible for Medical Reimbursement</p>
+                  <p className="font-semibold text-[#577877]">Not available</p>
                 </div>
                 <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
                   <span className="text-[#577877] block text-[11px]">Currency</span>
-                  <p className="font-semibold text-[#162623]">USD ($) · Self-pay</p>
+                  <p className="font-semibold text-[#577877]">Currency is provided with each payment</p>
                 </div>
               </div>
             </div>
@@ -1177,7 +1196,8 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               </h3>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
+            <p className="rounded-xl border border-dashed border-[#577877]/25 bg-[#F0F5F7]/30 p-5 text-center text-xs text-[#577877]">No saved payment method is available for this account.</p>
+            <div className="hidden flex items-center justify-between pt-1">
               <div className="flex items-center">
                 <span className="px-2.5 py-1 rounded bg-[#EBF5F5] text-[#295255] font-bold text-xs tracking-wider border border-[#295255]/20">
                   VISA
@@ -1304,7 +1324,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                 className="btn-primary !py-2 !px-4 text-xs flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-sm">print</span>
-                <span>Print Receipt</span>
+                <span>Contact billing support →</span>
               </button>
             </div>
           </div>

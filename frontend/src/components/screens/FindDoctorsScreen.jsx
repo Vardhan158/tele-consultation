@@ -253,37 +253,6 @@ function getSlotEndTime(slotTime) {
 export default function FindDoctorsScreen({ onNavigate }) {
   const [doctors, setDoctors] = useState([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    patientApi.doctors().then(async (items) => {
-      if (!Array.isArray(items)) return;
-      const mapped = await Promise.all(items.map(async (doctor) => {
-        const slots = await patientApi.availability(doctor.id).catch(() => []);
-        const nextSlot = Array.isArray(slots) && slots.length ? slots[0] : null;
-        return {
-          ...doctor,
-          name: doctor.full_name,
-          fullName: doctor.full_name,
-          clinic: doctor.clinic_name,
-          languages: doctor.supported_languages || [],
-          fee: doctor.fee_paise / 100,
-          feeDisplay: `${(doctor.fee_paise / 100).toFixed(2)}`,
-          feeVideoVisit: `${(doctor.fee_paise / 100).toFixed(2)} per video visit`,
-          availableToday: Boolean(nextSlot && new Date(nextSlot.starts_at).toDateString() === new Date().toDateString()),
-          nextSlot,
-          nextSlotLabel: nextSlot ? new Date(nextSlot.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : null,
-          experienceShort: doctor.registration_number ? `Registration ${doctor.registration_number}` : 'Verified clinic doctor',
-          badge: nextSlot ? 'Available' : 'No slots available',
-          badgeType: nextSlot ? 'available-today' : 'accepting',
-          durationShort: '30 minutes',
-          initials: doctor.full_name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
-        };
-      }));
-      if (!cancelled) setDoctors(mapped);
-    }).catch(() => { if (!cancelled) setDoctors([]); });
-    return () => { cancelled = true; };
-  }, []);
-
   // Navigation: Directory List View | "Meet your doctor" Profile View | "Book appointment" View
   const [selectedDoctorView, setSelectedDoctorView] = useState(null);
   const [doctorProfileTab, setDoctorProfileTab] = useState('overview'); // 'overview' | 'experience' | 'reviews'
@@ -295,10 +264,31 @@ export default function FindDoctorsScreen({ onNavigate }) {
   // Filters matching screenshot defaults
   const [selectedSpecialties, setSelectedSpecialties] = useState([]);
   const [availabilityFilter, setAvailabilityFilter] = useState('Any time');
-  const [priceRange, setPriceRange] = useState('$50 – $150');
+  const [feeLimit, setFeeLimit] = useState(1000);
+  const [experienceFilter, setExperienceFilter] = useState('Any experience');
+  const [durationFilter, setDurationFilter] = useState('Any duration');
+  const [nextSlotFilter, setNextSlotFilter] = useState('Any time');
   const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [sortOption, setSortOption] = useState('Recommended');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    patientApi.doctors({
+      q: searchQuery.trim(), specialty: selectedSpecialties[0], language: selectedLanguages[0],
+      location: locationQuery.trim(), fee_max_paise: feeLimit * 100,
+    }).then(async (items) => {
+      if (!Array.isArray(items)) return;
+      const mapped = await Promise.all(items.map(async (doctor) => {
+        const slots = await patientApi.availability(doctor.id).catch(() => []);
+        const nextSlot = Array.isArray(slots) && slots.length ? slots[0] : null;
+        return { ...doctor, name: doctor.full_name, fullName: doctor.full_name, clinic: doctor.clinic_name, languages: doctor.supported_languages || [], fee: doctor.fee_paise / 100, feeDisplay: `${(doctor.fee_paise / 100).toFixed(2)}`, feeVideoVisit: `${(doctor.fee_paise / 100).toFixed(2)} per video visit`, availableToday: Boolean(nextSlot && new Date(nextSlot.starts_at).toDateString() === new Date().toDateString()), nextSlot, nextSlotLabel: nextSlot ? new Date(nextSlot.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : null, experienceShort: doctor.registration_number ? `Registration ${doctor.registration_number}` : 'Verified clinic doctor', badge: nextSlot ? 'Available' : 'No slots available', badgeType: nextSlot ? 'available-today' : 'accepting', durationShort: '30 minutes', initials: doctor.full_name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() };
+      }));
+      if (!cancelled) setDoctors(mapped);
+    }).catch(() => { if (!cancelled) setDoctors([]); });
+    return () => { cancelled = true; };
+  }, [searchQuery, selectedSpecialties, selectedLanguages, locationQuery, feeLimit]);
 
   // Booking Flow State (Matches Screenshot 5)
   const [bookingDoctor, setBookingDoctor] = useState(null);
@@ -336,6 +326,10 @@ export default function FindDoctorsScreen({ onNavigate }) {
     setSelectedSpecialties([]);
     setAvailabilityFilter('Any time');
     setSelectedLanguages([]);
+    setFeeLimit(1000);
+    setExperienceFilter('Any experience');
+    setDurationFilter('Any duration');
+    setNextSlotFilter('Any time');
   };
 
   const startBooking = (doctor) => {
@@ -383,13 +377,11 @@ export default function FindDoctorsScreen({ onNavigate }) {
       }
 
       if (locationQuery.trim() && !(doc.clinic || '').toLowerCase().includes(locationQuery.trim().toLowerCase())) return false;
-      if (priceRange === '$0 – $50' && doc.fee > 50) return false;
-      if (priceRange === '$50 – $100' && (doc.fee < 50 || doc.fee > 100)) return false;
-      if (priceRange === '$100+' && doc.fee < 100) return false;
+      if (doc.fee > feeLimit) return false;
 
       return true;
     });
-  }, [doctors, selectedSpecialties, availabilityFilter, selectedLanguages, searchQuery, locationQuery, priceRange]);
+  }, [doctors, selectedSpecialties, availabilityFilter, selectedLanguages, searchQuery, locationQuery, feeLimit]);
 
   const sortedDoctors = useMemo(() => [...filteredDoctors].sort((a, b) => {
     if (sortOption === 'Fee: Low to high') return a.fee - b.fee;
@@ -400,6 +392,17 @@ export default function FindDoctorsScreen({ onNavigate }) {
   const pageCount = Math.max(1, Math.ceil(sortedDoctors.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const visibleDoctors = sortedDoctors.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const activeFilters = [
+    searchQuery.trim() && { key: 'search', label: `Search: ${searchQuery.trim()}`, clear: () => setSearchQuery('') },
+    locationQuery.trim() && { key: 'location', label: `Location: ${locationQuery.trim()}`, clear: () => setLocationQuery('') },
+    ...selectedSpecialties.map((spec) => ({ key: `specialty-${spec}`, label: spec, clear: () => toggleSpecialty(spec) })),
+    ...selectedLanguages.map((language) => ({ key: `language-${language}`, label: language, clear: () => toggleLanguage(language) })),
+    availabilityFilter !== 'Any time' && { key: 'availability', label: availabilityFilter, clear: () => setAvailabilityFilter('Any time') },
+    feeLimit < 1000 && { key: 'fee', label: `Fee up to $${feeLimit}`, clear: () => setFeeLimit(1000) },
+    experienceFilter !== 'Any experience' && { key: 'experience', label: experienceFilter, clear: () => setExperienceFilter('Any experience') },
+    durationFilter !== 'Any duration' && { key: 'duration', label: durationFilter, clear: () => setDurationFilter('Any duration') },
+    nextSlotFilter !== 'Any time' && { key: 'next-slot', label: `Next slot: ${nextSlotFilter}`, clear: () => setNextSlotFilter('Any time') },
+  ].filter(Boolean);
 
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState('');
@@ -1305,8 +1308,8 @@ export default function FindDoctorsScreen({ onNavigate }) {
   // VIEW 1: DIRECTORY LIST VIEW (Matches Screenshot 3)
   // ========================================================
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-[calc(100vh-4rem)] w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623] flex flex-col">
+      <div className="mx-auto max-w-7xl w-full flex-1 space-y-6">
 
         {/* Page Heading & Subtitle */}
         <div>
@@ -1319,9 +1322,9 @@ export default function FindDoctorsScreen({ onNavigate }) {
         </div>
 
         {/* Search & Location Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
           {/* Search Doctors Input */}
-          <div className="md:col-span-5 relative">
+          <div className="md:col-span-4 min-w-0 relative">
             <span className="material-symbols-outlined !text-[#577877] absolute left-3.5 top-1/2 -translate-y-1/2 text-lg">
               search
             </span>
@@ -1330,12 +1333,12 @@ export default function FindDoctorsScreen({ onNavigate }) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by specialty, condition or doctor name"
-              className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-[#577877]/25 text-xs text-[#162623] placeholder-[#577877] focus:outline-none focus:border-[#295255] shadow-2xs"
+              className="w-full h-[52px] pl-10 pr-4 rounded-2xl bg-white border border-[#577877]/25 text-xs text-[#162623] placeholder-[#577877] focus:outline-none focus:border-[#295255] shadow-2xs"
             />
           </div>
 
           {/* Location Input */}
-          <div className="md:col-span-5 relative">
+          <div className="md:col-span-5 min-w-0 relative">
             <span className="material-symbols-outlined !text-[#577877] absolute left-3.5 top-1/2 -translate-y-1/2 text-lg">
               location_on
             </span>
@@ -1344,27 +1347,128 @@ export default function FindDoctorsScreen({ onNavigate }) {
               value={locationQuery}
               onChange={(e) => setLocationQuery(e.target.value)}
               placeholder="City, State, or Video visits"
-              className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-[#577877]/25 text-xs text-[#162623] placeholder-[#577877] focus:outline-none focus:border-[#295255] shadow-2xs"
+              className="w-full h-[52px] pl-10 pr-4 rounded-2xl bg-white border border-[#577877]/25 text-xs text-[#162623] placeholder-[#577877] focus:outline-none focus:border-[#295255] shadow-2xs"
             />
           </div>
 
           {/* Search Button */}
-          <div className="md:col-span-2">
-            <button
-              type="button"
-              className="btn-primary w-full !py-3 rounded-2xl text-xs font-semibold flex items-center justify-center gap-2 shadow-2xs"
-            >
-              <span className="material-symbols-outlined text-base">search</span>
+          <div className="md:col-span-3 min-w-0 relative flex items-stretch gap-4">
+            <button type="button" className="btn-primary min-w-0 flex-1 !h-[52px] !px-5 !py-0 rounded-2xl text-xs font-semibold inline-flex items-center justify-center gap-2 whitespace-nowrap shadow-2xs">
+              <span className="material-symbols-outlined shrink-0 text-base">search</span>
               <span>Search</span>
             </button>
+            <button type="button" onClick={() => setFiltersOpen((open) => !open)} className="btn-secondary shrink-0 !h-[52px] !px-3 !py-0 rounded-2xl flex items-center justify-center gap-1.5 text-xs" aria-expanded={filtersOpen} aria-label="Open filters">
+              <span className="material-symbols-outlined text-base">tune</span>
+              <span className="hidden xl:inline">Filters</span>
+            </button>
+            {filtersOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/50 p-4 sm:p-6">
+                <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[#577877]/20 bg-white p-5 sm:p-7 shadow-2xl space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex items-center justify-between border-b border-[#577877]/15 pb-4">
+                  <h2 className="text-base font-bold text-[#162623]">Refine your search</h2>
+                  <div className="flex items-center gap-4">
+                    <button type="button" onClick={clearAllFilters} className="text-xs font-semibold text-[#295255] hover:underline">Clear all</button>
+                    <button type="button" onClick={() => setFiltersOpen(false)} className="rounded-lg p-1 text-[#577877] hover:bg-[#F0F5F7]" aria-label="Close filters">
+                      <span className="material-symbols-outlined text-xl">close</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <label className="font-bold text-[#162623] block">Specialty</label>
+                  {['Internal medicine', 'Family medicine', 'Cardiology', 'Dermatology'].map((spec) => (
+                    <label key={spec} className="flex items-center gap-2 text-[#577877] cursor-pointer">
+                      <input type="checkbox" checked={selectedSpecialties.includes(spec)} onChange={() => toggleSpecialty(spec)} className="accent-[#295255]" />
+                      {spec}
+                    </label>
+                  ))}
+                </div>
+                <div className="border-t border-[#577877]/15 pt-3 space-y-2 text-xs">
+                  <label className="font-bold text-[#162623] block">Availability</label>
+                  {['Any time', 'Available today', 'This week'].map((avail) => (
+                    <label key={avail} className="flex items-center gap-2 text-[#577877] cursor-pointer">
+                      <input type="radio" name="availability-menu" checked={availabilityFilter === avail} onChange={() => setAvailabilityFilter(avail)} className="accent-[#295255]" />
+                      {avail}
+                    </label>
+                  ))}
+                </div>
+                <div className="border-t border-[#577877]/15 pt-3 space-y-2 text-xs">
+                  <label htmlFor="consultation-type" className="font-bold text-[#162623] block">Consultation type</label>
+                  <select id="consultation-type" value="Video Consultation" disabled className="w-full px-3 py-2 rounded-xl border border-[#577877]/25 bg-[#F0F5F7]/50 text-xs text-[#577877]">
+                    <option>Video Consultation</option>
+                  </select>
+                  <p className="text-[11px] text-[#577877]">Video visits are currently available for all listed doctors.</p>
+                </div>
+                <div className="border-t border-[#577877]/15 pt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-bold text-[#162623]">Experience
+                    <select value={experienceFilter} onChange={(e) => setExperienceFilter(e.target.value)} className="mt-1 w-full rounded-xl border border-[#577877]/25 bg-[#F0F5F7]/50 px-3 py-2 text-xs font-normal">
+                      <option>Any experience</option><option>0–5 years</option><option>5–10 years</option><option>10+ years</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold text-[#162623]">Consultation duration
+                    <select value={durationFilter} onChange={(e) => setDurationFilter(e.target.value)} className="mt-1 w-full rounded-xl border border-[#577877]/25 bg-[#F0F5F7]/50 px-3 py-2 text-xs font-normal">
+                      <option>Any duration</option><option>15 minutes</option><option>30 minutes</option><option>45 minutes</option><option>60 minutes</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold text-[#162623]">Next available slot
+                    <select value={nextSlotFilter} onChange={(e) => setNextSlotFilter(e.target.value)} className="mt-1 w-full rounded-xl border border-[#577877]/25 bg-[#F0F5F7]/50 px-3 py-2 text-xs font-normal">
+                      <option>Any time</option><option>Today</option><option>Tomorrow</option><option>This week</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="border-t border-[#577877]/15 pt-3 text-[11px] text-[#577877]">
+                  Doctor gender, clinic/hospital, and patient-rating filters will be enabled when those fields are available from the doctor directory API.
+                </div>
+                <div className="border-t border-[#577877]/15 pt-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="fee-limit" className="text-xs font-bold text-[#162623]">Consultation fee</label>
+                    <span className="text-xs font-semibold text-[#295255]">${feeLimit}</span>
+                  </div>
+                  <input id="fee-limit" type="range" min="0" max="1000" step="10" value={feeLimit} onChange={(e) => setFeeLimit(Number(e.target.value))} className="w-full accent-[#295255]" />
+                  <div className="flex justify-between text-[11px] text-[#577877]"><span>$0</span><span>$1000</span></div>
+                </div>
+                <div className="border-t border-[#577877]/15 pt-3 space-y-2 text-xs">
+                  <label className="font-bold text-[#162623] block">Language</label>
+                  {['English', 'Spanish'].map((lang) => (
+                    <label key={lang} className="flex items-center gap-2 text-[#577877] cursor-pointer">
+                      <input type="checkbox" checked={selectedLanguages.includes(lang)} onChange={() => toggleLanguage(lang)} className="accent-[#295255]" />
+                      {lang}
+                    </label>
+                  ))}
+                </div>
+                <div className="border-t border-[#577877]/15 pt-3">
+                  <label htmlFor="sort-filter" className="text-xs font-bold text-[#162623] block mb-1">Sort</label>
+                  <select id="sort-filter" value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="w-full rounded-xl border border-[#577877]/25 bg-[#F0F5F7]/50 px-3 py-2 text-xs focus:outline-none focus:border-[#295255]">
+                    <option value="Recommended">Recommended</option>
+                    <option value="Rating">Highest Rated</option>
+                    <option value="Fee: Low to high">Lowest Fee</option>
+                    <option value="Fee: High to low">Highest Fee</option>
+                  </select>
+                </div>
+                <button type="button" onClick={() => setFiltersOpen(false)} className="btn-primary w-full justify-center">Apply filters</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
+            <span className="text-xs font-semibold text-[#295255]">{activeFilters.length} active filter{activeFilters.length === 1 ? '' : 's'}:</span>
+            {activeFilters.map((filter) => (
+              <button key={filter.key} type="button" onClick={filter.clear} className="inline-flex items-center gap-1 rounded-full border border-[#295255]/20 bg-white px-3 py-1.5 text-xs text-[#295255] hover:bg-[#E5EEF1]" aria-label={`Remove ${filter.label} filter`}>
+                {filter.label}
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            ))}
+            <button type="button" onClick={clearAllFilters} className="text-xs font-semibold text-[#295255] underline underline-offset-2">Clear filters</button>
+          </div>
+        )}
+
         {/* Main 2-Column Content Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 gap-6 items-start">
 
           {/* Left Column (4 cols): Refine your search filters */}
-          <div className="lg:col-span-4 care-card p-6 sm:p-7 space-y-6">
+          <div className="hidden lg:col-span-4 care-card p-6 sm:p-7 space-y-6">
             <h2 className="text-base font-bold text-[#162623]">Refine your search</h2>
 
             {/* Specialty Filter */}
@@ -1423,8 +1527,11 @@ export default function FindDoctorsScreen({ onNavigate }) {
                 <span className="text-[11px] text-[#577877] block mb-1">Price range</span>
                 <input
                   type="text"
-                  value={priceRange}
-                  onChange={(e) => setPriceRange(e.target.value)}
+                  value={feeLimit}
+                  onChange={(e) => setFeeLimit(Number(e.target.value))}
+                  type="range"
+                  min="0"
+                  max="1000"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-[#F0F5F7]/50 text-xs text-[#162623] font-medium focus:outline-none focus:border-[#295255]"
                 />
               </div>
@@ -1467,29 +1574,16 @@ export default function FindDoctorsScreen({ onNavigate }) {
           </div>
 
           {/* Right Column (8 cols): Doctor Cards Feed */}
-          <div className="lg:col-span-8 space-y-4">
+          <div className="space-y-4">
 
-            {/* Filter Meta & Sort */}
-            <div className="flex items-center justify-between text-xs text-[#577877] px-1">
-              <span>{filteredDoctors.length} doctors match your preferences</span>
-              <div className="flex items-center gap-1.5">
-                <span>Sort:</span>
-                <select
-                  value={sortOption}
-                  onChange={(e) => setSortOption(e.target.value)}
-                  className="bg-transparent font-semibold text-[#162623] focus:outline-none cursor-pointer"
-                >
-                  <option value="Recommended">Recommended</option>
-                  <option value="Rating">Highest Rated</option>
-                  <option value="Fee">Lowest Fee</option>
-                </select>
-              </div>
+            <div className="text-xs text-[#577877] px-1">
+              {filteredDoctors.length} doctors match your preferences
             </div>
 
             {/* Doctor Cards */}
             <div className="space-y-4">
               {visibleDoctors.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[#577877]/30 bg-white p-8 text-center">
+                <div className="min-h-72 rounded-2xl border border-dashed border-[#577877]/30 bg-white px-5 py-12 sm:px-8 flex flex-col items-center justify-center text-center">
                   <span className="material-symbols-outlined !text-[#295255] text-3xl">person_search</span>
                   <h3 className="mt-3 text-base font-bold text-[#162623]">No doctors found</h3>
                   <p className="mt-1 text-sm text-[#577877]">Try clearing a filter or broadening your search.</p>

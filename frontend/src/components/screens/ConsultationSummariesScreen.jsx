@@ -175,9 +175,19 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
   if (!activeConsultation) {
     return (
       <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-        <div className="mx-auto max-w-7xl rounded-2xl bg-white border border-[#577877]/15 p-8 text-center">
-          <h1 className="text-2xl font-bold">No consultation summaries yet</h1>
-          <p className="mt-2 text-sm text-[#577877]">Completed consultation notes will appear here when they are available.</p>
+        <div className="mx-auto max-w-7xl space-y-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Consultation Summaries</h1>
+            <p className="mt-1 text-sm text-[#577877]">Review doctor-released notes and follow-up instructions from your visits.</p>
+          </div>
+          <div className="min-h-80 rounded-2xl bg-white border border-[#577877]/15 p-8 text-center flex flex-col items-center justify-center">
+            <span className="material-symbols-outlined !text-[#295255] text-5xl">description</span>
+            <h2 className="mt-4 text-2xl font-bold">No consultation summaries yet</h2>
+            <p className="mt-2 max-w-md text-sm text-[#577877]">After your doctor completes a consultation and releases the summary, it will appear here.</p>
+            <button type="button" onClick={() => onNavigate('appointments')} className="btn-primary mt-6 rounded-xl">
+              View My Appointments
+            </button>
+          </div>
         </div>
       </div>
     );
