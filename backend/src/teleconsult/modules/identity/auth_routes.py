@@ -61,45 +61,35 @@ def valid_totp(secret: str, code: str) -> bool:
     return False
 
 
+from teleconsult.adapters.email.templates import (
+    render_recovery_email_html,
+    render_verification_email_html,
+)
+
+
 async def send_verification_email(email: str, code: str) -> None:
-    settings = get_settings()
+    html = render_verification_email_html(code)
     await send_brevo_email(
         email,
-        "Your Kaizentrix Care verification code",
-        f"Kaizentrix Care\n\nVerify your account\n\nUse the verification code below to finish creating your patient portal account:\n\n{code}\n\nThis code expires in 10 minutes. If you did not request this code, you can safely ignore this email.\n\nKaizentrix Care Patient Portal\nConnected care, thoughtfully delivered.",
-        f"""
-        <div style=\"margin:0;background:#F0F5F7;padding:40px 16px;font-family:Arial,sans-serif;color:#162623;\">
-          <div style=\"max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #d9e5e7;border-radius:16px;overflow:hidden;\">
-            <div style=\"background:#295255;padding:24px 32px;color:#ffffff;\">
-              <div style=\"font-size:20px;font-weight:700;\">Kaizentrix Care</div>
-              <div style=\"margin-top:4px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:.8;\">Patient Portal</div>
-            </div>
-            <div style=\"padding:32px;\">
-              <div style=\"font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#577877;\">Account verification</div>
-              <h1 style=\"margin:10px 0 12px;font-size:26px;line-height:1.25;\">Verify your account</h1>
-              <p style=\"margin:0;color:#577877;font-size:15px;line-height:1.6;\">Use the verification code below to finish creating your patient portal account.</p>
-              <div style=\"margin:24px 0;padding:20px;text-align:center;background:#E8F3F3;border:1px solid #c9dfdf;border-radius:12px;\">
-                <div style=\"font-size:12px;color:#577877;\">Your verification code</div>
-                <div style=\"margin-top:8px;font-size:32px;letter-spacing:8px;font-weight:700;color:#295255;\">{code}</div>
-              </div>
-              <p style=\"margin:0;font-size:13px;line-height:1.6;color:#577877;\"><strong style=\"color:#162623;\">Expires in 10 minutes.</strong> If you did not request this code, you can safely ignore this email.</p>
-            </div>
-            <div style=\"padding:18px 32px;background:#F8FAFB;border-top:1px solid #e5eef0;color:#577877;font-size:12px;line-height:1.5;\">Connected care, thoughtfully delivered.</div>
-          </div>
-        </div>
-        """,
+        "Verify your Kaizentrix Care account",
+        f"Your verification code is {code}. It expires in 5 minutes.",
+        html_content=html,
     )
 
 
 async def send_recovery_email(email: str, token: str) -> None:
+    html = render_recovery_email_html(token)
     await send_brevo_email(
         email,
         "Reset your Kaizentrix Care password",
         f"Use this password reset token within 15 minutes: {token}",
+        html_content=html,
     )
 
 
-async def send_brevo_email(email: str, subject: str, text: str, html: str | None = None) -> None:
+async def send_brevo_email(
+    email: str, subject: str, text: str, html_content: str | None = None
+) -> None:
     settings = get_settings()
     sender = settings.brevo_sender_email or settings.email_from
     if not settings.brevo_api_key or not sender:
@@ -107,14 +97,22 @@ async def send_brevo_email(email: str, subject: str, text: str, html: str | None
     import aiohttp
     payload = {
         "sender": {"name": settings.brevo_sender_name, "email": sender},
-        "to": [{"email": email}], "subject": subject, "textContent": text,
-        **({"htmlContent": html} if html else {}),
+        "to": [{"email": email}],
+        "subject": subject,
+        "textContent": text,
     }
+    if html_content:
+        payload["htmlContent"] = html_content
+
     timeout = aiohttp.ClientTimeout(total=15)
     async with aiohttp.ClientSession(timeout=timeout) as client:
         async with client.post(
             "https://api.brevo.com/v3/smtp/email",
-            headers={"accept": "application/json", "api-key": settings.brevo_api_key, "content-type": "application/json"},
+            headers={
+                "accept": "application/json",
+                "api-key": settings.brevo_api_key,
+                "content-type": "application/json",
+            },
             json=payload,
         ) as result:
             if result.status >= 400:
@@ -302,12 +300,14 @@ async def verify_email(payload: VerifyEmailRequest, response: Response, session:
         user = await database["users"].find_one({"tenant_id": settings.default_tenant_id, "email": email})
         token = await database["recovery_tokens"].find_one({
             "user_id": user["id"] if user else None,
-            "token_hash": token_hash(payload.code),
             "used_at": None,
             "expires_at": {"$gt": datetime.now(UTC)},
-        })
-        if user is None or token is None:
+        }, sort=[("created_at", -1)])
+        if user is None or token is None or token.get("attempts", 0) >= 5:
             raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+        if not hmac.compare_digest(token.get("token_hash", ""), token_hash(payload.code)):
+            await database["recovery_tokens"].update_one({"_id": token["_id"]}, {"$inc": {"attempts": 1}})
+            raise HTTPException(status_code=400, detail="Invalid verification code")
         now = datetime.now(UTC)
         await database["recovery_tokens"].update_one({"_id": token["_id"]}, {"$set": {"used_at": now}})
         await database["users"].update_one({"_id": user["_id"]}, {"$set": {"verified_at": now}})
@@ -319,7 +319,8 @@ async def verify_email(payload: VerifyEmailRequest, response: Response, session:
             "created_at": now,
         })
         response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
-        return {"status": "authenticated", "user_id": user["id"], "full_name": user["full_name"], "email": user["email"]}
+        doctor = await database["doctors"].find_one({"tenant_id": settings.default_tenant_id, "$or": [{"id": user["id"]}, {"user_id": user["id"]}]}) if user.get("role") == "doctor" else None
+        return {"status": "authenticated", "user_id": user["id"], "full_name": user["full_name"], "email": user["email"], "approval_status": doctor.get("approval_status", "pending") if doctor else "approved"}
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
     user = await session.scalar(select(UserAccount).where(UserAccount.email == payload.email.strip().lower()))
@@ -327,12 +328,14 @@ async def verify_email(payload: VerifyEmailRequest, response: Response, session:
         raise HTTPException(status_code=400, detail="Invalid verification code")
     token = await session.scalar(select(RecoveryToken).where(
         RecoveryToken.user_id == user.id,
-        RecoveryToken.token_hash == token_hash(payload.code),
         RecoveryToken.used_at.is_(None),
         RecoveryToken.expires_at > datetime.now(UTC),
-    ))
-    if token is None:
+    ).order_by(RecoveryToken.created_at.desc()))
+    if token is None or token.attempts >= 5:
         raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    if not hmac.compare_digest(token.token_hash, token_hash(payload.code)):
+        token.attempts += 1
+        raise HTTPException(status_code=400, detail="Invalid verification code")
     token.used_at = datetime.now(UTC)
     user.verified_at = datetime.now(UTC)
     raw_token = secrets.token_urlsafe(48)
@@ -368,11 +371,20 @@ async def get_me(request: Request) -> dict[str, object]:
             })
             if not user:
                 return {"authenticated": False}
+            approval_status = "approved"
+            if user.get("role") == "doctor":
+                doc = await database["doctors"].find_one({
+                    "tenant_id": settings.default_tenant_id,
+                    "$or": [{"id": user["id"]}, {"user_id": user["id"]}, {"user_account_id": user["id"]}]
+                })
+                approval_status = doc.get("approval_status", "pending") if doc else "pending"
             return {
                 "authenticated": True, "user_id": user["id"],
                 "tenant_id": user["tenant_id"], "full_name": user.get("full_name"),
                 "email": user.get("email"), "phone": user.get("mobile_number"),
                 "role": user.get("role", "patient"),
+                "approval_status": approval_status,
+                "email_verified": bool(user.get("verified_at")),
             }
         except Exception:
             return {"authenticated": False}
@@ -382,6 +394,12 @@ async def get_me(request: Request) -> dict[str, object]:
             principal = await get_principal(request)
             user = await session.get(UserAccount, UUID(principal.user_id))
             patient = await session.get(Patient, UUID(principal.user_id))
+            approval_status = "approved"
+            if user and user.role == "doctor":
+                doctor = await session.scalar(select(Doctor).where(
+                    Doctor.user_account_id == user.id, Doctor.tenant_id == user.tenant_id
+                ))
+                approval_status = doctor.approval_status if doctor else "pending"
             return {
                 "authenticated": True,
                 "user_id": principal.user_id,
@@ -390,6 +408,8 @@ async def get_me(request: Request) -> dict[str, object]:
                 "email": user.email if user else (patient.email if patient else None),
                 "phone": user.mobile_number if user else (patient.phone if patient else None),
                 "role": user.role if user else "patient",
+                "approval_status": approval_status,
+                "email_verified": bool(user.verified_at) if user else True,
             }
     except Exception:
         return {"authenticated": False}

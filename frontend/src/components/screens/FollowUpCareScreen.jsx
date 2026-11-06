@@ -1,42 +1,84 @@
-import { useState, useEffect } from 'react';
-import { supportApi } from '../../lib/api';
+import { useState, useEffect } from "react";
+import { supportApi } from "../../lib/api";
 
 // Legacy visual fixture retained for backwards-compatible layout only; API data is authoritative.
 // eslint-disable-next-line no-unused-vars
 const initialTasks = [
   {
-    id: 'task-bp',
-    title: 'Log your blood pressure',
-    subtitle: 'Morning and evening readings · Due Nov 6',
-    dueBadge: 'Due Nov 6',
+    id: "task-bp",
+    title: "Log your blood pressure",
+    subtitle: "Morning and evening readings · Due Nov 6",
+    dueBadge: "Due Nov 6",
     completed: false,
-    completedNote: '',
+    completedNote: "",
   },
   {
-    id: 'task-panel',
-    title: 'Complete metabolic panel',
-    subtitle: 'Lab order in Medical records · Due Nov 10',
-    dueBadge: 'Due Nov 10',
+    id: "task-panel",
+    title: "Complete metabolic panel",
+    subtitle: "Lab order in Medical records · Due Nov 10",
+    dueBadge: "Due Nov 10",
     completed: false,
-    completedNote: '',
+    completedNote: "",
   },
   {
-    id: 'task-appt',
-    title: 'Confirm your follow-up appointment',
-    subtitle: 'Completed Nov 4 · Nov 12, 2:30 PM PT',
+    id: "task-appt",
+    title: "Confirm your follow-up appointment",
+    subtitle: "Completed Nov 4 · Nov 12, 2:30 PM PT",
     dueBadge: null,
     completed: true,
-    completedNote: 'Completed Nov 4 · Nov 12, 2:30 PM PT',
+    completedNote: "Completed Nov 4 · Nov 12, 2:30 PM PT",
   },
 ];
 
 const initialReadings = [
-  { date: 'Oct 28', systolic: 142, diastolic: 88, pulse: 74, time: '8:30 AM', notes: 'Baseline' },
-  { date: 'Oct 29', systolic: 138, diastolic: 86, pulse: 72, time: '8:15 AM', notes: 'Post-consult' },
-  { date: 'Oct 30', systolic: 136, diastolic: 85, pulse: 71, time: '8:30 AM', notes: 'Morning' },
-  { date: 'Oct 31', systolic: 130, diastolic: 82, pulse: 70, time: '8:45 AM', notes: 'Weekend morning' },
-  { date: 'Nov 1', systolic: 134, diastolic: 84, pulse: 73, time: '8:20 AM', notes: 'Morning' },
-  { date: 'Nov 3', systolic: 132, diastolic: 82, pulse: 72, time: '8:30 AM', notes: 'Morning, before breakfast' },
+  {
+    date: "Oct 28",
+    systolic: 142,
+    diastolic: 88,
+    pulse: 74,
+    time: "8:30 AM",
+    notes: "Baseline",
+  },
+  {
+    date: "Oct 29",
+    systolic: 138,
+    diastolic: 86,
+    pulse: 72,
+    time: "8:15 AM",
+    notes: "Post-consult",
+  },
+  {
+    date: "Oct 30",
+    systolic: 136,
+    diastolic: 85,
+    pulse: 71,
+    time: "8:30 AM",
+    notes: "Morning",
+  },
+  {
+    date: "Oct 31",
+    systolic: 130,
+    diastolic: 82,
+    pulse: 70,
+    time: "8:45 AM",
+    notes: "Weekend morning",
+  },
+  {
+    date: "Nov 1",
+    systolic: 134,
+    diastolic: 84,
+    pulse: 73,
+    time: "8:20 AM",
+    notes: "Morning",
+  },
+  {
+    date: "Nov 3",
+    systolic: 132,
+    diastolic: 82,
+    pulse: 72,
+    time: "8:30 AM",
+    notes: "Morning, before breakfast",
+  },
 ];
 
 export default function FollowUpCareScreen({ onNavigate }) {
@@ -44,29 +86,40 @@ export default function FollowUpCareScreen({ onNavigate }) {
   const [readings, setReadings] = useState(initialReadings);
 
   useEffect(() => {
-    supportApi.followUp()
+    supportApi
+      .followUp()
       .then((data) => {
         const apiTasks = Array.isArray(data) ? data : data?.tasks;
         if (Array.isArray(apiTasks) && apiTasks.length > 0) {
-          setTasks(apiTasks.map((t) => ({
-            id: t.id,
-            title: t.title || t.advice || 'Follow-up task',
-            subtitle: t.subtitle || t.advice || (t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''),
-            dueBadge: t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : null,
-            completed: t.completed ?? t.status === 'completed',
-            completedNote: (t.completed ?? t.status === 'completed') ? 'Completed' : '',
-          })));
+          setTasks(
+            apiTasks.map((t) => ({
+              id: t.id,
+              title: t.title || t.advice || "Follow-up task",
+              subtitle:
+                t.subtitle ||
+                t.advice ||
+                (t.due_date
+                  ? `Due ${new Date(t.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                  : ""),
+              dueBadge: t.due_date
+                ? `Due ${new Date(t.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                : null,
+              completed: t.completed ?? t.status === "completed",
+              completedNote:
+                (t.completed ?? t.status === "completed") ? "Completed" : "",
+            })),
+          );
         }
       })
       .catch(() => {});
   }, []);
 
   // Form State
-  const [dateTime, setDateTime] = useState('Nov 4, 2026 · 8:30 AM');
-  const [systolic, setSystolic] = useState('132');
-  const [diastolic, setDiastolic] = useState('82');
-  const [pulse, setPulse] = useState('72');
-  const [notes, setNotes] = useState('Morning, before breakfast');
+  const [dateTime, setDateTime] = useState("Nov 4, 2026 · 8:30 AM");
+  const [systolic, setSystolic] = useState("132");
+  const [diastolic, setDiastolic] = useState("82");
+  const [pulse, setPulse] = useState("72");
+  const [notes, setNotes] = useState("Morning, before breakfast");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Toggle tasks
@@ -74,7 +127,9 @@ export default function FollowUpCareScreen({ onNavigate }) {
 
   const completedCount = tasks.filter((t) => t.completed).length;
   const remainingCount = tasks.length - completedCount;
-  const progressPercent = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
+  const progressPercent = tasks.length
+    ? Math.round((completedCount / tasks.length) * 100)
+    : 0;
 
   // Handle save reading
   const handleSaveReading = (e) => {
@@ -82,7 +137,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
     if (!systolic || !diastolic) return;
 
     const newReading = {
-      date: 'Nov 4',
+      date: "Nov 4",
       systolic: parseInt(systolic, 10) || 132,
       diastolic: parseInt(diastolic, 10) || 82,
       pulse: parseInt(pulse, 10) || 72,
@@ -95,12 +150,13 @@ export default function FollowUpCareScreen({ onNavigate }) {
     setTimeout(() => setSaveSuccess(false), 3500);
   };
 
-  const latestReading = readings[readings.length - 1] || initialReadings[initialReadings.length - 1];
+  const latestReading =
+    readings[readings.length - 1] ||
+    initialReadings[initialReadings.length - 1];
 
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
       <div className="mx-auto max-w-6xl space-y-6">
-
         {/* Header matching Screenshot 1:1 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -114,14 +170,14 @@ export default function FollowUpCareScreen({ onNavigate }) {
 
           <button
             type="button"
-            onClick={() => onNavigate && onNavigate('summaries')}
+            onClick={() => onNavigate && onNavigate("summaries")}
             className="self-start sm:self-auto border border-[#577877]/30 bg-white hover:bg-[#F0F5F7] text-[#162623] px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-2xs transition cursor-pointer"
           >
             View consultation summary
           </button>
           <button
             type="button"
-            onClick={() => onNavigate && onNavigate('find-doctors')}
+            onClick={() => onNavigate && onNavigate("find-doctors")}
             className="self-start sm:self-auto btn-primary text-xs sm:text-sm"
           >
             Book follow-up appointment
@@ -129,38 +185,39 @@ export default function FollowUpCareScreen({ onNavigate }) {
         </div>
 
         {/* Cyan Announcement Banner matching Screenshot */}
-        {tasks.length > 0 && <div className="rounded-2xl p-4 sm:p-5 bg-[#E8F3F3] border border-[#295255]/20 flex items-start gap-3.5 shadow-2xs">
-          <div className="w-8 h-8 rounded-full bg-[#295255]/10 flex items-center justify-center shrink-0 mt-0.5">
-            <svg
-              className="w-5 h-5 text-[#295255]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
+        {tasks.length > 0 && (
+          <div className="rounded-2xl p-4 sm:p-5 bg-[#E8F3F3] border border-[#295255]/20 flex items-start gap-3.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-full bg-[#295255]/10 flex items-center justify-center shrink-0 mt-0.5">
+              <svg
+                className="w-5 h-5 text-[#295255]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-[#162623]">
+                Your next review is November 12
+              </h3>
+              <p className="text-xs text-[#577877] mt-0.5 leading-relaxed">
+                Bring your blood pressure log to your video appointment. Your
+                care team will review progress with you.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-[#162623]">
-              Your next review is November 12
-            </h3>
-            <p className="text-xs text-[#577877] mt-0.5 leading-relaxed">
-              Bring your blood pressure log to your video appointment. Your care team will review progress with you.
-            </p>
-          </div>
-        </div>}
+        )}
 
         {/* Main 2-Column Grid matching Screenshot */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
           {/* Left Column (7 cols): Next steps & BP log */}
           <div className="lg:col-span-7 space-y-6">
-
             {/* CARD 1: Your next steps matching Screenshot */}
             <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-5">
               <div className="flex items-center justify-between">
@@ -208,19 +265,21 @@ export default function FollowUpCareScreen({ onNavigate }) {
                         aria-label={`Toggle ${task.title}`}
                         className={`w-5 h-5 rounded mt-0.5 flex items-center justify-center transition shrink-0 ${
                           task.completed
-                            ? 'bg-[#295255] text-white'
-                            : 'border border-[#577877]/40 bg-white hover:border-[#295255]'
+                            ? "bg-[#295255] text-white"
+                            : "border border-[#577877]/40 bg-white hover:border-[#295255]"
                         }`}
                       >
                         {task.completed && (
-                          <span className="material-symbols-outlined text-sm font-bold">check</span>
+                          <span className="material-symbols-outlined text-sm font-bold">
+                            check
+                          </span>
                         )}
                       </button>
 
                       <div>
                         <h4
                           className={`text-xs sm:text-sm font-bold text-[#162623] ${
-                            task.completed ? 'line-through text-[#577877]' : ''
+                            task.completed ? "line-through text-[#577877]" : ""
                           }`}
                         >
                           {task.title}
@@ -344,17 +403,15 @@ export default function FollowUpCareScreen({ onNavigate }) {
                 </div>
 
                 <p className="text-[11px] text-[#577877] pt-2">
-                  Trend from your entered readings. This is not a diagnosis or an automated medical assessment.
+                  Trend from your entered readings. This is not a diagnosis or
+                  an automated medical assessment.
                 </p>
               </div>
-
             </div>
-
           </div>
 
           {/* Right Column (5 cols): Add BP reading & Urgent feeling unwell alert */}
           <div className="lg:col-span-5 space-y-6">
-
             {/* CARD 1: Add a blood pressure reading form matching Screenshot */}
             <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-4">
               <h2 className="text-base sm:text-lg font-bold text-[#162623]">
@@ -363,7 +420,9 @@ export default function FollowUpCareScreen({ onNavigate }) {
 
               {saveSuccess && (
                 <div className="p-3 bg-[#E6F4EA] border border-[#137333]/20 rounded-xl text-xs text-[#137333] font-medium flex items-center gap-2">
-                  <span className="material-symbols-outlined text-sm">check_circle</span>
+                  <span className="material-symbols-outlined text-sm">
+                    check_circle
+                  </span>
                   <span>Reading logged successfully!</span>
                 </div>
               )}
@@ -440,13 +499,16 @@ export default function FollowUpCareScreen({ onNavigate }) {
                   type="submit"
                   className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium py-3 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition text-xs sm:text-sm cursor-pointer mt-2"
                 >
-                  <span className="material-symbols-outlined text-base">add</span>
+                  <span className="material-symbols-outlined text-base">
+                    add
+                  </span>
                   <span>Save reading</span>
                 </button>
               </form>
 
               <p className="text-[11px] text-[#577877] leading-relaxed pt-1">
-                Entries are not monitored in real time. Follow the guidance given by your clinician.
+                Entries are not monitored in real time. Follow the guidance
+                given by your clinician.
               </p>
             </div>
 
@@ -460,15 +522,13 @@ export default function FollowUpCareScreen({ onNavigate }) {
                   Feeling unwell?
                 </h3>
                 <p className="text-xs text-[#92400E]/90 mt-1 leading-relaxed">
-                  Don&apos;t wait for a portal response. Seek urgent help for severe or sudden symptoms.
+                  Don&apos;t wait for a portal response. Seek urgent help for
+                  severe or sudden symptoms.
                 </p>
               </div>
             </div>
-
           </div>
-
         </div>
-
       </div>
     </div>
   );

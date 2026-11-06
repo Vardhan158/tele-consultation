@@ -1,20 +1,31 @@
 from datetime import datetime, UTC, timedelta
 import base64, hashlib, hmac, secrets, struct, time
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
-from teleconsult.modules.identity.auth_routes import password_hash, send_verification_email, token_hash
+from teleconsult.modules.identity.auth_routes import auth_database_session, password_hash, send_verification_email, token_hash
 from teleconsult.modules.identity.models import AuthSession, RecoveryToken, UserAccount
 from teleconsult.modules.patient_portal.models import Doctor
 from teleconsult.config.settings import get_settings
+from teleconsult.kernel.mongodb.client import mongo_database
+from pymongo.errors import DuplicateKeyError
 
 router = APIRouter(prefix="/doctor", tags=["doctor-onboarding"])
+OTP_EXPIRY_MINUTES = 5
+
+
+def generate_verification_otp() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def otp_expiry(now: datetime) -> datetime:
+    return now + timedelta(minutes=OTP_EXPIRY_MINUTES)
 
 
 class DoctorRegistration(BaseModel):
@@ -41,10 +52,102 @@ def _totp(secret: str, counter: int | None = None) -> str:
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register_doctor(payload: DoctorRegistration, session: AsyncSession = Depends(tenant_session)):
+async def register_doctor(payload: DoctorRegistration, session: AsyncSession | None = Depends(auth_database_session)):
     email = payload.email.strip().lower()
-    if await session.scalar(select(UserAccount.id).where(UserAccount.email == email)):
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
+    settings = get_settings()
+    if settings.mongodb_enabled:
+        if not mongo_database.enabled:
+            raise HTTPException(status_code=503, detail="MongoDB is enabled but not connected")
+        tenant_id = settings.default_tenant_id
+        user_id = str(uuid4())
+        now = datetime.now(UTC)
+        user = {
+            "id": user_id,
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+            "full_name": payload.full_name.strip(),
+            "email": email,
+            "phone": payload.mobile_number,
+            "mobile_number": payload.mobile_number,
+            "password_hash": password_hash(payload.password),
+            "terms_version": "doctor-terms-current",
+            "terms_accepted_at": now,
+            "role": "doctor",
+            "verified_at": None,
+            "created_at": now,
+        }
+        doctor = {
+            "id": user_id,
+            "user_id": user_id,
+            "user_account_id": user_id,
+            "tenant_id": tenant_id,
+            "full_name": user["full_name"],
+            "specialty": payload.specialty,
+            "clinic_name": payload.clinic_name,
+            "registration_number": payload.registration_number,
+            "qualifications": payload.qualifications,
+            "experience_years": payload.experience_years,
+            "languages": payload.languages,
+            "supported_languages": payload.languages,
+            "active": False,
+            "approved_for_consultation": False,
+            "approval_status": "pending",
+            "created_at": now,
+        }
+        code = generate_verification_otp()
+        try:
+            await mongo_database.database()["users"].insert_one(user)
+            await mongo_database.database()["doctors"].insert_one(doctor)
+            await mongo_database.database()["recovery_tokens"].insert_one({
+                "id": str(uuid4()), "user_id": user_id, "token_hash": token_hash(code),
+                "expires_at": otp_expiry(now), "used_at": None, "attempts": 0,
+            })
+            await send_verification_email(email, code)
+        except DuplicateKeyError:
+            existing_user = await mongo_database.database()["users"].find_one({
+                "tenant_id": tenant_id, "email": email
+            })
+            if existing_user and existing_user.get("verified_at") is None:
+                code = generate_verification_otp()
+                await mongo_database.database()["recovery_tokens"].update_many(
+                    {"user_id": existing_user["id"], "used_at": None},
+                    {"$set": {"used_at": now}},
+                )
+                await mongo_database.database()["recovery_tokens"].insert_one({
+                    "id": str(uuid4()), "user_id": existing_user["id"],
+                    "token_hash": token_hash(code),
+                    "expires_at": otp_expiry(now), "used_at": None, "attempts": 0,
+                })
+                await send_verification_email(email, code)
+                return {
+                    "status": "verification_required",
+                    "user_id": existing_user["id"],
+                    "email": email,
+                    "approval_status": "pending",
+                }
+            raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in.") from None
+        return {"status": "verification_required", "user_id": user_id, "email": email, "approval_status": "pending"}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+    existing_user = await session.scalar(select(UserAccount).where(UserAccount.email == email))
+    if existing_user:
+        if existing_user.verified_at is None:
+            code = generate_verification_otp()
+            session.add(RecoveryToken(
+                user_id=existing_user.id,
+                token_hash=token_hash(code),
+                expires_at=otp_expiry(datetime.now(UTC)),
+            ))
+            await send_verification_email(existing_user.email, code)
+            return {
+                "status": "verification_required",
+                "user_id": str(existing_user.id),
+                "email": email,
+                "approval_status": "pending",
+            }
+        raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in.")
+
     tenant_id = UUID(get_settings().default_tenant_id)
     user = UserAccount(tenant_id=tenant_id, full_name=payload.full_name.strip(), email=email,
         mobile_number=payload.mobile_number, password_hash=password_hash(payload.password),
@@ -56,29 +159,142 @@ async def register_doctor(payload: DoctorRegistration, session: AsyncSession = D
         qualifications=payload.qualifications, experience_years=payload.experience_years,
         languages=payload.languages, supported_languages=payload.languages, active=False,
         approved_for_consultation=False, approval_status="pending"))
-    code = "000000" if get_settings().environment in {"dev", "local"} else __import__("secrets").randbelow(1_000_000).__format__("06d")
-    session.add(RecoveryToken(user_id=user.id, token_hash=token_hash(code), expires_at=datetime.now(UTC) + timedelta(minutes=10)))
+    code = generate_verification_otp()
+    session.add(RecoveryToken(user_id=user.id, token_hash=token_hash(code), expires_at=otp_expiry(datetime.now(UTC)), attempts=0))
     await send_verification_email(user.email, code)
-    return {"status": "verification_required", "user_id": str(user.id), "approval_status": "pending"}
+    return {"status": "verification_required", "user_id": str(user.id), "email": email, "approval_status": "pending"}
 
 
 @router.post("/{doctor_id}/approve")
-async def approve_doctor(doctor_id: UUID, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinic:doctor:approve"))):
-    doctor = await session.scalar(select(Doctor).where(Doctor.id == doctor_id, Doctor.tenant_id == UUID(principal.tenant_id)))
+async def approve_doctor(
+    doctor_id: str,
+    request: Request,
+    session: AsyncSession | None = Depends(auth_database_session),
+):
+    settings = get_settings()
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if "clinic:doctor:approve" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    if settings.mongodb_enabled:
+        db = mongo_database.database()
+        result = await db["doctors"].update_one(
+            {
+                "tenant_id": settings.default_tenant_id,
+                "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+            },
+            {
+                "$set": {
+                    "approval_status": "approved",
+                    "active": True,
+                    "approved_for_consultation": True,
+                }
+            },
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        return {"status": "approved", "doctor_id": str(doctor_id)}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+    doctor = await session.scalar(
+        select(Doctor).where(
+            Doctor.id == UUID(doctor_id), Doctor.tenant_id == UUID(principal.tenant_id)
+        )
+    )
     if doctor is None:
         raise HTTPException(status_code=404, detail="Doctor not found")
     doctor.approval_status, doctor.active, doctor.approved_for_consultation = "approved", True, True
     return {"status": doctor.approval_status, "doctor_id": str(doctor.id)}
 
+
 @router.get("/pending")
-async def pending_doctors(session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinic:doctor:read"))):
-    rows = await session.scalars(select(Doctor).where(Doctor.tenant_id == UUID(principal.tenant_id), Doctor.approval_status == "pending"))
-    return [{"id": row.id, "full_name": row.full_name, "specialty": row.specialty, "clinic_name": row.clinic_name, "registration_number": row.registration_number} for row in rows]
+async def pending_doctors(
+    request: Request,
+    session: AsyncSession | None = Depends(auth_database_session),
+):
+    settings = get_settings()
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if "clinic:doctor:read" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    if settings.mongodb_enabled:
+        db = mongo_database.database()
+        doctors = await db["doctors"].find({
+            "tenant_id": settings.default_tenant_id,
+            "approval_status": "pending",
+        }).to_list(100)
+        return [
+            {
+                "id": doc.get("id") or doc.get("user_id"),
+                "full_name": doc.get("full_name"),
+                "specialty": doc.get("specialty"),
+                "clinic_name": doc.get("clinic_name"),
+                "registration_number": doc.get("registration_number"),
+            }
+            for doc in doctors
+        ]
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+    rows = await session.scalars(
+        select(Doctor).where(
+            Doctor.tenant_id == UUID(principal.tenant_id),
+            Doctor.approval_status == "pending",
+        )
+    )
+    return [
+        {
+            "id": str(row.id),
+            "full_name": row.full_name,
+            "specialty": row.specialty,
+            "clinic_name": row.clinic_name,
+            "registration_number": row.registration_number,
+        }
+        for row in rows
+    ]
 
 
 @router.post("/{doctor_id}/reject")
-async def reject_doctor(doctor_id: UUID, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinic:doctor:approve"))):
-    doctor = await session.scalar(select(Doctor).where(Doctor.id == doctor_id, Doctor.tenant_id == UUID(principal.tenant_id)))
+async def reject_doctor(
+    doctor_id: str,
+    request: Request,
+    session: AsyncSession | None = Depends(auth_database_session),
+):
+    settings = get_settings()
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if "clinic:doctor:approve" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    if settings.mongodb_enabled:
+        db = mongo_database.database()
+        result = await db["doctors"].update_one(
+            {
+                "tenant_id": settings.default_tenant_id,
+                "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+            },
+            {
+                "$set": {
+                    "approval_status": "rejected",
+                    "active": False,
+                    "approved_for_consultation": False,
+                }
+            },
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        return {"status": "rejected", "doctor_id": str(doctor_id)}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+    doctor = await session.scalar(
+        select(Doctor).where(
+            Doctor.id == UUID(doctor_id), Doctor.tenant_id == UUID(principal.tenant_id)
+        )
+    )
     if doctor is None:
         raise HTTPException(status_code=404, detail="Doctor not found")
     doctor.approval_status, doctor.active, doctor.approved_for_consultation = "rejected", False, False

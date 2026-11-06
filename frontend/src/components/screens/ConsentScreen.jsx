@@ -1,47 +1,51 @@
-import { useState, useEffect } from 'react';
-import { patientApi } from '../../lib/api';
+import { useState, useEffect } from "react";
+import { patientApi } from "../../lib/api";
 
 // Legacy fixture retained only for backwards-compatible layout data.
 // eslint-disable-next-line no-unused-vars
 const initialPermissions = [
   {
-    id: 'telehealth',
-    title: 'Telehealth care',
-    description: 'Consent to receive care through video appointments. Required for video visits.',
+    id: "telehealth",
+    title: "Telehealth care",
+    description:
+      "Consent to receive care through video appointments. Required for video visits.",
     granted: true,
-    statusText: 'Granted · Oct 29, 2026',
+    statusText: "Granted · Oct 29, 2026",
     required: true,
   },
   {
-    id: 'medical_record_sharing',
-    title: 'Share records with your care team',
-    description: 'Allow your treating providers to access records relevant to your care.',
+    id: "medical_record_sharing",
+    title: "Share records with your care team",
+    description:
+      "Allow your treating providers to access records relevant to your care.",
     granted: true,
-    statusText: 'Granted · Oct 29, 2026',
+    statusText: "Granted · Oct 29, 2026",
     required: false,
   },
   {
-    id: 'reminders',
-    title: 'Appointment reminders',
-    description: 'Receive appointment and follow-up reminders by email and SMS.',
+    id: "reminders",
+    title: "Appointment reminders",
+    description:
+      "Receive appointment and follow-up reminders by email and SMS.",
     granted: true,
-    statusText: 'Granted · Nov 4, 2026',
+    statusText: "Granted · Nov 4, 2026",
     required: false,
   },
   {
-    id: 'research',
-    title: 'Optional health research',
-    description: 'Allow contact about research opportunities. This does not affect your care.',
+    id: "research",
+    title: "Optional health research",
+    description:
+      "Allow contact about research opportunities. This does not affect your care.",
     granted: false,
-    statusText: 'Not granted',
+    statusText: "Not granted",
     required: false,
   },
   {
-    id: 'news',
-    title: 'Product news & wellness updates',
-    description: 'Receive optional newsletters and feature updates.',
+    id: "news",
+    title: "Product news & wellness updates",
+    description: "Receive optional newsletters and feature updates.",
     granted: false,
-    statusText: 'Withdrawn · Nov 4, 2026',
+    statusText: "Withdrawn · Nov 4, 2026",
     required: false,
   },
 ];
@@ -49,53 +53,59 @@ const initialPermissions = [
 // eslint-disable-next-line no-unused-vars
 const initialActivity = [
   {
-    id: 'act-1',
-    permission: 'Product news',
-    change: 'Withdrawn',
-    datetime: 'Nov 4, 2026 · 9:12 AM',
-    source: 'Patient portal',
+    id: "act-1",
+    permission: "Product news",
+    change: "Withdrawn",
+    datetime: "Nov 4, 2026 · 9:12 AM",
+    source: "Patient portal",
   },
   {
-    id: 'act-2',
-    permission: 'Appointment reminders',
-    change: 'Granted',
-    datetime: 'Nov 4, 2026 · 9:10 AM',
-    source: 'Patient portal',
+    id: "act-2",
+    permission: "Appointment reminders",
+    change: "Granted",
+    datetime: "Nov 4, 2026 · 9:10 AM",
+    source: "Patient portal",
   },
   {
-    id: 'act-3',
-    permission: 'Telehealth care',
-    change: 'Granted',
-    datetime: 'Oct 29, 2026 · 10:05 AM',
-    source: 'Patient portal',
+    id: "act-3",
+    permission: "Telehealth care",
+    change: "Granted",
+    datetime: "Oct 29, 2026 · 10:05 AM",
+    source: "Patient portal",
   },
 ];
 
 export default function ConsentScreen({ onNavigate }) {
   const [permissions, setPermissions] = useState([]);
   const [activity, setActivity] = useState([]);
-  const [lastSaved, setLastSaved] = useState('Nov 4, 2026 at 9:12 AM PT');
+  const [lastSaved, setLastSaved] = useState("Nov 4, 2026 at 9:12 AM PT");
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   useEffect(() => {
-    patientApi.consents()
+    patientApi
+      .consents()
       .then((items) => {
         if (Array.isArray(items) && items.length > 0) {
           setPermissions((prev) =>
             prev.map((perm) => {
-              const found = items.find((c) => c.consent_type === perm.id || (c.consent_type === 'treatment' && perm.id === 'telehealth'));
+              const found = items.find(
+                (c) =>
+                  c.consent_type === perm.id ||
+                  (c.consent_type === "treatment" && perm.id === "telehealth"),
+              );
               if (found) {
                 return {
                   ...perm,
                   dbId: found.id,
-                  granted: found.status === 'granted',
-                  statusText: found.status === 'granted'
-                    ? `Granted · ${new Date(found.granted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-                    : 'Withdrawn',
+                  granted: found.status === "granted",
+                  statusText:
+                    found.status === "granted"
+                      ? `Granted · ${new Date(found.granted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                      : "Withdrawn",
                 };
               }
               return perm;
-            })
+            }),
           );
         }
       })
@@ -107,30 +117,37 @@ export default function ConsentScreen({ onNavigate }) {
     if (!target) return;
 
     if (target.required && target.granted) {
-      if (!window.confirm('Telehealth care consent is required for video consultations. Withdrawing will prevent upcoming teleconsultation sessions. Continue?')) {
+      if (
+        !window.confirm(
+          "Telehealth care consent is required for video consultations. Withdrawing will prevent upcoming teleconsultation sessions. Continue?",
+        )
+      ) {
         return;
       }
     }
 
     const nextGranted = !target.granted;
-    const nowFormatted = new Date().toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    const nowFormatted = new Date().toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
-    const nowTimeFormatted = new Date().toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
+    const nowTimeFormatted = new Date().toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
     });
 
     if (nextGranted) {
-      patientApi.grantConsent({
-        consent_type: target.id === 'telehealth' ? 'treatment' : target.id,
-        version: 'v1.0',
-        metadata: { source: 'patient_portal' },
-      }).then((res) => {
-        target.dbId = res.id;
-      }).catch(() => {});
+      patientApi
+        .grantConsent({
+          consent_type: target.id === "telehealth" ? "treatment" : target.id,
+          version: "v1.0",
+          metadata: { source: "patient_portal" },
+        })
+        .then((res) => {
+          target.dbId = res.id;
+        })
+        .catch(() => {});
     } else if (target.dbId) {
       patientApi.withdrawConsent(target.dbId).catch(() => {});
     }
@@ -147,8 +164,8 @@ export default function ConsentScreen({ onNavigate }) {
               granted: nextGranted,
               statusText: newStatusText,
             }
-          : p
-      )
+          : p,
+      ),
     );
 
     setLastSaved(`${nowFormatted} at ${nowTimeFormatted}`);
@@ -156,22 +173,22 @@ export default function ConsentScreen({ onNavigate }) {
     // Append to audit trail
     const newActivityItem = {
       id: `act-${activity.length + 1}`,
-      permission: target.title.split(' ')[0] + ' ' + (target.title.split(' ')[1] || ''),
-      change: nextGranted ? 'Granted' : 'Withdrawn',
+      permission:
+        target.title.split(" ")[0] + " " + (target.title.split(" ")[1] || ""),
+      change: nextGranted ? "Granted" : "Withdrawn",
       datetime: `${nowFormatted} · ${nowTimeFormatted}`,
-      source: 'Patient portal',
+      source: "Patient portal",
     };
     setActivity((prev) => [newActivityItem, ...prev]);
   };
 
   const handleDownloadRecord = () => {
-    alert('Authorized Consent Audit Record downloaded as signed PDF.');
+    alert("Authorized Consent Audit Record downloaded as signed PDF.");
   };
 
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
       <div className="mx-auto max-w-7xl space-y-6">
-
         {/* Top Header Row with Title and Action Button */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
@@ -179,7 +196,8 @@ export default function ConsentScreen({ onNavigate }) {
               Your data. Your choices.
             </h1>
             <p className="mt-1.5 text-sm text-[#577877]">
-              Understand and manage how your health information is used and shared.
+              Understand and manage how your health information is used and
+              shared.
             </p>
           </div>
 
@@ -188,7 +206,9 @@ export default function ConsentScreen({ onNavigate }) {
             onClick={handleDownloadRecord}
             className="btn-secondary !px-5 !py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs shrink-0"
           >
-            <span className="material-symbols-outlined !text-[#295255] text-base">download</span>
+            <span className="material-symbols-outlined !text-[#295255] text-base">
+              download
+            </span>
             <span>Download consent record</span>
           </button>
         </div>
@@ -199,16 +219,18 @@ export default function ConsentScreen({ onNavigate }) {
             check_circle
           </span>
           <div className="text-xs">
-            <p className="font-bold text-[#162623]">Your preferences are up to date</p>
+            <p className="font-bold text-[#162623]">
+              Your preferences are up to date
+            </p>
             <p className="text-[#577877] mt-0.5">
-              Last saved {lastSaved}. You can change optional choices at any time.
+              Last saved {lastSaved}. You can change optional choices at any
+              time.
             </p>
           </div>
         </div>
 
         {/* Main 2-Column Split View */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
           {/* Left Column: Care & communication permissions (8 cols / ~68%) */}
           <div className="lg:col-span-8 care-card p-7 sm:p-8 space-y-6">
             <h2 className="text-lg font-bold text-[#162623]">
@@ -220,11 +242,13 @@ export default function ConsentScreen({ onNavigate }) {
                 <div
                   key={perm.id}
                   className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                    idx > 0 ? 'pt-6' : ''
+                    idx > 0 ? "pt-6" : ""
                   }`}
                 >
                   <div className="space-y-1.5 max-w-xl">
-                    <h3 className="text-sm font-bold text-[#162623]">{perm.title}</h3>
+                    <h3 className="text-sm font-bold text-[#162623]">
+                      {perm.title}
+                    </h3>
                     <p className="text-xs text-[#577877] leading-relaxed">
                       {perm.description}
                     </p>
@@ -232,8 +256,8 @@ export default function ConsentScreen({ onNavigate }) {
                       <span
                         className={`inline-flex items-center text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
                           perm.granted
-                            ? 'bg-[#E7F3F1] text-[#295255]'
-                            : 'bg-[#F0F5F7] text-[#577877]'
+                            ? "bg-[#E7F3F1] text-[#295255]"
+                            : "bg-[#F0F5F7] text-[#577877]"
                         }`}
                       >
                         {perm.statusText}
@@ -248,13 +272,13 @@ export default function ConsentScreen({ onNavigate }) {
                     aria-checked={perm.granted}
                     onClick={() => handleToggle(perm.id)}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#295255]/20 ${
-                      perm.granted ? 'bg-[#295255]' : 'bg-[#C5D5D7]'
+                      perm.granted ? "bg-[#295255]" : "bg-[#C5D5D7]"
                     }`}
                   >
                     <span
                       aria-hidden="true"
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        perm.granted ? 'translate-x-5' : 'translate-x-0'
+                        perm.granted ? "translate-x-5" : "translate-x-0"
                       }`}
                     />
                   </button>
@@ -265,7 +289,6 @@ export default function ConsentScreen({ onNavigate }) {
 
           {/* Right Column: Informative Panels (4 cols / ~32%) */}
           <div className="lg:col-span-4 space-y-5">
-
             {/* Card 1: Informed, not overwhelmed */}
             <div className="care-card p-6 sm:p-7 space-y-4">
               <h3 className="text-base font-bold text-[#162623]">
@@ -279,11 +302,13 @@ export default function ConsentScreen({ onNavigate }) {
               </div>
 
               <p className="text-xs text-[#577877] leading-relaxed">
-                Withdrawing optional consent does not affect access to your existing care or records.
+                Withdrawing optional consent does not affect access to your
+                existing care or records.
               </p>
 
               <p className="text-xs text-[#577877] leading-relaxed">
-                Some information may need to be retained for clinical or legal reasons.
+                Some information may need to be retained for clinical or legal
+                reasons.
               </p>
 
               <div className="pt-2 space-y-3">
@@ -297,7 +322,7 @@ export default function ConsentScreen({ onNavigate }) {
 
                 <button
                   type="button"
-                  onClick={() => onNavigate('support')}
+                  onClick={() => onNavigate("support")}
                   className="text-xs font-semibold text-[#295255] hover:underline block mx-auto text-center"
                 >
                   Ask a privacy question
@@ -311,15 +336,16 @@ export default function ConsentScreen({ onNavigate }) {
                 info
               </span>
               <div className="text-xs space-y-1">
-                <p className="font-bold text-[#162623]">Before your next video visit</p>
+                <p className="font-bold text-[#162623]">
+                  Before your next video visit
+                </p>
                 <p className="text-[#577877] leading-relaxed">
-                  Your telehealth consent is active. You can review the full consent document before joining.
+                  Your telehealth consent is active. You can review the full
+                  consent document before joining.
                 </p>
               </div>
             </div>
-
           </div>
-
         </div>
 
         {/* Bottom Card: Consent Activity Table from Screenshot */}
@@ -338,8 +364,13 @@ export default function ConsentScreen({ onNavigate }) {
               </thead>
               <tbody className="divide-y divide-[#577877]/10">
                 {activity.map((item) => (
-                  <tr key={item.id} className="hover:bg-[#F0F5F7]/50 transition">
-                    <td className="py-3.5 font-medium text-[#162623]">{item.permission}</td>
+                  <tr
+                    key={item.id}
+                    className="hover:bg-[#F0F5F7]/50 transition"
+                  >
+                    <td className="py-3.5 font-medium text-[#162623]">
+                      {item.permission}
+                    </td>
                     <td className="py-3.5 text-[#577877]">{item.change}</td>
                     <td className="py-3.5 text-[#577877]">{item.datetime}</td>
                     <td className="py-3.5 text-[#577877]">{item.source}</td>
@@ -365,13 +396,12 @@ export default function ConsentScreen({ onNavigate }) {
             <span>·</span>
             <span
               className="hover:text-[#162623] cursor-pointer"
-              onClick={() => onNavigate('support')}
+              onClick={() => onNavigate("support")}
             >
               Need help?
             </span>
           </div>
         </div>
-
       </div>
 
       {/* Privacy Policy Modal */}
@@ -380,8 +410,12 @@ export default function ConsentScreen({ onNavigate }) {
           <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">policy</span>
-                <h3 className="text-base font-bold text-[#162623]">Kaizentrix Care Privacy Notice</h3>
+                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                  policy
+                </span>
+                <h3 className="text-base font-bold text-[#162623]">
+                  Kaizentrix Care Privacy Notice
+                </h3>
               </div>
               <button
                 type="button"
@@ -394,13 +428,23 @@ export default function ConsentScreen({ onNavigate }) {
 
             <div className="space-y-3 text-xs text-[#577877] leading-relaxed max-h-72 overflow-y-auto pr-1">
               <p>
-                <strong>1. Data Encryption &amp; Security:</strong> All patient personal identifiable information (PII) and protected health information (PHI) are transmitted over TLS 1.3 and encrypted at rest with AES-256 in strict accordance with DISHA and HIPAA frameworks.
+                <strong>1. Data Encryption &amp; Security:</strong> All patient
+                personal identifiable information (PII) and protected health
+                information (PHI) are transmitted over TLS 1.3 and encrypted at
+                rest with AES-256 in strict accordance with DISHA and HIPAA
+                frameworks.
               </p>
               <p>
-                <strong>2. Telehealth Consultations:</strong> Video appointments are conducted through private, peer-to-peer or server-tokenized WebRTC rooms. Audio and video streams are never stored without explicit multi-party clinical consent.
+                <strong>2. Telehealth Consultations:</strong> Video appointments
+                are conducted through private, peer-to-peer or server-tokenized
+                WebRTC rooms. Audio and video streams are never stored without
+                explicit multi-party clinical consent.
               </p>
               <p>
-                <strong>3. Right to Revoke:</strong> Patients maintain the continuous right to grant or withdraw consent for non-essential communications and diagnostic sharing at any time via this portal.
+                <strong>3. Right to Revoke:</strong> Patients maintain the
+                continuous right to grant or withdraw consent for non-essential
+                communications and diagnostic sharing at any time via this
+                portal.
               </p>
             </div>
 

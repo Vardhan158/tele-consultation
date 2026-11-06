@@ -1,12 +1,19 @@
-import { useState } from 'react';
-import Sidebar from './Sidebar';
-import Header from './Header';
+import { useState } from "react";
+import Sidebar from "./Sidebar";
+import Header from "./Header";
 
-export default function Layout({ activeTab, onSelectTab, onSignOut, patient, children }) {
+export default function Layout({
+  activeTab,
+  onSelectTab,
+  onSignOut,
+  patient,
+  children,
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623] flex flex-col">
+    <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623] flex flex-col lg:flex-row">
+      {/* Persistent Flex Sidebar */}
       <Sidebar
         activeTab={activeTab}
         onSelectTab={onSelectTab}
@@ -15,7 +22,8 @@ export default function Layout({ activeTab, onSelectTab, onSignOut, patient, chi
         patient={patient}
       />
 
-      <div className="lg:pl-72 flex flex-col flex-1 min-h-screen">
+      {/* Main Content Workspace using remaining available width */}
+      <div className="flex flex-col flex-1 min-w-0 min-h-screen bg-[#F0F5F7]">
         <Header
           activeTab={activeTab}
           onOpenMobile={() => setMobileOpen(true)}
@@ -23,7 +31,7 @@ export default function Layout({ activeTab, onSelectTab, onSignOut, patient, chi
           onSignOut={onSignOut}
           patient={patient}
         />
-        <main className="flex-1 w-full bg-[#F0F5F7]">
+        <main className="flex-1 w-full bg-[#F0F5F7] p-6 space-y-6">
           {children}
         </main>
       </div>

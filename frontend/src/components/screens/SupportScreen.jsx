@@ -1,69 +1,72 @@
-import { useState, useEffect } from 'react';
-import { supportApi } from '../../lib/api';
+import { useState, useEffect } from "react";
+import { supportApi } from "../../lib/api";
 
 const initialFaqs = [
   {
-    id: 'faq-1',
-    category: 'video',
-    question: 'How do I join my video appointment?',
+    id: "faq-1",
+    category: "video",
+    question: "How do I join my video appointment?",
     answer:
-      'Open My appointments and select your visit. The waiting room opens 10 minutes before your scheduled time. Allow camera and microphone access, test your setup, then check in.',
+      "Open My appointments and select your visit. The waiting room opens 10 minutes before your scheduled time. Allow camera and microphone access, test your setup, then check in.",
     defaultOpen: true,
   },
   {
-    id: 'faq-2',
-    category: 'appointments',
-    question: 'Can I reschedule my appointment?',
+    id: "faq-2",
+    category: "appointments",
+    question: "Can I reschedule my appointment?",
     answer:
       'Yes. Go to My appointments, select your upcoming visit, and choose "Reschedule". You can select a new date and time with your doctor without incurring additional fees.',
     defaultOpen: false,
   },
   {
-    id: 'faq-3',
-    category: 'payments',
-    question: 'When will I receive my refund?',
+    id: "faq-3",
+    category: "payments",
+    question: "When will I receive my refund?",
     answer:
-      'Refunds for cancelled appointments are initiated immediately and typically post to your original payment method within 5–10 business days.',
+      "Refunds for cancelled appointments are initiated immediately and typically post to your original payment method within 5–10 business days.",
     defaultOpen: false,
   },
   {
-    id: 'faq-4',
-    category: 'records',
-    question: 'How do I share a medical record?',
+    id: "faq-4",
+    category: "records",
+    question: "How do I share a medical record?",
     answer:
-      'You can upload PDFs or images up to 10 MB directly under Medical records. Your care team can also review and attach records during consultations.',
+      "You can upload PDFs or images up to 10 MB directly under Medical records. Your care team can also review and attach records during consultations.",
     defaultOpen: false,
   },
   {
-    id: 'faq-5',
-    category: 'privacy',
-    question: 'Who can see my health information?',
+    id: "faq-5",
+    category: "privacy",
+    question: "Who can see my health information?",
     answer:
-      'Only you and your licensed care providers have access to your clinical documents and consultation records. You can review and adjust permissions under Consent management.',
+      "Only you and your licensed care providers have access to your clinical documents and consultation records. You can review and adjust permissions under Consent management.",
     defaultOpen: false,
   },
 ];
 
 export default function SupportScreen({ onNavigate }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [openFaqIds, setOpenFaqIds] = useState(['faq-1']);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [openFaqIds, setOpenFaqIds] = useState(["faq-1"]);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
   // Ticket Modal State
   const [showTicketModal, setShowTicketModal] = useState(false);
-  const [ticketCategory, setTicketCategory] = useState('video_connection');
-  const [ticketSubject, setTicketSubject] = useState('');
-  const [ticketDescription, setTicketDescription] = useState('');
+  const [ticketCategory, setTicketCategory] = useState("video_connection");
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketDescription, setTicketDescription] = useState("");
   const [ticketSuccess, setTicketSuccess] = useState(false);
   const [tickets, setTickets] = useState([]);
 
   useEffect(() => {
-    supportApi.tickets().then((items) => setTickets(Array.isArray(items) ? items : [])).catch(() => setTickets([]));
+    supportApi
+      .tickets()
+      .then((items) => setTickets(Array.isArray(items) ? items : []))
+      .catch(() => setTickets([]));
   }, [ticketSuccess]);
 
   const toggleFaq = (id) => {
     setOpenFaqIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
@@ -101,44 +104,58 @@ export default function SupportScreen({ onNavigate }) {
     try {
       await supportApi.createTicket({
         category: ticketCategory,
-        description: `${ticketSubject ? `${ticketSubject.trim()}\n` : ''}${ticketDescription.trim()}`,
+        description: `${ticketSubject ? `${ticketSubject.trim()}\n` : ""}${ticketDescription.trim()}`,
       });
       setTicketSuccess(true);
     } catch (error) {
       setTicketSuccess(false);
-      setTicketDescription(error.message || 'Unable to create support request.');
+      setTicketDescription(
+        error.message || "Unable to create support request.",
+      );
       return;
     }
 
     setTimeout(() => {
       setTicketSuccess(false);
       setShowTicketModal(false);
-      setTicketSubject('');
-      setTicketDescription('');
+      setTicketSubject("");
+      setTicketDescription("");
     }, 2000);
   };
 
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
       <div className="mx-auto max-w-6xl space-y-6">
-
         {/* Page Header matching Screenshot 1:1 */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
             A little help goes a long way
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-            Find answers, solve a technical issue, or reach the patient support team.
+            Find answers, solve a technical issue, or reach the patient support
+            team.
           </p>
         </div>
 
         {tickets.length > 0 && (
           <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 space-y-3">
-            <h2 className="text-base font-bold text-[#162623]">Your support requests</h2>
+            <h2 className="text-base font-bold text-[#162623]">
+              Your support requests
+            </h2>
             {tickets.map((ticket) => (
-              <div key={ticket.id} className="flex items-center justify-between gap-3 border-t border-[#577877]/10 pt-3 text-xs">
-                <div><p className="font-semibold text-[#162623]">{ticket.category.replaceAll('_', ' ')}</p><p className="text-[#577877]">{ticket.id}</p></div>
-                <span className="rounded-full bg-[#E8F3F3] px-3 py-1 font-semibold text-[#295255]">{ticket.status}</span>
+              <div
+                key={ticket.id}
+                className="flex items-center justify-between gap-3 border-t border-[#577877]/10 pt-3 text-xs"
+              >
+                <div>
+                  <p className="font-semibold text-[#162623]">
+                    {ticket.category.replaceAll("_", " ")}
+                  </p>
+                  <p className="text-[#577877]">{ticket.id}</p>
+                </div>
+                <span className="rounded-full bg-[#E8F3F3] px-3 py-1 font-semibold text-[#295255]">
+                  {ticket.status}
+                </span>
               </div>
             ))}
           </div>
@@ -156,7 +173,9 @@ export default function SupportScreen({ onNavigate }) {
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#577877]">
-                <span className="material-symbols-outlined text-lg">search</span>
+                <span className="material-symbols-outlined text-lg">
+                  search
+                </span>
               </div>
               <input
                 type="text"
@@ -173,11 +192,11 @@ export default function SupportScreen({ onNavigate }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Appointments */}
           <div
-            onClick={() => handleCategoryClick('appointments', 'appointments')}
+            onClick={() => handleCategoryClick("appointments", "appointments")}
             className={`bg-white rounded-2xl border p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-2 cursor-pointer transition ${
-              selectedCategory === 'appointments'
-                ? 'border-[#295255] ring-2 ring-[#295255]/20'
-                : 'border-[#577877]/15 hover:border-[#295255]/40'
+              selectedCategory === "appointments"
+                ? "border-[#295255] ring-2 ring-[#295255]/20"
+                : "border-[#577877]/15 hover:border-[#295255]/40"
             }`}
           >
             <span className="material-symbols-outlined !text-[#295255] text-2xl block">
@@ -198,11 +217,11 @@ export default function SupportScreen({ onNavigate }) {
 
           {/* Card 2: Video visits */}
           <div
-            onClick={() => handleCategoryClick('video', 'appointments')}
+            onClick={() => handleCategoryClick("video", "appointments")}
             className={`bg-white rounded-2xl border p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-2 cursor-pointer transition ${
-              selectedCategory === 'video'
-                ? 'border-[#295255] ring-2 ring-[#295255]/20'
-                : 'border-[#577877]/15 hover:border-[#295255]/40'
+              selectedCategory === "video"
+                ? "border-[#295255] ring-2 ring-[#295255]/20"
+                : "border-[#577877]/15 hover:border-[#295255]/40"
             }`}
           >
             <span className="material-symbols-outlined !text-[#295255] text-2xl block">
@@ -223,11 +242,11 @@ export default function SupportScreen({ onNavigate }) {
 
           {/* Card 3: Payments */}
           <div
-            onClick={() => handleCategoryClick('payments', 'payments')}
+            onClick={() => handleCategoryClick("payments", "payments")}
             className={`bg-white rounded-2xl border p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-2 cursor-pointer transition ${
-              selectedCategory === 'payments'
-                ? 'border-[#295255] ring-2 ring-[#295255]/20'
-                : 'border-[#577877]/15 hover:border-[#295255]/40'
+              selectedCategory === "payments"
+                ? "border-[#295255] ring-2 ring-[#295255]/20"
+                : "border-[#577877]/15 hover:border-[#295255]/40"
             }`}
           >
             <span className="material-symbols-outlined !text-[#295255] text-2xl block">
@@ -249,7 +268,6 @@ export default function SupportScreen({ onNavigate }) {
 
         {/* Main 2-Column Section matching Screenshot */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
           {/* Left Column (8 cols): Frequently Asked Questions */}
           <div className="lg:col-span-8 bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-4">
             <div className="flex items-center justify-between pb-1">
@@ -270,7 +288,9 @@ export default function SupportScreen({ onNavigate }) {
             <div className="divide-y divide-[#577877]/10">
               {filteredFaqs.length === 0 ? (
                 <div className="py-8 text-center text-[#577877]">
-                  <p className="text-xs">No questions matched &quot;{searchQuery}&quot;.</p>
+                  <p className="text-xs">
+                    No questions matched &quot;{searchQuery}&quot;.
+                  </p>
                 </div>
               ) : (
                 filteredFaqs.map((faq) => {
@@ -286,7 +306,7 @@ export default function SupportScreen({ onNavigate }) {
                           {faq.question}
                         </span>
                         <span className="material-symbols-outlined text-[#577877] text-lg shrink-0">
-                          {isOpen ? 'remove' : 'add'}
+                          {isOpen ? "remove" : "add"}
                         </span>
                       </button>
 
@@ -304,7 +324,6 @@ export default function SupportScreen({ onNavigate }) {
 
           {/* Right Column (4 cols): Talk to real person & Need medical advice */}
           <div className="lg:col-span-4 space-y-6">
-
             {/* CARD 1: Talk to a real person matching Screenshot 1:1 */}
             <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-4">
               <h2 className="text-base font-bold text-[#162623]">
@@ -318,7 +337,8 @@ export default function SupportScreen({ onNavigate }) {
               </div>
 
               <p className="text-xs text-[#577877] leading-relaxed">
-                Mon–Fri, 8:00 AM–6:00 PM PT. We usually reply within 1 business day.
+                Mon–Fri, 8:00 AM–6:00 PM PT. We usually reply within 1 business
+                day.
               </p>
 
               {/* Blue Start Support Request Button */}
@@ -327,7 +347,9 @@ export default function SupportScreen({ onNavigate }) {
                 onClick={() => setShowTicketModal(true)}
                 className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm transition text-xs sm:text-sm cursor-pointer"
               >
-                <span className="material-symbols-outlined text-base">chat_bubble</span>
+                <span className="material-symbols-outlined text-base">
+                  chat_bubble
+                </span>
                 <span>Start a support request</span>
               </button>
 
@@ -342,7 +364,8 @@ export default function SupportScreen({ onNavigate }) {
               </div>
 
               <p className="text-[11px] text-[#577877] leading-relaxed pt-1">
-                For account or technical help only. Do not include sensitive clinical details.
+                For account or technical help only. Do not include sensitive
+                clinical details.
               </p>
             </div>
 
@@ -356,15 +379,13 @@ export default function SupportScreen({ onNavigate }) {
                   Need medical advice?
                 </h3>
                 <p className="text-xs text-[#92400E]/90 mt-1 leading-relaxed">
-                  Contact your care team for clinical questions. In an emergency, call your local emergency number.
+                  Contact your care team for clinical questions. In an
+                  emergency, call your local emergency number.
                 </p>
               </div>
             </div>
-
           </div>
-
         </div>
-
       </div>
 
       {/* Support Request Modal */}
@@ -374,11 +395,17 @@ export default function SupportScreen({ onNavigate }) {
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-[#2563EB]/10 flex items-center justify-center text-[#2563EB]">
-                  <span className="material-symbols-outlined text-lg">support_agent</span>
+                  <span className="material-symbols-outlined text-lg">
+                    support_agent
+                  </span>
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#162623]">New support request</h3>
-                  <p className="text-xs text-[#577877]">We reply within 1 business day</p>
+                  <h3 className="text-base font-bold text-[#162623]">
+                    New support request
+                  </h3>
+                  <p className="text-xs text-[#577877]">
+                    We reply within 1 business day
+                  </p>
                 </div>
               </div>
               <button
@@ -392,10 +419,15 @@ export default function SupportScreen({ onNavigate }) {
 
             {ticketSuccess ? (
               <div className="p-4 bg-[#E6F4EA] border border-[#137333]/20 rounded-xl text-center space-y-2">
-                <span className="material-symbols-outlined text-3xl text-[#137333]">check_circle</span>
-                <h4 className="text-sm font-bold text-[#137333]">Ticket submitted</h4>
+                <span className="material-symbols-outlined text-3xl text-[#137333]">
+                  check_circle
+                </span>
+                <h4 className="text-sm font-bold text-[#137333]">
+                  Ticket submitted
+                </h4>
                 <p className="text-xs text-[#577877]">
-                  Your request has been routed to patient assistance. A confirmation has been sent to your email.
+                  Your request has been routed to patient assistance. A
+                  confirmation has been sent to your email.
                 </p>
               </div>
             ) : (
@@ -409,8 +441,12 @@ export default function SupportScreen({ onNavigate }) {
                     onChange={(e) => setTicketCategory(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#295255]"
                   >
-                    <option value="video_connection">Video &amp; audio connection</option>
-                    <option value="appointments">Appointment booking &amp; rescheduling</option>
+                    <option value="video_connection">
+                      Video &amp; audio connection
+                    </option>
+                    <option value="appointments">
+                      Appointment booking &amp; rescheduling
+                    </option>
                     <option value="billing">Payments &amp; refunds</option>
                     <option value="records">Medical records access</option>
                     <option value="other">General portal assistance</option>
@@ -446,7 +482,8 @@ export default function SupportScreen({ onNavigate }) {
                 </div>
 
                 <p className="text-[11px] text-[#577877]">
-                  Please do not include sensitive health details or emergency symptoms here.
+                  Please do not include sensitive health details or emergency
+                  symptoms here.
                 </p>
 
                 <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#577877]/15">
@@ -469,7 +506,6 @@ export default function SupportScreen({ onNavigate }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }

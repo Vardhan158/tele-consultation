@@ -18,7 +18,7 @@ from teleconsult.modules.reporting.routes import router as reporting_router
 from teleconsult.modules.scheduling.routes import router as scheduling_router
 from teleconsult.modules.support_access.routes import router as support_access_router
 from teleconsult.modules.tenancy.routes import router as tenancy_router
-from teleconsult.modules.patient_portal.routes import router as patient_router
+from teleconsult.modules.patient_portal.routes import router as patient_router, public_router as public_patient_router
 from teleconsult.modules.identity.auth_routes import router as auth_router
 from teleconsult.modules.identity.doctor_routes import router as doctor_router
 from teleconsult.modules.identity.settings_routes import router as settings_router
@@ -30,7 +30,7 @@ from teleconsult.modules.records.patient_routes import router as records_router
 from teleconsult.modules.records.clinical_routes import router as clinical_router, clinician_router
 from teleconsult.modules.support_access.patient_routes import router as support_router
 from teleconsult.modules.scheduling.admin_routes import router as scheduling_admin_router
-from teleconsult.modules.tenancy.clinic_admin_routes import router as clinic_admin_router
+from teleconsult.modules.admin.routes import router as admin_router
 from teleconsult.config.routes import router as config_router
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.tenancy.context import set_tenant
@@ -47,6 +47,7 @@ PUBLIC_PATHS = frozenset({
     "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/verify-email",
     "/api/v1/auth/recovery", "/api/v1/auth/recovery/reset", "/api/v1/auth/me",
     "/api/v1/auth/logout", "/api/v1/patient/payments/webhook",
+    "/api/v1/patient/doctors", "/api/v1/patient/doctors/{doctor_id}/availability",
     "/doctor/register",
 })
 
@@ -140,10 +141,11 @@ def create_app() -> FastAPI:
     app.include_router(clinician_router)
     app.include_router(support_router)
     app.include_router(scheduling_admin_router)
-    app.include_router(clinic_admin_router)
+    app.include_router(admin_router)
     app.include_router(config_router)
     # Versioned API contract. The module-native paths above remain available
     # for local compatibility while clients migrate to /api/v1.
+    app.include_router(public_patient_router, prefix="/api/v1")
     for versioned_router in (
         auth_router, settings_router, patient_router, payment_router, notification_router,
         video_router, records_router, clinical_router, support_router,

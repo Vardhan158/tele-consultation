@@ -1,85 +1,106 @@
-import { useState, useEffect, useRef } from 'react';
-import { notificationApi } from '../../lib/api';
+import { useState, useEffect } from "react";
+import { notificationApi } from "../../lib/api";
 
-export default function Header({ onOpenMobile, onSelectTab, onSignOut, activeTab = 'dashboard', patient }) {
+export default function Header({
+  onOpenMobile,
+  onSelectTab,
+  onSignOut,
+  activeTab = "dashboard",
+  patient,
+}) {
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const profileMenuRef = useRef(null);
-  const name = patient?.full_name || 'Patient';
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'P';
+  const isAdmin = patient?.role === "clinic_admin";
+  const isDoctor = patient?.role === "doctor";
+  const name = patient?.full_name || (isAdmin ? "Clinic Admin" : isDoctor ? "Doctor" : "Patient");
+  const initials =
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "A";
 
   useEffect(() => {
-    notificationApi.list()
+    if (isAdmin || isDoctor) {
+      setUnreadCount(0);
+      return;
+    }
+    notificationApi
+      .list()
       .then((items) => {
-        if (Array.isArray(items)) setUnreadCount(items.filter((n) => n.status !== 'read').length);
+        if (Array.isArray(items))
+          setUnreadCount(items.filter((n) => n.status !== "read").length);
       })
       .catch(() => {});
-  }, [activeTab]);
+  }, [activeTab, patient, isAdmin, isDoctor]);
 
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
-        setIsProfileMenuOpen(false);
-      }
-    };
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') setIsProfileMenuOpen(false);
-    };
-
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, []);
-
-  const selectProfileMenuItem = (tab) => {
-    setIsProfileMenuOpen(false);
-    onSelectTab(tab);
-  };
   const getBreadcrumbTitle = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return 'Dashboard';
-      case 'find-doctors':
-        return 'Find doctors';
-      case 'appointments':
-        return 'My appointments';
-      case 'medical-records':
-        return 'Medical records';
-      case 'prescriptions':
-        return 'Prescriptions';
-      case 'summaries':
-        return 'Consultation summaries';
-      case 'follow-up':
-        return 'Follow-up care';
-
-      case 'support':
-        return 'Help & support';
-      case 'payments':
-        return 'Payments';
-      case 'consent':
-        return 'Consent management';
-      case 'notifications':
-        return 'Notifications';
-      case 'settings':
-        return 'Settings';
-      case 'profile':
-        return 'Your patient profile';
+      case "clinic-overview":
+      case "overview":
+        return "Clinic Overview";
+      case "clinic-doctors":
+      case "doctors":
+      case "clinic-approvals":
+        return "Doctor Approvals & Credentials";
+      case "clinic-services":
+      case "services":
+        return "Services & Fee Structure";
+      case "clinic-schedules":
+      case "schedules":
+        return "Schedule & Shifts";
+      case "clinic-appointments":
+        return "Master Appointments";
+      case "clinic-payments":
+        return "Payments & Refunds";
+      case "clinic-reports":
+      case "reports":
+        return "Operational Reports";
+      case "clinic-settings":
+        return "Clinic Settings";
+      case "dashboard":
+      case "doctor-dashboard":
+        return "Dashboard";
+      case "find-doctors":
+        return "Find doctors";
+      case "appointments":
+      case "doctor-appointments":
+        return "Appointments";
+      case "medical-records":
+        return "Medical records";
+      case "prescriptions":
+        return "Prescriptions";
+      case "summaries":
+        return "Consultation summaries";
+      case "follow-up":
+        return "Follow-up care";
+      case "support":
+        return "Help & support";
+      case "payments":
+        return "Payments";
+      case "consent":
+        return "Consent management";
+      case "notifications":
+        return "Notifications";
+      case "settings":
+      case "doctor-settings":
+        return "Settings";
+      case "profile":
+        return "Profile";
       default:
-        return 'Dashboard';
+        return "Overview";
     }
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-[#F0F5F7]/95 backdrop-blur-md border-b border-[#577877]/15 flex items-center justify-between px-4 sm:px-6 lg:px-8 font-sans">
+    <header className="sticky top-0 z-30 h-16 bg-[#F0F5F7]/95 backdrop-blur-md border-b border-[#577877]/15 flex items-center justify-between px-4 sm:px-6 lg:px-8 font-sans text-[#162623]">
       {/* Left: Breadcrumbs & Toggle */}
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onOpenMobile}
-          className="p-1.5 rounded-lg text-[#577877] hover:text-[#162623] hover:bg-white transition"
+          className="p-1.5 rounded-lg text-[#577877] hover:text-[#162623] hover:bg-white transition lg:hidden"
           aria-label="Toggle sidebar"
         >
           <span className="material-symbols-outlined text-xl">menu</span>
@@ -88,9 +109,9 @@ export default function Header({ onOpenMobile, onSelectTab, onSignOut, activeTab
         <div className="flex items-center gap-2 text-xs font-medium text-[#577877]">
           <span
             className="hover:text-[#162623] cursor-pointer"
-            onClick={() => onSelectTab('dashboard')}
+            onClick={() => onSelectTab(isAdmin ? "clinic-overview" : isDoctor ? "doctor-dashboard" : "dashboard")}
           >
-            Patient portal
+            {isAdmin ? "Clinic Admin Workspace" : isDoctor ? "Doctor Portal" : "Patient Portal"}
           </span>
           <span>/</span>
           <span className="font-semibold text-[#162623]">
@@ -99,52 +120,51 @@ export default function Header({ onOpenMobile, onSelectTab, onSignOut, activeTab
         </div>
       </div>
 
-      {/* Right Header Elements matching the screenshot */}
+      {/* Right Header Elements */}
       <div className="flex items-center gap-3 sm:gap-4 text-xs">
         {/* Private Workspace indicator */}
-        {/* User Pill with EM Avatar and Emma M. ⌄ */}
-        <button type="button" onClick={() => onSelectTab('notifications')} className="flex items-center gap-1.5 p-1.5 rounded-xl hover:bg-white transition" title="Notifications">
-          <span className="material-symbols-outlined !text-[#577877] text-xl">notifications</span>
-          <span className="px-2 py-0.5 rounded-full bg-[#E5EEF1] text-[#295255] font-bold text-[11px]">{unreadCount} new</span>
-        </button>
+        <div className="hidden sm:flex items-center gap-1.5 text-[#577877] font-medium">
+          <span className="material-symbols-outlined !text-[#577877] text-base">
+            lock
+          </span>
+          <span>{isAdmin ? "Admin Security Vault" : "Private workspace"}</span>
+        </div>
 
-        <div className="relative flex items-center gap-2 pl-2 border-l border-[#577877]/20" ref={profileMenuRef}>
+        {/* Notifications (Patient only) */}
+        {!isAdmin && !isDoctor && (
           <button
             type="button"
-            onClick={() => setIsProfileMenuOpen((open) => !open)}
-            className="flex items-center gap-2 p-1 rounded-xl hover:bg-white transition"
-            aria-haspopup="menu"
-            aria-expanded={isProfileMenuOpen}
+            onClick={() => onSelectTab("notifications")}
+            className="flex items-center gap-1.5 p-1.5 rounded-xl hover:bg-white transition"
+            title="Notifications"
           >
-            <div className="w-8 h-8 rounded-full bg-[#E5EEF1] text-[#295255] flex items-center justify-center font-bold text-xs">
+            <span className="material-symbols-outlined !text-[#577877] text-xl">
+              notifications
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-[#E5EEF1] text-[#295255] font-bold text-[11px]">
+              {unreadCount} new
+            </span>
+          </button>
+        )}
+
+        <div className="flex items-center gap-2 pl-2 border-l border-[#577877]/20">
+          <div className="flex items-center gap-2 p-1">
+            <div className="w-8 h-8 rounded-full bg-[#295255] text-white flex items-center justify-center font-bold text-xs shadow-sm">
               {initials}
             </div>
             <span className="font-semibold text-[#162623] hidden md:inline">
               {name}
             </span>
-            <span className="material-symbols-outlined !text-[#577877] text-base">
-              expand_more
-            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="p-1.5 rounded-lg text-[#577877] hover:text-red-700 hover:bg-white transition"
+            title="Sign out"
+          >
+            <span className="material-symbols-outlined text-base">logout</span>
           </button>
-
-          {isProfileMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-[#577877]/15 bg-white p-1.5 shadow-lg" role="menu">
-              <button type="button" onClick={() => selectProfileMenuItem('profile')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-[#162623] hover:bg-[#F0F5F7]" role="menuitem">
-                <span className="material-symbols-outlined text-base text-[#577877]">person</span>
-                View profile
-              </button>
-              <button type="button" onClick={() => selectProfileMenuItem('settings')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-[#162623] hover:bg-[#F0F5F7]" role="menuitem">
-                <span className="material-symbols-outlined text-base text-[#577877]">settings</span>
-                Settings
-              </button>
-              <div className="my-1 border-t border-[#577877]/15" />
-              <button type="button" onClick={() => { setIsProfileMenuOpen(false); onSignOut(); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" role="menuitem">
-                <span className="material-symbols-outlined !text-red-700 text-base">logout</span>
-                Sign out
-              </button>
-            </div>
-          )}
-
         </div>
       </div>
     </header>

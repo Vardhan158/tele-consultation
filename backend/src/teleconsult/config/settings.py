@@ -44,9 +44,9 @@ class Settings(BaseSettings):
     brevo_sender_name: str = Field(default="Kaizentrix Care", validation_alias="BREVO_SENDER_NAME")
 
     # Payment Gateway (Razorpay)
-    razorpay_key_id: str = ""
-    razorpay_key_secret: str = ""
-    razorpay_webhook_secret: str = ""
+    razorpay_key_id: str = Field(default="", validation_alias="RAZORPAY_KEY_ID")
+    razorpay_key_secret: str = Field(default="", validation_alias="RAZORPAY_KEY_SECRET")
+    razorpay_webhook_secret: str = Field(default="", validation_alias="RAZORPAY_WEBHOOK_SECRET")
 
     # Video Consultation (WebRTC)
     video_provider: str = "webrtc"

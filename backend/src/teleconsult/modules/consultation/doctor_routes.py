@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
+from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.modules.identity.auth_routes import auth_database_session
 from teleconsult.modules.consultation.clinical_models import ClinicalNote, ClinicalNoteAmendment
 from teleconsult.modules.patient_portal.models import Appointment, Doctor, DoctorAvailability, Patient
 from teleconsult.modules.audit.models import AuditRecord
@@ -58,7 +60,26 @@ class NotePayload(BaseModel):
 
 
 @router.get("/dashboard")
-async def dashboard(session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("doctor:appointment:read"))):
+async def dashboard(session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:appointment:read"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doctor = await db["doctors"].find_one({
+            "tenant_id": principal.tenant_id,
+            "$or": [{"id": principal.user_id}, {"user_id": principal.user_id}, {"user_account_id": principal.user_id}],
+        })
+        if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+        now = datetime.now(UTC)
+        appointments = await db["appointments"].find({
+            "tenant_id": principal.tenant_id,
+            "doctor_id": doctor.get("id"),
+            "starts_at": {"$gte": now},
+        }).sort("starts_at", 1).to_list(100)
+        completed = await db["appointments"].count_documents({"tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"), "status": "completed"})
+        pending_notes = await db["clinical_notes"].count_documents({"tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"), "status": "draft"})
+        return {"today": sum(1 for item in appointments if str(item.get("starts_at", ""))[:10] == now.date().isoformat()), "upcoming": len(appointments), "completed": completed, "pending_notes": pending_notes}
+    if session is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
     doctor = await _doctor(session, principal)
     now = datetime.now(UTC)
     appointments = await session.scalars(select(Appointment).where(
@@ -73,7 +94,21 @@ async def dashboard(session: AsyncSession = Depends(tenant_session), principal: 
 
 
 @router.get("/appointments")
-async def doctor_appointments(session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("doctor:appointment:read"))):
+async def doctor_appointments(session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:appointment:read"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doctor = await db["doctors"].find_one({
+            "tenant_id": principal.tenant_id,
+            "$or": [{"id": principal.user_id}, {"user_id": principal.user_id}, {"user_account_id": principal.user_id}],
+        })
+        if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+        result = await db["appointments"].find({
+            "tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"),
+        }).sort("starts_at", -1).to_list(200)
+        return [{"id": item.get("id") or str(item.get("_id")), "patient_id": item.get("patient_id"), "starts_at": item.get("starts_at"), "ends_at": item.get("ends_at"), "status": item.get("status"), "payment_status": item.get("payment_status", "not_required")} for item in result]
+    if session is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
     doctor = await _doctor(session, principal)
     result = await session.scalars(select(Appointment).where(
         Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id).order_by(Appointment.starts_at.desc()).limit(200))
