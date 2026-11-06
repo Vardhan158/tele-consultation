@@ -45,12 +45,23 @@ async def get_principal(request: Request) -> Principal:
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
         role = user.get("role", "patient")
-        permissions = {
-            "notification:read", "notification:retry", "patient:profile:read", "appointment:read",
-            "records:read", "prescription:read", "followup:read", "support:read",
-            "payment:read", "payment:create", "payment:verify", "payment:refund",
-            "directory:read", "appointment:create", "appointment:write",
-        } if role == "patient" else set()
+        if role == "clinic_admin":
+            permissions = {"clinic:doctor:read", "clinic:doctor:approve"}
+        elif role == "doctor":
+            permissions = {
+                "doctor:profile:read", "doctor:profile:write", "doctor:availability:read",
+                "doctor:availability:write", "doctor:appointment:read", "doctor:appointment:write",
+                "consultation:join", "consultation:admit", "consultation:complete", "clinical:read",
+                "clinical:write", "clinical:publish", "records:read", "prescription:read", "notification:read",
+            }
+        else:
+            permissions = {
+                "notification:read", "notification:retry", "patient:profile:read", "appointment:read",
+                "records:read", "prescription:read", "followup:read", "support:read",
+                "payment:read", "payment:create", "payment:verify", "payment:refund",
+                "directory:read", "appointment:create", "appointment:write", "consultation:join",
+                "records:upload", "support:create",
+            }
         return Principal(
             user_id=user["id"], tenant_id=user["tenant_id"], roles=frozenset({role}),
             permissions=frozenset(permissions), mfa_verified=bool(auth_session.get("mfa_verified")),

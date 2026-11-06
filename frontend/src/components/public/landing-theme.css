@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-poppins: "Poppins", sans-serif;
+
+  /* The 4 Exact Core Brand Colors */
+  --color-deep-teal: #295255;
+  --color-ice-white: #f0f5f7;
+  --color-dark-forest: #162623;
+  --color-muted-teal: #577877;
+
+  /* Semantic Application Mappings */
+  --color-primary: #295255;
+  --color-primary-container: #295255;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #f0f5f7;
+
+  --color-secondary: #577877;
+  --color-secondary-container: #577877;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #f0f5f7;
+
+  --color-surface: #f0f5f7;
+  --color-surface-card: #ffffff;
+  --color-surface-container: #f0f5f7;
+  --color-surface-container-low: #f0f5f7;
+  --color-surface-container-lowest: #ffffff;
+
+  --color-on-surface: #162623;
+  --color-on-surface-variant: #577877;
+
+  --color-outline: #577877;
+  --color-outline-variant: #577877;
+
+  --color-background: #f0f5f7;
+  --color-on-background: #162623;
+
+  --spacing-space-2xs: 0.25rem;
+  --spacing-space-xs: 0.5rem;
+  --spacing-space-sm: 0.75rem;
+  --spacing-space-md: 1rem;
+  --spacing-space-lg: 1.5rem;
+  --spacing-space-xl: 2rem;
+  --spacing-space-2xl: 3rem;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: "Poppins", sans-serif;
+    background-color: #f0f5f7;
+    color: #162623;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Poppins", sans-serif;
+    color: #162623;
+    font-weight: 600;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font-family: "Poppins", sans-serif;
+  }
+}

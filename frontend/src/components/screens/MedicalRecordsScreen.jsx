@@ -1,129 +1,129 @@
-import { useState, useRef, useEffect } from 'react';
-import { recordsApi } from '../../lib/api';
+import { useState, useRef, useEffect } from "react";
+import { recordsApi } from "../../lib/api";
 
 // Legacy fixture retained only for backwards-compatible layout data.
 // eslint-disable-next-line no-unused-vars
 const initialMedicalRecords = [
   {
-    id: 'REC-2026-001',
-    name: 'Blood pressure log.pdf',
-    date: 'Nov 4, 2026',
-    addedBy: 'You',
-    category: 'Other',
-    categoryDisplay: 'Clinical documents',
-    size: '245 KB',
+    id: "REC-2026-001",
+    name: "Blood pressure log.pdf",
+    date: "Nov 4, 2026",
+    addedBy: "You",
+    category: "Other",
+    categoryDisplay: "Clinical documents",
+    size: "245 KB",
   },
   {
-    id: 'REC-2026-002',
-    name: 'Metabolic panel.pdf',
-    date: 'Oct 30, 2026',
-    addedBy: 'Dr. Sarah Chen',
-    category: 'Lab reports',
-    categoryDisplay: 'Lab report',
-    size: '1.2 MB',
+    id: "REC-2026-002",
+    name: "Metabolic panel.pdf",
+    date: "Oct 30, 2026",
+    addedBy: "Dr. Sarah Chen",
+    category: "Lab reports",
+    categoryDisplay: "Lab report",
+    size: "1.2 MB",
   },
   {
-    id: 'REC-2026-003',
-    name: 'Consultation summary.pdf',
-    date: 'Oct 29, 2026',
-    addedBy: 'Dr. Sarah Chen',
-    category: 'Other',
-    categoryDisplay: 'Clinical document',
-    size: '480 KB',
+    id: "REC-2026-003",
+    name: "Consultation summary.pdf",
+    date: "Oct 29, 2026",
+    addedBy: "Dr. Sarah Chen",
+    category: "Other",
+    categoryDisplay: "Clinical document",
+    size: "480 KB",
   },
   {
-    id: 'REC-2026-004',
-    name: 'Annual wellness labs.pdf',
-    date: 'Aug 20, 2026',
-    addedBy: 'Dr. Michael Patel',
-    category: 'Lab reports',
-    categoryDisplay: 'Lab report',
-    size: '2.1 MB',
+    id: "REC-2026-004",
+    name: "Annual wellness labs.pdf",
+    date: "Aug 20, 2026",
+    addedBy: "Dr. Michael Patel",
+    category: "Lab reports",
+    categoryDisplay: "Lab report",
+    size: "2.1 MB",
   },
   {
-    id: 'REC-2026-005',
-    name: 'Chest X-ray report.pdf',
-    date: 'Jun 19, 2026',
-    addedBy: 'Bayview Medical',
-    category: 'Imaging',
-    categoryDisplay: 'Imaging report',
-    size: '4.8 MB',
+    id: "REC-2026-005",
+    name: "Chest X-ray report.pdf",
+    date: "Jun 19, 2026",
+    addedBy: "Bayview Medical",
+    category: "Imaging",
+    categoryDisplay: "Imaging report",
+    size: "4.8 MB",
   },
   {
-    id: 'REC-2026-006',
-    name: 'Allergy history.pdf',
-    date: 'Mar 12, 2026',
-    addedBy: 'You',
-    category: 'Other',
-    categoryDisplay: 'Clinical document',
-    size: '180 KB',
+    id: "REC-2026-006",
+    name: "Allergy history.pdf",
+    date: "Mar 12, 2026",
+    addedBy: "You",
+    category: "Other",
+    categoryDisplay: "Clinical document",
+    size: "180 KB",
   },
   {
-    id: 'REC-2026-007',
-    name: 'Lipid panel breakdown.pdf',
-    date: 'Apr 2, 2026',
-    addedBy: 'Dr. Michael Patel',
-    category: 'Lab reports',
-    categoryDisplay: 'Lab report',
-    size: '1.5 MB',
+    id: "REC-2026-007",
+    name: "Lipid panel breakdown.pdf",
+    date: "Apr 2, 2026",
+    addedBy: "Dr. Michael Patel",
+    category: "Lab reports",
+    categoryDisplay: "Lab report",
+    size: "1.5 MB",
   },
   {
-    id: 'REC-2026-008',
-    name: 'Brain MRI scan report.pdf',
-    date: 'Jan 14, 2026',
-    addedBy: 'Bayview Radiology',
-    category: 'Imaging',
-    categoryDisplay: 'Imaging report',
-    size: '8.4 MB',
+    id: "REC-2026-008",
+    name: "Brain MRI scan report.pdf",
+    date: "Jan 14, 2026",
+    addedBy: "Bayview Radiology",
+    category: "Imaging",
+    categoryDisplay: "Imaging report",
+    size: "8.4 MB",
   },
   {
-    id: 'REC-2026-009',
-    name: 'Complete blood count (CBC).pdf',
-    date: 'Dec 18, 2025',
-    addedBy: 'Quest Diagnostics',
-    category: 'Lab reports',
-    categoryDisplay: 'Lab report',
-    size: '950 KB',
+    id: "REC-2026-009",
+    name: "Complete blood count (CBC).pdf",
+    date: "Dec 18, 2025",
+    addedBy: "Quest Diagnostics",
+    category: "Lab reports",
+    categoryDisplay: "Lab report",
+    size: "950 KB",
   },
   {
-    id: 'REC-2026-010',
-    name: 'Discharge summary - Surgery.pdf',
-    date: 'Oct 11, 2025',
-    addedBy: 'UCSF Medical',
-    category: 'Other',
-    categoryDisplay: 'Clinical document',
-    size: '3.2 MB',
+    id: "REC-2026-010",
+    name: "Discharge summary - Surgery.pdf",
+    date: "Oct 11, 2025",
+    addedBy: "UCSF Medical",
+    category: "Other",
+    categoryDisplay: "Clinical document",
+    size: "3.2 MB",
   },
   {
-    id: 'REC-2026-011',
-    name: 'Immunization history record.pdf',
-    date: 'Sep 05, 2025',
-    addedBy: 'You',
-    category: 'Other',
-    categoryDisplay: 'Clinical document',
-    size: '310 KB',
+    id: "REC-2026-011",
+    name: "Immunization history record.pdf",
+    date: "Sep 05, 2025",
+    addedBy: "You",
+    category: "Other",
+    categoryDisplay: "Clinical document",
+    size: "310 KB",
   },
   {
-    id: 'REC-2026-012',
-    name: 'Cardiology follow-up note.pdf',
-    date: 'Jul 29, 2025',
-    addedBy: 'Dr. Sarah Chen',
-    category: 'Other',
-    categoryDisplay: 'Clinical document',
-    size: '520 KB',
+    id: "REC-2026-012",
+    name: "Cardiology follow-up note.pdf",
+    date: "Jul 29, 2025",
+    addedBy: "Dr. Sarah Chen",
+    category: "Other",
+    categoryDisplay: "Clinical document",
+    size: "520 KB",
   },
 ];
 
 export default function MedicalRecordsScreen({ onNavigate }) {
-  const [activeCategory, setActiveCategory] = useState('All records');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [activeCategory, setActiveCategory] = useState("All records");
+  const [searchTerm, setSearchTerm] = useState("");
   const [dbRecords, setDbRecords] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
-  const [toastMessage, setToastMessage] = useState('');
+  const [toastMessage, setToastMessage] = useState("");
 
-  const [selectedFileName, setSelectedFileName] = useState('');
-  const [selectedFileType, setSelectedFileType] = useState('Imaging report');
+  const [selectedFileName, setSelectedFileName] = useState("");
+  const [selectedFileType, setSelectedFileType] = useState("Imaging report");
   const [selectedFileObj, setSelectedFileObj] = useState(null);
   const [isTooLarge, setIsTooLarge] = useState(false);
   const fileInputRef = useRef(null);
@@ -132,17 +132,42 @@ export default function MedicalRecordsScreen({ onNavigate }) {
     try {
       const items = await recordsApi.list();
       if (Array.isArray(items) && items.length > 0) {
-        setDbRecords(items.map((doc) => ({
-          id: doc.id,
-          name: doc.file_name || doc.title || 'Document.pdf',
-          date: doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Nov 4, 2026',
-          addedBy: doc.category === 'imaging' ? 'Bayview Radiology' : (doc.file_name?.toLowerCase().includes('log') || doc.file_name?.toLowerCase().includes('history') ? 'You' : 'Dr. Sarah Chen'),
-          category: doc.category?.toLowerCase().includes('lab') ? 'Lab reports'
-            : doc.category?.toLowerCase().includes('imaging') ? 'Imaging'
-            : 'Other',
-          categoryDisplay: doc.category === 'lab_report' ? 'Lab report' : doc.category === 'imaging' ? 'Imaging report' : 'Clinical document',
-          size: doc.size_bytes ? (doc.size_bytes >= 1048576 ? `${(doc.size_bytes / 1048576).toFixed(1)} MB` : `${Math.round(doc.size_bytes / 1024)} KB`) : '1.2 MB',
-        })));
+        setDbRecords(
+          items.map((doc) => ({
+            id: doc.id,
+            name: doc.file_name || doc.title || "Document.pdf",
+            date: doc.created_at
+              ? new Date(doc.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              : "Nov 4, 2026",
+            addedBy:
+              doc.category === "imaging"
+                ? "Bayview Radiology"
+                : doc.file_name?.toLowerCase().includes("log") ||
+                    doc.file_name?.toLowerCase().includes("history")
+                  ? "You"
+                  : "Dr. Sarah Chen",
+            category: doc.category?.toLowerCase().includes("lab")
+              ? "Lab reports"
+              : doc.category?.toLowerCase().includes("imaging")
+                ? "Imaging"
+                : "Other",
+            categoryDisplay:
+              doc.category === "lab_report"
+                ? "Lab report"
+                : doc.category === "imaging"
+                  ? "Imaging report"
+                  : "Clinical document",
+            size: doc.size_bytes
+              ? doc.size_bytes >= 1048576
+                ? `${(doc.size_bytes / 1048576).toFixed(1)} MB`
+                : `${Math.round(doc.size_bytes / 1024)} KB`
+              : "1.2 MB",
+          })),
+        );
       }
     } catch {
       // Handled
@@ -161,30 +186,32 @@ export default function MedicalRecordsScreen({ onNavigate }) {
     if (!selectedFileName || isTooLarge) return;
     setIsUploading(true);
     try {
-      const rawName = selectedFileName.split(' · ')[0];
-      const cat = selectedFileType.toLowerCase().includes('lab')
-        ? 'lab_report'
-        : selectedFileType.toLowerCase().includes('imaging')
-        ? 'imaging'
-        : 'other';
-      if (!selectedFileObj) throw new Error('Choose a file before uploading.');
+      const rawName = selectedFileName.split(" · ")[0];
+      const cat = selectedFileType.toLowerCase().includes("lab")
+        ? "lab_report"
+        : selectedFileType.toLowerCase().includes("imaging")
+          ? "imaging"
+          : "other";
+      if (!selectedFileObj) throw new Error("Choose a file before uploading.");
       await recordsApi.upload(selectedFileObj, cat);
-      setToastMessage(`"${rawName}" uploaded securely to your medical records.`);
+      setToastMessage(
+        `"${rawName}" uploaded securely to your medical records.`,
+      );
       fetchRecords();
-      setSelectedFileName('');
+      setSelectedFileName("");
       setSelectedFileObj(null);
     } catch (err) {
       setToastMessage(`Upload error: ${err.message}`);
     } finally {
       setIsUploading(false);
-      setTimeout(() => setToastMessage(''), 3500);
+      setTimeout(() => setToastMessage(""), 3500);
     }
   };
 
   // Filter records
   const filteredRecords = records.filter((rec) => {
     const matchesCategory =
-      activeCategory === 'All records' ||
+      activeCategory === "All records" ||
       rec.category.toLowerCase() === activeCategory.toLowerCase();
     const matchesSearch =
       rec.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -218,7 +245,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
     try {
       const blob = await recordsApi.download(rec.id);
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = rec.name;
       link.click();
@@ -227,7 +254,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
     } catch (err) {
       setToastMessage(err.message);
     }
-    setTimeout(() => setToastMessage(''), 3500);
+    setTimeout(() => setToastMessage(""), 3500);
   };
 
   const handleDeleteRecord = async (rec) => {
@@ -239,23 +266,24 @@ export default function MedicalRecordsScreen({ onNavigate }) {
     } catch (err) {
       setToastMessage(err.message);
     }
-    setTimeout(() => setToastMessage(''), 3500);
+    setTimeout(() => setToastMessage(""), 3500);
   };
 
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
       <div className="mx-auto max-w-7xl space-y-6">
-
         {/* Toast */}
         {toastMessage && (
           <div className="p-3.5 rounded-xl bg-white border border-[#295255]/30 shadow-sm flex items-center justify-between text-xs text-[#295255] font-semibold">
             <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">check_circle</span>
+              <span className="material-symbols-outlined text-base">
+                check_circle
+              </span>
               {toastMessage}
             </span>
             <button
               type="button"
-              onClick={() => setToastMessage('')}
+              onClick={() => setToastMessage("")}
               className="text-[#577877] hover:text-[#162623]"
             >
               <span className="material-symbols-outlined text-sm">close</span>
@@ -270,7 +298,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
               Your health story, together
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              Safely organize your documents and share relevant records with your care team.
+              Safely organize your documents and share relevant records with
+              your care team.
             </p>
           </div>
 
@@ -289,10 +318,14 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           {/* Card 1: All records */}
           <div className="care-card p-5 sm:p-6 rounded-2xl bg-white border border-[#577877]/15 flex items-center gap-4">
             <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined !text-[#295255] text-xl">description</span>
+              <span className="material-symbols-outlined !text-[#295255] text-xl">
+                description
+              </span>
             </span>
             <div>
-              <div className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">{records.length}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
+                {records.length}
+              </div>
               <p className="text-xs text-[#577877]">All records</p>
             </div>
           </div>
@@ -300,11 +333,13 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           {/* Card 2: Lab reports */}
           <div className="care-card p-5 sm:p-6 rounded-2xl bg-white border border-[#577877]/15 flex items-center gap-4">
             <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined !text-[#295255] text-xl">science</span>
+              <span className="material-symbols-outlined !text-[#295255] text-xl">
+                science
+              </span>
             </span>
             <div>
               <div className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
-                {records.filter((r) => r.category === 'Lab reports').length}
+                {records.filter((r) => r.category === "Lab reports").length}
               </div>
               <p className="text-xs text-[#577877]">Lab reports</p>
             </div>
@@ -313,11 +348,13 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           {/* Card 3: Imaging */}
           <div className="care-card p-5 sm:p-6 rounded-2xl bg-white border border-[#577877]/15 flex items-center gap-4">
             <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined !text-[#295255] text-xl">filter_center_focus</span>
+              <span className="material-symbols-outlined !text-[#295255] text-xl">
+                filter_center_focus
+              </span>
             </span>
             <div>
               <div className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
-                {records.filter((r) => r.category === 'Imaging').length}
+                {records.filter((r) => r.category === "Imaging").length}
               </div>
               <p className="text-xs text-[#577877]">Imaging</p>
             </div>
@@ -326,11 +363,13 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           {/* Card 4: Clinical documents */}
           <div className="care-card p-5 sm:p-6 rounded-2xl bg-white border border-[#577877]/15 flex items-center gap-4">
             <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined !text-[#295255] text-xl">assignment</span>
+              <span className="material-symbols-outlined !text-[#295255] text-xl">
+                assignment
+              </span>
             </span>
             <div>
               <div className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
-                {records.filter((r) => r.category === 'Other').length}
+                {records.filter((r) => r.category === "Other").length}
               </div>
               <p className="text-xs text-[#577877]">Clinical documents</p>
             </div>
@@ -339,17 +378,15 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
         {/* Main 2-Column Content Layout matching Screenshot */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
           {/* Left Column (8 cols): Records Table Card matching Screenshot */}
           <div className="lg:col-span-8 care-card p-6 sm:p-7 rounded-2xl bg-white border border-[#577877]/15 space-y-5">
-
             {/* Category Tabs matching Screenshot */}
             <div className="flex items-center gap-6 border-b border-[#577877]/20 pb-3 text-xs font-semibold">
               {[
-                { id: 'All records', label: 'All records' },
-                { id: 'Lab reports', label: 'Lab reports' },
-                { id: 'Imaging', label: 'Imaging' },
-                { id: 'Other', label: 'Other' },
+                { id: "All records", label: "All records" },
+                { id: "Lab reports", label: "Lab reports" },
+                { id: "Imaging", label: "Imaging" },
+                { id: "Other", label: "Other" },
               ].map((tab) => {
                 const isTabActive = activeCategory === tab.id;
                 return (
@@ -359,8 +396,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                     onClick={() => setActiveCategory(tab.id)}
                     className={`transition pb-1 relative cursor-pointer ${
                       isTabActive
-                        ? 'text-[#295255] font-bold'
-                        : 'text-[#577877] hover:text-[#162623]'
+                        ? "text-[#295255] font-bold"
+                        : "text-[#577877] hover:text-[#162623]"
                     }`}
                   >
                     <span>{tab.label}</span>
@@ -404,7 +441,10 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                 </thead>
                 <tbody className="divide-y divide-[#577877]/10">
                   {filteredRecords.slice(0, 6).map((rec) => (
-                    <tr key={rec.id} className="hover:bg-[#F8FAFB]/70 transition">
+                    <tr
+                      key={rec.id}
+                      className="hover:bg-[#F8FAFB]/70 transition"
+                    >
                       <td className="py-3.5 px-4 font-medium text-[#162623] whitespace-nowrap">
                         {rec.name}
                       </td>
@@ -424,7 +464,11 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                             View
                           </button>
                           <span className="text-[#577877]">·</span>
-                          <button type="button" onClick={() => handleDeleteRecord(rec)} className="hover:underline cursor-pointer text-rose-700">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecord(rec)}
+                            className="hover:underline cursor-pointer text-rose-700"
+                          >
                             Delete
                           </button>
                           <span className="text-[#577877]">·</span>
@@ -444,7 +488,10 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                   ))}
                   {filteredRecords.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center text-[#577877]">
+                      <td
+                        colSpan={4}
+                        className="py-8 text-center text-[#577877]"
+                      >
                         No records match your criteria.
                       </td>
                     </tr>
@@ -456,15 +503,15 @@ export default function MedicalRecordsScreen({ onNavigate }) {
             {/* Table Footer matching Screenshot */}
             <div className="pt-2 text-xs text-[#577877]">
               <span>
-                Showing {Math.min(6, filteredRecords.length)} of {records.length} records · Documents are retained with your care history.
+                Showing {Math.min(6, filteredRecords.length)} of{" "}
+                {records.length} records · Documents are retained with your care
+                history.
               </span>
             </div>
-
           </div>
 
           {/* Right Column (4 cols): Add a health record + Looking for results? */}
           <div className="lg:col-span-4 space-y-5">
-
             {/* CARD 1: Add a health record matching Screenshot */}
             <div className="care-card p-6 sm:p-7 rounded-2xl bg-white border border-[#577877]/15 space-y-4">
               <h3 className="text-base font-bold text-[#162623]">
@@ -478,8 +525,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                     cloud_upload
                   </span>
                 </div>
-                <h4 className="font-bold text-xs text-[#162623]">Drop a file here</h4>
-                <p className="text-[11px] text-[#577877]">PDF, JPG, PNG · Up to 10 MB</p>
+                <h4 className="font-bold text-xs text-[#162623]">
+                  Drop a file here
+                </h4>
+                <p className="text-[11px] text-[#577877]">
+                  PDF, JPG, PNG · Up to 10 MB
+                </p>
                 <div className="pt-1">
                   <input
                     ref={fileInputRef}
@@ -503,12 +554,18 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                 <label className="block text-xs font-semibold text-[#162623] mb-1.5">
                   Selected file
                 </label>
-                <div className={`p-3 rounded-xl border text-xs font-medium bg-white flex items-center justify-between ${
-                  isTooLarge ? 'border-rose-400 text-[#162623]' : 'border-[#577877]/25 text-[#162623]'
-                }`}>
+                <div
+                  className={`p-3 rounded-xl border text-xs font-medium bg-white flex items-center justify-between ${
+                    isTooLarge
+                      ? "border-rose-400 text-[#162623]"
+                      : "border-[#577877]/25 text-[#162623]"
+                  }`}
+                >
                   <span>{selectedFileName}</span>
                   {isTooLarge && (
-                    <span className="material-symbols-outlined text-sm text-rose-500">error</span>
+                    <span className="material-symbols-outlined text-sm text-rose-500">
+                      error
+                    </span>
                   )}
                 </div>
                 {isTooLarge && (
@@ -548,11 +605,11 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                   onClick={handleUploadRecord}
                   className={`w-full py-2.5 rounded-xl font-semibold text-xs text-center transition select-none ${
                     isTooLarge || !selectedFileName || isUploading
-                      ? 'bg-[#F0F5F7] text-[#577877] cursor-not-allowed border border-[#577877]/10'
-                      : 'bg-[#295255] text-white hover:bg-[#1f3f42] cursor-pointer shadow-sm'
+                      ? "bg-[#F0F5F7] text-[#577877] cursor-not-allowed border border-[#577877]/10"
+                      : "bg-[#295255] text-white hover:bg-[#1f3f42] cursor-pointer shadow-sm"
                   }`}
                 >
-                  {isUploading ? 'Uploading...' : 'Upload record'}
+                  {isUploading ? "Uploading..." : "Upload record"}
                 </button>
               </div>
 
@@ -565,9 +622,9 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
               {/* Footnote */}
               <p className="text-[11px] text-[#577877] leading-relaxed">
-                Check the file before uploading. Only include information relevant to your care.
+                Check the file before uploading. Only include information
+                relevant to your care.
               </p>
-
             </div>
 
             {/* CARD 2: Looking for results? matching Screenshot */}
@@ -576,15 +633,16 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                 info
               </span>
               <div className="text-xs space-y-1">
-                <h4 className="font-bold text-[#162623]">Looking for results?</h4>
+                <h4 className="font-bold text-[#162623]">
+                  Looking for results?
+                </h4>
                 <p className="text-[#577877] leading-relaxed">
-                  Your provider will review new results and explain what they mean for your care.
+                  Your provider will review new results and explain what they
+                  mean for your care.
                 </p>
               </div>
             </div>
-
           </div>
-
         </div>
 
         {/* Global Footer matching Screenshot */}
@@ -597,13 +655,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
             <span>·</span>
             <span
               className="hover:text-[#162623] cursor-pointer"
-              onClick={() => onNavigate('support')}
+              onClick={() => onNavigate("support")}
             >
               Need help?
             </span>
           </div>
         </div>
-
       </div>
 
       {/* Record Preview Modal */}
@@ -612,8 +669,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">description</span>
-                <h3 className="text-base font-bold text-[#162623]">{previewRecord.name}</h3>
+                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                  description
+                </span>
+                <h3 className="text-base font-bold text-[#162623]">
+                  {previewRecord.name}
+                </h3>
               </div>
               <button
                 type="button"
@@ -627,31 +688,46 @@ export default function MedicalRecordsScreen({ onNavigate }) {
             <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-[#577877]">Date Uploaded:</span>
-                <span className="font-semibold text-[#162623]">{previewRecord.date}</span>
+                <span className="font-semibold text-[#162623]">
+                  {previewRecord.date}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#577877]">Added by:</span>
-                <span className="font-semibold text-[#162623]">{previewRecord.addedBy}</span>
+                <span className="font-semibold text-[#162623]">
+                  {previewRecord.addedBy}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#577877]">Category:</span>
-                <span className="font-semibold text-[#295255]">{previewRecord.categoryDisplay}</span>
+                <span className="font-semibold text-[#295255]">
+                  {previewRecord.categoryDisplay}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#577877]">File Size:</span>
-                <span className="font-semibold text-[#162623]">{previewRecord.size}</span>
+                <span className="font-semibold text-[#162623]">
+                  {previewRecord.size}
+                </span>
               </div>
               <div className="flex justify-between pt-1 border-t border-[#577877]/15">
                 <span className="text-[#577877]">Encryption:</span>
-                <span className="font-semibold text-emerald-700">AES-256 Verified at rest</span>
+                <span className="font-semibold text-emerald-700">
+                  AES-256 Verified at rest
+                </span>
               </div>
             </div>
 
             <div className="p-6 rounded-xl border border-dashed border-[#577877]/30 text-center space-y-2 bg-[#F8FAFB]">
-              <span className="material-symbols-outlined !text-[#295255] text-4xl">picture_as_pdf</span>
-              <p className="text-xs font-semibold text-[#162623]">Decrypted In-Memory Stream Active</p>
+              <span className="material-symbols-outlined !text-[#295255] text-4xl">
+                picture_as_pdf
+              </span>
+              <p className="text-xs font-semibold text-[#162623]">
+                Decrypted In-Memory Stream Active
+              </p>
               <p className="text-[11px] text-[#577877]">
-                Encrypted with your patient vault key for clinical teleconsultation review.
+                Encrypted with your patient vault key for clinical
+                teleconsultation review.
               </p>
             </div>
 
@@ -671,14 +747,15 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                 }}
                 className="btn-primary !py-2 !px-4 text-xs font-semibold flex items-center gap-1.5"
               >
-                <span className="material-symbols-outlined text-sm">download</span>
+                <span className="material-symbols-outlined text-sm">
+                  download
+                </span>
                 <span>Download PDF</span>
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

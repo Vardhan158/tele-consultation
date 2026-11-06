@@ -21,18 +21,23 @@ class DoctorResponse(BaseModel):
     full_name: str
     specialty: str
     clinic_name: str
-    fee_paise: int
-    timezone: str
+    fee_paise: int | None = None
+    currency: str | None = None
+    base_fee_paise: int | None = None
+    platform_fee_paise: int | None = None
+    total_payable_paise: int | None = None
+    timezone: str = "Asia/Kolkata"
     supported_languages: list[str]
     registration_number: str | None
 
 
 class AvailabilityResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: UUID
+    id: str
     doctor_id: UUID
     starts_at: datetime
     ends_at: datetime
+    timezone: str
 
 
 class AppointmentCreate(BaseModel):
@@ -40,6 +45,10 @@ class AppointmentCreate(BaseModel):
     starts_at: datetime
     duration_minutes: int = Field(default=30, ge=15, le=120)
     intake_id: UUID | None = None
+    reason: str = ""
+    notes: str = ""
+    appointment_type: str = ""
+    visit_format: str = ""
 
 
 class AppointmentResponse(BaseModel):
@@ -51,6 +60,10 @@ class AppointmentResponse(BaseModel):
     ends_at: datetime
     status: str
     payment_status: str
+    base_fee_paise: int | None = None
+    platform_fee_paise: int | None = None
+    total_payable_paise: int | None = None
+    currency: str | None = None
     doctor: DoctorResponse | None = None
 
 

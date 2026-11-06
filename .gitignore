@@ -12,3 +12,6 @@ dist/
 *.tfstate
 *.tfstate.*
 .terraform/
+.vite/
+frontend/output/
+.idea/

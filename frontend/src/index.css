@@ -1,80 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap');
-@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap");
 
-@theme {
-  --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-poppins: 'Poppins', sans-serif;
-
-  /* The 4 Exact Core Brand Colors */
-  --color-deep-teal: #295255;
-  --color-ice-white: #F0F5F7;
-  --color-dark-forest: #162623;
-  --color-muted-teal: #577877;
-
-  /* Semantic Application Mappings */
-  --color-primary: #295255;
-  --color-primary-container: #295255;
-  --color-on-primary: #ffffff;
-  --color-on-primary-container: #F0F5F7;
-
-  --color-secondary: #577877;
-  --color-secondary-container: #577877;
-  --color-on-secondary: #ffffff;
-  --color-on-secondary-container: #F0F5F7;
-
-  --color-surface: #F0F5F7;
-  --color-surface-card: #ffffff;
-  --color-surface-container: #F0F5F7;
-  --color-surface-container-low: #F0F5F7;
-  --color-surface-container-lowest: #ffffff;
-
-  --color-on-surface: #162623;
-  --color-on-surface-variant: #577877;
-
-  --color-outline: #577877;
-  --color-outline-variant: #577877;
-
-  --color-background: #F0F5F7;
-  --color-on-background: #162623;
-
-  --spacing-space-2xs: 0.25rem;
-  --spacing-space-xs: 0.5rem;
-  --spacing-space-sm: 0.75rem;
-  --spacing-space-md: 1rem;
-  --spacing-space-lg: 1.5rem;
-  --spacing-space-xl: 2rem;
-  --spacing-space-2xl: 3rem;
-}
-
-@layer base {
-  html, body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Poppins', sans-serif;
-    background-color: #F0F5F7;
-    color: #162623;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', sans-serif;
-    color: #162623;
-    font-weight: 600;
-  }
-
-  button, input, textarea, select {
-    font-family: 'Poppins', sans-serif;
-  }
-}
-
-/* Material Symbols */
 .material-symbols-outlined {
-  font-family: 'Material Symbols Outlined';
+  font-family: "Material Symbols Outlined";
   font-weight: normal;
   font-style: normal;
   font-size: 24px;
@@ -85,7 +12,7 @@
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
-  -webkit-font-feature-settings: 'liga';
+  -webkit-font-feature-settings: "liga";
   -webkit-font-smoothing: antialiased;
   color: #577877;
 }
@@ -95,12 +22,16 @@
   background-color: #ffffff;
   border-radius: 1rem;
   border: 1px solid rgba(87, 120, 119, 0.15);
-  box-shadow: 0 4px 20px -2px rgba(22, 38, 35, 0.05), 0 2px 6px -1px rgba(22, 38, 35, 0.03);
+  box-shadow:
+    0 4px 20px -2px rgba(22, 38, 35, 0.05),
+    0 2px 6px -1px rgba(22, 38, 35, 0.03);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .care-card:hover {
-  box-shadow: 0 10px 25px -3px rgba(22, 38, 35, 0.08), 0 4px 10px -2px rgba(22, 38, 35, 0.04);
+  box-shadow:
+    0 10px 25px -3px rgba(22, 38, 35, 0.08),
+    0 4px 10px -2px rgba(22, 38, 35, 0.04);
 }
 
 .care-card-interactive {
@@ -126,7 +57,7 @@
   gap: 0.5rem;
   background-color: #295255;
   color: #ffffff;
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
   font-weight: 500;
   font-size: 0.875rem;
   line-height: 1.25rem;
@@ -163,7 +94,7 @@
   gap: 0.5rem;
   background-color: #ffffff;
   color: #295255;
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
   font-weight: 500;
   font-size: 0.875rem;
   line-height: 1.25rem;
@@ -176,7 +107,7 @@
 }
 
 .btn-secondary:hover {
-  background-color: #F0F5F7;
+  background-color: #f0f5f7;
   border-color: #295255;
   color: #162623;
   transform: translateY(-1px);
@@ -188,7 +119,7 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F0F5F7;
+  background: #f0f5f7;
 }
 ::-webkit-scrollbar-thumb {
   background: #577877;
@@ -199,18 +130,222 @@
 }
 
 /* Typography Helpers for Poppins */
-.font-display-lg { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 2.25rem; line-height: 2.75rem; letter-spacing: -0.02em; color: #162623; }
-.font-headline-xl { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 1.875rem; line-height: 2.25rem; letter-spacing: -0.015em; color: #162623; }
-.font-headline-lg { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.01em; color: #162623; }
-.font-headline-md { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 1.25rem; line-height: 1.75rem; color: #162623; }
-.font-headline-sm { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 1rem; line-height: 1.5rem; color: #162623; }
+.font-display-lg {
+  font-family: "Poppins", sans-serif;
+  font-weight: 700;
+  font-size: 2.25rem;
+  line-height: 2.75rem;
+  letter-spacing: -0.02em;
+  color: #162623;
+}
+.font-headline-xl {
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  letter-spacing: -0.015em;
+  color: #162623;
+}
+.font-headline-lg {
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  letter-spacing: -0.01em;
+  color: #162623;
+}
+.font-headline-md {
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  color: #162623;
+}
+.font-headline-sm {
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  color: #162623;
+}
 
-.font-body-lg { font-family: 'Poppins', sans-serif; font-weight: 400; font-size: 1.125rem; line-height: 1.75rem; }
-.font-body-md { font-family: 'Poppins', sans-serif; font-weight: 400; font-size: 1rem; line-height: 1.5rem; }
-.font-body-sm { font-family: 'Poppins', sans-serif; font-weight: 400; font-size: 0.875rem; line-height: 1.25rem; }
-.font-body-xs { font-family: 'Poppins', sans-serif; font-weight: 400; font-size: 0.75rem; line-height: 1rem; }
+.font-body-lg {
+  font-family: "Poppins", sans-serif;
+  font-weight: 400;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+.font-body-md {
+  font-family: "Poppins", sans-serif;
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+.font-body-sm {
+  font-family: "Poppins", sans-serif;
+  font-weight: 400;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.font-body-xs {
+  font-family: "Poppins", sans-serif;
+  font-weight: 400;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
 
-.font-label-lg { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 0.875rem; line-height: 1.25rem; }
-.font-label-md { font-family: 'Poppins', sans-serif; font-weight: 500; font-size: 0.75rem; line-height: 1rem; }
-.font-label-caps { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 0.6875rem; line-height: 0.875rem; text-transform: uppercase; letter-spacing: 0.06em; }
-.font-mono-data { font-family: 'Poppins', monospace; font-variant-numeric: tabular-nums; }
+.font-label-lg {
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.font-label-md {
+  font-family: "Poppins", sans-serif;
+  font-weight: 500;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.font-label-caps {
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  line-height: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.font-mono-data {
+  font-family: "Poppins", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cinematic banner motion: transform/opacity only for smooth compositing. */
+@keyframes particleDrift1 {
+  0% { transform: translate(0px, 0px) scale(1) rotate(0deg); opacity: 0.35; }
+  25% { transform: translate(30px, -25px) scale(1.3) rotate(45deg); opacity: 0.85; }
+  50% { transform: translate(-20px, -45px) scale(0.9) rotate(90deg); opacity: 0.5; }
+  75% { transform: translate(-35px, -15px) scale(1.2) rotate(135deg); opacity: 0.9; }
+  100% { transform: translate(0px, 0px) scale(1) rotate(180deg); opacity: 0.35; }
+}
+
+@keyframes particleDrift2 {
+  0% { transform: translate(0px, 0px) scale(0.9); opacity: 0.4; }
+  33% { transform: translate(-45px, -30px) scale(1.4); opacity: 0.9; }
+  66% { transform: translate(35px, -40px) scale(1.1); opacity: 0.6; }
+  100% { transform: translate(0px, 0px) scale(0.9); opacity: 0.4; }
+}
+
+@keyframes particleDrift3 {
+  0% { transform: translate(0px, 0px) scale(1); opacity: 0.25; }
+  50% { transform: translate(50px, -35px) scale(1.5); opacity: 0.8; }
+  100% { transform: translate(0px, 0px) scale(1); opacity: 0.25; }
+}
+
+@keyframes waveShimmer {
+  0% { transform: translateX(-100%) rotate(15deg); }
+  100% { transform: translateX(200%) rotate(15deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.12); }
+}
+
+.animate-particle-1 { animation: particleDrift1 10s ease-in-out infinite; }
+.animate-particle-2 { animation: particleDrift2 14s ease-in-out infinite; }
+.animate-particle-3 { animation: particleDrift3 12s ease-in-out infinite; }
+.animate-wave { animation: waveShimmer 10s infinite linear; }
+.animate-glow { animation: pulseGlow 6s ease-in-out infinite; }
+
+.cinematic-wave {
+  position: absolute;
+  top: -45%;
+  left: -60%;
+  width: 90%;
+  height: 190%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, rgba(143, 224, 216, 0.04) 35%, rgba(255, 255, 255, 0.2) 50%, rgba(143, 224, 216, 0.04) 65%, transparent 100%);
+  transform: rotate(18deg) translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+.cinematic-wave-one {
+  animation: cinematicWaveOne 16s linear infinite;
+}
+
+.cinematic-wave-two {
+  opacity: 0.55;
+  animation: cinematicWaveTwo 23s linear infinite;
+  animation-delay: -8s;
+}
+
+@keyframes cinematicWaveOne {
+  from { transform: translate3d(-10%, 0, 0) rotate(18deg); }
+  to { transform: translate3d(260%, 0, 0) rotate(18deg); }
+}
+
+@keyframes cinematicWaveTwo {
+  from { transform: translate3d(80%, 0, 0) rotate(18deg); }
+  to { transform: translate3d(-220%, 0, 0) rotate(18deg); }
+}
+
+.cinematic-particle {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.cinematic-particle-one { top: 12%; right: 26%; width: 0.875rem; height: 0.875rem; background: rgba(94, 234, 212, 0.55); animation: particleDrift1 10s ease-in-out -2s infinite; }
+.cinematic-particle-two { bottom: 12%; right: 7%; width: 1.25rem; height: 1.25rem; background: rgba(110, 231, 183, 0.4); animation: particleDrift2 14s ease-in-out -5s infinite; }
+.cinematic-particle-three { top: 48%; left: 34%; width: 0.75rem; height: 0.75rem; background: rgba(255, 255, 255, 0.5); animation: particleDrift3 12s ease-in-out -7s infinite; }
+.cinematic-particle-four { bottom: 9%; left: 25%; width: 0.625rem; height: 0.625rem; background: rgba(252, 211, 77, 0.42); animation: particleDrift1 17s ease-in-out -11s infinite; }
+.cinematic-particle-five { top: 13%; left: 7%; width: 1rem; height: 1rem; background: rgba(153, 246, 228, 0.42); animation: particleDrift2 19s ease-in-out -3s infinite; }
+.cinematic-particle-six { top: 70%; right: 42%; width: 0.5rem; height: 0.5rem; background: rgba(186, 230, 253, 0.52); animation: particleDrift3 8s ease-in-out -1s infinite; }
+
+.pending-kpi-glow {
+  position: absolute;
+  inset: 0.25rem;
+  border-radius: 1rem;
+  pointer-events: none;
+  background: rgba(251, 191, 36, 0.18);
+  filter: blur(1rem);
+  animation: pendingKpiGlow 4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes pendingKpiGlow {
+  0%, 100% { opacity: 0.35; transform: scale(0.94); }
+  50% { opacity: 0.8; transform: scale(1.08); }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Cross-browser scrollbar hiding utility */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-particle-1, .animate-particle-2, .animate-particle-3, .animate-wave, .animate-glow,
+  .cinematic-wave-one, .cinematic-wave-two, .cinematic-particle, .pending-kpi-glow {
+    animation: none !important;
+  }
+}
