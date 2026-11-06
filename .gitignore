@@ -1,4 +1,6 @@
 .env
+backend/.env.clinic-admin-test
+frontend/.env.clinic-admin-test
 .certs/
 backend/.certs/
 .venv/

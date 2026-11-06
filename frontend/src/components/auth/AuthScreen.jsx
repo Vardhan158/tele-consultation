@@ -396,7 +396,7 @@ export default function AuthScreen({
                       type="tel"
                       minLength={7}
                       maxLength={32}
-                      pattern="[+0-9() .\-]{7,32}"
+                      pattern="[+0-9() .-]{7,32}"
                       name="mobile_number"
                       value={form.mobile_number}
                       onChange={update}

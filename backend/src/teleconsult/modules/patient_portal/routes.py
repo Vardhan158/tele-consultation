@@ -281,10 +281,7 @@ async def get_profile(
         })
         if document is None:
             raise HTTPException(status_code=404, detail="Profile not found")
-        return PatientResponse(
-            id=UUID(document.get("id", document["user_id"])),
-            full_name=document["full_name"], email=document["email"], phone=document["phone"],
-        )
+        return PatientResponse(id=UUID(document.get("id", document["user_id"])), **{key: document.get(key) for key in ("full_name", "email", "phone", "date_of_birth", "preferred_language", "address", "emergency_contact")})
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
     patient = await session.scalar(select(Patient).where(Patient.id == UUID(principal.user_id), Patient.tenant_id == UUID(principal.tenant_id)))
@@ -323,10 +320,7 @@ async def update_profile(
         document = await mongo_database.database()["patients"].find_one({
             "tenant_id": principal.tenant_id, "user_id": principal.user_id,
         })
-        return PatientResponse(
-            id=UUID(document.get("id", document["user_id"])),
-            full_name=document["full_name"], email=document["email"], phone=document["phone"],
-        )
+        return PatientResponse(id=UUID(document.get("id", document["user_id"])), **{key: document.get(key) for key in ("full_name", "email", "phone", "date_of_birth", "preferred_language", "address", "emergency_contact")})
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
     patient = await session.scalar(select(Patient).where(Patient.id == UUID(principal.user_id), Patient.tenant_id == UUID(principal.tenant_id)))

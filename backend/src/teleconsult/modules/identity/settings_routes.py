@@ -103,7 +103,17 @@ async def get_settings(session: AsyncSession | None = Depends(settings_session),
 
 
 @router.patch("", response_model=SettingsResponse)
-async def update_settings(payload: SettingsUpdate, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("patient:profile:write"))) -> SettingsResponse:
+async def update_settings(payload: SettingsUpdate, session: AsyncSession | None = Depends(settings_session), principal: Principal = Depends(require("patient:profile:write"))) -> SettingsResponse:
+    if app_settings().mongodb_enabled:
+        database = mongo_database.database()
+        values = {key: value for key, value in payload.model_dump(exclude_unset=True).items() if value is not None}
+        if values:
+            await database["user_settings"].update_one(
+                {"tenant_id": principal.tenant_id, "user_id": principal.user_id},
+                {"$set": values, "$setOnInsert": {"tenant_id": principal.tenant_id, "user_id": principal.user_id}},
+                upsert=True,
+            )
+        return await get_settings(None, principal)
     settings = await _settings(session, principal)
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(settings, key, value)
@@ -111,7 +121,17 @@ async def update_settings(payload: SettingsUpdate, session: AsyncSession = Depen
 
 
 @router.post("/password")
-async def change_password(payload: PasswordChange, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("patient:profile:write"))):
+async def change_password(payload: PasswordChange, session: AsyncSession | None = Depends(settings_session), principal: Principal = Depends(require("patient:profile:write"))):
+    if app_settings().mongodb_enabled:
+        database = mongo_database.database()
+        user = await database["users"].find_one({"tenant_id": principal.tenant_id, "id": principal.user_id})
+        if user is None or not password_matches(payload.current_password, user.get("password_hash", "")):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        if password_matches(payload.new_password, user.get("password_hash", "")):
+            raise HTTPException(status_code=400, detail="New password must be different")
+        await database["users"].update_one({"tenant_id": principal.tenant_id, "id": principal.user_id}, {"$set": {"password_hash": password_hash(payload.new_password), "password_changed_at": datetime.now(UTC)}})
+        await database["user_sessions"].update_many({"tenant_id": principal.tenant_id, "user_id": principal.user_id, "revoked_at": None}, {"$set": {"revoked_at": datetime.now(UTC)}})
+        return {"status": "password_changed"}
     user = await session.get(UserAccount, UUID(principal.user_id))
     if user is None or not password_matches(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
@@ -145,6 +165,19 @@ async def request_export(session: AsyncSession = Depends(tenant_session), princi
 
 
 @router.post("/deletion-request")
-async def request_deletion(session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("patient:profile:write"))):
-    session.add(AuditRecord(tenant_id=UUID(principal.tenant_id), actor_id=UUID(principal.user_id), action="account.deletion_request", resource_type="user_account", resource_id=UUID(principal.user_id), purpose="account deletion review", metadata_json={"retention_applies": True}))
-    return {"status": "requested", "message": "Your request was recorded for retention and compliance review."}
+async def request_deletion(session: AsyncSession | None = Depends(settings_session), principal: Principal = Depends(require("patient:profile:write"))):
+    if app_settings().mongodb_enabled:
+        database = mongo_database.database()
+        existing = await database["user_settings"].find_one({"tenant_id": principal.tenant_id, "user_id": principal.user_id}) or {}
+        privacy = existing.get("privacy") or {}
+        if (privacy.get("closure_request") or {}).get("status") == "pending":
+            return {"status": "pending"}
+        privacy["closure_request"] = {"status": "pending", "submitted_at": datetime.now(UTC)}
+        await database["user_settings"].update_one(
+            {"tenant_id": principal.tenant_id, "user_id": principal.user_id},
+            {"$set": {"privacy": privacy}, "$setOnInsert": {"tenant_id": principal.tenant_id, "user_id": principal.user_id}},
+            upsert=True,
+        )
+        return {"status": "pending"}
+    session.add(AuditRecord(tenant_id=UUID(principal.tenant_id), actor_id=UUID(principal.user_id), action="account.deletion_request", resource_type="user_account", resource_id=UUID(principal.user_id), purpose="account closure review", metadata_json={"retention_applies": True}))
+    return {"status": "pending", "message": "Your request was recorded for review."}

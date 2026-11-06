@@ -36,6 +36,7 @@ COLLECTIONS = {
     "user_sessions": {"bsonType": "object", "required": ["tenant_id", "user_id", "token_hash"]},
     "mfa_credentials": {"bsonType": "object", "required": ["tenant_id", "user_id"]},
     "user_settings": {"bsonType": "object", "required": ["tenant_id", "user_id"]},
+    "recovery_tokens": {"bsonType": "object", "required": ["user_id", "token_hash"]},
     "data_requests": {"bsonType": "object", "required": ["tenant_id", "user_id", "request_type"]},
 }
 
@@ -73,6 +74,9 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
     "clinical_notes": [([("tenant_id", ASCENDING), ("appointment_id", ASCENDING)], {})],
     "medical_records": [([("tenant_id", ASCENDING), ("patient_id", ASCENDING), ("created_at", DESCENDING)], {})],
     "user_sessions": [([("tenant_id", ASCENDING), ("token_hash", ASCENDING)], {"unique": True})],
+    "clinics": [([("tenant_id", ASCENDING), ("clinic_id", ASCENDING)], {"unique": True, "sparse": True})],
+    "audit_logs": [([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {})],
+    "notifications": [([("tenant_id", ASCENDING), ("recipient_id", ASCENDING), ("created_at", DESCENDING)], {})],
 }
 
 
