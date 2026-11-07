@@ -1,6 +1,72 @@
 import { useState, useRef } from "react";
 import { authApi } from "../../lib/api";
-import PublicNavbar from "../public/PublicNavbar";
+
+function ClinicianBrandPanel({ onBack }) {
+  return (
+    <aside className="relative hidden overflow-hidden bg-[#295255] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
+      <div className="space-y-8 relative z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center font-bold shadow-sm">
+              <span className="material-symbols-outlined !text-[#295255] text-2xl font-bold">
+                mark_email_read
+              </span>
+            </div>
+            <div>
+              <p className="text-xl font-bold tracking-tight text-white">
+                Kaizentrix Care
+              </p>
+              <p className="text-[10px] tracking-[.18em] uppercase text-[#F0F5F7]/80 font-semibold">
+                Email Verification
+              </p>
+            </div>
+          </div>
+
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-xl border border-white/10 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">
+                arrow_back
+              </span>
+              Back
+            </button>
+          )}
+        </div>
+
+        <div className="pt-16 xl:pt-24 space-y-5">
+          <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-xs font-semibold text-[#F0F5F7] tracking-wider uppercase border border-white/10">
+            Security & Verification
+          </span>
+          <h1 className="text-4xl xl:text-5xl font-bold leading-tight text-white">
+            Verify your
+            <br />
+            clinician email.
+          </h1>
+          <p className="text-sm xl:text-base text-[#F0F5F7]/85 leading-relaxed max-w-md">
+            Enter the 6-digit verification code sent to your email to verify ownership before administrator credential review.
+          </p>
+        </div>
+      </div>
+
+      <div className="relative z-10 pt-10 border-t border-white/15 space-y-2">
+        <div className="flex items-center gap-2 text-xs font-semibold text-white">
+          <span className="material-symbols-outlined !text-[#F0F5F7] text-base">
+            lock
+          </span>
+          <span>HIPAA & GDPR Compliant Identity Verification</span>
+        </div>
+        <p className="text-xs text-[#F0F5F7]/75">
+          Two-step verification ensures clinical communications remain secure.
+        </p>
+      </div>
+
+      <div className="absolute -bottom-20 -right-20 w-96 h-96 rounded-full bg-[#577877]/25 blur-3xl pointer-events-none" />
+    </aside>
+  );
+}
 
 export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onVerified }) {
   const [email, setEmail] = useState(initialEmail);
@@ -17,7 +83,6 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
 
     const newDigits = [...digits];
     if (cleaned.length > 1) {
-      // Handle paste
       const pasted = cleaned.slice(0, 6).split("");
       for (let i = 0; i < 6; i++) {
         newDigits[i] = pasted[i] || "";
@@ -61,7 +126,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
 
     setStatus("submitting");
     try {
-      await authApi.verifyEmail(email.trim().lower ? email.trim().toLowerCase() : email.trim(), code);
+      await authApi.verifyEmail(email.trim().toLowerCase(), code);
       setStatus("success");
       if (onVerified) {
         onVerified();
@@ -91,34 +156,32 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623]">
-      <PublicNavbar />
-      <main className="px-4 py-8 sm:px-6 sm:py-12">
-        <div className="mx-auto max-w-md space-y-6 rounded-2xl border border-[rgba(87,120,119,0.18)] bg-white p-6 shadow-[0_10px_30px_-8px_rgba(22,38,35,0.08)] sm:p-8">
+    <div className="min-h-screen bg-[#F0F5F7] font-sans grid grid-cols-1 lg:grid-cols-2 text-[#162623]">
+      <ClinicianBrandPanel onBack={onBack} />
 
+      <main className="flex flex-col justify-between p-6 sm:p-10 lg:p-14 xl:p-16 min-h-screen overflow-y-auto">
+        <div className="max-w-md w-full mx-auto space-y-6">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-1 text-sm font-medium text-[#295255] hover:underline"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#295255] hover:underline cursor-pointer"
           >
-            ← Back to registration
+            <span className="material-symbols-outlined text-sm">arrow_back</span>
+            Back to registration
           </button>
 
-          <div className="text-center">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#295255]/10 text-[#295255]">
-              <span className="text-2xl">🔐</span>
-            </div>
-            <h1 className="text-2xl font-bold text-[#162623]">
+          <div className="space-y-1">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
               Verify Clinician Email
-            </h1>
-            <p className="mt-2 text-sm text-[#577877]">
-              Enter the 6-digit verification code sent to your registered email address.
+            </h2>
+            <p className="text-xs sm:text-sm text-[#577877]">
+              Enter the 6-digit OTP code sent to your registered email address.
             </p>
           </div>
 
-          <form onSubmit={handleVerify} className="space-y-6">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#577877]">
+          <form onSubmit={handleVerify} className="space-y-5">
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-[#162623]">
                 Registered Email
               </label>
               <input
@@ -127,12 +190,12 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="doctor@clinic.com"
-                className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-sm font-medium text-[#162623] focus:border-[#295255] focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#577877]">
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-[#162623]">
                 6-Digit Verification Code (OTP)
               </label>
               <div className="mt-2 flex justify-between gap-2">
@@ -146,7 +209,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
                     value={digit}
                     onChange={(e) => handleDigitChange(idx, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(idx, e)}
-                    className="h-12 w-11 rounded-xl border border-[#577877]/30 text-center text-xl font-bold text-[#295255] shadow-sm transition focus:border-[#295255] focus:ring-2 focus:ring-[#295255]/20 focus:outline-none"
+                    className="h-12 w-11 rounded-xl border border-[#577877]/30 text-center text-xl font-bold text-[#295255] shadow-xs transition focus:border-[#295255] focus:outline-none"
                   />
                 ))}
               </div>
@@ -174,25 +237,28 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
             <button
               type="submit"
               disabled={status === "submitting"}
-              className="w-full rounded-xl bg-[#295255] px-4 py-3 font-semibold text-white shadow-md transition hover:bg-[#1f3f41] disabled:opacity-50"
+              className="w-full rounded-xl bg-[#295255] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1f3f41] disabled:opacity-50 cursor-pointer"
             >
-              {status === "submitting" ? "Verifying OTP…" : "Verify OTP"}
+              {status === "submitting" ? "Verifying OTP…" : "Verify OTP Code"}
             </button>
           </form>
 
-          <div className="pt-2 text-center text-xs text-[#577877]">
+          <div className="text-center text-xs text-[#577877]">
             Didn't receive the code?{" "}
             <button
               type="button"
               onClick={handleResend}
               disabled={resendStatus === "sending"}
-              className="font-semibold text-[#295255] hover:underline disabled:opacity-50"
+              className="font-bold text-[#295255] hover:underline disabled:opacity-50 cursor-pointer"
             >
               {resendStatus === "sending" ? "Resending…" : "Resend OTP"}
             </button>
           </div>
-
         </div>
+
+        <footer className="pt-8 text-center text-xs text-[#577877]">
+          © 2026 Kaizentrix Care · Clinician Credentialing Workspace.
+        </footer>
       </main>
     </div>
   );

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     database_url: str = ""
     migration_database_url: str = ""
     tenancy_mode: TenancyMode = TenancyMode.POOLED
-    default_tenant_id: str = "00000000-0000-0000-0000-000000000001"
+    default_tenant_id: str = "1"
     auth_method: str = "password"
     payment_mode: str = "clinic_specific"
     intake_policy: str = "clinic_configured"
@@ -59,8 +59,8 @@ class Settings(BaseSettings):
     mongodb_enabled: bool = Field(default=False, validation_alias="MONGODB_ENABLED")
     mongodb_uri: str = Field(default="", validation_alias="MONGODB_URI")
     mongodb_database: str = Field(default="kaizentrix_care", validation_alias="MONGODB_DATABASE")
-    mongodb_server_selection_timeout_ms: int = Field(default=2000, validation_alias="MONGODB_SERVER_SELECTION_TIMEOUT_MS")
-    mongodb_connect_timeout_ms: int = Field(default=2000, validation_alias="MONGODB_CONNECT_TIMEOUT_MS")
+    mongodb_server_selection_timeout_ms: int = Field(default=15000, validation_alias="MONGODB_SERVER_SELECTION_TIMEOUT_MS")
+    mongodb_connect_timeout_ms: int = Field(default=15000, validation_alias="MONGODB_CONNECT_TIMEOUT_MS")
     mongodb_max_pool_size: int = Field(default=50, validation_alias="MONGODB_MAX_POOL_SIZE")
     mongodb_min_pool_size: int = Field(default=0, validation_alias="MONGODB_MIN_POOL_SIZE")
     mongodb_repositories_enabled: bool = Field(default=False, validation_alias="MONGODB_REPOSITORIES_ENABLED")

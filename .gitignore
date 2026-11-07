@@ -6,6 +6,7 @@ backend/.certs/
 .venv/
 __pycache__/
 *.pyc
+*.log
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/

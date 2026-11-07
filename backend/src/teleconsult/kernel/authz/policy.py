@@ -35,11 +35,16 @@ async def get_principal(request: Request) -> Principal:
         import hashlib
         database = mongo_database.database()
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        now_dt = datetime.now(UTC)
+        now_iso = now_dt.isoformat()
         auth_session = await database["user_sessions"].find_one({
             "tenant_id": get_settings().default_tenant_id,
             "token_hash": token_hash,
             "revoked_at": {"$exists": False},
-            "expires_at": {"$gt": datetime.now(UTC)},
+            "$or": [
+                {"expires_at": {"$gt": now_iso}},
+                {"expires_at": {"$gt": now_dt}},
+            ],
         })
         user = await database["users"].find_one({"id": auth_session["user_id"]}) if auth_session else None
         if not user:
