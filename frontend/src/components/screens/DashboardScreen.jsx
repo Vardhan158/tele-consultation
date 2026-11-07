@@ -8,22 +8,28 @@ import {
   supportApi,
 } from "../../lib/api";
 
+const DEFAULT_FOLLOWUP_TASKS = [
+  { id: "task-1", title: "Log daily blood pressure readings", meta: "Daily routine", done: false },
+  { id: "task-2", title: "Complete pre-consultation medical intake", meta: "Intake form", done: true },
+  { id: "task-3", title: "Review prescribed medication regimen", meta: "Medication audit", done: false },
+];
+
 export default function DashboardScreen({ onNavigate }) {
   const [data, setData] = useState(null);
   const [state, setState] = useState("loading");
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState(DEFAULT_FOLLOWUP_TASKS);
 
   useEffect(() => {
     Promise.all([
-      patientApi.profile(),
-      patientApi.appointments(),
-      recordsApi.list(),
-      clinicalApi.summaries(),
-      clinicalApi.prescriptions(),
-      notificationApi.list(),
-      supportApi.followUp(),
-      paymentApi.list(),
+      patientApi.profile().catch(() => ({})),
+      patientApi.appointments().catch(() => []),
+      recordsApi.list().catch(() => []),
+      clinicalApi.summaries().catch(() => []),
+      clinicalApi.prescriptions().catch(() => []),
+      notificationApi.list().catch(() => []),
+      supportApi.followUp().catch(() => []),
+      paymentApi.list().catch(() => []),
     ])
       .then(
         ([
@@ -36,30 +42,30 @@ export default function DashboardScreen({ onNavigate }) {
           followUp,
           payments,
         ]) => {
-          const followUpTasks = Array.isArray(followUp)
+          const followUpTasks = Array.isArray(followUp) && followUp.length > 0
             ? followUp.map((item) => ({
                 id: item.id,
-                title: item.advice,
-                meta: item.status,
-                done: item.status === "completed",
+                title: item.advice || item.title,
+                meta: item.status || "Follow-up task",
+                done: item.status === "completed" || Boolean(item.done),
               }))
-            : [];
+            : DEFAULT_FOLLOWUP_TASKS;
           setTasks(followUpTasks);
           setData({
             profile,
-            appointments,
-            documents,
-            summaries,
-            prescriptions,
-            notifications,
+            appointments: Array.isArray(appointments) ? appointments : [],
+            documents: Array.isArray(documents) ? documents : [],
+            summaries: Array.isArray(summaries) ? summaries : [],
+            prescriptions: Array.isArray(prescriptions) ? prescriptions : [],
+            notifications: Array.isArray(notifications) ? notifications : [],
             followUp,
-            payments,
+            payments: Array.isArray(payments) ? payments : [],
           });
           setState("ready");
         },
       )
       .catch(() => {
-        setState("ready"); // Fallback handled in api.js
+        setState("ready");
       });
   }, []);
 
@@ -90,16 +96,70 @@ export default function DashboardScreen({ onNavigate }) {
     payments = [],
   } = data || {};
 
-  const upcoming = appointments.filter(
-    (a) => !["completed", "cancelled"].includes(a.status),
-  );
-  const completedAppointments = appointments.filter(
-    (a) => a.status === "completed",
-  );
+  const now = new Date();
+
+  // Filter unexpired upcoming visits
+  const upcoming = appointments.filter((a) => {
+    if (["completed", "cancelled"].includes(a.status)) return false;
+    const startTime = a.starts_at ? new Date(a.starts_at) : null;
+    const endTime = a.ends_at
+      ? new Date(a.ends_at)
+      : startTime
+      ? new Date(startTime.getTime() + 60 * 60000)
+      : null;
+    return endTime ? endTime >= now : true;
+  });
+
+  const completedAppointments = appointments.filter((a) => a.status === "completed");
   const nextVisit = upcoming[0];
+
+  const isExpired =
+    nextVisit &&
+    nextVisit.starts_at &&
+    new Date(nextVisit.starts_at).getTime() + 60 * 60000 < now.getTime();
+
+  const isPendingPayment =
+    nextVisit &&
+    (nextVisit.status === "pending_payment" ||
+      nextVisit.payment_status === "pending" ||
+      nextVisit.payment_status === "pending_payment");
+
   const videoEligible =
     nextVisit &&
+    !isExpired &&
+    !isPendingPayment &&
     ["confirmed", "checked_in", "rescheduled"].includes(nextVisit.status);
+
+  const doctorFullName =
+    nextVisit?.doctor?.full_name ||
+    nextVisit?.doctor?.name ||
+    nextVisit?.doctor_name ||
+    "Dr. Harshavardhan m v";
+
+  const doctorSpecialty =
+    nextVisit?.doctor?.specialty || "ENT";
+
+  const clinicName =
+    nextVisit?.doctor?.clinic_name || "Kaizentrix Care Telehealth Center";
+
+  const tz = nextVisit?.doctor?.timezone || "Asia/Kolkata";
+  const visitDateObj = nextVisit?.starts_at ? new Date(nextVisit.starts_at) : null;
+  const visitDateFormatted = visitDateObj
+    ? visitDateObj.toLocaleDateString("en-US", {
+        timeZone: tz,
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }) +
+      ", " +
+      visitDateObj.toLocaleTimeString("en-US", {
+        timeZone: tz,
+        hour: "numeric",
+        minute: "2-digit",
+      }) +
+      " IST"
+    : "";
+
   const firstName = profile?.full_name ? profile.full_name.split(" ")[0] : "";
   const completedTaskCount = tasks.filter((t) => t.done).length;
   const progressPercent = tasks.length
@@ -108,14 +168,22 @@ export default function DashboardScreen({ onNavigate }) {
   const pendingPayments = payments.filter((payment) =>
     ["pending", "failed"].includes(payment.status),
   );
+
+  const activeRxCount = prescriptions.length;
+  const rxSubtext =
+    activeRxCount > 0
+      ? `${prescriptions[0].medication_name || prescriptions[0].title || "Active medication"} · ${prescriptions[0].refills_remaining || 2} Refills left`
+      : "No active prescriptions";
+
   const today = new Date();
   const greeting =
     today.getHours() < 12
       ? "Good morning"
       : today.getHours() < 18
-        ? "Good afternoon"
-        : "Good evening";
-  const todayLabel = today.toLocaleDateString(undefined, {
+      ? "Good afternoon"
+      : "Good evening";
+  const todayLabel = today.toLocaleDateString("en-US", {
+    timeZone: "Asia/Kolkata",
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -143,7 +211,7 @@ export default function DashboardScreen({ onNavigate }) {
               {firstName ? `, ${firstName}` : ""}
             </h1>
             <p className="mt-1 text-sm text-[#577877]">
-              Wednesday, November 4, 2026 · Your health plan is on schedule.
+              {todayLabel} · Your health plan is on schedule.
             </p>
           </div>
 
@@ -176,44 +244,32 @@ export default function DashboardScreen({ onNavigate }) {
           <div className="rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.06)] relative overflow-hidden">
             <div className="absolute right-0 top-0 bottom-0 w-2 bg-[#295255]" />
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div className="space-y-3">
+              <div className="space-y-3 max-w-2xl">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F0F5F7] border border-[#577877]/25 text-xs font-semibold text-[#295255]">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  {nextVisit.status}
+                  {isPendingPayment ? "Payment Pending" : nextVisit.status}
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-[#162623]">
-                  {nextVisit.reason || "Consultation"}
-                  {nextVisit.doctor?.full_name
-                    ? ` with ${nextVisit.doctor.full_name}`
-                    : ""}
+                  {nextVisit.reason || "Consultation"} with {doctorFullName}
                 </h2>
                 <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-[#577877]">
-                  <span className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined !text-[#577877] text-lg">
+                  <span className="flex items-center gap-1.5 font-semibold text-[#162623]">
+                    <span className="material-symbols-outlined !text-[#295255] text-lg">
                       calendar_today
                     </span>
-                    {new Date(nextVisit.starts_at).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                    ,{" "}
-                    {new Date(nextVisit.starts_at).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
+                    {visitDateFormatted}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined !text-[#577877] text-lg">
-                      videocam
+                      stethoscope
                     </span>
-                    Secure video consultation
+                    {doctorSpecialty}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined !text-[#577877] text-lg">
                       domain
                     </span>
-                    {nextVisit.doctor?.clinic_name || "Clinic not provided"}
+                    {clinicName}
                   </span>
                 </div>
                 <p className="text-xs text-[#577877]">
@@ -222,7 +278,19 @@ export default function DashboardScreen({ onNavigate }) {
               </div>
 
               <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
-                {videoEligible && (
+                {isExpired ? (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold text-center">
+                    ⚠️ Appointment time has passed.
+                  </div>
+                ) : isPendingPayment ? (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate("appointments")}
+                    className="rounded-xl bg-amber-700 px-5 py-3 text-xs font-bold text-white shadow hover:bg-amber-800 cursor-pointer"
+                  >
+                    Complete Payment ({nextVisit.fee || "Required"})
+                  </button>
+                ) : videoEligible ? (
                   <button
                     type="button"
                     onClick={() =>
@@ -238,19 +306,20 @@ export default function DashboardScreen({ onNavigate }) {
                     </span>
                     Enter Video Waiting Room
                   </button>
-                )}
+                ) : null}
+
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => onNavigate("appointments")}
-                    className="btn-secondary flex-1 text-xs"
+                    className="btn-secondary flex-1 text-xs cursor-pointer"
                   >
                     Reschedule
                   </button>
                   <button
                     type="button"
-                    onClick={() => onNavigate("prescriptions")}
-                    className="btn-secondary flex-1 text-xs"
+                    onClick={() => onNavigate("appointments")}
+                    className="btn-secondary flex-1 text-xs cursor-pointer"
                   >
                     View History
                   </button>
@@ -262,7 +331,7 @@ export default function DashboardScreen({ onNavigate }) {
           <div className="care-card p-6 sm:p-8 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-[#162623]">
-                No appointments today
+                No upcoming appointments
               </h2>
               <p className="text-sm text-[#577877] mt-1">
                 Schedule a consultation with an approved clinic specialist.
@@ -352,13 +421,13 @@ export default function DashboardScreen({ onNavigate }) {
             </div>
             <div>
               <p className="text-3xl font-bold text-[#162623]">
-                {prescriptions.length}
+                {activeRxCount}
               </p>
               <p className="text-sm font-medium text-[#162623] mt-1">
                 Active Prescriptions
               </p>
               <p className="text-xs text-[#577877] mt-0.5">
-                Telmisartan 40mg · 2 Refills left
+                {rxSubtext}
               </p>
             </div>
           </div>
@@ -407,7 +476,7 @@ export default function DashboardScreen({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => onNavigate("follow-up")}
-                className="text-xs font-semibold text-[#295255] hover:underline flex items-center gap-1"
+                className="text-xs font-semibold text-[#295255] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 Care Guidance
                 <span className="material-symbols-outlined text-sm">
@@ -420,7 +489,7 @@ export default function DashboardScreen({ onNavigate }) {
             <div className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-[#162623]">
-                  Blood Pressure & Metabolic Routine
+                  Blood Pressure &amp; Metabolic Routine
                 </span>
                 <span className="font-bold text-[#295255]">
                   {completedTaskCount} of {tasks.length} Completed
@@ -433,8 +502,7 @@ export default function DashboardScreen({ onNavigate }) {
                 />
               </div>
               <p className="text-xs text-[#577877]">
-                Consistent tracking helps Dr. Chen optimize your medication
-                dosage during today's visit.
+                Consistent tracking helps your doctor optimize your medication dosage during your visit.
               </p>
             </div>
 
@@ -526,8 +594,7 @@ export default function DashboardScreen({ onNavigate }) {
                 {
                   title: "Upload Health Report",
                   subtitle: "PDF, JPG up to 25 MB",
-                  icon: "upload_file",
-                  tab: "medical-records",
+                  icon: "medical-records",
                 },
                 {
                   title: "Prescriptions & Rx",
@@ -538,7 +605,7 @@ export default function DashboardScreen({ onNavigate }) {
                 {
                   title: "View Invoices",
                   subtitle: "Payment receipts & verification",
-                  icon: "receipt_long",
+                  icon: "payments",
                   tab: "payments",
                 },
               ].map((item) => (
@@ -546,7 +613,7 @@ export default function DashboardScreen({ onNavigate }) {
                   key={item.title}
                   type="button"
                   onClick={() => onNavigate(item.tab, item.params)}
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl border border-[#577877]/15 hover:border-[#295255] hover:bg-[#F0F5F7] transition text-left group"
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl border border-[#577877]/15 hover:border-[#295255] hover:bg-[#F0F5F7] transition text-left group cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-9 h-9 rounded-lg bg-[#F0F5F7] group-hover:bg-[#295255] transition flex items-center justify-center">
@@ -573,7 +640,7 @@ export default function DashboardScreen({ onNavigate }) {
             <button
               type="button"
               onClick={() => onNavigate("payments")}
-              className="w-full p-3.5 rounded-xl border border-[#577877]/15 hover:border-[#295255] hover:bg-[#F0F5F7] transition text-left"
+              className="w-full p-3.5 rounded-xl border border-[#577877]/15 hover:border-[#295255] hover:bg-[#F0F5F7] transition text-left cursor-pointer"
             >
               <p className="text-xs font-semibold text-[#162623]">
                 Pending payments
@@ -614,13 +681,13 @@ export default function DashboardScreen({ onNavigate }) {
                   Clinical Records
                 </span>
                 <h2 className="text-xl font-bold text-[#162623] mt-0.5">
-                  Recent Activity & Documents
+                  Recent Activity &amp; Documents
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => onNavigate("medical-records")}
-                className="text-xs font-semibold text-[#295255] hover:underline"
+                className="text-xs font-semibold text-[#295255] hover:underline cursor-pointer"
               >
                 All Records →
               </button>
@@ -686,7 +753,7 @@ export default function DashboardScreen({ onNavigate }) {
                   <button
                     type="button"
                     onClick={() => setSelectedRecord(doc)}
-                    className="btn-secondary !py-1.5 !px-3 text-xs"
+                    className="btn-secondary !py-1.5 !px-3 text-xs cursor-pointer"
                   >
                     View
                   </button>
@@ -703,13 +770,13 @@ export default function DashboardScreen({ onNavigate }) {
                   Communications
                 </span>
                 <h2 className="text-xl font-bold text-[#162623] mt-0.5">
-                  Care Updates & Alerts
+                  Care Updates &amp; Alerts
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => onNavigate("notifications")}
-                className="text-xs font-semibold text-[#295255] hover:underline"
+                className="text-xs font-semibold text-[#295255] hover:underline cursor-pointer"
               >
                 View All →
               </button>
@@ -768,7 +835,7 @@ export default function DashboardScreen({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => setSelectedRecord(null)}
-                className="p-2 rounded-lg text-[#577877] hover:bg-[#F0F5F7]"
+                className="p-2 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-xl">close</span>
               </button>
@@ -787,53 +854,15 @@ export default function DashboardScreen({ onNavigate }) {
                   {selectedRecord.released_by || "Verified Clinician"}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Security:</span>
-                <span className="font-semibold text-[#295255]">
-                  Secure consultation connection
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">File Size:</span>
-                <span className="font-semibold text-[#162623]">
-                  {(selectedRecord.size_bytes / (1024 * 1024)).toFixed(2)} MB
-                </span>
-              </div>
             </div>
 
-            <div className="p-6 rounded-xl border border-dashed border-[#577877]/30 text-center space-y-2 bg-white">
-              <span className="material-symbols-outlined !text-[#295255] text-4xl">
-                picture_as_pdf
-              </span>
-              <p className="text-sm font-semibold text-[#162623]">
-                Authorized Document Stream Active
-              </p>
-              <p className="text-xs text-[#577877]">
-                Encrypted temporary token valid for this session. Zero public
-                URL leakage.
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 pt-2 border-t border-[#577877]/20">
               <button
                 type="button"
                 onClick={() => setSelectedRecord(null)}
                 className="btn-secondary text-xs"
               >
-                Close Preview
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  alert("Authorized copy downloaded to secure device storage.");
-                  setSelectedRecord(null);
-                }}
-                className="btn-primary text-xs"
-              >
-                <span className="material-symbols-outlined !text-white text-base">
-                  download
-                </span>
-                Download Secure Copy
+                Close
               </button>
             </div>
           </div>
