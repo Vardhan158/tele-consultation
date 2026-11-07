@@ -33,6 +33,7 @@ COLLECTIONS = {
     "consents": {"bsonType": "object", "required": ["tenant_id", "patient_id", "consent_type"]},
     "support_tickets": {"bsonType": "object", "required": ["tenant_id", "requester_id"]},
     "audit_logs": {"bsonType": "object", "required": ["tenant_id", "actor_id", "action"]},
+    "blocked_dates": {"bsonType": "object", "required": ["tenant_id", "date"]},
     "user_sessions": {"bsonType": "object", "required": ["tenant_id", "user_id", "token_hash"]},
     "mfa_credentials": {"bsonType": "object", "required": ["tenant_id", "user_id"]},
     "user_settings": {"bsonType": "object", "required": ["tenant_id", "user_id"]},
@@ -76,6 +77,7 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
     "user_sessions": [([("tenant_id", ASCENDING), ("token_hash", ASCENDING)], {"unique": True})],
     "clinics": [([("tenant_id", ASCENDING), ("clinic_id", ASCENDING)], {"unique": True, "sparse": True})],
     "audit_logs": [([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {})],
+    "blocked_dates": [([("tenant_id", ASCENDING), ("date", ASCENDING)], {"unique": True})],
     "notifications": [([("tenant_id", ASCENDING), ("recipient_id", ASCENDING), ("created_at", DESCENDING)], {})],
 }
 

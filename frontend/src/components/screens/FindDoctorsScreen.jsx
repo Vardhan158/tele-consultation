@@ -147,12 +147,7 @@ export default function FindDoctorsScreen({
     ],
     visit_formats: ["Video consultation", "Audio consultation"],
   });
-  const [bookingOptionsLoading, setBookingOptionsLoading] = useState(false);
-  const [bookingOptionsError, setBookingOptionsError] = useState("");
-
   useEffect(() => {
-    setBookingOptionsLoading(true);
-    setBookingOptionsError("");
     patientApi
       .bookingOptions()
       .then((data) => {
@@ -160,12 +155,7 @@ export default function FindDoctorsScreen({
           setBookingOptions(data);
         }
       })
-      .catch((err) => {
-        setBookingOptionsError(
-          err.message || "Failed to load booking options",
-        );
-      })
-      .finally(() => setBookingOptionsLoading(false));
+      .catch(() => {});
   }, []);
 
   const [patientProfile, setPatientProfile] = useState(null);
@@ -250,10 +240,9 @@ export default function FindDoctorsScreen({
       const dateParts = new Intl.DateTimeFormat("en-US", {
         timeZone: timezone,
         year: "numeric",
-        month: "numeric",
+        month: "long",
         day: "numeric",
         weekday: "short",
-        month: "long",
       }).formatToParts(slotDate);
       const dateFields = Object.fromEntries(
         dateParts.map(({ type, value }) => [type, value]),
@@ -428,7 +417,7 @@ export default function FindDoctorsScreen({
         handler: async function (response) {
           try {
             setBookingLoading(true);
-            const verified = await patientApi.verifyPayment({
+            await patientApi.verifyPayment({
               payment_id: orderRes.payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,

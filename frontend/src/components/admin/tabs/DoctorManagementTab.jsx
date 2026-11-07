@@ -17,7 +17,6 @@ export default function DoctorManagementTab() {
   const [reasonText, setReasonText] = useState("");
   const [suspendModal, setSuspendModal] = useState(null); // { doctorId: string, doctorName: string }
   const [suspendReason, setSuspendReason] = useState("");
-  const [systemStatus, setSystemStatus] = useState({ connected: false, auditActive: false });
 
   const loadDoctors = () => {
     setLoading(true);
@@ -25,10 +24,8 @@ export default function DoctorManagementTab() {
       .doctors()
       .then((res) => {
         setDoctors(Array.isArray(res) ? res : []);
-        setSystemStatus({ connected: true, auditActive: true });
       })
       .catch((err) => {
-        setSystemStatus({ connected: false, auditActive: false });
         showToast(err.message || "Failed to load clinicians directory.", "error");
       })
       .finally(() => setLoading(false));

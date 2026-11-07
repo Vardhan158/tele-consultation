@@ -75,15 +75,17 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess }) {
           >
             ← Back
           </button>
-          <h1 className="text-2xl font-bold text-[#162623]">
-            Clinician registration
-          </h1>
-          <p className="text-sm text-[#577877]">
+          <div className="mb-2 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#E8F3F3] text-[#295255]"><span className="material-symbols-outlined">medical_services</span></div>
+            <div><p className="text-xs font-semibold uppercase tracking-wider text-[#577877]">Clinician enrollment</p><h1 className="text-2xl font-bold text-[#162623] sm:text-3xl">Create your clinician account</h1></div>
+          </div>
+          <p className="border-b border-[#577877]/15 pb-5 text-sm leading-relaxed text-[#577877]">
             Credentials are reviewed by an authorized clinic administrator before
             consultation access is enabled.
           </p>
+          <div className="grid gap-4 sm:grid-cols-2">
           {fields.map(([name, label]) => (
-            <label key={name} className="block text-sm text-[#162623]">
+            <label key={name} className={`block text-sm font-semibold text-[#162623] ${['full_name', 'email', 'mobile_number', 'password'].includes(name) ? 'sm:col-span-2' : ''}`}>
               {label}
               <input
                 required
@@ -99,10 +101,12 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess }) {
                 }
                 value={form[name]}
                 onChange={update}
-                className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2"
+                placeholder={name === 'qualifications' || name === 'languages' ? 'e.g. MBBS, MD' : ''}
+                className="mt-1.5 w-full rounded-xl border border-[#577877]/25 bg-[#F0F5F7] px-3.5 py-3 text-sm font-normal outline-none transition focus:border-[#295255] focus:bg-white focus:ring-4 focus:ring-[#295255]/10"
               />
             </label>
           ))}
+          </div>
           {message && (
             <p
               className={

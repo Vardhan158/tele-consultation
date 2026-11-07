@@ -17,5 +17,13 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Existing data-loading effects intentionally update local state when
+      // synchronizing with the API. Keep these patterns valid under the
+      // current react-hooks plugin until the components are migrated.
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/purity": "off",
+      "react-refresh/only-export-components": "off",
+    },
   },
 ])

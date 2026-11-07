@@ -46,7 +46,7 @@ async def get_principal(request: Request) -> Principal:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
         role = user.get("role", "patient")
         if role == "clinic_admin":
-            permissions = {"clinic:doctor:read", "clinic:doctor:approve"}
+            permissions = {"clinic:admin", "clinic:doctor:read", "clinic:doctor:approve"}
         elif role == "doctor":
             permissions = {
                 "doctor:profile:read", "doctor:profile:write", "doctor:availability:read",
@@ -88,7 +88,7 @@ async def get_principal(request: Request) -> Principal:
                         }) if user.role == "doctor" else frozenset()
                         return Principal(user_id=str(user.id), tenant_id=str(user.tenant_id), roles=frozenset({"doctor"}), permissions=doctor_permissions, mfa_verified=bool(auth_session.mfa_verified))
                     if user.role == "clinic_admin":
-                        return Principal(user_id=str(user.id), tenant_id=str(user.tenant_id), roles=frozenset({"clinic_admin"}), permissions=frozenset({"clinic:doctor:read", "clinic:doctor:approve"}), mfa_verified=bool(auth_session.mfa_verified))
+                        return Principal(user_id=str(user.id), tenant_id=str(user.tenant_id), roles=frozenset({"clinic_admin"}), permissions=frozenset({"clinic:admin", "clinic:doctor:read", "clinic:doctor:approve"}), mfa_verified=bool(auth_session.mfa_verified))
                     return Principal(
                         user_id=str(user.id), tenant_id=str(user.tenant_id), roles=frozenset({"patient"}),
                         permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read"}),
