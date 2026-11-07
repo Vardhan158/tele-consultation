@@ -7,6 +7,15 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 from teleconsult.config.settings import get_settings
 
+try:
+    import dns.asyncresolver
+    import dns.resolver
+    for _r in (dns.asyncresolver.get_default_resolver(), dns.resolver.get_default_resolver()):
+        _r.lifetime = 10.0
+        _r.nameservers = ["8.8.8.8", "1.1.1.1", "192.168.88.1"]
+except Exception:
+    pass
+
 
 class MongoDatabase:
     def __init__(self) -> None:
@@ -29,7 +38,15 @@ class MongoDatabase:
             minPoolSize=settings.mongodb_min_pool_size,
             appname="kaizentrix-care",
         )
-        await self._client.admin.command("ping")
+        for attempt in range(3):
+            try:
+                await self._client.admin.command("ping")
+                break
+            except Exception as exc:
+                if attempt == 2:
+                    raise exc
+                import asyncio
+                await asyncio.sleep(0.5)
 
     async def close(self) -> None:
         if self._client is not None:

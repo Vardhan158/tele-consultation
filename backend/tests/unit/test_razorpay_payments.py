@@ -28,8 +28,11 @@ async def test_razorpay_payment_workflow_end_to_end(mongodb_test_database) -> No
         assert login_res.status_code == 200, f"Login failed: {login_res.text}"
 
         doc_id = "51ae2a4f-3fe9-4ca0-a106-3266454e4171"
-        random_day = secrets.randbelow(20) + 10
-        starts_at = f"2029-05-{random_day:02d}T09:00:00Z"
+        random_year = secrets.randbelow(5) + 2030
+        random_month = secrets.randbelow(11) + 1
+        random_day = secrets.randbelow(20) + 1
+        random_hour = secrets.randbelow(12) + 1
+        starts_at = f"{random_year}-{random_month:02d}-{random_day:02d}T{random_hour:02d}:00:00Z"
 
         # 2. Test Server-side Order Creation with Pricing Recalculation
         order_res = await client.post(

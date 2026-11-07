@@ -159,68 +159,109 @@ async def create_payment_order(
         )
 
     # 3. Create or reuse appointment in pending_payment status
-    appointment_id = f"apt-{secrets.token_hex(6)}"
-    idempotency_key = f"idemp-{appointment_id}"
-    apt_doc = {
-        "id": appointment_id,
+    existing_apt = await db["appointments"].find_one({
         "tenant_id": principal.tenant_id,
-        "patient_id": principal.user_id,
         "doctor_id": payload.doctor_id,
         "starts_at": payload.starts_at,
-        "duration_minutes": service.get("duration_minutes", 30),
-        "status": "pending_payment",
-        "payment_status": "pending_payment",
-        "type": payload.appointment_type,
-        "visit_format": payload.visit_format,
-        "visit_reason": payload.visit_reason,
-        "doctor_notes": payload.doctor_notes,
-        "idempotency_key": idempotency_key,
-        "fee": total_payable_paise / 100.0,
-        "fee_paise": total_payable_paise,
-        "created_at": datetime.now(UTC).isoformat(),
-    }
-    await db["appointments"].insert_one(dict(apt_doc))
+    })
 
-    # 4. Generate Razorpay Order ID
-    key_id = settings.razorpay_key_id or os.getenv("RAZORPAY_KEY_ID") or "rzp_test_kaizentrix"
-
-    rzp_client = get_razorpay_client()
-    if rzp_client:
-        try:
-            rzp_order = rzp_client.order.create({
-                "amount": total_payable_paise,
-                "currency": currency,
-                "receipt": appointment_id[:40],
-                "notes": {"appointment_id": appointment_id, "patient_id": principal.user_id},
-            })
-            order_id = rzp_order["id"]
-        except Exception:
-            order_id = f"order_{secrets.token_hex(10)}"
+    if existing_apt:
+        if existing_apt.get("status") == "confirmed" or existing_apt.get("payment_status") == "captured":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Selected appointment slot is already booked and confirmed.",
+            )
+        appointment_id = existing_apt["id"]
+        await db["appointments"].update_one(
+            {"id": appointment_id},
+            {
+                "$set": {
+                    "type": payload.appointment_type,
+                    "visit_format": payload.visit_format,
+                    "visit_reason": payload.visit_reason,
+                    "doctor_notes": payload.doctor_notes,
+                    "fee": total_payable_paise / 100.0,
+                    "fee_paise": total_payable_paise,
+                    "status": "pending_payment",
+                    "payment_status": "pending_payment",
+                }
+            },
+        )
     else:
-        order_id = f"order_{secrets.token_hex(10)}"
+        appointment_id = f"apt-{secrets.token_hex(6)}"
+        idempotency_key = f"idemp-{appointment_id}"
+        apt_doc = {
+            "id": appointment_id,
+            "tenant_id": principal.tenant_id,
+            "patient_id": principal.user_id,
+            "doctor_id": payload.doctor_id,
+            "starts_at": payload.starts_at,
+            "duration_minutes": service.get("duration_minutes", 30),
+            "status": "pending_payment",
+            "payment_status": "pending_payment",
+            "type": payload.appointment_type,
+            "visit_format": payload.visit_format,
+            "visit_reason": payload.visit_reason,
+            "doctor_notes": payload.doctor_notes,
+            "idempotency_key": idempotency_key,
+            "fee": total_payable_paise / 100.0,
+            "fee_paise": total_payable_paise,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        await db["appointments"].insert_one(dict(apt_doc))
 
-    # 5. Store Payment Record in MongoDB payments
-    payment_id = f"pay-{secrets.token_hex(6)}"
-    payment_doc = {
-        "id": payment_id,
+    # 4. Store or reuse Payment Record in MongoDB payments
+    existing_pay = await db["payments"].find_one({
         "tenant_id": principal.tenant_id,
-        "patient_id": principal.user_id,
-        "doctor_id": payload.doctor_id,
         "appointment_id": appointment_id,
-        "idempotency_key": f"idemp-{payment_id}",
-        "amount": total_payable_paise,
-        "amount_paise": total_payable_paise,
-        "base_fee_paise": base_fee_paise,
-        "platform_fee_paise": platform_fee_paise,
-        "currency": currency,
         "status": "created",
-        "provider": "razorpay",
-        "razorpay_order_id": order_id,
-        "provider_order_id": order_id,
-        "receipt": appointment_id[:40],
-        "created_at": datetime.now(UTC).isoformat(),
-    }
-    await db["payments"].insert_one(dict(payment_doc))
+    })
+
+    key_id = settings.razorpay_key_id or os.getenv("RAZORPAY_KEY_ID") or "rzp_test_SjC9thwdLWFQ8m"
+    key_secret = settings.razorpay_key_secret or os.getenv("RAZORPAY_KEY_SECRET") or "l0wIalwefClE3hHfLvyHg832"
+
+    if existing_pay and existing_pay.get("razorpay_order_id"):
+        payment_id = existing_pay["id"]
+        order_id = existing_pay["razorpay_order_id"]
+    else:
+        order_id = None
+        if razorpay and key_id and key_secret and not key_id.startswith("rzp_test_placeholder"):
+            try:
+                rzp_client = razorpay.Client(auth=(key_id, key_secret))
+                rzp_order = rzp_client.order.create({
+                    "amount": total_payable_paise,
+                    "currency": currency,
+                    "receipt": appointment_id[:40],
+                    "notes": {"appointment_id": appointment_id, "patient_id": principal.user_id},
+                })
+                order_id = rzp_order["id"]
+            except Exception:
+                order_id = f"order_{secrets.token_hex(10)}"
+        else:
+            order_id = f"order_{secrets.token_hex(10)}"
+
+        payment_id = f"pay-{secrets.token_hex(6)}"
+        payment_doc = {
+            "id": payment_id,
+            "tenant_id": principal.tenant_id,
+            "patient_id": principal.user_id,
+            "doctor_id": payload.doctor_id,
+            "appointment_id": appointment_id,
+            "idempotency_key": f"idemp-{payment_id}",
+            "amount": total_payable_paise,
+            "amount_paise": total_payable_paise,
+            "base_fee_paise": base_fee_paise,
+            "platform_fee_paise": platform_fee_paise,
+            "currency": currency,
+            "status": "created",
+            "provider": "razorpay",
+            "razorpay_order_id": order_id,
+            "provider_order_id": order_id,
+            "provider_transaction_id": f"tx_pending_{payment_id}",
+            "receipt": appointment_id[:40],
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        await db["payments"].insert_one(dict(payment_doc))
 
     return {
         "payment_id": payment_id,
@@ -270,10 +311,10 @@ async def verify_razorpay_payment(
     msg = f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}"
     expected_sig = hmac.new(key_secret.encode(), msg.encode(), hashlib.sha256).hexdigest()
 
-    sig_valid = hmac.compare_digest(expected_sig, payload.razorpay_signature) or payload.razorpay_signature.startswith("sig_test_")
+    sig_valid = hmac.compare_digest(expected_sig, payload.razorpay_signature)
 
     rzp_client = get_razorpay_client()
-    if rzp_client and not payload.razorpay_signature.startswith("sig_test_"):
+    if rzp_client:
         try:
             rzp_client.utility.verify_payment_signature({
                 "razorpay_order_id": payload.razorpay_order_id,
