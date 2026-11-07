@@ -26,8 +26,8 @@ async def test_appointment_payment_status_scenarios() -> None:
         assert login_res.status_code == 200
 
         doc_id = "51ae2a4f-3fe9-4ca0-a106-3266454e4171"
-        random_day = secrets.randbelow(20) + 10
-        starts_at = f"2033-06-{random_day:02d}T10:00:00Z"
+        rand_y = secrets.randbelow(5) + 2038
+        starts_at = f"{rand_y}-{secrets.randbelow(11)+1:02d}-{secrets.randbelow(20)+1:02d}T{secrets.randbelow(12)+1:02d}:00:00Z"
 
         # Scenario 1: Pending Payment Appointment Creation
         order_res = await client.post(

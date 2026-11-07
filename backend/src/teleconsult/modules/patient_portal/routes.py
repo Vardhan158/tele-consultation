@@ -681,7 +681,7 @@ async def list_appointments(
                     full_name=doctor.get("full_name", ""),
                     specialty=doctor.get("specialty", ""),
                     clinic_name=doctor.get("clinic_name", ""),
-                    fee_paise=int(doctor.get("fee_paise", 0)),
+                    fee_paise=int(doctor["fee_paise"]) if doctor.get("fee_paise") is not None else None,
                     timezone=doctor.get("timezone") or clinic_timezone,
                     supported_languages=doctor.get("supported_languages", []),
                     registration_number=doctor.get("registration_number"),
@@ -698,9 +698,17 @@ async def list_appointments(
             fee_paise = appointment.get("fee_paise")
             base_fee_paise = appointment.get("base_fee_paise")
             platform_fee_paise = appointment.get("platform_fee_paise")
-            total_payable_paise = appointment.get("fee_paise") or (
+            payment = await database["payments"].find_one({
+                "tenant_id": principal.tenant_id, "appointment_id": appointment.get("id")
+            }, sort=[("created_at", -1)])
+            if payment:
+                fee_paise = fee_paise or payment.get("amount_paise")
+                base_fee_paise = base_fee_paise if base_fee_paise is not None else payment.get("base_fee_paise")
+                platform_fee_paise = platform_fee_paise if platform_fee_paise is not None else payment.get("platform_fee_paise")
+            total_payable_paise = fee_paise or (
                 (base_fee_paise or 0) + (platform_fee_paise or 0) if base_fee_paise is not None else None
             )
+            payment_status = payment.get("status") if payment else appointment.get("payment_status", "pending")
 
             results.append(AppointmentResponse(
                 id=_to_uuid(appointment.get("id")),
@@ -709,11 +717,11 @@ async def list_appointments(
                 starts_at=starts_at_dt,
                 ends_at=ends_at_dt,
                 status=appointment.get("status", "confirmed"),
-                payment_status=appointment.get("payment_status", "pending"),
+                payment_status=payment_status,
                 base_fee_paise=base_fee_paise,
                 platform_fee_paise=platform_fee_paise,
                 total_payable_paise=total_payable_paise,
-                currency=appointment.get("currency", "INR"),
+                currency=appointment.get("currency") or (payment.get("currency") if payment else None),
                 doctor=doctor_response,
             ))
         return results

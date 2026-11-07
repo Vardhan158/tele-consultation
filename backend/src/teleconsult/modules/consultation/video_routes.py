@@ -72,10 +72,16 @@ async def join_waiting_room(
 
         status_val = apt_doc.get("status")
         pay_status = (apt_doc.get("payment_status") or "").lower()
+        payment_doc = await db["payments"].find_one(
+            {"tenant_id": principal.tenant_id, "appointment_id": str(appointment_id)},
+            sort=[("created_at", -1)],
+        )
+        if payment_doc:
+            pay_status = (payment_doc.get("status") or pay_status).lower()
 
         # Reject if appointment requires payment and payment_status is pending/failed
         is_free_or_paid = pay_status in {"captured", "success", "not_required", "no_payment_required", "not_needed"}
-        if not is_free_or_paid and pay_status in {"pending", "pending_payment", "failed", "unpaid"}:
+        if not is_free_or_paid:
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
                 detail="Payment is required before joining the consultation room.",

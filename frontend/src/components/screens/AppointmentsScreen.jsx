@@ -60,16 +60,20 @@ function formatDbAppointment(apt) {
       .toUpperCase() || "DC";
 
   // Fee calculation from backend records ONLY! No hardcoded $85!
-  const totalPaise = apt.total_payable_paise || apt.fee_paise || (apt.doctor?.fee_paise ?? null);
-  const currency = apt.currency || "INR";
+  const totalPaise = apt.total_payable_paise ?? apt.fee_paise ?? (apt.doctor?.fee_paise ?? null);
+  const currency = apt.currency;
   const currSymbol = currency === "INR" ? "₹" : "$";
 
-  const feeFull = totalPaise != null
-    ? `${currSymbol}${(totalPaise / 100).toFixed(2)}`
+  const isValidatedFree = totalPaise === 0 && apt.payment_status === "not_required";
+  const feeFull = isValidatedFree
+    ? "NO PAYMENT REQUIRED"
+    : totalPaise != null && currency
+      ? `${currSymbol}${(totalPaise / 100).toFixed(2)}`
     : "Fee unavailable";
 
   const isPaid = apt.payment_status === "captured" || apt.payment_status === "success";
   const isPendingPayment = apt.status === "pending_payment" || apt.payment_status === "pending" || apt.payment_status === "pending_payment";
+  const canJoinVideo = isPaid || isValidatedFree;
 
   const statusLabel =
     apt.status === "confirmed"
@@ -117,6 +121,7 @@ function formatDbAppointment(apt) {
     rawPaymentStatus: apt.payment_status,
     isPaid,
     isPendingPayment,
+    canJoinVideo,
     fee: feeFull,
     feePaise: totalPaise,
     currency,
@@ -225,14 +230,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
 
       const loaded = await loadRazorpayScript();
       if (!loaded || !window.Razorpay) {
-        const verified = await patientApi.verifyPayment({
-          payment_id: orderRes.payment_id,
-          razorpay_order_id: orderRes.order_id,
-          razorpay_payment_id: `pay_${Date.now().toString(36)}`,
-          razorpay_signature: `sig_test_${Date.now()}`,
-        });
-        setToastMessage("Payment completed successfully!");
-        fetchAppointments();
+        setToastMessage("Payment service is temporarily unavailable. Please try again.");
         return;
       }
 
@@ -427,13 +425,15 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                             >
                               Complete Payment ({apt.fee})
                             </button>
-                          ) : (
+                          ) : apt.canJoinVideo ? (
                             <button
                               onClick={() => handleJoinWaitingRoom(apt)}
                               className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1f3f41] cursor-pointer"
                             >
                               Join Video Room
                             </button>
+                          ) : (
+                            <span className="text-xs text-[#577877]">Video access unavailable until payment is verified.</span>
                           )}
                         </div>
                       </div>

@@ -311,10 +311,10 @@ async def verify_razorpay_payment(
     msg = f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}"
     expected_sig = hmac.new(key_secret.encode(), msg.encode(), hashlib.sha256).hexdigest()
 
-    sig_valid = hmac.compare_digest(expected_sig, payload.razorpay_signature) or payload.razorpay_signature.startswith("sig_test_")
+    sig_valid = hmac.compare_digest(expected_sig, payload.razorpay_signature)
 
     rzp_client = get_razorpay_client()
-    if rzp_client and not payload.razorpay_signature.startswith("sig_test_"):
+    if rzp_client:
         try:
             rzp_client.utility.verify_payment_signature({
                 "razorpay_order_id": payload.razorpay_order_id,
