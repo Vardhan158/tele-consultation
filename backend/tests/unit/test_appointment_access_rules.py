@@ -8,6 +8,7 @@ from httpx import AsyncClient, ASGITransport
 from teleconsult.main import app
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.config.settings import get_settings
+from teleconsult.modules.identity.auth_routes import password_hash
 
 
 @pytest.mark.asyncio
@@ -15,6 +16,25 @@ async def test_appointment_access_rules_regression() -> None:
     settings = get_settings()
     if settings.mongodb_enabled:
         await mongo_database.connect()
+
+    # Ensure test patient user exists with known password_hash
+    patient_id = "00000000-0000-0000-0000-000000000002"
+    db = mongo_database.database()
+    await db["users"].update_one(
+        {"tenant_id": settings.default_tenant_id, "email": "patient-e2e@teleconsult.local"},
+        {
+            "$set": {
+                "id": patient_id,
+                "user_id": patient_id,
+                "tenant_id": settings.default_tenant_id,
+                "email": "patient-e2e@teleconsult.local",
+                "password_hash": password_hash("PatientPassword123!"),
+                "role": "patient",
+                "verified_at": "2026-01-01T00:00:00Z",
+            }
+        },
+        upsert=True,
+    )
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -28,7 +48,6 @@ async def test_appointment_access_rules_regression() -> None:
         me_res = await client.get("/api/v1/auth/me")
         patient_id = me_res.json()["user_id"]
 
-        db = mongo_database.database()
         doc_id = "51ae2a4f-3fe9-4ca0-a106-3266454e4171"
 
         # Scenario 1: Unpaid / Pending Payment Appointment -> Video Join Rejected (402)

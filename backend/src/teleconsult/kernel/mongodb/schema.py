@@ -1,8 +1,12 @@
+from datetime import UTC, datetime
+import os
 from typing import Any
 
 from pymongo import ASCENDING, DESCENDING
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.modules.identity.auth_routes import password_hash
 
 COLLECTIONS = {
     "users": {"bsonType": "object", "required": ["tenant_id", "email", "role"]},
@@ -80,6 +84,117 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
 }
 
 
+async def ensure_clinic_seeded(db=None) -> None:
+    db = mongo_database.database() if db is None else db
+    settings = get_settings()
+    tenant_id = settings.default_tenant_id or "1"
+    now_iso = datetime.now(UTC).isoformat()
+
+    # 1. Seed / Upsert Clinic Settings
+    admin_email = os.getenv("CLINIC_ADMIN_EMAIL", "clinic-admin@teleconsult.local")
+    admin_password = os.getenv("CLINIC_ADMIN_PASSWORD", "AdminPassword123!")
+    clinic_name = os.getenv("CLINIC_NAME", "Kaizentrix Care Telehealth Center")
+    clinic_tz = os.getenv("CLINIC_TIMEZONE", "Asia/Kolkata")
+
+    clinic_settings_doc = {
+        "tenant_id": tenant_id,
+        "clinic_name": clinic_name,
+        "address": os.getenv("CLINIC_ADDRESS", "742 Medical Center Blvd, San Francisco, CA 94107"),
+        "contact_email": os.getenv("CLINIC_CONTACT_EMAIL", "support@kaizentrixcare.local"),
+        "contact_phone": os.getenv("CLINIC_CONTACT_PHONE", "+1 (800) 555-KAIZEN"),
+        "timezone": clinic_tz,
+        "cancellation_deadline_hours": 24,
+        "intake_policy": "clinic_configured",
+        "prescriptions_enabled": True,
+        "operating_hours": os.getenv("CLINIC_OPERATING_HOURS", "Mon - Sat: 08:00 AM - 08:00 PM IST"),
+        "authorized_administrators": [admin_email],
+        "email_alerts_new_doctor": True,
+        "email_alerts_daily_summary": True,
+        "email_alerts_payment_failures": True,
+        "appointment_types": [{"label": "First Consultation, Follow-up Consultation, Second Opinion, Emergency Consultation, Routine Checkup", "enabled": True}],
+        "visit_formats": [{"label": "Video consultation, Audio consultation", "enabled": True}],
+        "updated_at": now_iso,
+    }
+    await db["clinic_settings"].update_one(
+        {"tenant_id": tenant_id},
+        {"$set": clinic_settings_doc},
+        upsert=True,
+    )
+
+    # 2. Seed / Upsert Clinic Administrator User
+    hashed_pwd = password_hash(admin_password)
+    admin_user_id = "00000000-0000-0000-0000-000000000001"
+    await db["users"].update_one(
+        {"tenant_id": tenant_id, "email": admin_email},
+        {
+            "$set": {
+                "id": admin_user_id,
+                "user_id": admin_user_id,
+                "tenant_id": tenant_id,
+                "full_name": "Clinic Administrator",
+                "email": admin_email,
+                "mobile_number": "0000000000",
+                "password_hash": hashed_pwd,
+                "role": "clinic_admin",
+                "verified_at": now_iso,
+                "created_at": now_iso,
+            }
+        },
+        upsert=True,
+    )
+
+    # 3. Seed / Upsert Default Clinician (Dr. Harshavardhan m v)
+    doc_id = "51ae2a4f-3fe9-4ca0-a106-3266454e4171"
+    await db["doctors"].update_one(
+        {"tenant_id": tenant_id, "id": doc_id},
+        {
+            "$set": {
+                "id": doc_id,
+                "user_id": doc_id,
+                "user_account_id": doc_id,
+                "tenant_id": tenant_id,
+                "full_name": "Harshavardhan m v",
+                "specialty": "ENT",
+                "clinic_name": clinic_name,
+                "registration_number": "KMC-HAR3210",
+                "qualifications": ["MBBS", "MS (ENT)"],
+                "experience_years": 10,
+                "languages": ["English", "Hindi", "Kannada"],
+                "supported_languages": ["English", "Hindi", "Kannada"],
+                "active": True,
+                "approved_for_consultation": True,
+                "approval_status": "approved",
+                "timezone": clinic_tz,
+                "fee_paise": 40000,
+                "created_at": now_iso,
+            }
+        },
+        upsert=True,
+    )
+
+    # 4. Seed / Upsert Default Clinical Service (ENT Follow-up Consultation)
+    await db["services"].update_one(
+        {"tenant_id": tenant_id, "id": "srv-4df86248"},
+        {
+            "$set": {
+                "id": "srv-4df86248",
+                "tenant_id": tenant_id,
+                "name": "ENT Follow-up Consultation",
+                "specialty": "ENT",
+                "duration_minutes": 30,
+                "currency": "INR",
+                "base_fee": 400,
+                "platform_fee": 75,
+                "active": True,
+                "effective_date": "2026-01-01",
+                "assigned_doctors": [doc_id],
+                "appointment_types": ["Follow-up Consultation"],
+            }
+        },
+        upsert=True,
+    )
+
+
 async def ensure_schema(db=None) -> dict[str, Any]:
     db = mongo_database.database() if db is None else db
     existing = await db.list_collection_names()
@@ -95,4 +210,5 @@ async def ensure_schema(db=None) -> dict[str, Any]:
             await db[name].create_indexes([
                 __import__("pymongo").IndexModel(keys, **options) for keys, options in specs
             ])
+    await ensure_clinic_seeded(db)
     return {"collections": len(COLLECTIONS), "created": created, "indexed": len(INDEXES)}
