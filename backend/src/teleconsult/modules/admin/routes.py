@@ -455,11 +455,6 @@ async def get_services(request: Request) -> list[dict[str, Any]]:
             .find({"tenant_id": settings.default_tenant_id})
             .to_list(100)
         )
-        if not services:
-            for s in DEFAULT_SERVICES:
-                item = {**s, "tenant_id": settings.default_tenant_id}
-                await db["services"].insert_one(item)
-            return DEFAULT_SERVICES
         return [
             {
                 "id": s.get("id") or str(s.get("_id")),
@@ -467,16 +462,16 @@ async def get_services(request: Request) -> list[dict[str, Any]]:
                 "specialty": s.get("specialty"),
                 "duration_minutes": s.get("duration_minutes", 30),
                 "currency": s.get("currency", "INR"),
-                "base_fee": s.get("base_fee", 500),
-                "platform_fee": s.get("platform_fee", 50),
+                "base_fee": s.get("base_fee", 0),
+                "platform_fee": s.get("platform_fee", 0),
                 "active": s.get("active", True),
-                "effective_date": s.get("effective_date", "2026-01-01"),
+                "effective_date": s.get("effective_date", datetime.now(UTC).strftime("%Y-%m-%d")),
                 "assigned_doctors": s.get("assigned_doctors", []),
                 "appointment_types": s.get("appointment_types", []),
             }
             for s in services
         ]
-    return DEFAULT_SERVICES
+    return []
 
 
 class ServiceSavePayload(BaseModel):
@@ -530,6 +525,28 @@ async def save_service(
         metadata={"base_fee": payload.base_fee, "platform_fee": payload.platform_fee, "assigned_doctors": payload.assigned_doctors, "appointment_types": payload.appointment_types},
     )
     return item
+
+
+@router.delete("/services/{service_id}")
+async def delete_service(
+    service_id: str,
+    request: Request,
+) -> dict[str, Any]:
+    principal = await _verify_admin(request)
+    settings = get_settings()
+    if settings.mongodb_enabled:
+        db = mongo_database.database()
+        res = await db["services"].delete_one({"tenant_id": settings.default_tenant_id, "id": service_id})
+        if res.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Service configuration not found")
+    await _audit_log(
+        principal,
+        action="service.delete",
+        resource_type="service",
+        resource_id=service_id,
+        metadata={"deleted": True},
+    )
+    return {"status": "deleted", "id": service_id}
 
 
 # --- 04. Schedule Management ---

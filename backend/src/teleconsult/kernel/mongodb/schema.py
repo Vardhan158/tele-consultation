@@ -115,6 +115,30 @@ async def ensure_clinic_seeded(db=None) -> None:
         "visit_formats": [{"label": "Video consultation, Audio consultation", "enabled": True}],
         "updated_at": now_iso,
     }
+    # 0. Seed / Upsert Primary Clinic Document in `clinics` Collection
+    clinic_id = "clinic-001"
+    clinic_doc = {
+        "id": clinic_id,
+        "clinic_id": clinic_id,
+        "tenant_id": tenant_id,
+        "name": clinic_name,
+        "clinic_name": clinic_name,
+        "address": os.getenv("CLINIC_ADDRESS", "742 Medical Center Blvd, San Francisco, CA 94107"),
+        "contact_email": os.getenv("CLINIC_CONTACT_EMAIL", "support@kaizentrixcare.local"),
+        "contact_phone": os.getenv("CLINIC_CONTACT_PHONE", "+1 (800) 555-KAIZEN"),
+        "timezone": clinic_tz,
+        "operating_hours": os.getenv("CLINIC_OPERATING_HOURS", "Mon - Sat: 08:00 AM - 08:00 PM IST"),
+        "active": True,
+        "status": "active",
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    await db["clinics"].update_one(
+        {"tenant_id": tenant_id},
+        {"$set": clinic_doc},
+        upsert=True,
+    )
+
     await db["clinic_settings"].update_one(
         {"tenant_id": tenant_id},
         {"$set": clinic_settings_doc},
@@ -192,6 +216,12 @@ async def ensure_clinic_seeded(db=None) -> None:
             }
         },
         upsert=True,
+    )
+
+    import logging
+    logging.getLogger("uvicorn").info(
+        f"Clinic credentials ({admin_email}), clinic settings ({clinic_name}), "
+        f"clinician ({doc_id}), and services seeded successfully into database."
     )
 
 
