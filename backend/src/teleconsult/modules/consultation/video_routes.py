@@ -87,6 +87,18 @@ async def join_waiting_room(
             else:
                 raise HTTPException(status_code=404, detail="Appointment not found")
 
+        # Enforce appointment ownership: patient_id must match principal.user_id
+        apt_patient_id = str(apt_doc.get("patient_id", ""))
+        if (
+            "patient" in principal.roles
+            and apt_patient_id
+            and apt_patient_id != str(principal.user_id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorized to access this consultation room.",
+            )
+
         status_val = apt_doc.get("status")
         pay_status = (apt_doc.get("payment_status") or "").lower()
         payment_doc = await db["payments"].find_one(

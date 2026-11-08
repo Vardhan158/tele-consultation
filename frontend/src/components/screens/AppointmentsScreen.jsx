@@ -106,7 +106,7 @@ function formatDbAppointment(apt) {
 
   return {
     id: apt.id,
-    displayId: apt.id && apt.id.length > 12 ? `KC-APT-${apt.id.slice(0, 4).toUpperCase()}` : apt.id || "KC-APT-1001",
+    displayId: apt.id ? `KC-APT-${apt.id.slice(-6).toUpperCase()}` : "KC-APT-1001",
     doctor: {
       id: apt.doctor?.id || apt.doctor_id,
       name: docName,
