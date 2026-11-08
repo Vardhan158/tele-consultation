@@ -98,19 +98,16 @@ export default function DashboardScreen({ onNavigate }) {
 
   const now = new Date();
 
-  // Filter unexpired upcoming visits
-  const upcoming = appointments.filter((a) => {
-    if (["completed", "cancelled"].includes(a.status)) return false;
-    const startTime = a.starts_at ? new Date(a.starts_at) : null;
-    const endTime = a.ends_at
-      ? new Date(a.ends_at)
-      : startTime
-      ? new Date(startTime.getTime() + 60 * 60000)
-      : null;
-    return endTime ? endTime >= now : true;
-  });
+  // Filter active upcoming visits (matching AppointmentsScreen.jsx filtering rules)
+  const upcoming = appointments.filter((a) =>
+    ["confirmed", "requested", "pending_payment", "checked_in"].includes(
+      a.rawStatus || a.status,
+    ),
+  );
 
-  const completedAppointments = appointments.filter((a) => a.status === "completed");
+  const completedAppointments = appointments.filter((a) =>
+    ["completed"].includes(a.rawStatus || a.status),
+  );
   const nextVisit = upcoming[0];
 
   const isExpired =
