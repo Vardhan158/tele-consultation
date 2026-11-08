@@ -382,83 +382,51 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
     return (
       <div className="w-full min-h-screen bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 font-sans text-[#162623]">
         <div className="mx-auto max-w-7xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#577877]/15 pb-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-                Live Video Consultation
+                Live Teleconsultation
               </h1>
               <p className="text-xs sm:text-sm text-[#577877] mt-1">
                 {apt?.doctor?.name || "Dr. Harshavardhan m v"} · {apt?.doctor?.specialty || "ENT"} · {apt?.displayId || apt?.id}
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                <span>Connected · Live Consultation</span>
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setToastMessage("Left consultation room.");
+                setView("list");
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-xs font-semibold text-[#295255] shadow-xs hover:bg-[#F0F5F7] cursor-pointer"
+            >
+              ← Back to Appointments
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-8 space-y-4">
-              <div className="rounded-2xl overflow-hidden bg-[#162623] relative shadow-lg aspect-16/10 flex flex-col justify-between">
-                {consultationRoom?.session_id && (
+              <div className="care-card p-6 rounded-2xl bg-white border border-[#577877]/15 shadow-lg">
+                {consultationRoom?.session_id ? (
                   <WebRtcConsultation
                     appointmentId={apt?.id}
                     authorization={consultationRoom}
                     role="patient"
-                    onEnded={() => setView("list")}
+                    onEnded={() => {
+                      setToastMessage("Consultation ended.");
+                      setView("list");
+                    }}
                   />
-                )}
-
-                <div className="w-full h-full relative flex items-center justify-center bg-[#162623]">
-                  {consultationCam ? (
-                    <video
-                      ref={localVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-white/70">
-                      <span className="material-symbols-outlined text-5xl mb-2">videocam_off</span>
-                      <p className="text-xs font-medium">Camera Off</p>
-                    </div>
-                  )}
-
-                  <div className="absolute bottom-4 left-4 z-20 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm text-white text-xs border border-white/10">
-                    {apt?.doctor?.name || "Dr. Harshavardhan m v"} ({apt?.doctor?.specialty || "ENT"})
+                ) : (
+                  <div className="p-12 text-center text-[#577877] space-y-3">
+                    <span className="material-symbols-outlined animate-spin text-4xl text-[#295255]">
+                      sync
+                    </span>
+                    <p className="text-sm font-bold text-[#162623]">
+                      Authorizing video consultation room…
+                    </p>
                   </div>
-                </div>
-              </div>
-
-              <div className="care-card p-4 rounded-2xl bg-white border border-[#577877]/15 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setConsultationMic(!consultationMic)}
-                    className="border border-[#577877]/30 text-[#162623] px-4 py-2 rounded-xl font-semibold text-xs transition cursor-pointer"
-                  >
-                    {consultationMic ? "Mic On" : "Mic Off"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConsultationCam(!consultationCam)}
-                    className="border border-[#577877]/30 text-[#162623] px-4 py-2 rounded-xl font-semibold text-xs transition cursor-pointer"
-                  >
-                    {consultationCam ? "Camera On" : "Camera Off"}
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setView("list")}
-                  className="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow cursor-pointer"
-                >
-                  Leave Call
-                </button>
+                )}
               </div>
             </div>
 
