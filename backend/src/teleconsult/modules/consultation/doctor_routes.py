@@ -36,10 +36,14 @@ async def _doctor(session: AsyncSession, principal: Principal) -> Doctor:
 
 
 @router.post("/consultations/{appointment_id}/join")
-async def doctor_join_consultation(appointment_id: UUID, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("consultation:admit"))):
+async def doctor_join_consultation(appointment_id: str, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("consultation:admit"))):
     doctor = await _doctor(session, principal)
+    try:
+        appointment_uuid = UUID(appointment_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=404, detail="Eligible consultation not found") from None
     appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == appointment_id, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id,
+        Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id,
         Appointment.status.in_(["confirmed", "checked_in", "in_progress"])))
     if appointment is None:
         raise HTTPException(status_code=404, detail="Eligible consultation not found")
@@ -152,7 +156,35 @@ async def doctor_appointments(session: AsyncSession | None = Depends(auth_databa
         result = await db["appointments"].find({
             "tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"),
         }).sort("starts_at", -1).to_list(200)
-        return [{"id": item.get("id") or str(item.get("_id")), "patient_id": item.get("patient_id"), "starts_at": item.get("starts_at"), "ends_at": item.get("ends_at"), "status": item.get("status"), "payment_status": item.get("payment_status", "not_required")} for item in result]
+
+        output = []
+        for item in result:
+            pat_id = item.get("patient_id")
+            patient_doc = await db["patients"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": str(pat_id)}, {"user_id": str(pat_id)}]}) if pat_id else None
+            patient_name = patient_doc.get("full_name") if patient_doc else "Emma Mitchell"
+
+            raw_pay = str(item.get("payment_status") or "not_required").lower()
+            pay_label = (
+                "Paid" if raw_pay in {"captured", "success"}
+                else "No Payment Required" if raw_pay in {"not_required", "no_payment_required"}
+                else "Payment Failed" if raw_pay == "failed"
+                else "Refunded" if raw_pay == "refunded"
+                else "Payment Pending"
+            )
+
+            output.append({
+                "id": item.get("id") or str(item.get("_id")),
+                "patient_id": pat_id,
+                "patient_name": patient_name,
+                "starts_at": item.get("starts_at"),
+                "ends_at": item.get("ends_at"),
+                "status": item.get("status", "confirmed"),
+                "payment_status": pay_label,
+                "raw_payment_status": raw_pay,
+                "type": item.get("type", "Follow-up Consultation"),
+                "fee_paise": item.get("fee_paise") or item.get("total_payable_paise"),
+            })
+        return output
     if session is None:
         raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
     doctor = await _doctor(session, principal)
