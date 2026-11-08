@@ -9,6 +9,7 @@ export default function ServiceFeeConfigTab() {
   const [appointmentTypes, setAppointmentTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingService, setEditingService] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState({
     id: "",
     name: "",
@@ -23,7 +24,7 @@ export default function ServiceFeeConfigTab() {
     appointment_types: [],
   });
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [doctorSearch, setDoctorSearch] = useState("");
 
   const loadServices = () => {
@@ -153,19 +154,18 @@ export default function ServiceFeeConfigTab() {
     }
   };
 
-  const handleDeleteService = async (srvId) => {
-    if (!window.confirm("Are you sure you want to delete this clinical service configuration?")) {
-      return;
-    }
-    setDeletingId(srvId);
+  const confirmDeleteService = async () => {
+    if (!deleteTarget?.id) return;
+    setDeleting(true);
     try {
-      await adminApi.deleteService(srvId);
+      await adminApi.deleteService(deleteTarget.id);
       showToast("Clinical service configuration deleted successfully.", "success");
+      setDeleteTarget(null);
       loadServices();
     } catch (err) {
       showToast(err.message || "Failed to delete service.", "error");
     } finally {
-      setDeletingId(null);
+      setDeleting(false);
     }
   };
 
@@ -217,6 +217,68 @@ export default function ServiceFeeConfigTab() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal Popup */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/60 backdrop-blur-xs p-4 font-sans">
+          <div className="care-card max-w-md w-full p-6 space-y-5 border-2 border-rose-500/40 shadow-2xl">
+            <div className="flex items-center gap-3 pb-3 border-b border-[#577877]/15">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-2xl font-bold">
+                  delete_forever
+                </span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#162623]">
+                  Delete Clinical Service
+                </h3>
+                <p className="text-xs text-[#577877]">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-rose-50/70 p-4 border border-rose-200/80 text-xs space-y-2 text-[#162623]">
+              <p className="font-bold text-rose-900">
+                Are you sure you want to permanently delete this clinical service configuration?
+              </p>
+              <div className="pt-1.5 space-y-1 text-[#577877]">
+                <div>
+                  <strong className="text-[#162623]">Service Name:</strong>{" "}
+                  {deleteTarget.name}
+                </div>
+                <div>
+                  <strong className="text-[#162623]">Specialty:</strong>{" "}
+                  {deleteTarget.specialty}
+                </div>
+                <div>
+                  <strong className="text-[#162623]">Total Charge:</strong>{" "}
+                  {deleteTarget.currency === "USD" ? "$" : "₹"}
+                  {(deleteTarget.base_fee || 0) + (deleteTarget.platform_fee || 0)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#577877]/15">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-xl border border-[#577877]/30 px-4 py-2 text-xs font-semibold text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDeleteService}
+                className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+              >
+                {deleting ? "Deleting…" : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Popup Dialog for Add / Edit Clinical Service */}
       {editingService && (
@@ -539,11 +601,10 @@ export default function ServiceFeeConfigTab() {
                       Edit
                     </button>
                     <button
-                      disabled={deletingId === srv.id}
-                      onClick={() => handleDeleteService(srv.id)}
-                      className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 cursor-pointer"
+                      onClick={() => setDeleteTarget(srv)}
+                      className="rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
                     >
-                      {deletingId === srv.id ? "Deleting…" : "Delete"}
+                      Delete
                     </button>
                   </td>
                 </tr>
