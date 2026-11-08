@@ -104,6 +104,28 @@ async def join_waiting_room(
                 detail="Payment is required before joining the consultation room.",
             )
 
+        # Validate permitted joining window on backend
+        starts_at_str = apt_doc.get("starts_at")
+        ends_at_str = apt_doc.get("ends_at")
+        if starts_at_str and settings.environment not in {"dev", "local_test"}:
+            try:
+                starts_dt = datetime.fromisoformat(str(starts_at_str).replace("Z", "+00:00"))
+                if ends_at_str:
+                    ends_dt = datetime.fromisoformat(str(ends_at_str).replace("Z", "+00:00"))
+                else:
+                    ends_dt = starts_dt + timedelta(minutes=30)
+
+                join_window_start = starts_dt - timedelta(minutes=30)
+                join_window_end = ends_dt
+
+                if now < join_window_start or now > join_window_end:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Consultation join window is closed. Permitted joining window has expired.",
+                    )
+            except ValueError:
+                pass
+
         video_doc = await db["video_sessions"].find_one({
             "tenant_id": principal.tenant_id,
             "appointment_id": str(appointment_id),
