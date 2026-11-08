@@ -2,6 +2,7 @@ import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -75,15 +76,54 @@ async def dashboard(session: AsyncSession | None = Depends(auth_database_session
         })
         if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
             raise HTTPException(status_code=403, detail="Approved doctor access is required")
-        now = datetime.now(UTC)
-        appointments = await db["appointments"].find({
+
+        clinic_settings = await db["clinic_settings"].find_one({"tenant_id": principal.tenant_id})
+        tz_name = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
+        try:
+            tz = ZoneInfo(tz_name)
+        except Exception:
+            tz = ZoneInfo("Asia/Kolkata")
+
+        now_tz = datetime.now(tz)
+        today_iso = now_tz.strftime("%Y-%m-%d")
+
+        all_appointments = await db["appointments"].find({
             "tenant_id": principal.tenant_id,
             "doctor_id": doctor.get("id"),
-            "starts_at": {"$gte": now},
-        }).sort("starts_at", 1).to_list(100)
+            "status": {"$in": ["confirmed", "requested", "pending_payment", "checked_in", "in_progress", "rescheduled"]},
+        }).sort("starts_at", 1).to_list(200)
+
+        today_count = 0
+        upcoming_count = 0
+
+        for item in all_appointments:
+            starts_raw = item.get("starts_at")
+            if not starts_raw:
+                continue
+
+            if isinstance(starts_raw, datetime):
+                starts_dt = starts_raw.astimezone(tz)
+            else:
+                try:
+                    starts_dt = datetime.fromisoformat(str(starts_raw).replace("Z", "+00:00")).astimezone(tz)
+                except ValueError:
+                    continue
+
+            item_date_str = starts_dt.strftime("%Y-%m-%d")
+            if item_date_str == today_iso:
+                today_count += 1
+
+            if starts_dt.timestamp() + 3600 >= now_tz.timestamp():
+                upcoming_count += 1
+
         completed = await db["appointments"].count_documents({"tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"), "status": "completed"})
         pending_notes = await db["clinical_notes"].count_documents({"tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"), "status": "draft"})
-        return {"today": sum(1 for item in appointments if str(item.get("starts_at", ""))[:10] == now.date().isoformat()), "upcoming": len(appointments), "completed": completed, "pending_notes": pending_notes}
+        return {
+            "today": today_count,
+            "upcoming": upcoming_count,
+            "completed": completed,
+            "pending_notes": pending_notes,
+        }
     if session is None:
         raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
     doctor = await _doctor(session, principal)

@@ -33,11 +33,33 @@ export default function DoctorDashboardScreen({ onNavigate }) {
       </div>
     );
 
+  const todayStr = new Date().toLocaleDateString("en-CA");
+  const todayCount =
+    dashboard?.today ??
+    appointments.filter(
+      (a) =>
+        a.starts_at &&
+        new Date(a.starts_at).toISOString().split("T")[0] === todayStr &&
+        !["cancelled"].includes(a.status),
+    ).length;
+
+  const upcomingCount =
+    dashboard?.upcoming ??
+    appointments.filter((a) =>
+      ["confirmed", "requested", "pending_payment", "checked_in"].includes(a.status),
+    ).length;
+
+  const completedCount =
+    dashboard?.completed ??
+    appointments.filter((a) => a.status === "completed").length;
+
+  const pendingNotesCount = dashboard?.pending_notes ?? 0;
+
   const cards = [
-    ["Today", dashboard?.today ?? 0],
-    ["Upcoming", dashboard?.upcoming ?? 0],
-    ["Completed", dashboard?.completed ?? 0],
-    ["Pending notes", dashboard?.pending_notes ?? 0],
+    ["Today", todayCount],
+    ["Upcoming", upcomingCount],
+    ["Completed", completedCount],
+    ["Pending notes", pendingNotesCount],
   ];
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
