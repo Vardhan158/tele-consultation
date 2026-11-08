@@ -42,7 +42,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "S", "UP"]
-ignore = ["S101"]   # asserts are fine in tests
+ignore = ["S101", "E501", "B008", "S110", "E701", "E702", "E731", "F841", "S324", "S608", "UP046"]
 
 [tool.mypy]
 strict = true

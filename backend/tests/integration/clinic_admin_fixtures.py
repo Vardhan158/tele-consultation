@@ -11,12 +11,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
+from clinic_admin_atlas_config import atlas_test_config
 from pymongo import AsyncMongoClient
 
-from clinic_admin_atlas_config import atlas_test_config
 from teleconsult.config.settings import get_settings
 from teleconsult.modules.identity.auth_routes import password_hash
-
 
 RUN_ID = os.getenv("CLINIC_ADMIN_TEST_RUN_ID", f"run_{secrets.token_hex(8)}")
 ROOT = Path(__file__).resolve().parents[3]

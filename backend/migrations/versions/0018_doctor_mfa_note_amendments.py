@@ -1,6 +1,6 @@
 """Add clinician MFA data and clinical note amendment history."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0018_doctor_mfa_note_amendments"
 down_revision = "0017_doctor_identity"

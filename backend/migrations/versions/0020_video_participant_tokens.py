@@ -1,6 +1,6 @@
 """Keep independent short-lived signaling tokens for each participant."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0020_video_participant_tokens"
 down_revision = "0019_session_mfa"

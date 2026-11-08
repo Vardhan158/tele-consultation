@@ -1,22 +1,32 @@
+import base64
 import hashlib
 import hmac
 import secrets
-import base64
 import struct
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from teleconsult.kernel.db.session import tenant_session
-from teleconsult.modules.identity.models import AuthSession, RecoveryToken, UserAccount
-from teleconsult.modules.identity.schemas import LoginRequest, RecoveryRequest, RegisterRequest, ResetPasswordRequest, VerifyEmailRequest
-from teleconsult.modules.patient_portal.models import Patient
-from teleconsult.modules.patient_portal.consent import PatientConsent
+from teleconsult.adapters.email.templates import (
+    render_recovery_email_html,
+    render_verification_email_html,
+)
 from teleconsult.config.settings import get_settings
+from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from uuid import UUID
+from teleconsult.modules.identity.models import AuthSession, RecoveryToken, UserAccount
+from teleconsult.modules.identity.schemas import (
+    LoginRequest,
+    RecoveryRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    VerifyEmailRequest,
+)
+from teleconsult.modules.patient_portal.consent import PatientConsent
+from teleconsult.modules.patient_portal.models import Doctor, Patient
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 GENERIC_AUTH_ERROR = "Unable to authenticate with those details"
@@ -59,12 +69,6 @@ def valid_totp(secret: str, code: str) -> bool:
         if hmac.compare_digest(expected, code):
             return True
     return False
-
-
-from teleconsult.adapters.email.templates import (
-    render_recovery_email_html,
-    render_verification_email_html,
-)
 
 
 async def send_verification_email(email: str, code: str) -> None:
@@ -135,8 +139,9 @@ async def register(payload: RegisterRequest, response: Response, session: AsyncS
             raise HTTPException(status_code=503, detail="MongoDB is enabled but not connected")
         if not settings.brevo_api_key or not (settings.brevo_sender_email or settings.email_from):
             raise HTTPException(status_code=503, detail="Email delivery is not configured")
-        from pymongo.errors import DuplicateKeyError
         from uuid import uuid4
+
+        from pymongo.errors import DuplicateKeyError
 
         database = mongo_database.database()
         if await database["users"].find_one({"tenant_id": settings.default_tenant_id, "email": email}):

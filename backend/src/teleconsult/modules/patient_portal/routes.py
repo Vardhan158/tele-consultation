@@ -1,38 +1,45 @@
 import hashlib
 import re
-from datetime import timedelta, datetime, UTC
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from collections.abc import AsyncIterator
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
-from teleconsult.config.settings import get_settings
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.identity.auth_routes import auth_database_session
+from teleconsult.modules.notifications.service import queue_patient_notification
 from teleconsult.modules.patient_portal.consent import PatientConsent
 from teleconsult.modules.patient_portal.intake import MedicalIntake
-from teleconsult.modules.audit.models import AuditRecord
-from teleconsult.modules.notifications.service import queue_patient_notification
-from teleconsult.modules.patient_portal.models import Appointment, AppointmentEvent, Doctor, DoctorAvailability, Patient
+from teleconsult.modules.patient_portal.models import (
+    Appointment,
+    AppointmentEvent,
+    Doctor,
+    DoctorAvailability,
+    Patient,
+)
 from teleconsult.modules.patient_portal.schemas import (
     AppointmentCreate,
+    AppointmentReschedule,
     AppointmentResponse,
-    DoctorResponse,
-    PatientCreate,
-    PatientResponse,
+    AvailabilityResponse,
     ConsentCreate,
     ConsentResponse,
-    AppointmentReschedule,
-    PatientProfileUpdate,
+    DoctorResponse,
     MedicalIntakeCreate,
     MedicalIntakeResponse,
-    AvailabilityResponse,
+    PatientCreate,
+    PatientProfileUpdate,
+    PatientResponse,
 )
 
 router = APIRouter(prefix="/patient", tags=["patient-journey"])

@@ -1,6 +1,6 @@
 """Add doctor eligibility, public profile metadata, and slots."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0006_directory_availability"
 down_revision = "0005_patient_profile_intake"

@@ -1,6 +1,6 @@
 """Add patient follow-up and least-privilege support tickets."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0013_followup_support"
 down_revision = "0012_clinical_outputs"

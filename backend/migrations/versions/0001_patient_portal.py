@@ -1,7 +1,7 @@
 """Create the patient portal core tables."""
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0001_patient_portal"
 down_revision = None

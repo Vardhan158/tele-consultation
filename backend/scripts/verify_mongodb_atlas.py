@@ -5,7 +5,6 @@ data. It may create the foundation collections and indexes in the configured
 database, but it does not alter PostgreSQL or enable MongoDB application use.
 """
 import asyncio
-import sys
 
 from pymongo import AsyncMongoClient
 from pymongo.errors import PyMongoError

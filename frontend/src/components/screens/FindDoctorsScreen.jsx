@@ -250,7 +250,6 @@ export default function FindDoctorsScreen({
       const dateParts = new Intl.DateTimeFormat("en-US", {
         timeZone: timezone,
         year: "numeric",
-        month: "numeric",
         day: "numeric",
         weekday: "short",
         month: "long",

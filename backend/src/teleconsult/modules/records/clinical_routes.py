@@ -1,21 +1,23 @@
 import json
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
-from datetime import datetime, UTC
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.config.settings import get_settings
-from teleconsult.modules.records.clinical_models import ConsultationSummary, Prescription
-from teleconsult.modules.records.clinical_schemas import ClinicalOutputResponse
 from teleconsult.modules.notifications.models import Notification
 from teleconsult.modules.notifications.service import queue_patient_notification
 from teleconsult.modules.patient_portal.models import Appointment
+from teleconsult.modules.records.clinical_models import ConsultationSummary, Prescription
+from teleconsult.modules.records.clinical_schemas import ClinicalOutputResponse
 
 router = APIRouter(prefix="/patient/clinical-outputs", tags=["clinical-outputs"])
 clinician_router = APIRouter(prefix="/clinician/clinical-outputs", tags=["clinical-publication"])

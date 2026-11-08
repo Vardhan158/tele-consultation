@@ -1,6 +1,6 @@
 """Add private patient document registry."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0011_patient_documents"
 down_revision = "0010_video_sessions"

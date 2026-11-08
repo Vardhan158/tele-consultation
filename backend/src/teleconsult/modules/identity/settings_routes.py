@@ -1,21 +1,20 @@
-from datetime import datetime, UTC
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from teleconsult.config.settings import get_settings as app_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.config.settings import get_settings as app_settings
-from teleconsult.modules.identity.models import UserAccount
-from teleconsult.modules.identity.settings_models import UserSettings
-from teleconsult.modules.identity.models import AuthSession
-from teleconsult.modules.identity.auth_routes import password_hash, password_matches
 from teleconsult.modules.audit.models import AuditRecord
+from teleconsult.modules.identity.auth_routes import password_hash, password_matches
+from teleconsult.modules.identity.models import AuthSession, UserAccount
+from teleconsult.modules.identity.settings_models import UserSettings
 
 router = APIRouter(prefix="/patient/settings", tags=["patient-settings"])
 

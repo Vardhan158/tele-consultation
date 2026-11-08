@@ -4,7 +4,6 @@ import asyncpg
 
 from teleconsult.config.settings import get_settings
 
-
 APP_SCHEMAS = (
     "patient_portal",
     "identity",

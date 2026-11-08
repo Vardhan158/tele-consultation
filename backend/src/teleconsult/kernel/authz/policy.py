@@ -1,8 +1,8 @@
 """The single authorization entry point. Every non-public route must depend on require()."""
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
-from datetime import datetime, UTC
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker

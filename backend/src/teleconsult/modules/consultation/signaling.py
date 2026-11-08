@@ -1,15 +1,17 @@
 """Appointment-scoped Socket.IO signaling; media never traverses this server."""
-from datetime import datetime, UTC
 import hashlib
 import logging
+from datetime import UTC, datetime
 from uuid import UUID
+
 import socketio
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
 from teleconsult.kernel.db.session import get_engine
 from teleconsult.modules.consultation.video_models import VideoSession, VideoSessionEvent
 from teleconsult.modules.identity.models import AuthSession, UserAccount
 from teleconsult.modules.patient_portal.models import Appointment, Doctor
-from sqlalchemy.ext.asyncio import async_sessionmaker
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://localhost:5173", "https://127.0.0.1:5173"], logger=False, engineio_logger=False)
 _rooms: dict[str, set[str]] = {}

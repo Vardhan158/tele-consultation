@@ -1,21 +1,27 @@
-from datetime import datetime, UTC, timedelta
-import hashlib, secrets
+import hashlib
+import secrets
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.identity.auth_routes import auth_database_session
-from teleconsult.modules.consultation.clinical_models import ClinicalNote, ClinicalNoteAmendment
-from teleconsult.modules.patient_portal.models import Appointment, Doctor, DoctorAvailability, Patient
 from teleconsult.modules.audit.models import AuditRecord
+from teleconsult.modules.consultation.clinical_models import ClinicalNote, ClinicalNoteAmendment
 from teleconsult.modules.consultation.video_models import VideoSession
-from teleconsult.config.settings import get_settings
+from teleconsult.modules.identity.auth_routes import auth_database_session
+from teleconsult.modules.patient_portal.models import (
+    Appointment,
+    Doctor,
+    DoctorAvailability,
+    Patient,
+)
 
 router = APIRouter(prefix="/doctor", tags=["doctor-portal"])
 
@@ -184,7 +190,7 @@ async def doctor_patients(session: AsyncSession = Depends(tenant_session), princ
         Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id).distinct())
     result = []
     seen = set()
-    for patient, appointment in rows:
+    for patient, _appointment in rows:
         if patient.id in seen:
             continue
         seen.add(patient.id)

@@ -1,6 +1,6 @@
 """Clinic Administrator endpoints for the 8-screen admin dashboard."""
 import secrets
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -13,11 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.identity.auth_routes import auth_database_session
 from teleconsult.modules.identity.models import UserAccount
 from teleconsult.modules.patient_portal.models import Appointment, Doctor, Patient
 from teleconsult.modules.payments.models import PaymentTransaction
-from teleconsult.modules.audit.models import AuditRecord
 
 router = APIRouter(prefix="/admin", tags=["clinic-admin"])
 
@@ -787,7 +787,6 @@ async def create_doctor_shift(
             raise HTTPException(status_code=422, detail="Clinic timezone is not configured correctly.") from exc
 
         for dt in target_dates:
-            dt_str = dt.strftime("%Y-%m-%d")
             shift_start = datetime.combine(dt, time(start_h, start_m), tzinfo=clinic_timezone).astimezone(UTC)
             shift_end = datetime.combine(dt, time(end_h, end_m), tzinfo=clinic_timezone).astimezone(UTC)
             break_start = datetime.combine(dt, time(b_start_h, b_start_m), tzinfo=clinic_timezone).astimezone(UTC)

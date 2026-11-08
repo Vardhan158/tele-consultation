@@ -1,6 +1,6 @@
 """Add clinician identity, approval, and profile metadata."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0017_doctor_identity"
 down_revision = "0016_payment_order_webhook"

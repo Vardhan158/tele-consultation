@@ -1,6 +1,5 @@
 """Real Atlas concurrency validation for inactive MongoDB scheduling repositories."""
 import asyncio
-import os
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -8,7 +7,11 @@ from pymongo import AsyncMongoClient
 from pymongo.errors import DuplicateKeyError
 
 from teleconsult.config.settings import get_settings
-from teleconsult.kernel.authz.mongodb_policy import MongoPrincipal, require_same_tenant, require_self
+from teleconsult.kernel.authz.mongodb_policy import (
+    MongoPrincipal,
+    require_same_tenant,
+    require_self,
+)
 from teleconsult.kernel.mongodb.schema import ensure_schema
 from teleconsult.modules.scheduling.mongodb_repositories import (
     AppointmentMongoRepository,

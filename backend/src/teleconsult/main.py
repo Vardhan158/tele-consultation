@@ -1,43 +1,46 @@
-"""API entrypoint and composition root: wires modules and adapters together."""
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from time import perf_counter
+from typing import Any
 
-from teleconsult.kernel.http.security_headers import SecurityHeadersMiddleware
-from teleconsult.kernel.observability.logging import configure_logging
-from teleconsult.modules.audit.routes import router as audit_router
-from teleconsult.modules.consent.routes import router as consent_router
-from teleconsult.modules.consultation.routes import router as consultation_router
-from teleconsult.modules.directory.routes import router as directory_router
-from teleconsult.modules.identity.routes import router as identity_router
-from teleconsult.modules.notifications.routes import router as notifications_router
-from teleconsult.modules.payments.routes import router as payments_router
-from teleconsult.modules.records.routes import router as records_router
-from teleconsult.modules.reporting.routes import router as reporting_router
-from teleconsult.modules.scheduling.routes import router as scheduling_router
-from teleconsult.modules.support_access.routes import router as support_access_router
-from teleconsult.modules.tenancy.routes import router as tenancy_router
-from teleconsult.modules.patient_portal.routes import router as patient_router, public_router as public_patient_router
-from teleconsult.modules.identity.auth_routes import router as auth_router
-from teleconsult.modules.identity.doctor_routes import router as doctor_router
-from teleconsult.modules.identity.settings_routes import router as settings_router
-from teleconsult.modules.payments.patient_routes import router as payment_router
-from teleconsult.modules.notifications.patient_routes import router as notification_router
-from teleconsult.modules.consultation.video_routes import router as video_router
-from teleconsult.modules.consultation.doctor_routes import router as doctor_portal_router
-from teleconsult.modules.records.patient_routes import router as records_router
-from teleconsult.modules.records.clinical_routes import router as clinical_router, clinician_router
-from teleconsult.modules.support_access.patient_routes import router as support_router
-from teleconsult.modules.scheduling.admin_routes import router as scheduling_admin_router
-from teleconsult.modules.admin.routes import router as admin_router
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from teleconsult.config.routes import router as config_router
 from teleconsult.config.settings import get_settings
-from teleconsult.kernel.tenancy.context import set_tenant
-from time import perf_counter
-from teleconsult.modules.consultation.signaling import socket_app
+from teleconsult.kernel.http.security_headers import SecurityHeadersMiddleware
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.kernel.mongodb.schema import ensure_schema
+from teleconsult.kernel.observability.logging import configure_logging
+from teleconsult.kernel.tenancy.context import set_tenant
+from teleconsult.modules.admin.routes import router as admin_router
+from teleconsult.modules.audit.routes import router as audit_router
+from teleconsult.modules.consent.routes import router as consent_router
+from teleconsult.modules.consultation.doctor_routes import router as doctor_portal_router
+from teleconsult.modules.consultation.routes import router as consultation_router
+from teleconsult.modules.consultation.signaling import socket_app
+from teleconsult.modules.consultation.video_routes import router as video_router
+from teleconsult.modules.directory.routes import router as directory_router
+from teleconsult.modules.identity.auth_routes import router as auth_router
+from teleconsult.modules.identity.doctor_routes import router as doctor_router
+from teleconsult.modules.identity.routes import router as identity_router
+from teleconsult.modules.identity.settings_routes import router as settings_router
+from teleconsult.modules.notifications.patient_routes import router as notification_router
+from teleconsult.modules.notifications.routes import router as notifications_router
+from teleconsult.modules.patient_portal.routes import public_router as public_patient_router
+from teleconsult.modules.patient_portal.routes import router as patient_router
+from teleconsult.modules.payments.patient_routes import router as payment_router
+from teleconsult.modules.payments.routes import router as payments_router
+from teleconsult.modules.records.clinical_routes import clinician_router
+from teleconsult.modules.records.clinical_routes import router as clinical_router
+from teleconsult.modules.records.patient_routes import router as records_router
+from teleconsult.modules.reporting.routes import router as reporting_router
+from teleconsult.modules.scheduling.admin_routes import router as scheduling_admin_router
+from teleconsult.modules.scheduling.routes import router as scheduling_router
+from teleconsult.modules.support_access.patient_routes import router as support_router
+from teleconsult.modules.support_access.routes import router as support_access_router
+from teleconsult.modules.tenancy.routes import router as tenancy_router
 
 # Routes that are intentionally unauthenticated. Keep this list tiny and reviewed.
 PUBLIC_PATHS = frozenset({
@@ -56,7 +59,7 @@ def create_app() -> FastAPI:
     configure_logging()
     # API docs are disabled by default; enable per environment deliberately.
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await mongo_database.connect()
         if mongo_database.enabled:
             await ensure_schema()
@@ -103,11 +106,11 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
-    async def request_observability(request: Request, call_next):
+    async def request_observability(request: Request, call_next: Any) -> Response:
         if get_settings().environment in {"dev", "local"}:
             set_tenant(request.headers.get("X-Dev-Tenant-Id", get_settings().default_tenant_id))
         started = perf_counter()
-        response = await call_next(request)
+        response: Response = await call_next(request)
         duration_ms = round((perf_counter() - started) * 1000, 2)
         # Operational telemetry only: no patient data, query strings, or bodies.
         response.headers["Server-Timing"] = f"app;dur={duration_ms}"
@@ -121,11 +124,11 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     @app.get("/health/mongodb")
-    async def mongodb_health() -> dict:
+    async def mongodb_health() -> dict[str, Any]:
         return await mongo_database.ping()
 
     @app.get("/health/mongodb/transactions")
-    async def mongodb_transactions() -> dict:
+    async def mongodb_transactions() -> dict[str, Any]:
         return await mongo_database.transaction_probe()
 
     app.include_router(identity_router)

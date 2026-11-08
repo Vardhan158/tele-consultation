@@ -1,7 +1,8 @@
-from datetime import datetime, UTC
 from uuid import UUID, uuid4
-from sqlalchemy import DateTime, JSON, String, Text
+
+from sqlalchemy import JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from teleconsult.kernel.db.base import Base
 
 

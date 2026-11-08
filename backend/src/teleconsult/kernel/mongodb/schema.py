@@ -1,5 +1,5 @@
-from datetime import UTC, datetime
 import os
+from datetime import UTC, datetime
 from typing import Any
 
 from pymongo import ASCENDING, DESCENDING
@@ -84,7 +84,7 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
 }
 
 
-async def ensure_clinic_seeded(db=None) -> None:
+async def ensure_clinic_seeded(db: Any = None) -> None:
     db = mongo_database.database() if db is None else db
     settings = get_settings()
     tenant_id = settings.default_tenant_id or "1"
@@ -225,7 +225,7 @@ async def ensure_clinic_seeded(db=None) -> None:
     )
 
 
-async def ensure_schema(db=None) -> dict[str, Any]:
+async def ensure_schema(db: Any = None) -> dict[str, Any]:
     db = mongo_database.database() if db is None else db
     existing = await db.list_collection_names()
     created = []

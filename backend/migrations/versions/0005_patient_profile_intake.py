@@ -1,6 +1,6 @@
 """Add patient profile fields and medical intake."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0005_patient_profile_intake"
 down_revision = "0004_identity_auth"
