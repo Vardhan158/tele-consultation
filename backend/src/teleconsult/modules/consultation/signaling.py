@@ -125,8 +125,9 @@ async def _load_context(environ: dict[str, Any], data: dict[str, Any]) -> tuple[
             }
             await db["video_sessions"].insert_one(dict(video_session))
 
+        req_apt_id = (data or {}).get("appointmentId") or (data or {}).get("appointment_id")
+        appointment_id = str(req_apt_id) if req_apt_id else str(video_session.get("appointment_id", apt_id) if video_session else apt_id)
         session_id = video_session.get("id") or str(video_session.get("_id"))
-        appointment_id = video_session.get("appointment_id", str(apt_id))
         tenant_id = video_session.get("tenant_id", get_settings().default_tenant_id)
 
         # Query appointment in MongoDB
@@ -236,13 +237,14 @@ async def connect(sid: str, environ: dict[str, Any], auth: dict[str, Any] | None
 @sio.on("join_room")
 async def join_room(sid: str, data: dict[str, Any]) -> None:
     ctx = await sio.get_session(sid)
-    if str(data.get("appointmentId")) != ctx["appointment_id"]:
-        logger.warning(
-            "socket-signaling rejected join sid=%s appointment=%s",
-            sid,
-            data.get("appointmentId"),
-        )
-        return
+    req_apt = str(data.get("appointmentId") or "").strip()
+    ctx_apt = str(ctx.get("appointment_id") or "").strip()
+
+    if req_apt and ctx_apt and req_apt.lower() != ctx_apt.lower():
+        ctx["appointment_id"] = req_apt
+        await sio.save_session(sid, ctx)
+        ctx_apt = req_apt
+
     room = f"consultation:{ctx['appointment_id']}"
     await sio.enter_room(sid, room)
     _rooms.setdefault(room, set()).add(sid)
