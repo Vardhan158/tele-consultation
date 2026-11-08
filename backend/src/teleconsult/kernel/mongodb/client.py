@@ -11,8 +11,7 @@ try:
     import dns.asyncresolver
     import dns.resolver
     for _r in (dns.asyncresolver.get_default_resolver(), dns.resolver.get_default_resolver()):
-        _r.lifetime = 10.0
-        _r.nameservers = ["8.8.8.8", "1.1.1.1", "192.168.88.1"]
+        _r.lifetime = 15.0
 except Exception:
     pass
 

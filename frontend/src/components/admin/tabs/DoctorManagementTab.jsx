@@ -425,8 +425,8 @@ export default function DoctorManagementTab() {
       ) : (
         <div className="space-y-4">
           <div className="grid gap-4">
-            {paginatedDoctors.map((doc) => (
-              <div key={doc.id} className="care-card p-5 transition hover:border-[#295255]/40">
+            {paginatedDoctors.map((doc, idx) => (
+              <div key={`${doc.id || doc.user_id || 'doc'}-${idx}`} className="care-card p-5 transition hover:border-[#295255]/40">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">

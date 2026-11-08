@@ -2,21 +2,14 @@ import { useEffect, useState } from "react";
 import { adminApi } from "../../../lib/api";
 import { useToast } from "../../common/Toast";
 
-const DEFAULT_APPOINTMENT_TYPES = [
-  "First Consultation",
-  "Follow-up Consultation",
-  "Second Opinion",
-  "Emergency Consultation",
-  "Routine Checkup",
-];
-
 export default function ServiceFeeConfigTab() {
   const { showToast } = useToast();
   const [services, setServices] = useState([]);
   const [doctors, setDoctors] = useState([]);
-  const [appointmentTypes, setAppointmentTypes] = useState(DEFAULT_APPOINTMENT_TYPES);
+  const [appointmentTypes, setAppointmentTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingService, setEditingService] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState({
     id: "",
     name: "",
@@ -26,11 +19,12 @@ export default function ServiceFeeConfigTab() {
     base_fee: 500,
     platform_fee: 50,
     active: true,
-    effective_date: "2026-01-01",
+    effective_date: new Date().toISOString().split("T")[0],
     assigned_doctors: [],
     appointment_types: [],
   });
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [doctorSearch, setDoctorSearch] = useState("");
 
   const loadServices = () => {
@@ -49,10 +43,14 @@ export default function ServiceFeeConfigTab() {
         );
         if (settingsRes?.appointment_types && Array.isArray(settingsRes.appointment_types)) {
           const parsed = settingsRes.appointment_types
-            .map((item) => (typeof item === "string" ? item : item?.name || item?.label))
+            .flatMap((item) => {
+              if (typeof item === "string") return item.split(",").map((s) => s.trim());
+              const label = item?.label || item?.name || "";
+              return label.split(",").map((s) => s.trim());
+            })
             .filter(Boolean);
           if (parsed.length > 0) {
-            setAppointmentTypes([...new Set([...DEFAULT_APPOINTMENT_TYPES, ...parsed])]);
+            setAppointmentTypes([...new Set(parsed)]);
           }
         }
       })
@@ -79,7 +77,7 @@ export default function ServiceFeeConfigTab() {
       active: true,
       effective_date: new Date().toISOString().split("T")[0],
       assigned_doctors: doctors.length > 0 ? [doctors[0].id] : [],
-      appointment_types: ["Follow-up Consultation"],
+      appointment_types: appointmentTypes.length > 0 ? [appointmentTypes[0]] : [],
     });
     setEditingService({});
   };
@@ -95,16 +93,16 @@ export default function ServiceFeeConfigTab() {
 
     setForm({
       id: srv.id,
-      name: srv.name,
-      specialty: srv.specialty,
+      name: srv.name || "",
+      specialty: srv.specialty || "",
       duration_minutes: srv.duration_minutes || 30,
       currency: srv.currency || "INR",
-      base_fee: srv.base_fee,
-      platform_fee: srv.platform_fee,
-      active: srv.active,
-      effective_date: srv.effective_date || "2026-01-01",
+      base_fee: srv.base_fee ?? 0,
+      platform_fee: srv.platform_fee ?? 0,
+      active: srv.active ?? true,
+      effective_date: srv.effective_date || new Date().toISOString().split("T")[0],
       assigned_doctors: Array.isArray(srv.assigned_doctors) ? srv.assigned_doctors : [],
-      appointment_types: parsedTypes.length > 0 ? [...new Set(parsedTypes)] : ["Follow-up Consultation"],
+      appointment_types: parsedTypes.length > 0 ? [...new Set(parsedTypes)] : [],
     });
     setEditingService(srv);
   };
@@ -135,10 +133,6 @@ export default function ServiceFeeConfigTab() {
       showToast("Please assign at least one clinician to this service.", "warning");
       return;
     }
-    if (!form.appointment_types || form.appointment_types.length === 0) {
-      showToast("Please select at least one applicable appointment type.", "warning");
-      return;
-    }
 
     setSaving(true);
     try {
@@ -160,30 +154,30 @@ export default function ServiceFeeConfigTab() {
     }
   };
 
+  const confirmDeleteService = async () => {
+    if (!deleteTarget?.id) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteService(deleteTarget.id);
+      showToast("Clinical service configuration deleted successfully.", "success");
+      setDeleteTarget(null);
+      loadServices();
+    } catch (err) {
+      showToast(err.message || "Failed to delete service.", "error");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const activeServicesCount = services.filter((s) => s.active).length;
 
   return (
     <div className="space-y-6 font-sans">
-      {/* Premium Cinematic Animated SaaS Banner */}
+      {/* Premium Cinematic Animated Banner */}
       <div className="relative min-h-[220px] lg:min-h-[240px] overflow-hidden rounded-2xl bg-gradient-to-r from-[#162623] via-[#295255] to-[#1f3f41] p-6 sm:p-8 text-white shadow-xl border border-[rgba(87,120,119,0.25)] flex flex-col justify-between">
-        {/* Soft Background Illumination Glow Orbs */}
         <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-[#577877]/30 blur-3xl animate-glow pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-teal-400/20 blur-3xl animate-glow pointer-events-none" />
 
-        {/* Animated Light Waves Overlay */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-          <div className="cinematic-wave cinematic-wave-one" />
-          <div className="cinematic-wave cinematic-wave-two" />
-        </div>
-
-        {/* Continuous Floating Glass Particles */}
-        <div className="cinematic-particle cinematic-particle-one" />
-        <div className="cinematic-particle cinematic-particle-two" />
-        <div className="cinematic-particle cinematic-particle-three" />
-        <div className="cinematic-particle cinematic-particle-four" />
-        <div className="cinematic-particle cinematic-particle-five" />
-
-        {/* Main Banner Content */}
         <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-teal-100 backdrop-blur-md border border-white/15 shadow-inner">
@@ -191,16 +185,14 @@ export default function ServiceFeeConfigTab() {
               SERVICE CONFIGURATION WORKSPACE
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl lg:text-4xl drop-shadow-sm font-sans">
-              Clinical Services & Pricing
+              Clinical Services &amp; Pricing
             </h1>
             <p className="text-xs text-teal-100/90 sm:text-sm leading-relaxed max-w-xl">
               Configure consultation services, appointment durations, platform fees, and pricing policies.
             </p>
           </div>
 
-          {/* Glassmorphism Live Active Services KPI Card & CTA Action Button */}
           <div className="relative z-10 flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-3 shrink-0">
-            {/* Active Services Live KPI Box */}
             <div className="relative flex items-center gap-3 rounded-2xl bg-white/10 p-3.5 backdrop-blur-md border border-white/20 shadow-lg min-w-[210px]">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-400/20 text-teal-300 border border-teal-300/30">
                 <span className="material-symbols-outlined text-xl">medical_services</span>
@@ -215,7 +207,6 @@ export default function ServiceFeeConfigTab() {
               </div>
             </div>
 
-            {/* Add New Clinical Service Button */}
             <button
               onClick={openNewService}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-[#295255] shadow-md transition-all hover:bg-[#F0F5F7] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
@@ -226,6 +217,68 @@ export default function ServiceFeeConfigTab() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal Popup */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/60 backdrop-blur-xs p-4 font-sans">
+          <div className="care-card max-w-md w-full p-6 space-y-5 border-2 border-rose-500/40 shadow-2xl">
+            <div className="flex items-center gap-3 pb-3 border-b border-[#577877]/15">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-2xl font-bold">
+                  delete_forever
+                </span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#162623]">
+                  Delete Clinical Service
+                </h3>
+                <p className="text-xs text-[#577877]">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-rose-50/70 p-4 border border-rose-200/80 text-xs space-y-2 text-[#162623]">
+              <p className="font-bold text-rose-900">
+                Are you sure you want to permanently delete this clinical service configuration?
+              </p>
+              <div className="pt-1.5 space-y-1 text-[#577877]">
+                <div>
+                  <strong className="text-[#162623]">Service Name:</strong>{" "}
+                  {deleteTarget.name}
+                </div>
+                <div>
+                  <strong className="text-[#162623]">Specialty:</strong>{" "}
+                  {deleteTarget.specialty}
+                </div>
+                <div>
+                  <strong className="text-[#162623]">Total Charge:</strong>{" "}
+                  {deleteTarget.currency === "USD" ? "$" : "₹"}
+                  {(deleteTarget.base_fee || 0) + (deleteTarget.platform_fee || 0)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#577877]/15">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-xl border border-[#577877]/30 px-4 py-2 text-xs font-semibold text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDeleteService}
+                className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+              >
+                {deleting ? "Deleting…" : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Popup Dialog for Add / Edit Clinical Service */}
       {editingService && (
@@ -335,7 +388,7 @@ export default function ServiceFeeConfigTab() {
                   onChange={(e) => setForm({ ...form, active: e.target.value === "true" })}
                   className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#295255] focus:outline-none"
                 >
-                  <option value="true">Active & Available</option>
+                  <option value="true">Active &amp; Available</option>
                   <option value="false">Inactive / Archived</option>
                 </select>
               </div>
@@ -372,11 +425,11 @@ export default function ServiceFeeConfigTab() {
                           .toLowerCase()
                           .includes(doctorSearch.toLowerCase()),
                       )
-                      .map((doctor) => {
+                      .map((doctor, idx) => {
                         const isSelected = form.assigned_doctors.includes(doctor.id);
                         return (
                           <div
-                            key={doctor.id}
+                            key={`${doctor.id}-${idx}`}
                             onClick={() => toggleDoctor(doctor.id)}
                             className={`flex items-center justify-between p-2 rounded-xl cursor-pointer text-xs transition border ${
                               isSelected
@@ -414,7 +467,7 @@ export default function ServiceFeeConfigTab() {
               <div className="sm:col-span-2 rounded-xl border border-[#577877]/15 bg-[#F0F5F7]/60 p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-[#162623]">
-                    Applicable Appointment Types <span className="text-red-600">*</span>
+                    Applicable Appointment Types
                   </label>
                   <span className="px-2.5 py-0.5 rounded-full bg-[#295255] text-white font-bold text-[10px]">
                     {form.appointment_types.length} Selected
@@ -425,31 +478,37 @@ export default function ServiceFeeConfigTab() {
                 </p>
 
                 <div className="grid gap-2 sm:grid-cols-2 max-h-36 overflow-y-auto no-scrollbar p-1">
-                  {appointmentTypes.map((type) => {
-                    const isSelected = form.appointment_types.includes(type);
-                    return (
-                      <div
-                        key={type}
-                        onClick={() => toggleAppointmentType(type)}
-                        className={`flex items-center gap-2 p-2 rounded-xl cursor-pointer text-xs transition border ${
-                          isSelected
-                            ? "bg-[#295255] text-white font-semibold border-[#162623] shadow-xs"
-                            : "bg-white text-[#162623] border-[#577877]/20 hover:bg-[#F0F5F7]"
-                        }`}
-                      >
-                        <span
-                          className={`w-4 h-4 rounded flex items-center justify-center text-[10px] shrink-0 ${
+                  {appointmentTypes.length === 0 ? (
+                    <div className="text-xs text-[#577877] p-2 sm:col-span-2 text-center">
+                      No specific appointment types configured.
+                    </div>
+                  ) : (
+                    appointmentTypes.map((type, idx) => {
+                      const isSelected = form.appointment_types.includes(type);
+                      return (
+                        <div
+                          key={`${type}-${idx}`}
+                          onClick={() => toggleAppointmentType(type)}
+                          className={`flex items-center gap-2 p-2 rounded-xl cursor-pointer text-xs transition border ${
                             isSelected
-                              ? "bg-white text-[#295255] font-bold"
-                              : "border border-[#577877]/40 bg-white"
+                              ? "bg-[#295255] text-white font-semibold border-[#162623] shadow-xs"
+                              : "bg-white text-[#162623] border-[#577877]/20 hover:bg-[#F0F5F7]"
                           }`}
                         >
-                          {isSelected ? "✓" : ""}
-                        </span>
-                        <span>{type}</span>
-                      </div>
-                    );
-                  })}
+                          <span
+                            className={`w-4 h-4 rounded flex items-center justify-center text-[10px] shrink-0 ${
+                              isSelected
+                                ? "bg-white text-[#295255] font-bold"
+                                : "border border-[#577877]/40 bg-white"
+                            }`}
+                          >
+                            {isSelected ? "✓" : ""}
+                          </span>
+                          <span>{type}</span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -480,9 +539,18 @@ export default function ServiceFeeConfigTab() {
           <span className="material-symbols-outlined animate-spin text-3xl">sync</span>
         </div>
       ) : services.length === 0 ? (
-        <div className="care-card p-12 text-center text-[#577877]">
-          <span className="material-symbols-outlined text-4xl mb-2">medical_services</span>
-          <p className="text-sm font-medium">No clinical services configured yet.</p>
+        <div className="care-card p-12 text-center text-[#577877] space-y-3">
+          <span className="material-symbols-outlined text-4xl">medical_services</span>
+          <p className="text-base font-bold text-[#162623]">No Clinical Services Configured</p>
+          <p className="text-xs max-w-md mx-auto text-[#577877]">
+            There are no service fee structures configured in the database. Click below to add a new clinical service fee.
+          </p>
+          <button
+            onClick={openNewService}
+            className="rounded-xl bg-[#295255] px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-[#1f3f41] cursor-pointer"
+          >
+            + Add New Clinical Service
+          </button>
         </div>
       ) : (
         <div className="care-card overflow-hidden">
@@ -501,8 +569,8 @@ export default function ServiceFeeConfigTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#577877]/15">
-              {services.map((srv) => (
-                <tr key={srv.id} className="hover:bg-[#F0F5F7]/50">
+              {services.map((srv, idx) => (
+                <tr key={`${srv.id || 'srv'}-${idx}`} className="hover:bg-[#F0F5F7]/50">
                   <td className="p-3 font-bold text-[#162623]">{srv.name}</td>
                   <td className="p-3 text-[#295255] font-semibold">{srv.specialty}</td>
                   <td className="p-3 text-[#577877]">{srv.duration_minutes || 30} mins</td>
@@ -525,12 +593,18 @@ export default function ServiceFeeConfigTab() {
                       {srv.active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="p-3 text-right">
+                  <td className="p-3 text-right space-x-2">
                     <button
                       onClick={() => openEditService(srv)}
                       className="rounded-lg border border-[#577877]/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#295255] hover:bg-[#F0F5F7] cursor-pointer"
                     >
                       Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(srv)}
+                      className="rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>

@@ -70,6 +70,19 @@ function ClinicianBrandPanel({ onBack }) {
   );
 }
 
+const generateRegNumber = (fullName = "", mobile = "") => {
+  const nameClean = fullName
+    .replace(/^dr\.?\s*/i, "")
+    .replace(/[^a-zA-Z]/g, "")
+    .toUpperCase();
+  const namePart = nameClean.slice(0, 3) || "DOC";
+
+  const mobileClean = mobile.replace(/\D/g, "");
+  const mobilePart = mobileClean.length >= 4 ? mobileClean.slice(-4) : "1234";
+
+  return `KMC-${namePart}${mobilePart}`;
+};
+
 export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchToPatientAuth }) {
   const [form, setForm] = useState({
     full_name: "",
@@ -83,14 +96,35 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
     qualifications: "",
     languages: "",
   });
+  const [isRegManual, setIsRegManual] = useState(false);
   const [state, setState] = useState("idle");
   const [message, setMessage] = useState("");
 
-  const update = (event) =>
-    setForm((current) => ({
-      ...current,
-      [event.target.name]: event.target.value,
-    }));
+  const update = (event) => {
+    const { name, value } = event.target;
+    if (name === "registration_number") {
+      setIsRegManual(true);
+      setForm((curr) => ({ ...curr, registration_number: value }));
+      return;
+    }
+
+    setForm((curr) => {
+      const next = { ...curr, [name]: value };
+      if (!isRegManual && (name === "full_name" || name === "mobile_number")) {
+        next.registration_number = generateRegNumber(
+          name === "full_name" ? value : curr.full_name,
+          name === "mobile_number" ? value : curr.mobile_number,
+        );
+      }
+      return next;
+    });
+  };
+
+  const handleAutoGenerateReg = () => {
+    const autoGen = generateRegNumber(form.full_name, form.mobile_number);
+    setForm((curr) => ({ ...curr, registration_number: autoGen }));
+    setIsRegManual(false);
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -257,16 +291,26 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-semibold text-[#162623]">
-                  Professional Registration Number <span className="text-red-600">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-[#162623]">
+                    Registration Number <span className="text-red-600">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAutoGenerateReg}
+                    className="text-[10px] font-bold text-[#295255] hover:underline cursor-pointer flex items-center gap-0.5"
+                    title="Auto-generate registration number based on name and mobile number"
+                  >
+                    <span>⚡ Auto-Generate</span>
+                  </button>
+                </div>
                 <input
                   required
                   name="registration_number"
                   type="text"
                   value={form.registration_number}
                   onChange={update}
-                  placeholder="MCI-123456"
+                  placeholder="KMC-HAR3210"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
                 />
               </div>

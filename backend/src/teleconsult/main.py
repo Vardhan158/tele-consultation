@@ -60,6 +60,8 @@ def create_app() -> FastAPI:
         await mongo_database.connect()
         if mongo_database.enabled:
             await ensure_schema()
+            import logging
+            logging.getLogger("uvicorn").info("MongoDB Atlas schema & clinic credentials seeded successfully on server startup.")
         try:
             yield
         finally:

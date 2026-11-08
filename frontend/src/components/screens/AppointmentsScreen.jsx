@@ -378,8 +378,8 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                   </p>
                 </div>
               ) : (
-                activeUpcomingList.map((apt) => (
-                  <div key={apt.id} className="care-card p-6 space-y-4 shadow-sm hover:border-[#295255]/30">
+                activeUpcomingList.map((apt, idx) => (
+                  <div key={`${apt.id || 'apt'}-${idx}`} className="care-card p-6 space-y-4 shadow-sm hover:border-[#295255]/30">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-mono text-[#577877]">{apt.displayId}</span>
                       <div className="flex items-center gap-2">
@@ -451,8 +451,8 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                   No past consultation records found.
                 </div>
               ) : (
-                activePastList.map((apt) => (
-                  <div key={apt.id} className="care-card p-6 space-y-2">
+                activePastList.map((apt, idx) => (
+                  <div key={`${apt.id || 'apt'}-${idx}`} className="care-card p-6 space-y-2">
                     <div className="flex justify-between text-xs">
                       <span className="font-bold text-[#162623]">{apt.doctor.name}</span>
                       <span className="text-[#577877]">{apt.dateShort}</span>
@@ -471,8 +471,8 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                   No cancelled appointments.
                 </div>
               ) : (
-                activeCancelledList.map((apt) => (
-                  <div key={apt.id} className="care-card p-6 space-y-2">
+                activeCancelledList.map((apt, idx) => (
+                  <div key={`${apt.id || 'apt'}-${idx}`} className="care-card p-6 space-y-2">
                     <div className="flex justify-between text-xs">
                       <span className="font-bold text-[#162623]">{apt.doctor.name}</span>
                       <span className="text-red-700 font-bold">Cancelled</span>

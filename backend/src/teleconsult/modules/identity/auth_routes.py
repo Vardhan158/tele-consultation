@@ -257,7 +257,7 @@ async def login(payload: LoginRequest, response: Response, session: AsyncSession
         response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
         return {
             "status": "authenticated", "user_id": user["id"],
-            "full_name": user["full_name"], "email": user["email"],
+            "full_name": user.get("full_name", "User"), "email": user.get("email", ""),
             "role": user.get("role", "patient"),
         }
     if session is None:

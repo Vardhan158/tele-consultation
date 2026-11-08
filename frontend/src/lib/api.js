@@ -334,6 +334,10 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  deleteService: (id) =>
+    apiRequest(`/admin/services/${id}`, {
+      method: "DELETE",
+    }),
   schedules: (doctorId = null) =>
     apiRequest(
       `/admin/schedules${doctorId ? `?doctor_id=${doctorId}` : ""}`,
