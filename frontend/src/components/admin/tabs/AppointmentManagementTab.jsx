@@ -207,8 +207,8 @@ export default function AppointmentManagementTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#577877]/15">
-                {paginatedAppointments.map((apt) => (
-                  <tr key={apt.id} className="hover:bg-[#F0F5F7]/50">
+                {paginatedAppointments.map((apt, idx) => (
+                  <tr key={`${apt.id || 'apt'}-${idx}`} className="hover:bg-[#F0F5F7]/50">
                     <td className="p-3">
                       <div className="font-bold text-[#162623]">{new Date(apt.starts_at).toLocaleDateString()}</div>
                       <div className="text-[11px] text-[#577877]">

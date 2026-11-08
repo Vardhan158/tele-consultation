@@ -425,11 +425,11 @@ export default function ServiceFeeConfigTab() {
                           .toLowerCase()
                           .includes(doctorSearch.toLowerCase()),
                       )
-                      .map((doctor) => {
+                      .map((doctor, idx) => {
                         const isSelected = form.assigned_doctors.includes(doctor.id);
                         return (
                           <div
-                            key={doctor.id}
+                            key={`${doctor.id}-${idx}`}
                             onClick={() => toggleDoctor(doctor.id)}
                             className={`flex items-center justify-between p-2 rounded-xl cursor-pointer text-xs transition border ${
                               isSelected
@@ -483,11 +483,11 @@ export default function ServiceFeeConfigTab() {
                       No specific appointment types configured.
                     </div>
                   ) : (
-                    appointmentTypes.map((type) => {
+                    appointmentTypes.map((type, idx) => {
                       const isSelected = form.appointment_types.includes(type);
                       return (
                         <div
-                          key={type}
+                          key={`${type}-${idx}`}
                           onClick={() => toggleAppointmentType(type)}
                           className={`flex items-center gap-2 p-2 rounded-xl cursor-pointer text-xs transition border ${
                             isSelected
@@ -569,8 +569,8 @@ export default function ServiceFeeConfigTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#577877]/15">
-              {services.map((srv) => (
-                <tr key={srv.id} className="hover:bg-[#F0F5F7]/50">
+              {services.map((srv, idx) => (
+                <tr key={`${srv.id || 'srv'}-${idx}`} className="hover:bg-[#F0F5F7]/50">
                   <td className="p-3 font-bold text-[#162623]">{srv.name}</td>
                   <td className="p-3 text-[#295255] font-semibold">{srv.specialty}</td>
                   <td className="p-3 text-[#577877]">{srv.duration_minutes || 30} mins</td>

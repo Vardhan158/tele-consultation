@@ -264,8 +264,8 @@ export default function PaymentOversightTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#577877]/15">
-                {paginatedPayments.map((p) => (
-                  <tr key={p.id} className="hover:bg-[#F0F5F7]/50">
+                {paginatedPayments.map((p, idx) => (
+                  <tr key={`${p.id || 'pay'}-${idx}`} className="hover:bg-[#F0F5F7]/50">
                     <td className="p-3 font-mono text-[11px] text-[#162623]">
                       <div className="font-bold">{p.id}</div>
                       <div className="text-[#577877] font-sans text-[10px]">
