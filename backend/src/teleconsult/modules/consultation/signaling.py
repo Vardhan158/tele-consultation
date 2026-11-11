@@ -94,7 +94,7 @@ class AptObj:
 async def _load_context(environ: dict[str, Any], data: dict[str, Any]) -> tuple[Any, Any, str, str]:
     token = (data or {}).get("consultationToken") or (data or {}).get("sessionId")
     if not token:
-        token = "default_consultation_token"
+        raise ValueError("Consultation token is required")
 
     if get_settings().mongodb_enabled:
         db = mongo_database.database()

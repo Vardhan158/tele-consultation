@@ -687,7 +687,8 @@ def _to_uuid(val: Any) -> UUID:
             return UUID(val_str)
         except ValueError:
             pass
-    raw_bytes = hashlib.md5(val_str.encode()).digest()
+    # Preserve stable legacy IDs; this hash is not used for authentication.
+    raw_bytes = hashlib.md5(val_str.encode(), usedforsecurity=False).digest()
     return UUID(bytes=raw_bytes)
 
 

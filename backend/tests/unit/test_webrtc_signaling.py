@@ -1,10 +1,11 @@
 import asyncio
 import secrets
+
 import pytest
 import socketio
-from teleconsult.main import app
-from teleconsult.kernel.mongodb.client import mongo_database
+
 from teleconsult.config.settings import get_settings
+from teleconsult.kernel.mongodb.client import mongo_database
 
 
 @pytest.mark.asyncio

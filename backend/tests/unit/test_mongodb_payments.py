@@ -9,7 +9,7 @@ from teleconsult.modules.payments.mongodb_repositories import (
 
 
 def test_payment_signatures_use_hmac_without_float_amounts() -> None:
-    secret = "synthetic-secret"
+    secret = "synthetic-secret"  # noqa: S105 - synthetic HMAC fixture
     order_id, payment_id = "order_test", "pay_test"
     signature = hmac.new(secret.encode(), f"{order_id}|{payment_id}".encode(), hashlib.sha256).hexdigest()
     assert verify_payment_signature(order_id=order_id, payment_id=payment_id, signature=signature, secret=secret)

@@ -1,4 +1,3 @@
-/* global process */
 import { expect, test } from '@playwright/test';
 
 const enabled = process.env.CLINIC_ADMIN_E2E === 'true';

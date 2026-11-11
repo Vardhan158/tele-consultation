@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import secrets
 import struct
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
