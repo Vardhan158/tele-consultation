@@ -182,7 +182,35 @@ async def register(payload: RegisterRequest, response: Response, session: AsyncS
         from pymongo.errors import DuplicateKeyError
 
         database = mongo_database.database()
-        if await database["users"].find_one({"tenant_id": settings.default_tenant_id, "email": email}):
+        existing_user = await database["users"].find_one(
+            {"tenant_id": settings.default_tenant_id, "email": email}
+        )
+        if existing_user and existing_user.get("verified_at") is None:
+            now = datetime.now(UTC)
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            token_id = str(uuid4())
+            await database["recovery_tokens"].insert_one(
+                {
+                    "id": token_id,
+                    "user_id": existing_user["id"],
+                    "token_hash": token_hash(code),
+                    "expires_at": now + timedelta(minutes=10),
+                    "used_at": None,
+                    "attempts": 0,
+                    "created_at": now,
+                }
+            )
+            try:
+                await send_verification_email(email, code)
+            except HTTPException:
+                await database["recovery_tokens"].delete_one({"id": token_id})
+                raise
+            return {
+                "status": "verification_required",
+                "user_id": existing_user["id"],
+                "email": email,
+            }
+        if existing_user:
             raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in.")
         user_id = str(uuid4())
         now = datetime.now(UTC)
@@ -221,6 +249,7 @@ async def register(payload: RegisterRequest, response: Response, session: AsyncS
                 "id": str(uuid4()), "user_id": user_id,
                 "token_hash": token_hash(code),
                 "expires_at": now + timedelta(minutes=10), "used_at": None,
+                "attempts": 0, "created_at": now,
             })
             registration_stage = "verification_email"
             await send_verification_email(email, code)
