@@ -4,6 +4,8 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+PRODUCTION_FRONTEND_ORIGINS = ("https://tele-consultation-five.vercel.app",)
+
 
 class TenancyMode(StrEnum):
     POOLED = "pooled"   # shared schema + row-level security (implemented)
@@ -72,7 +74,12 @@ class Settings(BaseSettings):
     @property
     def allowed_frontend_origins(self) -> list[str]:
         """Return the configured browser origins with whitespace removed."""
-        return [origin.strip().rstrip("/") for origin in self.frontend_origins.split(",") if origin.strip()]
+        configured = [
+            origin.strip().strip('"[]').rstrip("/")
+            for origin in self.frontend_origins.split(",")
+            if origin.strip().strip('"[]')
+        ]
+        return list(dict.fromkeys([*configured, *PRODUCTION_FRONTEND_ORIGINS]))
 
 
 @lru_cache
