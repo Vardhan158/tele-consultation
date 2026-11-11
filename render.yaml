@@ -15,4 +15,4 @@ services:
       - key: MONGODB_DATABASE
         value: kaizentrix_care
       - key: FRONTEND_ORIGINS
-        sync: false
+        value: https://tele-consultation-five.vercel.app

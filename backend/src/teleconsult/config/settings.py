@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     clinical_record_retention_days: int = 2555
     clinic_model: str = "clinic_network"
     frontend_origins: str = Field(
-        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://localhost:5173,https://127.0.0.1:5173",
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://localhost:5173,https://127.0.0.1:5173,https://tele-consultation-five.vercel.app",
         validation_alias="FRONTEND_ORIGINS",
     )
 
