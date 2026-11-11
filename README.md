@@ -111,3 +111,18 @@ docs/       ADRs, security artefacts, compliance records, runbooks, ENGINEERING_
 
 Read `docs/ENGINEERING_RULES.md` next.
 # Teleconsultation
+
+# Deployment
+
+The repository is configured for a Vercel frontend and a Render backend.
+
+1. In Render, create a Blueprint from this repository. Set the secret values for
+   `MONGODB_URI` and `FRONTEND_ORIGINS`. Initially, `FRONTEND_ORIGINS` can be the
+   expected Vercel URL, such as `https://tele-consultation.vercel.app`.
+2. In Vercel, import this repository and set the Root Directory to `frontend`.
+   Add `VITE_API_BASE_URL` with the Render service URL, without a trailing slash.
+3. After Vercel assigns the production domain, update `FRONTEND_ORIGINS` in Render
+   to that exact origin and redeploy the backend.
+
+For multiple allowed frontend origins, use a comma-separated value, for example
+`https://tele-consultation.vercel.app,https://www.example.com`.

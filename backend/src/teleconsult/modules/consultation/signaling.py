@@ -19,14 +19,7 @@ from teleconsult.modules.patient_portal.models import Appointment, Doctor
 
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "https://localhost:5173",
-        "https://127.0.0.1:5173",
-    ],
+    cors_allowed_origins=get_settings().allowed_frontend_origins,
     logger=False,
     engineio_logger=False,
 )

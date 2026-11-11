@@ -57,6 +57,7 @@ PUBLIC_PATHS = frozenset({
 
 def create_app() -> FastAPI:
     configure_logging()
+    allowed_origins = get_settings().allowed_frontend_origins
     # API docs are disabled by default; enable per environment deliberately.
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -77,7 +78,7 @@ def create_app() -> FastAPI:
         if isinstance(exc, HTTPException):
             response = JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
             origin = request.headers.get("origin")
-            if origin in {"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"}:
+            if origin in allowed_origins:
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
@@ -88,18 +89,14 @@ def create_app() -> FastAPI:
             content={"detail": str(exc) if get_settings().environment in {"dev", "local"} else "Service temporarily unavailable; please retry or contact support"}
         )
         origin = request.headers.get("origin")
-        if origin in {"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"}:
+        if origin in allowed_origins:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173", "http://127.0.0.1:5173",
-            "http://localhost:5174", "http://127.0.0.1:5174",
-            "https://localhost:5173", "https://127.0.0.1:5173",
-        ],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
