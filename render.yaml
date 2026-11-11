@@ -2,6 +2,7 @@ services:
   - type: web
     name: teleconsult-backend
     runtime: docker
+    autoDeployTrigger: commit
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health
