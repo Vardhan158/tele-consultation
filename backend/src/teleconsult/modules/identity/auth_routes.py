@@ -1,10 +1,12 @@
 import base64
 import hashlib
 import hmac
+import logging
 import secrets
 import struct
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -105,6 +107,21 @@ async def send_recovery_email(email: str, token: str) -> None:
     )
 
 
+async def _rollback_mongodb_registration(database: Any, user_id: str) -> None:
+    """Remove documents created by a registration attempt that did not complete."""
+    try:
+        await database["recovery_tokens"].delete_many({"user_id": user_id})
+        await database["consents"].delete_many({"patient_id": user_id})
+        await database["patients"].delete_many(
+            {"$or": [{"user_id": user_id}, {"id": user_id}]}
+        )
+        await database["users"].delete_one({"id": user_id})
+    except Exception:
+        logging.getLogger("teleconsult.auth").exception(
+            "Could not fully roll back failed registration for user %s", user_id
+        )
+
+
 async def send_brevo_email(
     email: str, subject: str, text: str, html_content: str | None = None
 ) -> None:
@@ -123,18 +140,25 @@ async def send_brevo_email(
         payload["htmlContent"] = html_content
 
     timeout = aiohttp.ClientTimeout(total=15)
-    async with aiohttp.ClientSession(timeout=timeout) as client:
-        async with client.post(
-            "https://api.brevo.com/v3/smtp/email",
-            headers={
-                "accept": "application/json",
-                "api-key": settings.brevo_api_key,
-                "content-type": "application/json",
-            },
-            json=payload,
-        ) as result:
-            if result.status >= 400:
-                raise HTTPException(status_code=503, detail="Brevo could not deliver the email")
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as client:
+            async with client.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "accept": "application/json",
+                    "api-key": settings.brevo_api_key,
+                    "content-type": "application/json",
+                },
+                json=payload,
+            ) as result:
+                if result.status >= 400:
+                    raise HTTPException(status_code=503, detail="Verification email could not be delivered")
+    except (aiohttp.ClientError, TimeoutError):
+        logging.getLogger("teleconsult.auth").exception("Brevo email request failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Verification email service is temporarily unavailable; please retry",
+        ) from None
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -177,26 +201,44 @@ async def register(payload: RegisterRequest, response: Response, session: AsyncS
             "mfa_enabled": False,
             "created_at": now,
         }
+        registration_stage = "user"
         try:
             await database["users"].insert_one(user)
+            registration_stage = "patient"
             await database["patients"].insert_one({
                 "id": user_id, "user_id": user_id, "tenant_id": settings.default_tenant_id,
                 "full_name": user["full_name"], "email": email,
                 "phone": payload.mobile_number, "created_at": now,
             })
+            registration_stage = "consent"
             await database["consents"].insert_one({
                 "id": str(uuid4()), "tenant_id": settings.default_tenant_id,
                 "patient_id": user_id, "consent_type": "registration_terms",
                 "version": payload.terms_version, "created_at": now,
             })
+            registration_stage = "verification_token"
             await database["recovery_tokens"].insert_one({
                 "id": str(uuid4()), "user_id": user_id,
                 "token_hash": token_hash(code),
                 "expires_at": now + timedelta(minutes=10), "used_at": None,
             })
+            registration_stage = "verification_email"
             await send_verification_email(email, code)
         except DuplicateKeyError:
+            await _rollback_mongodb_registration(database, user_id)
             raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in.") from None
+        except HTTPException:
+            await _rollback_mongodb_registration(database, user_id)
+            raise
+        except Exception:
+            logging.getLogger("teleconsult.auth").exception(
+                "Patient registration failed during %s", registration_stage
+            )
+            await _rollback_mongodb_registration(database, user_id)
+            raise HTTPException(
+                status_code=503,
+                detail=f"Registration service is temporarily unavailable during {registration_stage}; please retry",
+            ) from None
         return {"status": "verification_required", "user_id": user_id, "email": email}
 
     if session is None:
