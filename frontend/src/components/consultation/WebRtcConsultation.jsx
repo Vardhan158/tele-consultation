@@ -33,13 +33,19 @@ export default function WebRtcConsultation({
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [audioOnlyAvailable, setAudioOnlyAvailable] = useState(false);
+  const startRef = useRef(null);
+  const startingRef = useRef(false);
+  const remoteKindsRef = useRef(new Set());
 
   useEffect(() => {
     let active = true;
     let cleaned = false;
     const diagnostic = (event, value) => {
-      if (import.meta.env.DEV)
-        console.debug(`[WebRTC:${role}] ${event}`, value ?? "");
+      if (import.meta.env.DEV) {
+        const details = value && typeof value === "object" ? value : { value };
+        console.debug("[WebRTC]", { appointmentId, role, event, ...details });
+      }
     };
     const setRemoteStream = (stream) => {
       if (!remoteVideo.current || !stream) return;
@@ -48,8 +54,12 @@ export default function WebRtcConsultation({
         .play?.()
         .catch(() => diagnostic("remote-play-blocked"));
     };
-    const start = async () => {
+    const start = async (audioOnly = false) => {
+      if (startingRef.current) return;
+      startingRef.current = true;
       try {
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
         const room =
           authorization ||
           (await (role === "doctor"
@@ -61,16 +71,27 @@ export default function WebRtcConsultation({
         const ice = await consultationApi
           .config()
           .catch(() => ({ ice_servers: fallbackIceServers }));
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: !audioOnly, audio: true });
+        } catch (mediaError) {
+          if (!audioOnly && ["NotReadableError", "NotAllowedError", "OverconstrainedError"].includes(mediaError.name)) {
+            setError("Camera unavailable. You can continue with audio only.");
+            setStatus("device_unavailable");
+            setAudioOnlyAvailable(true);
+            startingRef.current = false;
+            return;
+          }
+          throw mediaError;
+        }
         if (!active) {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
-        if (!stream.getAudioTracks().length || !stream.getVideoTracks().length)
-          throw new Error("Camera and microphone tracks are required.");
+        if (!stream.getAudioTracks().length)
+          throw new Error("Microphone is unavailable. Check browser permissions and device connections.");
+        setCameraOff(audioOnly);
+        setAudioOnlyAvailable(false);
         streamRef.current = stream;
         if (localVideo.current) localVideo.current.srcObject = stream;
         const peer = new RTCPeerConnection({
@@ -80,13 +101,16 @@ export default function WebRtcConsultation({
         stream.getTracks().forEach((track) => peer.addTrack(track, stream));
         peer.ontrack = (event) => {
           diagnostic("track", event.track.kind);
+          remoteKindsRef.current.add(event.track.kind);
           setRemoteStream(event.streams?.[0] || new MediaStream([event.track]));
+          if (peer.connectionState === "connected") setStatus("in_progress");
         };
         peer.onicecandidate = (event) => {
           if (event.candidate)
             socketRef.current?.emit("ice_candidate", {
               candidate: event.candidate,
             });
+          if (event.candidate) diagnostic("ice-candidate-sent", { hasCandidate: true });
         };
         peer.onicecandidateerror = (event) =>
           diagnostic("ice-candidate-error", event.errorCode);
@@ -97,11 +121,10 @@ export default function WebRtcConsultation({
         peer.onconnectionstatechange = () => {
           diagnostic("connection-state", peer.connectionState);
           if (!active) return;
-          if (peer.connectionState === "connected") setStatus("in_progress");
+          if (peer.connectionState === "connected" && remoteKindsRef.current.size > 0) setStatus("in_progress");
           if (peer.connectionState === "disconnected")
             setStatus("reconnecting");
-          if (["failed", "closed"].includes(peer.connectionState))
-            setStatus("error");
+          if (peer.connectionState === "failed") setStatus("disconnected");
         };
         const socket = io(API_BASE_URL, {
           withCredentials: true,
@@ -120,42 +143,50 @@ export default function WebRtcConsultation({
           }
         };
         socket.on("connect", () => {
-          diagnostic("socket-connected");
-          socket.emit("join_room", { appointmentId, role });
+          diagnostic("socket-connected", { socketId: socket.id });
+          socket.emit("join_room", { appointmentId, role }, (ack) => diagnostic("room-join-ack", ack || { acknowledged: true }));
           if (active) setStatus("waiting");
         });
-        socket.on("reconnect", () => diagnostic("socket-reconnected"));
+        socket.on("room_joined", (info) => diagnostic("room-joined", info));
+        socket.on("peer_presence", (info) => { diagnostic("peer-presence", info); if (active) setStatus("connecting"); });
+        socket.on("signaling_error", (info) => { diagnostic("signaling-error", info); if (active) { setError("Consultation room authorization failed."); setStatus("error"); } });
+        socket.on("reconnect", () => diagnostic("socket-reconnected", { socketId: socket.id }));
         socket.on("disconnect", () => {
-          if (active) setStatus("reconnecting");
+          if (active) setStatus("disconnected");
         });
         socket.on("status", ({ status: next }) => {
-          if (active) setStatus(next);
+          diagnostic("server-status", { status: next });
+          if (active && ["waiting", "connecting", "completed"].includes(next)) setStatus(next);
+          if (active && next === "in_progress" && peer.connectionState !== "connected") setStatus("connecting");
         });
         socket.on("peer_ready", async () => {
           if (role !== "doctor" || cleaned || peer.signalingState !== "stable")
             return;
           const offer = await peer.createOffer();
           await peer.setLocalDescription(offer);
-          diagnostic("offer-created");
+          diagnostic("offer-created", { signalingState: peer.signalingState });
           socket.emit("offer", { offer });
         });
         socket.on("offer", async ({ offer }) => {
           if (cleaned) return;
+          diagnostic("offer-received", { type: offer?.type });
           await peer.setRemoteDescription(offer);
           await flushIce();
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
-          diagnostic("answer-created");
+          diagnostic("answer-created", { signalingState: peer.signalingState });
           socket.emit("answer", { answer });
         });
         socket.on("answer", async ({ answer }) => {
           if (!cleaned) {
             await peer.setRemoteDescription(answer);
+            diagnostic("answer-received", { signalingState: peer.signalingState });
             await flushIce();
           }
         });
         socket.on("ice_candidate", async ({ candidate }) => {
           if (!candidate || cleaned) return;
+          diagnostic("ice-candidate-received", { hasCandidate: true });
           if (!peer.remoteDescription) pendingIceRef.current.push(candidate);
           else {
             try {
@@ -169,9 +200,10 @@ export default function WebRtcConsultation({
           if (active) setStatus("waiting");
         });
         socket.on("connect_error", (err) => {
+          diagnostic("socket-connect-error", { message: err.message, code: err.data?.code });
           if (active) {
-            setError(err.message);
-            setStatus("error");
+            setError(err.data?.code ? `Connection rejected (${err.data.code}).` : err.message);
+            setStatus("disconnected");
           }
         });
         socket.on("connect", () => socket.emit("signaling_ready"));
@@ -180,8 +212,10 @@ export default function WebRtcConsultation({
           setError(err.message || "Unable to access the consultation.");
           setStatus("error");
         }
+        startingRef.current = false;
       }
     };
+    startRef.current = start;
     start();
     return () => {
       active = false;
@@ -194,6 +228,8 @@ export default function WebRtcConsultation({
       socketRef.current = null;
       peerRef.current = null;
       streamRef.current = null;
+      startingRef.current = false;
+      startRef.current = null;
     };
   }, [appointmentId, authorization, role]);
 
@@ -212,6 +248,9 @@ export default function WebRtcConsultation({
       role === "doctor" ? "end_consultation" : "leave_room",
     );
     streamRef.current?.getTracks().forEach((track) => track.stop());
+    peerRef.current?.close();
+    streamRef.current = null;
+    peerRef.current = null;
     setStatus("ended");
     onEnded?.();
   };
@@ -229,22 +268,26 @@ export default function WebRtcConsultation({
           ) : status === "waiting" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              Waiting for Doctor to Join
+              {role === "doctor" ? "Waiting for Patient to Join" : "Waiting for Doctor to Join"}
             </span>
           ) : status === "connecting" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-100 text-teal-800 font-bold uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-teal-600 animate-pulse" />
               Connecting to WebRTC Room…
             </span>
-          ) : status === "reconnecting" ? (
+          ) : status === "reconnecting" || status === "disconnected" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-bold uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
               Doctor Disconnected · Reconnecting…
             </span>
-          ) : (
+          ) : status === "device_unavailable" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-900 font-bold uppercase tracking-wider">Device Unavailable</span>
+          ) : status === "completed" || status === "ended" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-800 font-bold uppercase tracking-wider">
               Consultation Ended
             </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-900 font-bold uppercase tracking-wider">Connection Error</span>
           )}
         </div>
 
@@ -273,10 +316,14 @@ export default function WebRtcConsultation({
               </span>
               <h4 className="text-base font-bold text-white">
                 {status === "waiting"
-                  ? "Waiting for Doctor to Join"
+                  ? role === "doctor" ? "Waiting for Patient to Join" : "Waiting for Doctor to Join"
                   : status === "connecting"
                   ? "Connecting to Doctor…"
-                  : "Doctor Disconnected"}
+                  : status === "device_unavailable"
+                  ? "Camera or microphone unavailable"
+                  : status === "disconnected" || status === "reconnecting"
+                  ? "Disconnected — trying to reconnect"
+                  : "Consultation ended"}
               </h4>
               <p className="text-xs text-white/70 max-w-sm">
                 {role === "patient"
@@ -312,6 +359,17 @@ export default function WebRtcConsultation({
           </div>
         </div>
       </div>
+
+      {audioOnlyAvailable && (
+        <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
+          <p className="font-semibold">Camera unavailable</p>
+          <p className="mt-1">You can continue the consultation with audio only.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setError(""); setStatus("connecting"); startRef.current?.(false); }} className="rounded-xl border border-[#295255] px-4 py-2 text-xs font-bold text-[#295255]">Retry Camera</button>
+            <button type="button" onClick={() => { setError(""); setStatus("connecting"); startRef.current?.(true); }} className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-bold text-white">Continue audio only</button>
+          </div>
+        </div>
+      )}
 
       {/* Control Bar */}
       <div className="care-card p-4 rounded-2xl bg-white border border-[#577877]/15 flex items-center justify-between gap-3">

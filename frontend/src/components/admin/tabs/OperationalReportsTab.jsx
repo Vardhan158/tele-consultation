@@ -27,11 +27,11 @@ export default function OperationalReportsTab() {
     if (!reports) return;
     const csvRows = [
       ["Metric / Specialty", "Value / Count", "Revenue (INR)"],
-      ["Total Consultations", reports.summary?.total_consultations || 154, ""],
-      ["Doctor Utilization Rate", reports.summary?.doctor_utilization_rate || "84.2%", ""],
-      ["Completion Rate", reports.summary?.completion_rate || "92.5%", ""],
-      ["Cancellation Rate", reports.summary?.cancellation_rate || "5.2%", ""],
-      ["No-Show Rate", reports.summary?.no_show_rate || "2.3%", ""],
+      ["Total Consultations", reports.summary?.total_consultations ?? "", ""],
+      ["Doctor Utilization Rate", reports.summary?.doctor_utilization_rate ?? "", ""],
+      ["Completion Rate", reports.summary?.completion_rate ?? "", ""],
+      ["Cancellation Rate", reports.summary?.cancellation_rate ?? "", ""],
+      ["No-Show Rate", reports.summary?.no_show_rate ?? "", ""],
       [],
       ["Specialty Breakdown", "Visits Count", "Revenue (INR)"],
       ...(reports.by_specialty || []).map((s) => [s.specialty, s.count, s.revenue]),
@@ -55,9 +55,10 @@ export default function OperationalReportsTab() {
     );
   }
 
-  const summary = reports?.summary || {};
-  const bySpecialty = reports?.by_specialty || [];
-  const monthlyRevenue = reports?.monthly_revenue || [];
+  const summary = reports?.summary ?? {};
+  const bySpecialty = reports?.by_specialty ?? [];
+  const monthlyRevenue = reports?.monthly_revenue ?? [];
+  const maxSpecialtyCount = Math.max(...bySpecialty.map((item) => Number(item.count) || 0), 0);
 
   return (
     <div className="space-y-6 font-sans">
@@ -110,37 +111,37 @@ export default function OperationalReportsTab() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <div className="care-card p-4 text-center">
           <div className="text-2xl font-bold text-[#295255]">
-            {summary.total_consultations || 154}
+            {summary.total_consultations ?? "—"}
           </div>
           <div className="text-xs text-[#577877]">Total Consultations</div>
         </div>
         <div className="care-card p-4 text-center">
           <div className="text-2xl font-bold text-teal-600">
-            {summary.doctor_utilization_rate || "84.2%"}
+            {summary.doctor_utilization_rate ?? "—"}
           </div>
           <div className="text-xs text-[#577877]">Doctor Utilization</div>
         </div>
         <div className="care-card p-4 text-center">
           <div className="text-2xl font-bold text-emerald-600">
-            {summary.completion_rate || "92.5%"}
+            {summary.completion_rate ?? "—"}
           </div>
           <div className="text-xs text-[#577877]">Completion Rate</div>
         </div>
         <div className="care-card p-4 text-center">
           <div className="text-2xl font-bold text-red-600">
-            {summary.cancellation_rate || "5.2%"}
+            {summary.cancellation_rate ?? "—"}
           </div>
           <div className="text-xs text-[#577877]">Cancellation Rate</div>
         </div>
         <div className="care-card p-4 text-center">
           <div className="text-2xl font-bold text-amber-600">
-            {summary.no_show_rate || "2.3%"}
+            {summary.no_show_rate ?? "—"}
           </div>
           <div className="text-xs text-[#577877]">No-Show Rate</div>
         </div>
         <div className="care-card p-4 text-center">
           <div className="text-2xl font-bold text-[#162623]">
-            {summary.patient_satisfaction || "4.9 / 5.0"}
+            {summary.patient_satisfaction ?? "—"}
           </div>
           <div className="text-xs text-[#577877]">Patient Satisfaction</div>
         </div>
@@ -161,7 +162,9 @@ export default function OperationalReportsTab() {
                 <div className="h-2 w-full rounded-full bg-[#F0F5F7]">
                   <div
                     className="h-2 rounded-full bg-[#295255]"
-                    style={{ width: `${Math.min(100, (item.count / 50) * 100)}%` }}
+                    style={{
+                      width: `${maxSpecialtyCount ? (Number(item.count || 0) / maxSpecialtyCount) * 100 : 0}%`,
+                    }}
                   ></div>
                 </div>
               </div>

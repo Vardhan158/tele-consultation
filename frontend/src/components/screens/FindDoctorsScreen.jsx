@@ -1,37 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { patientApi } from "../../lib/api";
 
-const SPECIALTIES = [
-  "General Medicine",
-  "Internal Medicine",
-  "Cardiology",
-  "Dermatology",
-  "Pediatrics",
-  "Neurology",
-  "Orthopedics",
-  "Psychiatry",
-  "Gastroenterology",
-  "Endocrinology",
-  "Pulmonology",
-  "ENT",
-];
-
 const AVAILABILITY_FILTERS = [
   "Any time",
   "Available today",
   "Available this week",
   "Weekend availability",
-];
-
-const LANGUAGES = [
-  "English",
-  "Hindi",
-  "Kannada",
-  "Spanish",
-  "Mandarin",
-  "French",
-  "German",
-  "Arabic",
 ];
 
 function slotTimeInZone(value, timeZone) {
@@ -101,14 +75,14 @@ export default function FindDoctorsScreen({
               fee: doctor.fee_paise == null ? null : doctor.fee_paise / 100,
               feeDisplay:
                 doctor.fee_paise == null
-                  ? "Fee unavailable"
-                  : `${doctor.currency || "INR"} ${(doctor.fee_paise / 100).toFixed(2)}`,
+                  ? ""
+                  : `${doctor.currency || ""} ${(doctor.fee_paise / 100).toFixed(2)}`,
               feeVideoVisit:
                 doctor.fee_paise == null
-                  ? "Consultation fee unavailable"
-                  : `${doctor.currency || "INR"} ${(doctor.fee_paise / 100).toFixed(2)} per video visit`,
+                  ? ""
+                  : `${doctor.currency || ""} ${(doctor.fee_paise / 100).toFixed(2)} per video visit`,
               availability: Array.isArray(slots) ? slots : [],
-              timezone: doctor.timezone || "Asia/Kolkata",
+              timezone: doctor.timezone,
               availableToday: Boolean(
                 nextSlot &&
                   new Date(nextSlot.starts_at).toDateString() ===
@@ -139,14 +113,7 @@ export default function FindDoctorsScreen({
     loadDoctors();
   }, []);
 
-  const [bookingOptions, setBookingOptions] = useState({
-    appointment_types: [
-      "First Consultation",
-      "Follow-up Consultation",
-      "Second Opinion",
-    ],
-    visit_formats: ["Video consultation", "Audio consultation"],
-  });
+  const [bookingOptions, setBookingOptions] = useState({ appointment_types: [], visit_formats: [] });
   const [bookingOptionsLoading, setBookingOptionsLoading] = useState(false);
   const [bookingOptionsError, setBookingOptionsError] = useState("");
 
@@ -185,13 +152,7 @@ export default function FindDoctorsScreen({
 
   // Booking Flow State
   const [bookingDoctor, setBookingDoctor] = useState(null);
-  const [selectedDate, setSelectedDate] = useState({
-    day: 12,
-    monthName: "November",
-    year: 2026,
-    formatted: "Thu, November 12",
-    displayShort: "Nov 12, 2026",
-  });
+  const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
   const [appointmentType, setAppointmentType] = useState("");
   const [bookingPricing, setBookingPricing] = useState(null);
@@ -236,17 +197,17 @@ export default function FindDoctorsScreen({
       ...doctor,
       availability: currentSlots,
       nextSlot: currentSlots[0] || null,
-      timezone: doctor.timezone || "Asia/Kolkata",
+      timezone: doctor.timezone,
     };
     setBookingDoctor(currentDoctor);
-    setAppointmentType("Follow-up Consultation");
+    setAppointmentType(bookingOptions.appointment_types?.[0] || "");
     setBookingPricing(null);
     setBookingPricingError("");
-    setVisitFormat("Video consultation");
+    setVisitFormat(bookingOptions.visit_formats?.[0] || "");
 
     if (currentDoctor.nextSlot) {
       const slotDate = new Date(currentDoctor.nextSlot.starts_at);
-      const timezone = currentDoctor.timezone || "Asia/Kolkata";
+      const timezone = currentDoctor.timezone;
       const dateParts = new Intl.DateTimeFormat("en-US", {
         timeZone: timezone,
         year: "numeric",
@@ -304,11 +265,13 @@ export default function FindDoctorsScreen({
     };
   }, [bookingDoctor, appointmentType]);
 
-  const selectedMonthIndex = new Date(
-    `${selectedDate.monthName} 1, ${selectedDate.year}`,
-  ).getMonth();
-  const bookingTimezone = bookingDoctor?.timezone || "Asia/Kolkata";
-  const selectedDateKey = `${selectedDate.year}-${String(selectedMonthIndex + 1).padStart(2, "0")}-${String(selectedDate.day).padStart(2, "0")}`;
+  const selectedMonthIndex = selectedDate
+    ? new Date(`${selectedDate.monthName} 1, ${selectedDate.year}`).getMonth()
+    : null;
+  const bookingTimezone = bookingDoctor?.timezone;
+  const selectedDateKey = selectedDate
+    ? `${selectedDate.year}-${String(selectedMonthIndex + 1).padStart(2, "0")}-${String(selectedDate.day).padStart(2, "0")}`
+    : "";
   const slotsForSelectedDate = (bookingDoctor?.availability || []).filter(
     (slot) => {
       return slotDateKeyInZone(slot.starts_at, bookingTimezone) === selectedDateKey;
@@ -318,6 +281,9 @@ export default function FindDoctorsScreen({
     const slotTime = slotTimeInZone(slot.starts_at, bookingTimezone);
     return slotTime === selectedTimeSlot;
   });
+
+  const specialties = [...new Set(doctors.map((doctor) => doctor.specialty).filter(Boolean))].sort();
+  const languages = [...new Set(doctors.flatMap((doctor) => doctor.languages || []).filter(Boolean))].sort();
 
   const filteredDoctors = useMemo(() => {
     return doctors.filter((doc) => {
@@ -337,8 +303,7 @@ export default function FindDoctorsScreen({
         return false;
       }
       if (
-        searchQuery.trim() &&
-        searchQuery !== "Internal medicine or family medicine"
+        searchQuery.trim()
       ) {
         const q = searchQuery.toLowerCase();
         const matchName = (doc.fullName || "").toLowerCase().includes(q);
@@ -396,24 +361,7 @@ export default function FindDoctorsScreen({
       const loaded = await loadRazorpayScript();
 
       if (!loaded || !window.Razorpay) {
-        // Fallback for test mode if script is blocked or offline
-        const verified = await patientApi.verifyPayment({
-          payment_id: orderRes.payment_id,
-          razorpay_order_id: orderRes.order_id,
-          razorpay_payment_id: `pay_${Date.now().toString(36)}`,
-          razorpay_signature: `sig_test_${Date.now()}`,
-        });
-        setPaymentConfirmationData({
-          ...orderRes,
-          payment_id: verified.provider_transaction_id || verified.payment_id,
-          doctor: bookingDoctor,
-          dateFormatted: selectedDate.formatted,
-          displayShort: selectedDate.displayShort,
-          timeSlot: selectedTimeSlot,
-          timezone: bookingTimezone,
-        });
-        setBookingDoctor(null);
-        return;
+        throw new Error("Payment checkout is unavailable. Please try again.");
       }
 
       // 3. Launch Razorpay Standard Checkout
@@ -456,8 +404,8 @@ export default function FindDoctorsScreen({
           },
         },
         prefill: {
-          name: patientProfile?.full_name || "Patient",
-          email: patientProfile?.email || "patient@teleconsult.local",
+          name: patientProfile?.full_name,
+          email: patientProfile?.email,
         },
         theme: {
           color: "#295255",
@@ -517,7 +465,7 @@ export default function FindDoctorsScreen({
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-[#162623]">Specialty</label>
               <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {SPECIALTIES.map((spec) => (
+                {specialties.map((spec) => (
                   <label
                     key={spec}
                     className="flex items-center gap-2 text-xs text-[#162623] cursor-pointer"
@@ -560,7 +508,7 @@ export default function FindDoctorsScreen({
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-[#162623]">Languages</label>
               <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                {LANGUAGES.map((lang) => (
+                {languages.map((lang) => (
                   <label
                     key={lang}
                     className="flex items-center gap-2 text-xs text-[#162623] cursor-pointer"
@@ -639,7 +587,7 @@ export default function FindDoctorsScreen({
                         <div className="text-xs font-semibold text-[#295255]">{doc.specialty}</div>
                         <div className="text-xs text-[#577877]">{doc.clinic}</div>
                         <div className="text-[11px] text-[#577877]">
-                          Languages: {doc.languages.join(", ") || "English"}
+                          Languages: {doc.languages.join(", ") || "Not provided"}
                         </div>
                       </div>
                     </div>
@@ -832,7 +780,7 @@ export default function FindDoctorsScreen({
                   <div>
                     <span className="text-[#577877] block text-[11px]">Scheduled Date &amp; Time</span>
                     <span className="font-semibold">
-                      {selectedDate.displayShort} at {selectedTimeSlot || "Select slot"} {bookingTimezone}
+                      {selectedDate?.displayShort || ""} {selectedTimeSlot || "Select slot"} {bookingTimezone || ""}
                     </span>
                   </div>
 

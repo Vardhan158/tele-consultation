@@ -10,16 +10,29 @@ const mainNavItems = [
   { id: "consent", label: "Consent management", icon: "verified_user" },
 ];
 
-const adminNavItems = [
-  { id: "clinic-overview", label: "Overview", icon: "dashboard" },
-  { id: "clinic-doctors", label: "Doctor Approvals", icon: "badge" },
-  { id: "clinic-services", label: "Service Fees", icon: "medical_services" },
-  { id: "clinic-schedules", label: "Schedules", icon: "schedule" },
-  { id: "clinic-appointments", label: "Master Bookings", icon: "calendar_month" },
-  { id: "clinic-payments", label: "Payments & Refunds", icon: "payments" },
-  { id: "clinic-reports", label: "Operational Reports", icon: "analytics" },
-  { id: "clinic-settings", label: "Clinic Settings", icon: "settings" },
-];
+const roleNavigation = {
+  patient: [
+    { id: "dashboard", label: "Dashboard", icon: "grid_view" },
+    ...mainNavItems.slice(1),
+  ],
+  doctor: [
+    { id: "doctor-dashboard", label: "Dashboard", icon: "grid_view" },
+    { id: "doctor-appointments", label: "Appointments", icon: "calendar_month" },
+    { id: "doctor-patients", label: "Patients", icon: "groups" },
+    { id: "doctor-availability", label: "Availability", icon: "schedule" },
+    { id: "doctor-settings", label: "Settings", icon: "tune" },
+  ],
+  clinic_admin: [
+    { id: "clinic-overview", label: "Overview", icon: "dashboard" },
+    { id: "clinic-doctors", label: "Doctors", icon: "badge" },
+    { id: "clinic-services", label: "Services & fees", icon: "medical_services" },
+    { id: "clinic-schedules", label: "Schedules", icon: "schedule" },
+    { id: "clinic-appointments", label: "Appointments", icon: "calendar_month" },
+    { id: "clinic-payments", label: "Payments", icon: "payments" },
+    { id: "clinic-reports", label: "Reports", icon: "analytics" },
+    { id: "clinic-settings", label: "Clinic settings", icon: "settings" },
+  ],
+};
 
 const secondaryNavItems = [
   { id: "notifications", label: "Notifications", icon: "notifications" },
@@ -33,19 +46,10 @@ export default function Sidebar({
   onCloseMobile,
   patient,
 }) {
-  const isDoctor = patient?.role === "doctor";
-  const isAdmin = patient?.role === "clinic_admin";
-  const navigation = isAdmin
-    ? adminNavItems
-    : isDoctor
-      ? [
-          { id: "doctor-dashboard", label: "Dashboard", icon: "grid_view" },
-          { id: "doctor-appointments", label: "Appointments", icon: "calendar_month" },
-          { id: "doctor-patients", label: "Patients", icon: "groups" },
-          { id: "doctor-availability", label: "Availability", icon: "schedule" },
-          { id: "doctor-settings", label: "Settings", icon: "tune" },
-        ]
-      : mainNavItems;
+  const role = patient?.role === "doctor" || patient?.role === "clinic_admin" ? patient.role : "patient";
+  const isDoctor = role === "doctor";
+  const isAdmin = role === "clinic_admin";
+  const navigation = roleNavigation[role];
 
   const sidebarContent = (
     <div className="flex flex-col flex-1 overflow-y-auto px-4 py-5 relative z-10 select-none">
@@ -91,13 +95,15 @@ export default function Sidebar({
       </div>
 
       {/* Main Navigation Links */}
-      <nav className="space-y-1">
+      <nav aria-label={`${role.replace("_", " ")} navigation`} className="space-y-1">
         {navigation.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
               type="button"
+              aria-current={isActive ? "page" : undefined}
+              title={item.label}
               onClick={() => {
                 onSelectTab(item.id);
                 if (onCloseMobile) onCloseMobile();
@@ -126,13 +132,15 @@ export default function Sidebar({
 
       {/* Secondary Navigation */}
       {!isAdmin && (
-        <nav className="space-y-1">
+        <nav aria-label="Account navigation" className="space-y-1">
           {secondaryNavItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
+                  aria-current={isActive ? "page" : undefined}
+                  title={item.label}
                 onClick={() => {
                   onSelectTab(item.id);
                   if (onCloseMobile) onCloseMobile();

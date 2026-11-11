@@ -48,7 +48,8 @@ const defaultActiveMedications = [
   },
 ];
 
-const pastMedicationsList = [
+const pastMedicationsList = [];
+/*
   {
     id: "RX-2026-0420",
     name: "Amoxicillin",
@@ -72,9 +73,10 @@ const pastMedicationsList = [
     statusBadge: "Inactive",
     statusType: "neutral",
   },
-];
+]; */
 
-const consultationSummariesList = [
+const consultationSummariesList = [];
+/*
   {
     id: "SUM-2026-1038",
     doctor: "Dr. Sarah Chen, MD",
@@ -108,7 +110,7 @@ const consultationSummariesList = [
       "Mild conjunctival and nasal mucosal irritation. Cetirizine 10mg prescribed for symptom control as needed.",
     plan: "Avoid high pollen outdoors during morning hours.",
   },
-];
+]; */
 
 export default function PrescriptionsScreen({
   onNavigate,

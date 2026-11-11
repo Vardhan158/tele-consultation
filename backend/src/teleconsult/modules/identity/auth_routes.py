@@ -32,9 +32,10 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 GENERIC_AUTH_ERROR = "Unable to authenticate with those details"
 
 
-async def auth_database_session() -> AsyncSession | None:
-    """Use SQL only when explicitly configured; Mongo mode must not initialize SQL."""
-    if not get_settings().database_url.strip():
+async def auth_database_session() -> AsyncIterator[AsyncSession | None]:
+    """Use SQL only when MongoDB is disabled and PostgreSQL database_url is explicitly configured."""
+    settings = get_settings()
+    if settings.mongodb_enabled or not settings.database_url.strip():
         yield None
         return
     async for session in tenant_session():

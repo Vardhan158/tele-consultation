@@ -8,17 +8,11 @@ import {
   supportApi,
 } from "../../lib/api";
 
-const DEFAULT_FOLLOWUP_TASKS = [
-  { id: "task-1", title: "Log daily blood pressure readings", meta: "Daily routine", done: false },
-  { id: "task-2", title: "Complete pre-consultation medical intake", meta: "Intake form", done: true },
-  { id: "task-3", title: "Review prescribed medication regimen", meta: "Medication audit", done: false },
-];
-
 export default function DashboardScreen({ onNavigate }) {
   const [data, setData] = useState(null);
   const [state, setState] = useState("loading");
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [tasks, setTasks] = useState(DEFAULT_FOLLOWUP_TASKS);
+  const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
     Promise.all([
@@ -46,10 +40,10 @@ export default function DashboardScreen({ onNavigate }) {
             ? followUp.map((item) => ({
                 id: item.id,
                 title: item.advice || item.title,
-                meta: item.status || "Follow-up task",
+                meta: item.status || "",
                 done: item.status === "completed" || Boolean(item.done),
               }))
-            : DEFAULT_FOLLOWUP_TASKS;
+            : [];
           setTasks(followUpTasks);
           setData({
             profile,
@@ -128,18 +122,15 @@ export default function DashboardScreen({ onNavigate }) {
     ["confirmed", "checked_in", "rescheduled"].includes(nextVisit.status);
 
   const doctorFullName =
-    nextVisit?.doctor?.full_name ||
-    nextVisit?.doctor?.name ||
-    nextVisit?.doctor_name ||
-    "Dr. Harshavardhan m v";
+    nextVisit?.doctor?.full_name || nextVisit?.doctor?.name || nextVisit?.doctor_name || "";
 
   const doctorSpecialty =
-    nextVisit?.doctor?.specialty || "ENT";
+    nextVisit?.doctor?.specialty || "";
 
   const clinicName =
-    nextVisit?.doctor?.clinic_name || "Kaizentrix Care Telehealth Center";
+    nextVisit?.doctor?.clinic_name || "";
 
-  const tz = nextVisit?.doctor?.timezone || "Asia/Kolkata";
+  const tz = nextVisit?.doctor?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const visitDateObj = nextVisit?.starts_at ? new Date(nextVisit.starts_at) : null;
   const visitDateFormatted = visitDateObj
     ? visitDateObj.toLocaleDateString("en-US", {
@@ -169,7 +160,7 @@ export default function DashboardScreen({ onNavigate }) {
   const activeRxCount = prescriptions.length;
   const rxSubtext =
     activeRxCount > 0
-      ? `${prescriptions[0].medication_name || prescriptions[0].title || "Active medication"} · ${prescriptions[0].refills_remaining || 2} Refills left`
+      ? `${prescriptions[0].medication_name || prescriptions[0].title || ""}${prescriptions[0].refills_remaining != null ? ` · ${prescriptions[0].refills_remaining} Refills left` : ""}`
       : "No active prescriptions";
 
   const today = new Date();
@@ -180,7 +171,7 @@ export default function DashboardScreen({ onNavigate }) {
       ? "Good afternoon"
       : "Good evening";
   const todayLabel = today.toLocaleDateString("en-US", {
-    timeZone: "Asia/Kolkata",
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -247,7 +238,7 @@ export default function DashboardScreen({ onNavigate }) {
                   {isPendingPayment ? "Payment Pending" : nextVisit.status}
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-[#162623]">
-                  {nextVisit.reason || "Consultation"} with {doctorFullName}
+                  {nextVisit.reason || ""} {doctorFullName && `with ${doctorFullName}`}
                 </h2>
                 <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-[#577877]">
                   <span className="flex items-center gap-1.5 font-semibold text-[#162623]">
@@ -285,7 +276,7 @@ export default function DashboardScreen({ onNavigate }) {
                     onClick={() => onNavigate("appointments")}
                     className="rounded-xl bg-amber-700 px-5 py-3 text-xs font-bold text-white shadow hover:bg-amber-800 cursor-pointer"
                   >
-                    Complete Payment ({nextVisit.fee || "Required"})
+                    Complete Payment {nextVisit.fee ? `(${nextVisit.fee})` : ""}
                   </button>
                 ) : videoEligible ? (
                   <button
@@ -704,7 +695,7 @@ export default function DashboardScreen({ onNavigate }) {
                     </span>
                     <div>
                       <p className="text-xs font-semibold text-[#162623] truncate max-w-[220px] sm:max-w-xs">
-                        Clinical Encounter Note ({s.doctor_name || "Dr. Vance"})
+                        Clinical Encounter Note {s.doctor_name ? `(${s.doctor_name})` : ""}
                       </p>
                       <p className="text-[11px] text-[#577877]">
                         Released{" "}
@@ -848,7 +839,7 @@ export default function DashboardScreen({ onNavigate }) {
               <div className="flex justify-between">
                 <span className="text-[#577877]">Released By:</span>
                 <span className="font-semibold text-[#162623]">
-                  {selectedRecord.released_by || "Verified Clinician"}
+                  {selectedRecord.released_by || ""}
                 </span>
               </div>
             </div>

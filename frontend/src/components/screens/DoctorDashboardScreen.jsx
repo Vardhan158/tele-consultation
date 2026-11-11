@@ -129,7 +129,7 @@ export default function DoctorDashboardScreen({ onNavigate }) {
             <div className="space-y-3">
               {appointments.slice(0, 8).map((item, idx) => {
                 const displayRef = item.id ? `KC-APT-${item.id.slice(-6).toUpperCase()}` : "KC-APT-1001";
-                const patientName = item.patient_name || "Emma Mitchell";
+                const patientName = item.patient_name || "Patient";
                 const visitType = item.type || "Follow-up Consultation";
                 const payLabel = formatPaymentLabel(item.payment_status);
 

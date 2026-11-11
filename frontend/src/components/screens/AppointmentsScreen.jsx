@@ -23,7 +23,7 @@ function formatDbAppointment(apt) {
     ? new Date(apt.ends_at)
     : new Date(startDate.getTime() + 30 * 60000);
 
-  const tz = apt.doctor?.timezone || "Asia/Kolkata";
+  const tz = apt.doctor?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const dateShort = startDate.toLocaleDateString("en-US", {
     timeZone: tz,
@@ -57,7 +57,7 @@ function formatDbAppointment(apt) {
     docName.trim().toLowerCase().includes("mitchell") ||
     docName.trim().toLowerCase().includes("emma")
   ) {
-    docName = "Dr. Harshavardhan m v";
+    docName = "";
   }
 
   const docInitials =
@@ -67,15 +67,14 @@ function formatDbAppointment(apt) {
       .filter(Boolean)
       .slice(-2)
       .join("")
-      .toUpperCase() || "HM";
+      .toUpperCase();
 
   const totalPaise = apt.total_payable_paise || apt.fee_paise || (apt.doctor?.fee_paise ?? null);
-  const currency = apt.currency || "INR";
-  const currSymbol = currency === "INR" ? "₹" : "$";
+  const currency = apt.currency || "";
 
   const feeFull = totalPaise != null
-    ? `${currSymbol}${(totalPaise / 100).toFixed(2)}`
-    : "Fee unavailable";
+    ? `${currency} ${(totalPaise / 100).toFixed(2)}`
+    : "";
 
   const isPaid = apt.payment_status === "captured" || apt.payment_status === "success";
   const isExplicitlyFree = apt.payment_status === "not_required" || apt.payment_status === "no_payment_required";
@@ -97,7 +96,7 @@ function formatDbAppointment(apt) {
     : isExplicitlyFree
       ? "No Payment Required"
       : totalPaise == null
-        ? "Fee unavailable"
+        ? ""
         : apt.payment_status === "failed"
           ? "Payment Failed"
           : apt.payment_status === "refunded"
@@ -106,25 +105,25 @@ function formatDbAppointment(apt) {
 
   return {
     id: apt.id,
-    displayId: apt.id ? `KC-APT-${apt.id.slice(-6).toUpperCase()}` : "KC-APT-1001",
+    displayId: apt.id ? `KC-APT-${apt.id.slice(-6).toUpperCase()}` : "",
     doctor: {
       id: apt.doctor?.id || apt.doctor_id,
       name: docName,
       fullName: docName,
       initials: docInitials,
-      specialty: apt.doctor?.specialty || "ENT Specialist",
-      experienceShort: "Verified Clinician",
-      clinic: apt.doctor?.clinic_name || "Kaizentrix Care Telehealth Center",
+      specialty: apt.doctor?.specialty || "",
+      experienceShort: apt.doctor?.experience || "",
+      clinic: apt.doctor?.clinic_name || "",
       feeDisplay: feeFull,
       timezone: tz,
     },
-    reason: apt.type ? `${apt.type} consultation` : apt.reason || "Telehealth video consultation",
-    appointmentType: apt.type || "Follow-up Consultation",
+    reason: apt.type ? `${apt.type} consultation` : apt.reason || "",
+    appointmentType: apt.type || apt.appointment_type || "",
     dateShort,
     dateFull,
-    timeRange: `${startTime}–${endTime} IST`,
-    timeFull: `${startTime}–${endTime} · IST (${tz})`,
-    format: "Video appointment",
+    timeRange: `${startTime}–${endTime}`,
+    timeFull: `${startTime}–${endTime} (${tz})`,
+    format: apt.visit_format || "",
     status: statusLabel,
     rawStatus: apt.status,
     paymentStatus: paymentStatusLabel,
@@ -201,15 +200,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   // Active Video Call States
   const [consultationDuration, setConsultationDuration] = useState(0);
   const [consultationSideTab, setConsultationSideTab] = useState("chat");
-  const [consultationChatMessages, setConsultationChatMessages] = useState([
-    {
-      id: 1,
-      sender: "Dr. Harshavardhan m v",
-      time: "2:32 PM",
-      isMe: false,
-      text: "Hello, welcome to your teleconsultation. I am reviewing your medical records.",
-    },
-  ]);
+  const [consultationChatMessages, setConsultationChatMessages] = useState([]);
   const [consultationInput, setConsultationInput] = useState("");
   const [consultationMic, setConsultationMic] = useState(true);
   const [consultationCam, setConsultationCam] = useState(true);
@@ -279,25 +270,16 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
       setToastMessage("Initiating Razorpay Checkout...");
       const orderRes = await patientApi.createOrder({
         doctor_id: apt.doctor.id,
-        appointment_type: apt.appointmentType || "Follow-up Consultation",
+        appointment_type: apt.appointmentType,
         starts_at: apt.starts_at,
-        visit_format: "Video consultation",
-        visit_reason: apt.reason || "Consultation",
+        visit_format: apt.format,
+        visit_reason: apt.reason,
         doctor_notes: "",
       });
 
       const loaded = await loadRazorpayScript();
       if (!loaded || !window.Razorpay) {
-        setToastMessage("Payment script blocked. Processing test mode verification...");
-        await patientApi.verifyPayment({
-          payment_id: orderRes.payment_id,
-          razorpay_order_id: orderRes.order_id,
-          razorpay_payment_id: `pay_${Date.now().toString(36)}`,
-          razorpay_signature: `sig_test_${Date.now()}`,
-        });
-        setToastMessage("Payment completed & appointment confirmed!");
-        fetchAppointments();
-        return;
+        throw new Error("Payment checkout is unavailable. Please try again.");
       }
 
       const options = {
@@ -326,9 +308,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
             setToastMessage("Payment checkout cancelled.");
           },
         },
-        prefill: {
-          name: "Patient",
-        },
+        prefill: {},
         theme: {
           color: "#295255",
         },

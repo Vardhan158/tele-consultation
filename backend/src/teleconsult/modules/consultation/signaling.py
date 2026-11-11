@@ -108,25 +108,16 @@ async def _load_context(environ: dict[str, Any], data: dict[str, Any]) -> tuple[
                 {"doctor_token_hash": token_digest},
                 {"token": str(token)},
                 {"id": str(token)},
-                {"appointment_id": (data or {}).get("appointmentId")},
             ]
         })
 
-        apt_id = (data or {}).get("appointmentId") or (video_session.get("appointment_id") if video_session else None) or f"apt-{secrets.token_hex(4)}"
-
         if not video_session:
-            session_id = f"vses-{secrets.token_hex(6)}"
-            video_session = {
-                "id": session_id,
-                "tenant_id": get_settings().default_tenant_id,
-                "appointment_id": str(apt_id),
-                "status": "waiting",
-                "created_at": datetime.now(UTC).isoformat(),
-            }
-            await db["video_sessions"].insert_one(dict(video_session))
+            raise ValueError("Consultation token is invalid")
 
         req_apt_id = (data or {}).get("appointmentId") or (data or {}).get("appointment_id")
-        appointment_id = str(req_apt_id) if req_apt_id else str(video_session.get("appointment_id", apt_id) if video_session else apt_id)
+        appointment_id = str(video_session.get("appointment_id"))
+        if req_apt_id and str(req_apt_id).lower() != appointment_id.lower():
+            raise ValueError("Appointment does not match consultation token")
         session_id = video_session.get("id") or str(video_session.get("_id"))
         tenant_id = video_session.get("tenant_id", get_settings().default_tenant_id)
 
@@ -136,16 +127,14 @@ async def _load_context(environ: dict[str, Any], data: dict[str, Any]) -> tuple[
             "$or": [{"id": str(appointment_id)}, {"id": str(appointment_id).lower()}],
         })
         if not apt_doc:
-            apt_doc = {
-                "id": str(appointment_id),
-                "tenant_id": tenant_id,
-                "status": "confirmed",
-                "payment_status": "not_required",
-            }
+            raise ValueError("Appointment not found")
 
+        token_role = "doctor" if video_session.get("doctor_token_hash") == token_digest else "patient"
         raw_session = await _principal(environ)
-        user_id = "00000000-0000-0000-0000-000000000002"
-        role = (data or {}).get("role") or "patient"
+        if not raw_session:
+            raise ValueError("Authentication session is missing")
+        user_id = ""
+        role = token_role
 
         if raw_session:
             session_token_digest = hashlib.sha256(raw_session.encode()).hexdigest()
@@ -154,11 +143,25 @@ async def _load_context(environ: dict[str, Any], data: dict[str, Any]) -> tuple[
                 "token_hash": session_token_digest,
                 "revoked_at": {"$exists": False},
             })
-            if auth_session:
-                user_id = auth_session.get("user_id", user_id)
-                user_doc = await db["users"].find_one({"id": user_id})
-                if user_doc:
-                    role = user_doc.get("role", role)
+            if not auth_session:
+                raise ValueError("Authentication session is invalid or expired")
+            user_id = str(auth_session.get("user_id", ""))
+            user_doc = await db["users"].find_one({"id": user_id})
+            if not user_doc:
+                raise ValueError("Authenticated user was not found")
+            role = user_doc.get("role", role)
+
+        if role != token_role:
+            raise ValueError("Consultation token role does not match authenticated user")
+        if role == "patient" and str(apt_doc.get("patient_id")) != str(user_id):
+            raise ValueError("Patient is not assigned to this appointment")
+        if role == "doctor":
+            doctor_doc = await db["doctors"].find_one({"tenant_id": tenant_id, "$or": [{"id": str(user_id)}, {"user_id": str(user_id)}, {"user_account_id": str(user_id)}]})
+            if not doctor_doc or str(apt_doc.get("doctor_id")) != str(doctor_doc.get("id")):
+                raise ValueError("Doctor is not assigned to this appointment")
+
+        if role not in {"patient", "doctor"}:
+            raise ValueError("Consultation role is not authorized")
 
         return SessionObj(session_id, appointment_id, tenant_id), AptObj(appointment_id, apt_doc.get("status", "confirmed")), role, user_id
 
@@ -230,20 +233,33 @@ async def connect(sid: str, environ: dict[str, Any], auth: dict[str, Any] | None
         _trace("connect", sid, {"appointment_id": str(appointment.id), "role": role})
         return True
     except ValueError as err:
-        logger.warning("socket-signaling rejected connection sid=%s err=%s", sid, err)
-        return False
+        reason = str(err)
+        code = {
+            "Authentication session is missing": "missing_session",
+            "Authentication session is invalid or expired": "invalid_session",
+            "Authenticated user was not found": "user_not_found",
+            "Consultation token is invalid": "invalid_consultation_token",
+            "Appointment not found": "appointment_not_found",
+            "Patient is not assigned to this appointment": "patient_appointment_mismatch",
+            "Doctor is not assigned to this appointment": "doctor_appointment_mismatch",
+            "Consultation token role does not match authenticated user": "role_mismatch",
+        }.get(reason, "authorization_failed")
+        logger.warning("socket-signaling rejected connection sid=%s code=%s", sid, code)
+        raise ConnectionRefusedError("Consultation connection rejected", {"code": code}) from err
 
 
 @sio.on("join_room")
-async def join_room(sid: str, data: dict[str, Any]) -> None:
+async def join_room(sid: str, data: dict[str, Any], ack: Any = None) -> None:
     ctx = await sio.get_session(sid)
     req_apt = str(data.get("appointmentId") or "").strip()
     ctx_apt = str(ctx.get("appointment_id") or "").strip()
 
     if req_apt and ctx_apt and req_apt.lower() != ctx_apt.lower():
-        ctx["appointment_id"] = req_apt
-        await sio.save_session(sid, ctx)
-        ctx_apt = req_apt
+        _trace("join_room_rejected", sid, ctx, requested_appointment_id=req_apt)
+        await sio.emit("signaling_error", {"code": "appointment_mismatch"}, to=sid)
+        if ack:
+            ack({"ok": False, "code": "appointment_mismatch"})
+        return
 
     room = f"consultation:{ctx['appointment_id']}"
     await sio.enter_room(sid, room)
@@ -278,6 +294,10 @@ async def join_room(sid: str, data: dict[str, Any]) -> None:
             await db_sql.commit()
 
     await sio.emit("status", {"status": "waiting"}, room=room)
+    await sio.emit("room_joined", {"appointment_id": ctx["appointment_id"], "room": room, "role": ctx["role"], "members": len(_rooms[room])}, to=sid)
+    await sio.emit("peer_presence", {"role": ctx["role"], "members": len(_rooms[room])}, room=room, skip_sid=sid)
+    if ack:
+        ack({"ok": True, "appointment_id": ctx["appointment_id"], "room": room, "role": ctx["role"], "members": len(_rooms[room])})
     await _maybe_peer_ready(room)
 
 
@@ -299,16 +319,22 @@ async def _relay(sid: str, event: str, data: dict[str, Any]) -> None:
 
 @sio.on("offer")
 async def relay_offer(sid: str, data: dict[str, Any]) -> None:
+    ctx = await sio.get_session(sid)
+    _trace("offer", sid, ctx, room=f"consultation:{ctx['appointment_id']}")
     await _relay(sid, "offer", data)
 
 
 @sio.on("answer")
 async def relay_answer(sid: str, data: dict[str, Any]) -> None:
+    ctx = await sio.get_session(sid)
+    _trace("answer", sid, ctx, room=f"consultation:{ctx['appointment_id']}")
     await _relay(sid, "answer", data)
 
 
 @sio.on("ice_candidate")
 async def relay_ice_candidate(sid: str, data: dict[str, Any]) -> None:
+    ctx = await sio.get_session(sid)
+    _trace("ice_candidate", sid, ctx, room=f"consultation:{ctx['appointment_id']}")
     await _relay(sid, "ice_candidate", data)
 
 

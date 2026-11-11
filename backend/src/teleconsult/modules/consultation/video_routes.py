@@ -1,3 +1,4 @@
+import hashlib
 import secrets
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -138,6 +139,7 @@ async def join_waiting_room(
             except ValueError:
                 pass
 
+        raw_token = secrets.token_urlsafe(24)
         video_doc = await db["video_sessions"].find_one({
             "tenant_id": principal.tenant_id,
             "appointment_id": str(appointment_id),
@@ -152,15 +154,21 @@ async def join_waiting_room(
                 "room_id": f"teleconsult-{appointment_id}",
                 "provider": "webrtc",
                 "status": "waiting",
+                "patient_token_hash": hashlib.sha256(raw_token.encode()).hexdigest(),
                 "created_at": now.isoformat(),
             }
             await db["video_sessions"].insert_one(dict(video_doc))
+
+        await db["video_sessions"].update_one(
+            {"id": video_doc["id"]},
+            {"$set": {"patient_token_hash": hashlib.sha256(raw_token.encode()).hexdigest()}},
+        )
 
         return VideoJoinResponse(
             session_id=UUID(int=hash(video_doc["id"]) & 0xffffffffffffffffffffffffffffffff) if len(video_doc["id"]) != 36 else UUID(video_doc["id"]),
             room_id=video_doc.get("room_id", f"teleconsult-{appointment_id}"),
             room_url=None,
-            token=secrets.token_urlsafe(24),
+            token=raw_token,
             token_expires_at=now + timedelta(minutes=15),
             status=video_doc.get("status", "waiting"),
         )
@@ -171,6 +179,11 @@ async def join_waiting_room(
     ))
     if appointment is None:
         raise HTTPException(status_code=404, detail="Appointment not found")
+    if appointment.payment_status not in {"captured", "success", "not_required", "no_payment_required", "not_needed"}:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Payment is required before joining the consultation room.",
+        )
 
     video = await session.scalar(select(VideoSession).where(
         VideoSession.appointment_id == appointment.id, VideoSession.patient_id == UUID(principal.user_id)
