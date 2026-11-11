@@ -33,6 +33,18 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 GENERIC_AUTH_ERROR = "Unable to authenticate with those details"
 
 
+def session_cookie_options() -> dict[str, object]:
+    """Use a cross-site cookie in production for the Vercel-to-Render deployment."""
+    secure = get_settings().environment not in {"dev", "local"}
+    return {
+        "httponly": True,
+        "secure": secure,
+        "samesite": "none" if secure else "lax",
+        "max_age": 8 * 3600,
+        "path": "/",
+    }
+
+
 async def auth_database_session() -> AsyncIterator[AsyncSession | None]:
     """Use SQL only when MongoDB is disabled and PostgreSQL database_url is explicitly configured."""
     settings = get_settings()
@@ -261,7 +273,7 @@ async def login(payload: LoginRequest, response: Response, session: AsyncSession
             "mfa_verified": bool(user.get("role") != "doctor" or not user.get("mfa_enabled") or payload.mfa_code),
             "created_at": now,
         })
-        response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
+        response.set_cookie("teleconsult_session", raw_token, **session_cookie_options())
         return {
             "status": "authenticated", "user_id": user["id"],
             "full_name": user.get("full_name", "User"), "email": user.get("email", ""),
@@ -292,7 +304,7 @@ async def login(payload: LoginRequest, response: Response, session: AsyncSession
 
     raw_token = secrets.token_urlsafe(48)
     session.add(AuthSession(user_id=user.id, token_hash=token_hash(raw_token), expires_at=datetime.now(UTC) + timedelta(hours=8), mfa_verified=bool(user.role != "doctor" or not user.mfa_enabled or payload.mfa_code)))
-    response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
+    response.set_cookie("teleconsult_session", raw_token, **session_cookie_options())
     return {"status": "authenticated", "user_id": str(user.id), "full_name": user.full_name, "email": user.email, "role": user.role}
 
 
@@ -325,7 +337,7 @@ async def verify_email(payload: VerifyEmailRequest, response: Response, session:
             "expires_at": now + timedelta(hours=8), "mfa_verified": False,
             "created_at": now,
         })
-        response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
+        response.set_cookie("teleconsult_session", raw_token, **session_cookie_options())
         doctor = await database["doctors"].find_one({"tenant_id": settings.default_tenant_id, "$or": [{"id": user["id"]}, {"user_id": user["id"]}]}) if user.get("role") == "doctor" else None
         return {"status": "authenticated", "user_id": user["id"], "full_name": user["full_name"], "email": user["email"], "approval_status": doctor.get("approval_status", "pending") if doctor else "approved"}
     if session is None:
@@ -347,7 +359,7 @@ async def verify_email(payload: VerifyEmailRequest, response: Response, session:
     user.verified_at = datetime.now(UTC)
     raw_token = secrets.token_urlsafe(48)
     session.add(AuthSession(user_id=user.id, token_hash=token_hash(raw_token), expires_at=datetime.now(UTC) + timedelta(hours=8)))
-    response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
+    response.set_cookie("teleconsult_session", raw_token, **session_cookie_options())
     return {"status": "authenticated", "user_id": str(user.id), "full_name": user.full_name, "email": user.email}
 
 
@@ -432,14 +444,24 @@ async def logout(request: Request, response: Response, session: AsyncSession | N
                     {"token_hash": token_hash(raw_token), "tenant_id": get_settings().default_tenant_id},
                     {"$set": {"revoked_at": datetime.now(UTC)}},
                 )
-            response.delete_cookie("teleconsult_session")
+            response.delete_cookie(
+                "teleconsult_session",
+                path="/",
+                secure=bool(session_cookie_options()["secure"]),
+                samesite=str(session_cookie_options()["samesite"]),
+            )
             return
         if session is None:
             raise HTTPException(status_code=503, detail="No application database is configured")
         auth_session = await session.scalar(select(AuthSession).where(AuthSession.token_hash == token_hash(raw_token)))
         if auth_session:
             auth_session.revoked_at = datetime.now(UTC)
-    response.delete_cookie("teleconsult_session")
+    response.delete_cookie(
+        "teleconsult_session",
+        path="/",
+        secure=bool(session_cookie_options()["secure"]),
+        samesite=str(session_cookie_options()["samesite"]),
+    )
 
 
 @router.post("/recovery")
