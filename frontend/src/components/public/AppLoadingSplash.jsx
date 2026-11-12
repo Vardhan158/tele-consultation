@@ -166,24 +166,24 @@ export default function AppLoadingSplash({ onFinished }) {
 
     loadModel(truckUrl || "/assets/kaizenx_truck_v3.glb");
 
-    // Smooth Lerp Animation: Drive from Right (+6.5) to Left (-6.5)
+    // Smooth Lerp Animation: Drive from Left (-6.5) to Right (+6.5)
     const lerp = (start, end, factor) => start + (end - start) * factor;
-    let currentPosX = 6.5;
+    let currentPosX = -6.5;
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
-      // Map progress 0% -> 100% to X position from Right (+6.5) to Left (-6.5)
+      // Map progress 0% -> 100% to X position from Left (-6.5) to Right (+6.5)
       const p = Math.min(Math.max(progressRef.current / 100, 0), 1);
-      const targetPosX = 6.5 - p * 13.0;
+      const targetPosX = -6.5 + p * 13.0;
 
       currentPosX = lerp(currentPosX, targetPosX, 0.08);
 
       wrapperGroup.position.x = currentPosX;
       wrapperGroup.position.y = -0.3 + Math.sin(Date.now() * 0.003) * 0.06;
 
-      // Angle headlights facing Left (towards movement direction) with slight 3D perspective angle
-      wrapperGroup.rotation.y = -Math.PI / 2 + 0.38;
+      // Angle headlights facing Right (towards movement direction) with 3D perspective angle
+      wrapperGroup.rotation.y = Math.PI / 2 - 0.38;
       wrapperGroup.rotation.z = Math.sin(Date.now() * 0.003) * 0.015;
 
       renderer.render(scene, camera);
