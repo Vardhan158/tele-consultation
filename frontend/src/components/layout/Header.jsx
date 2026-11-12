@@ -3,6 +3,8 @@ import { notificationApi } from "../../lib/api";
 
 export default function Header({
   onOpenMobile,
+  collapsed = false,
+  onToggleCollapse,
   onSelectTab,
   onSignOut,
   activeTab = "dashboard",
@@ -97,13 +99,28 @@ export default function Header({
     <header className="sticky top-0 z-30 h-16 bg-[#F0F5F7]/95 backdrop-blur-md border-b border-[#577877]/15 flex items-center justify-between px-4 sm:px-6 lg:px-8 font-sans text-[#162623]">
       {/* Left: Breadcrumbs & Toggle */}
       <div className="flex items-center gap-3">
+        {/* Mobile drawer toggle */}
         <button
           type="button"
           onClick={onOpenMobile}
-          className="p-1.5 rounded-lg text-[#577877] hover:text-[#162623] hover:bg-white transition lg:hidden"
-          aria-label="Toggle sidebar"
+          className="p-1.5 rounded-lg text-[#577877] hover:text-[#162623] hover:bg-white transition lg:hidden cursor-pointer"
+          aria-label="Toggle navigation drawer"
+          title="Menu"
         >
           <span className="material-symbols-outlined text-xl">menu</span>
+        </button>
+
+        {/* Desktop collapse/expand toggle */}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="hidden lg:flex p-1.5 rounded-lg text-[#577877] hover:text-[#162623] hover:bg-white transition cursor-pointer"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <span className="material-symbols-outlined text-xl">
+            {collapsed ? "menu_open" : "menu"}
+          </span>
         </button>
 
         <div className="flex items-center gap-2 text-xs font-medium text-[#577877]">
