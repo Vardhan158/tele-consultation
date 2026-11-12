@@ -31,6 +31,7 @@ import DoctorAvailabilityScreen from "./components/screens/DoctorAvailabilityScr
 import DoctorSettingsScreen from "./components/screens/DoctorSettingsScreen";
 import DoctorConsultationScreen from "./components/screens/DoctorConsultationScreen";
 import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
+import AppLoadingSplash from "./components/public/AppLoadingSplash";
 
 const PATH_TO_TAB = {
   "/dashboard": "dashboard",
@@ -114,7 +115,7 @@ export default function App() {
       });
 
   useEffect(() => {
-    refreshUser().finally(() => setAuthChecking(false));
+    refreshUser();
   }, []);
 
   const navigateEntry = (mode) => {
@@ -137,7 +138,9 @@ export default function App() {
     PUBLIC_PATHS[location.pathname] ||
     (PATH_TO_TAB[location.pathname] ? "login" : entryMode);
 
-  if (authChecking) return null;
+  if (authChecking) {
+    return <AppLoadingSplash onFinished={() => setAuthChecking(false)} />;
+  }
 
   if (location.pathname === "/how-it-works") return <HowItWorksScreen />;
   if (location.pathname === "/about-us") return <AboutUsScreen />;
