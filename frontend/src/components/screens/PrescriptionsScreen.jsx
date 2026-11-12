@@ -183,7 +183,7 @@ export default function PrescriptionsScreen({
 
   const handleDownloadMedList = () => {
     const listText = [
-      "Kaizentrix Care - Active Medication List",
+      "Kaizen Care - Active Medication List",
       "Patient: Emma Mitchell (ID: KC-20481)",
       `Generated: November 4, 2026`,
       "Pharmacy: " + pharmacy.name + " - " + pharmacy.phone,
@@ -678,7 +678,7 @@ export default function PrescriptionsScreen({
 
         {/* Global Footer matching Screenshot */}
         <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-          <p>© 2026 Kaizentrix Care · Your health, thoughtfully connected.</p>
+          <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
           <div className="flex items-center gap-4">
             <span className="hover:text-[#162623] cursor-pointer">Privacy</span>
             <span>·</span>

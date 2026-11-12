@@ -383,7 +383,7 @@ export default function ConsentScreen({ onNavigate }) {
 
         {/* Global Footer */}
         <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-          <p>© 2026 Kaizentrix Care · Your health, thoughtfully connected.</p>
+          <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
           <div className="flex items-center gap-4">
             <span
               className="hover:text-[#162623] cursor-pointer"
@@ -414,7 +414,7 @@ export default function ConsentScreen({ onNavigate }) {
                   policy
                 </span>
                 <h3 className="text-base font-bold text-[#162623]">
-                  Kaizentrix Care Privacy Notice
+                  Kaizen Care Privacy Notice
                 </h3>
               </div>
               <button

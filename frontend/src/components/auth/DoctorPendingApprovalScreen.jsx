@@ -13,7 +13,7 @@ function ClinicianBrandPanel({ onSignOut }) {
             </div>
             <div>
               <p className="text-xl font-bold tracking-tight text-white">
-                Kaizentrix Care
+                Kaizen Care
               </p>
               <p className="text-[10px] tracking-[.18em] uppercase text-[#F0F5F7]/80 font-semibold">
                 Credential Review
@@ -144,7 +144,7 @@ export default function DoctorPendingApprovalScreen({ patient, onRefresh, onSign
         </div>
 
         <footer className="pt-8 text-center text-xs text-[#577877]">
-          © 2026 Kaizentrix Care · Clinician Credentialing Workspace.
+          © 2026 Kaizen Care · Clinician Credentialing Workspace.
         </footer>
       </main>
     </div>

@@ -136,11 +136,12 @@ export default function FindDoctorsScreen({
 
   const [patientProfile, setPatientProfile] = useState(null);
   useEffect(() => {
+    if (!authenticated) return;
     patientApi
       .profile()
       .then((data) => setPatientProfile(data))
       .catch(() => {});
-  }, []);
+  }, [authenticated]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpecialties, setSelectedSpecialties] = useState([]);
@@ -368,7 +369,7 @@ export default function FindDoctorsScreen({
         key: orderRes.key_id,
         amount: orderRes.amount_paise,
         currency: orderRes.currency,
-        name: "Kaizentrix Care Telehealth",
+        name: "Kaizen Care Telehealth",
         description: `${bookingDoctor.full_name} · ${appointmentType}`,
         order_id: orderRes.order_id,
         handler: async function (response) {

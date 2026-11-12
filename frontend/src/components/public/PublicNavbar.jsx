@@ -38,10 +38,10 @@ export default function PublicNavbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-[rgba(87,120,119,0.15)] bg-white/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-4 lg:px-10">
-        <NavLink to="/" aria-label="Kaizentrix Care home" className="flex shrink-0 items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25836F] focus-visible:ring-offset-2">
+        <NavLink to="/" aria-label="Kaizen Care home" className="flex shrink-0 items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25836F] focus-visible:ring-offset-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#25836F] text-white shadow-sm"><span className="material-symbols-outlined !text-white text-2xl">health_and_safety</span></div>
           <div>
-            <p className="text-lg font-bold leading-none tracking-tight text-[#162623]">Kaizentrix Care</p>
+            <p className="text-lg font-bold leading-none tracking-tight text-[#162623]">Kaizen Care</p>
             <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-[#577877]">Patient Portal</p>
           </div>
         </NavLink>

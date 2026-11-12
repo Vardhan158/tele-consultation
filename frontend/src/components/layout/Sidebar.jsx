@@ -76,7 +76,7 @@ export default function Sidebar({
           </div>
           <div className="flex flex-col">
             <span className="font-headline-sm text-base text-white tracking-tight font-bold leading-tight">
-              Kaizentrix Care
+              Kaizen Care
             </span>
             <span className="text-[10px] text-[#F0F5F7]/80 tracking-widest uppercase font-semibold mt-0.5">
               {isAdmin ? "Clinic Admin Workspace" : isDoctor ? "Doctor Portal" : "Patient Portal"}

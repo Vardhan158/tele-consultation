@@ -14,7 +14,7 @@ function ClinicianBrandPanel({ onBack }) {
             </div>
             <div>
               <p className="text-xl font-bold tracking-tight text-white">
-                Kaizentrix Care
+                Kaizen Care
               </p>
               <p className="text-[10px] tracking-[.18em] uppercase text-[#F0F5F7]/80 font-semibold">
                 Clinician Workspace
@@ -285,7 +285,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   type="text"
                   value={form.clinic_name}
                   onChange={update}
-                  placeholder="Kaizentrix Care Telehealth"
+                  placeholder="Kaizen Care Telehealth"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
@@ -397,7 +397,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
         </div>
 
         <footer className="pt-8 text-center text-xs text-[#577877]">
-          © 2026 Kaizentrix Care · Clinician Credentialing Workspace.
+          © 2026 Kaizen Care · Clinician Credentialing Workspace.
         </footer>
       </main>
     </div>

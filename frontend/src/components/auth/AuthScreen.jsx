@@ -24,7 +24,7 @@ function BrandPanel({ onBack }) {
             </div>
             <div>
               <p className="text-xl font-bold tracking-tight text-white">
-                Kaizentrix Care
+                Kaizen Care
               </p>
               <p className="text-[10px] tracking-[.18em] uppercase text-[#F0F5F7]/80 font-semibold">
                 Patient Portal
@@ -202,7 +202,7 @@ export default function AuthScreen({
                     Home
                   </button>
                 )}
-                <span>Kaizentrix Care Portal</span>
+                <span>Kaizen Care Portal</span>
               </div>
               <span>Step 2 of 2: Multi-Factor Check</span>
             </div>
@@ -312,7 +312,7 @@ export default function AuthScreen({
             </div>
 
             <p className="text-center text-[11px] text-[#577877]">
-              © 2026 Kaizentrix Care · Patient Portal
+              © 2026 Kaizen Care · Patient Portal
             </p>
           </div>
         </section>
@@ -341,7 +341,7 @@ export default function AuthScreen({
                   Home
                 </button>
               )}
-              <span className="font-medium">Kaizentrix Care</span>
+              <span className="font-medium">Kaizen Care</span>
             </div>
             <span>Secure Patient Access</span>
           </div>
@@ -548,7 +548,7 @@ export default function AuthScreen({
                 </p>
               ) : (
                 <p>
-                  New to Kaizentrix Care?{" "}
+                  New to Kaizen Care?{" "}
                   <button
                     type="button"
                     onClick={() => changeMode("register")}
@@ -563,7 +563,7 @@ export default function AuthScreen({
 
           {/* Footer */}
           <p className="text-center text-[11px] text-[#577877] pt-4">
-            © 2026 Kaizentrix Care · Privacy Policy · Terms of Service
+            © 2026 Kaizen Care · Privacy Policy · Terms of Service
           </p>
         </div>
       </section>

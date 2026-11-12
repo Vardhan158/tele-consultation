@@ -32,7 +32,7 @@ export default function HowItWorksScreen() {
           <div className="mx-auto max-w-4xl text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F0F5F7]/75">Your care journey</p>
             <h1 className="mt-4 text-4xl font-bold leading-tight text-white sm:text-5xl">How Your Care Journey Works</h1>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#F0F5F7]/85 sm:text-lg">From finding the right specialist to staying on top of follow-up care, Kaizentrix Care keeps each step simple and connected.</p>
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#F0F5F7]/85 sm:text-lg">From finding the right specialist to staying on top of follow-up care, Kaizen Care keeps each step simple and connected.</p>
           </div>
         </section>
 
@@ -57,7 +57,7 @@ export default function HowItWorksScreen() {
       </main>
       <footer className="border-t border-[#577877]/20 bg-white px-6 py-8 text-xs text-[#577877] lg:px-10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <p>© 2026 Kaizentrix Care · Patient Portal. All rights reserved.</p>
+          <p>© 2026 Kaizen Care · Patient Portal. All rights reserved.</p>
           <div className="flex gap-6"><span>Privacy Policy</span><span>Terms of Use</span></div>
         </div>
       </footer>

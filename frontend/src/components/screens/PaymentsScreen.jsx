@@ -198,7 +198,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           key: initiated.razorpay_key_id,
           amount: initiated.amount_paise,
           currency: initiated.currency || "INR",
-          name: "Kaizentrix Care",
+          name: "Kaizen Care",
           description: checkoutApt.visitType || "Doctor Consultation",
           order_id: initiated.order_id,
           prefill: {
@@ -343,7 +343,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-[#162623] tracking-tight">
-                      Kaizentrix Care
+                      Kaizen Care
                     </h2>
                     <p className="text-[10px] font-semibold tracking-wider uppercase text-[#577877]">
                       Patient Portal
@@ -471,7 +471,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
               {/* Footer Note */}
               <div className="pt-4 border-t border-[#577877]/15 text-[11px] text-[#577877] leading-relaxed">
-                Thank you for choosing Kaizentrix Care. This receipt confirms
+                Thank you for choosing Kaizen Care. This receipt confirms
                 payment and is not a statement of insurance benefits. Keep it
                 for your records.
               </div>
@@ -548,7 +548,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
           {/* Global Footer */}
           <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-            <p>© 2026 Kaizentrix Care · Your health, thoughtfully connected.</p>
+            <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
             <div className="flex items-center gap-4">
               <span className="hover:text-[#162623] cursor-pointer">
                 Privacy
@@ -899,7 +899,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
           {/* Global Footer matching Screenshot */}
           <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-            <p>© 2026 Kaizentrix Care · Your health, thoughtfully connected.</p>
+            <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
             <div className="flex items-center gap-4">
               <span className="hover:text-[#162623] cursor-pointer">
                 Privacy
@@ -1329,7 +1329,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
         {/* Global Footer matching Screenshot */}
         <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-          <p>© 2026 Kaizentrix Care · Your health, thoughtfully connected.</p>
+          <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
           <div className="flex items-center gap-4">
             <span className="hover:text-[#162623] cursor-pointer">Privacy</span>
             <span>·</span>
