@@ -52,7 +52,7 @@ export default function AppLoadingSplash({ onFinished }) {
 
     let p = 0;
     const interval = setInterval(() => {
-      // Step up to 85% smoothly
+      // Step up to 85% at a smooth, cinematic pace
       if (p < 85) {
         p += 5;
         setProgress(p);
@@ -67,20 +67,21 @@ export default function AppLoadingSplash({ onFinished }) {
           setStatusText("Welcome to Kaizen Care");
           clearInterval(interval);
 
+          // Hold briefly at 100% so user can read final status and see the 3D truck
           const t1 = setTimeout(() => {
             setFadeOut(true);
             const t2 = setTimeout(() => {
               if (onFinished) onFinished();
-            }, 500); // 500ms fade-out transition
+            }, 700); // 700ms smooth fade-out
             return () => clearTimeout(t2);
-          }, 200);
+          }, 500);
           return () => clearTimeout(t1);
         } else {
           p = Math.min(p + 2, 98);
           setProgress(p);
         }
       }
-    }, 40);
+    }, 130); // 130ms per step = ~2.2s total progress climb
 
     return () => clearInterval(interval);
   }, [onFinished, prefersReducedMotion]);
@@ -259,7 +260,7 @@ export default function AppLoadingSplash({ onFinished }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#162623] text-white p-6 sm:p-8 select-none transition-opacity duration-500 ease-out ${
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#162623] text-white p-6 sm:p-8 select-none transition-opacity duration-700 ease-in-out ${
         fadeOut
           ? "opacity-0 pointer-events-none"
           : "opacity-100 pointer-events-auto"
