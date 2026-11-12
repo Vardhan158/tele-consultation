@@ -96,6 +96,7 @@ export default function App() {
   const [navParams, setNavParams] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
   const [entryMode, setEntryMode] = useState(() => entryModeFromLocation());
   const [patient, setPatient] = useState(null);
   const [registeredDoctorEmail, setRegisteredDoctorEmail] = useState("");
@@ -115,7 +116,7 @@ export default function App() {
       });
 
   useEffect(() => {
-    refreshUser();
+    refreshUser().finally(() => setAuthChecking(false));
   }, []);
 
   const navigateEntry = (mode) => {
@@ -138,184 +139,193 @@ export default function App() {
     PUBLIC_PATHS[location.pathname] ||
     (PATH_TO_TAB[location.pathname] ? "login" : entryMode);
 
-  if (authChecking) {
-    return <AppLoadingSplash onFinished={() => setAuthChecking(false)} />;
-  }
+  const renderMainContent = () => {
+    if (authChecking) return null;
 
-  if (location.pathname === "/how-it-works") return <HowItWorksScreen />;
-  if (location.pathname === "/about-us") return <AboutUsScreen />;
-  if (location.pathname === "/contact") return <ContactScreen />;
+    if (location.pathname === "/how-it-works") return <HowItWorksScreen />;
+    if (location.pathname === "/about-us") return <AboutUsScreen />;
+    if (location.pathname === "/contact") return <ContactScreen />;
 
-  if (!authenticated) {
-    if (routedEntryMode === "landing")
+    if (!authenticated) {
+      if (routedEntryMode === "landing")
+        return (
+          <LandingScreen
+            onSignIn={() => navigateEntry("login")}
+            onRegister={() => navigateEntry("register")}
+            onDoctorRegister={() => navigateEntry("doctor-register")}
+            onFindDoctor={() => navigate("/find-doctors")}
+          />
+        );
+      if (routedEntryMode === "doctor-register")
+        return (
+          <DoctorRegistrationScreen
+            onBack={() => navigateEntry("landing")}
+            onSuccess={(email) => {
+              setRegisteredDoctorEmail(email);
+              navigate("/doctor/verify-email");
+            }}
+          />
+        );
+      if (routedEntryMode === "doctor-verify-email")
+        return (
+          <DoctorVerifyEmailScreen
+            initialEmail={registeredDoctorEmail}
+            onBack={() => navigate("/doctor/register")}
+            onVerified={() => {
+              refreshUser().then((res) => {
+                if (res?.authenticated && res?.role === "doctor") {
+                  navigate("/doctor/dashboard", { replace: true });
+                }
+              });
+            }}
+          />
+        );
+      if (routedEntryMode === "find-doctors") {
+        return (
+          <FindDoctorsScreen
+            onNavigate={handleNavigate}
+            onRequireAuth={() => navigateEntry("register")}
+            authenticated={false}
+          />
+        );
+      }
       return (
-        <LandingScreen
-          onSignIn={() => navigateEntry("login")}
-          onRegister={() => navigateEntry("register")}
-          onDoctorRegister={() => navigateEntry("doctor-register")}
-          onFindDoctor={() => navigate("/find-doctors")}
-        />
-      );
-    if (routedEntryMode === "doctor-register")
-      return (
-        <DoctorRegistrationScreen
+        <AuthScreen
           onBack={() => navigateEntry("landing")}
-          onSuccess={(email) => {
-            setRegisteredDoctorEmail(email);
-            navigate("/doctor/verify-email");
-          }}
-        />
-      );
-    if (routedEntryMode === "doctor-verify-email")
-      return (
-        <DoctorVerifyEmailScreen
-          initialEmail={registeredDoctorEmail}
-          onBack={() => navigate("/doctor/register")}
-          onVerified={() => {
+          initialMode={routedEntryMode}
+          onAuthenticated={() => {
             refreshUser().then((res) => {
-              if (res?.authenticated && res?.role === "doctor") {
+              if (!res?.authenticated) {
+                setAuthenticated(false);
+                setPatient(null);
+                navigate("/login", { replace: true });
+              } else if (res.role === "clinic_admin") {
+                navigate("/clinic/overview", { replace: true });
+              } else if (res.role === "doctor") {
                 navigate("/doctor/dashboard", { replace: true });
+              } else {
+                setActiveTab("dashboard");
+                navigate("/dashboard", { replace: true });
               }
             });
           }}
         />
       );
-    if (routedEntryMode === "find-doctors") {
+    }
+
+    const signOut = async () => {
+      await authApi.logout().catch(() => {});
+      setAuthenticated(false);
+      setPatient(null);
+      navigate("/", { replace: true });
+    };
+
+    const isDoctor = patient?.role === "doctor";
+
+    // Prevent clinician dashboard access until clinic approval is completed
+    if (isDoctor && patient?.approval_status !== "approved") {
       return (
-        <FindDoctorsScreen
-          onNavigate={handleNavigate}
-          onRequireAuth={() => navigateEntry("register")}
-          authenticated={false}
+        <DoctorPendingApprovalScreen
+          patient={patient}
+          onRefresh={refreshUser}
+          onSignOut={signOut}
         />
       );
     }
-    return (
-      <AuthScreen
-        onBack={() => navigateEntry("landing")}
-        initialMode={routedEntryMode}
-        onAuthenticated={() => {
-          refreshUser().then((res) => {
-            if (!res?.authenticated) {
-              setAuthenticated(false);
-              setPatient(null);
-              navigate("/login", { replace: true });
-            } else if (res.role === "clinic_admin") {
-              navigate("/clinic/overview", { replace: true });
-            } else if (res.role === "doctor") {
-              navigate("/doctor/dashboard", { replace: true });
-            } else {
-              setActiveTab("dashboard");
-              navigate("/dashboard", { replace: true });
-            }
-          });
-        }}
-      />
-    );
-  }
 
-  const signOut = async () => {
-    await authApi.logout().catch(() => {});
-    setAuthenticated(false);
-    setPatient(null);
-    navigate("/", { replace: true });
-  };
-
-  const isDoctor = patient?.role === "doctor";
-
-  // Prevent clinician dashboard access until clinic approval is completed
-  if (isDoctor && patient?.approval_status !== "approved") {
-    return (
-      <DoctorPendingApprovalScreen
-        patient={patient}
-        onRefresh={refreshUser}
-        onSignOut={signOut}
-      />
-    );
-  }
-
-  const renderScreen = () => {
-    if (patient?.role === "clinic_admin") {
-      return (
-        <ClinicAdminDashboard
-          activeTab={routedTab}
-          onSelectTab={handleNavigate}
-        />
-      );
-    }
-    if (isDoctor) {
-      switch (routedTab) {
-        case "doctor-dashboard":
-          return <DoctorDashboardScreen onNavigate={handleNavigate} />;
-        case "doctor-appointments":
-          return <DoctorAppointmentsScreen onNavigate={handleNavigate} />;
-        case "doctor-patients":
-          return <DoctorPatientsScreen />;
-        case "doctor-availability":
-          return <DoctorAvailabilityScreen />;
-        case "doctor-settings":
-          return <DoctorSettingsScreen />;
-        case "doctor-consultation":
-          return (
-            <DoctorConsultationScreen
-              appointment={navParams}
-              onBack={() => handleNavigate("doctor-appointments")}
-            />
-          );
-        default:
-          return <DoctorDashboardScreen onNavigate={handleNavigate} />;
-      }
-    }
-    switch (routedTab) {
-      case "dashboard":
-        return <DashboardScreen onNavigate={handleNavigate} />;
-      case "find-doctors":
-        return <FindDoctorsScreen onNavigate={handleNavigate} authenticated />;
-      case "appointments":
+    const renderScreen = () => {
+      if (patient?.role === "clinic_admin") {
         return (
-          <AppointmentsScreen
-            onNavigate={handleNavigate}
-            navParams={navParams}
+          <ClinicAdminDashboard
+            activeTab={routedTab}
+            onSelectTab={handleNavigate}
           />
         );
-      case "video-consultation":
-        return <VideoConsultationScreen onNavigate={handleNavigate} />;
-      case "medical-records":
-        return <MedicalRecordsScreen onNavigate={handleNavigate} />;
-      case "prescriptions":
-        return <PrescriptionsScreen onNavigate={handleNavigate} />;
-      case "summaries":
-        return <ConsultationSummariesScreen onNavigate={handleNavigate} />;
-      case "follow-up":
-        return <FollowUpCareScreen onNavigate={handleNavigate} />;
-      case "payments":
-        return (
-          <PaymentsScreen onNavigate={handleNavigate} navParams={navParams} />
-        );
-      case "notifications":
-        return <NotificationsScreen onNavigate={handleNavigate} />;
-      case "settings":
-        return <SettingsScreen onNavigate={handleNavigate} />;
-      case "profile":
-        return <ProfileScreen onNavigate={handleNavigate} />;
-      case "consent":
-        return <ConsentScreen onNavigate={handleNavigate} />;
-      case "support":
-        return <SupportScreen onNavigate={handleNavigate} />;
-      default:
-        return <DashboardScreen onNavigate={handleNavigate} />;
-    }
+      }
+      if (isDoctor) {
+        switch (routedTab) {
+          case "doctor-dashboard":
+            return <DoctorDashboardScreen onNavigate={handleNavigate} />;
+          case "doctor-appointments":
+            return <DoctorAppointmentsScreen onNavigate={handleNavigate} />;
+          case "doctor-patients":
+            return <DoctorPatientsScreen />;
+          case "doctor-availability":
+            return <DoctorAvailabilityScreen />;
+          case "doctor-settings":
+            return <DoctorSettingsScreen />;
+          case "doctor-consultation":
+            return (
+              <DoctorConsultationScreen
+                appointment={navParams}
+                onBack={() => handleNavigate("doctor-appointments")}
+              />
+            );
+          default:
+            return <DoctorDashboardScreen onNavigate={handleNavigate} />;
+        }
+      }
+      switch (routedTab) {
+        case "dashboard":
+          return <DashboardScreen onNavigate={handleNavigate} />;
+        case "find-doctors":
+          return <FindDoctorsScreen onNavigate={handleNavigate} authenticated />;
+        case "appointments":
+          return (
+            <AppointmentsScreen
+              onNavigate={handleNavigate}
+              navParams={navParams}
+            />
+          );
+        case "video-consultation":
+          return <VideoConsultationScreen onNavigate={handleNavigate} />;
+        case "medical-records":
+          return <MedicalRecordsScreen onNavigate={handleNavigate} />;
+        case "prescriptions":
+          return <PrescriptionsScreen onNavigate={handleNavigate} />;
+        case "summaries":
+          return <ConsultationSummariesScreen onNavigate={handleNavigate} />;
+        case "follow-up":
+          return <FollowUpCareScreen onNavigate={handleNavigate} />;
+        case "payments":
+          return (
+            <PaymentsScreen onNavigate={handleNavigate} navParams={navParams} />
+          );
+        case "notifications":
+          return <NotificationsScreen onNavigate={handleNavigate} />;
+        case "settings":
+          return <SettingsScreen onNavigate={handleNavigate} />;
+        case "profile":
+          return <ProfileScreen onNavigate={handleNavigate} />;
+        case "consent":
+          return <ConsentScreen onNavigate={handleNavigate} />;
+        case "support":
+          return <SupportScreen onNavigate={handleNavigate} />;
+        default:
+          return <DashboardScreen onNavigate={handleNavigate} />;
+      }
+    };
+
+    return (
+      <Layout
+        activeTab={
+          patient?.role === "clinic_admin" ? routedTab : routedTab
+        }
+        onSelectTab={handleNavigate}
+        onSignOut={signOut}
+        patient={patient}
+      >
+        {renderScreen()}
+      </Layout>
+    );
   };
 
   return (
-    <Layout
-      activeTab={
-        patient?.role === "clinic_admin" ? routedTab : routedTab
-      }
-      onSelectTab={handleNavigate}
-      onSignOut={signOut}
-      patient={patient}
-    >
-      {renderScreen()}
-    </Layout>
+    <>
+      {showSplash && (
+        <AppLoadingSplash onFinished={() => setShowSplash(false)} />
+      )}
+      {renderMainContent()}
+    </>
   );
 }

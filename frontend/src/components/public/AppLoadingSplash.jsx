@@ -8,43 +8,72 @@ export default function AppLoadingSplash({ onFinished }) {
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("Initializing Kaizen Care...");
   const [fadeOut, setFadeOut] = useState(false);
+  const [modelLoaded, setModelLoaded] = useState(false);
+
   const progressRef = useRef(0);
+  const modelLoadedRef = useRef(false);
 
   useEffect(() => {
     progressRef.current = progress;
   }, [progress]);
 
-  // Simulated progress timer for ultra-smooth splash feel
   useEffect(() => {
-    const steps = [
-      { p: 15, text: "Connecting to Telehealth Network..." },
-      { p: 40, text: "Deploying 3D Kaizen Mobile Unit..." },
-      { p: 70, text: "Preparing Clinical Workspace..." },
-      { p: 90, text: "Finalizing Security Credentials..." },
-      { p: 100, text: "Welcome to Kaizen Care" },
-    ];
+    modelLoadedRef.current = modelLoaded;
+  }, [modelLoaded]);
 
-    let currentStep = 0;
-    const interval = setInterval(() => {
-      if (currentStep < steps.length) {
-        setProgress(steps[currentStep].p);
-        setStatusText(steps[currentStep].text);
-        currentStep++;
-      } else {
-        clearInterval(interval);
+  // Check reduced motion preference
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Smooth loading lifecycle linked to actual 3D asset preloading
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setProgress(100);
+      setStatusText("Welcome to Kaizen Care");
+      setTimeout(() => {
+        setFadeOut(true);
         setTimeout(() => {
-          setFadeOut(true);
+          if (onFinished) onFinished();
+        }, 150);
+      }, 200);
+      return;
+    }
+
+    let p = 0;
+    const interval = setInterval(() => {
+      // Step up to 85% while preloading
+      if (p < 85) {
+        p += 15;
+        setProgress(p);
+        if (p < 30) setStatusText("Connecting to Telehealth Network...");
+        else if (p < 60) setStatusText("Loading 3D Kaizen Mobile Unit...");
+        else setStatusText("Preparing Clinical Workspace...");
+      } else {
+        // Hold at 85% until 3D model is confirmed loaded (or max timeout)
+        if (modelLoadedRef.current || p >= 98) {
+          p = 100;
+          setProgress(100);
+          setStatusText("Welcome to Kaizen Care");
+          clearInterval(interval);
+
           setTimeout(() => {
-            if (onFinished) onFinished();
-          }, 600);
-        }, 400);
+            setFadeOut(true);
+            setTimeout(() => {
+              if (onFinished) onFinished();
+            }, 600);
+          }, 300);
+        } else {
+          p = Math.min(p + 2, 98);
+          setProgress(p);
+        }
       }
-    }, 400);
+    }, 110);
 
     return () => clearInterval(interval);
-  }, [onFinished]);
+  }, [onFinished, prefersReducedMotion]);
 
-  // 3D Truck Scene inside Splash
+  // 3D Scene Setup
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -56,10 +85,10 @@ export default function AppLoadingSplash({ onFinished }) {
     scene = new THREE.Scene();
     scene.add(wrapperGroup);
 
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 0.2, 7.0);
+    const width = container.clientWidth || window.innerWidth;
+    const height = container.clientHeight || window.innerHeight;
+    camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+    camera.position.set(0, 0.6, 6.5);
 
     renderer = new THREE.WebGLRenderer({
       alpha: true,
@@ -69,15 +98,15 @@ export default function AppLoadingSplash({ onFinished }) {
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.35;
+    renderer.toneMappingExposure = 1.3;
 
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
     container.appendChild(renderer.domElement);
 
-    // Bright Studio Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
+    // Studio Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2.2);
     scene.add(ambientLight);
 
     const mainLight = new THREE.DirectionalLight(0xffffff, 3.5);
@@ -92,9 +121,7 @@ export default function AppLoadingSplash({ onFinished }) {
     rimLight.position.set(0, 8, -6);
     scene.add(rimLight);
 
-    // NO GRAY SHADOW PLANE TO KEEP BACKGROUND 100% CLEAN & TRANSPARENT
-
-    // Load Model
+    // Load Model with responsive scale and framing
     const loader = new GLTFLoader();
     const loadModel = (urlToLoad) => {
       loader.load(
@@ -102,15 +129,16 @@ export default function AppLoadingSplash({ onFinished }) {
         (gltf) => {
           const model = gltf.scene;
 
-          // Hide floor/road/plane meshes inside the GLB model
+          // Compute bounding box ONLY on visible mesh geometries
+          const box = new THREE.Box3();
           model.traverse((child) => {
             if (child.isMesh && child.geometry) {
               child.geometry.computeBoundingBox();
               const childBox = child.geometry.boundingBox;
+
+              // Hide floor/road plane mesh
               const childSize = childBox.getSize(new THREE.Vector3());
               const name = (child.name || "").toLowerCase();
-
-              // Detect flat ground/road/plane mesh (e.g. name contains floor/plane/road or Y height is flat relative to X/Z)
               const isGround =
                 name.includes("plane") ||
                 name.includes("floor") ||
@@ -121,25 +149,21 @@ export default function AppLoadingSplash({ onFinished }) {
                 (childSize.y < 0.8 && (childSize.x > 2.5 || childSize.z > 2.5));
 
               if (isGround) {
-                child.visible = false; // Hide the giant grey floor plane completely!
+                child.visible = false;
+              } else {
+                box.expandByObject(child);
               }
-            }
-          });
-
-          // Compute bounding box ONLY on visible truck meshes
-          const box = new THREE.Box3();
-          model.traverse((child) => {
-            if (child.visible && child.isMesh && child.geometry) {
-              box.expandByObject(child);
             }
           });
 
           const size = box.getSize(new THREE.Vector3());
           const center = box.getCenter(new THREE.Vector3());
-
           const maxDim = Math.max(size.x, size.y, size.z) || 1;
-          // Scale model up significantly so the truck alone is HUGE and clear
-          const scale = 5.5 / maxDim;
+
+          // Responsive sizing based on viewport width
+          const isMobileViewport = width < 640;
+          const targetSize = isMobileViewport ? 2.4 : 3.8;
+          const scale = targetSize / maxDim;
           model.scale.set(scale, scale, scale);
 
           model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
@@ -154,11 +178,15 @@ export default function AppLoadingSplash({ onFinished }) {
           });
 
           wrapperGroup.add(model);
+          setModelLoaded(true);
         },
         undefined,
         (err) => {
           if (urlToLoad !== "/assets/kaizenx_truck_v3.glb") {
             loadModel("/assets/kaizenx_truck_v3.glb");
+          } else {
+            // Fallback so app doesn't hang on slow network
+            setModelLoaded(true);
           }
         }
       );
@@ -166,25 +194,33 @@ export default function AppLoadingSplash({ onFinished }) {
 
     loadModel(truckUrl || "/assets/kaizenx_truck_v3.glb");
 
-    // Smooth Lerp Animation: Drive from Left (-6.5) to Right (+6.5)
+    // Animation Loop
     const lerp = (start, end, factor) => start + (end - start) * factor;
-    let currentPosX = -6.5;
+
+    const isMobileViewport = width < 640;
+    const moveRange = isMobileViewport ? 1.2 : 2.6; // Keep truck 100% inside visible camera frustum
+    let currentPosX = -moveRange / 2;
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
-      // Map progress 0% -> 100% to X position from Left (-6.5) to Right (+6.5)
-      const p = Math.min(Math.max(progressRef.current / 100, 0), 1);
-      const targetPosX = -6.5 + p * 13.0;
+      if (!prefersReducedMotion) {
+        const pr = Math.min(Math.max(progressRef.current / 100, 0), 1);
+        const targetPosX = -moveRange / 2 + pr * moveRange;
 
-      currentPosX = lerp(currentPosX, targetPosX, 0.08);
+        currentPosX = lerp(currentPosX, targetPosX, 0.08);
 
-      wrapperGroup.position.x = currentPosX;
-      wrapperGroup.position.y = -0.3 + Math.sin(Date.now() * 0.003) * 0.06;
+        wrapperGroup.position.x = currentPosX;
+        wrapperGroup.position.y = -0.2 + Math.sin(Date.now() * 0.003) * 0.06;
 
-      // Rotated 90 degrees
-      wrapperGroup.rotation.y = Math.PI / 2;
-      wrapperGroup.rotation.z = Math.sin(Date.now() * 0.003) * 0.015;
+        // Angle headlights facing Right (towards movement direction) with 3D perspective angle
+        wrapperGroup.rotation.y = Math.PI / 2 - 0.38;
+        wrapperGroup.rotation.z = Math.sin(Date.now() * 0.003) * 0.015;
+      } else {
+        wrapperGroup.position.x = 0;
+        wrapperGroup.position.y = -0.2;
+        wrapperGroup.rotation.y = Math.PI / 2 - 0.38;
+      }
 
       renderer.render(scene, camera);
     };
@@ -193,8 +229,8 @@ export default function AppLoadingSplash({ onFinished }) {
 
     const handleResize = () => {
       if (!container) return;
-      const newWidth = container.clientWidth;
-      const newHeight = container.clientHeight;
+      const newWidth = container.clientWidth || window.innerWidth;
+      const newHeight = container.clientHeight || window.innerHeight;
       camera.aspect = newWidth / newHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(newWidth, newHeight);
@@ -207,26 +243,31 @@ export default function AppLoadingSplash({ onFinished }) {
       renderer.dispose();
       scene.clear();
     };
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#162623] text-white p-8 select-none transition-all duration-700 ease-in-out ${
-        fadeOut ? "opacity-0 pointer-events-none scale-105" : "opacity-100 scale-100"
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#162623] text-white p-6 sm:p-8 select-none transition-opacity duration-600 ease-out ${
+        fadeOut
+          ? "opacity-0 pointer-events-none"
+          : "opacity-100 pointer-events-auto"
       }`}
+      aria-hidden={fadeOut}
+      role="dialog"
+      aria-label="Application Loading"
     >
-      {/* Background Cinematic Mesh & Glow */}
+      {/* Background Mesh Glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-emerald-500/10 rounded-full blur-[150px]" />
-        <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[130px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[140px]" />
+        <div className="absolute bottom-10 right-10 w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-[120px]" />
       </div>
 
       {/* Top Brand Header */}
-      <div className="relative z-10 flex items-center gap-3 pt-4">
-        <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
+      <div className="relative z-10 flex items-center gap-3 pt-2 sm:pt-4">
+        <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
           <svg
-            width="24"
-            height="26"
+            width="22"
+            height="24"
             viewBox="0 0 35 42"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -244,25 +285,29 @@ export default function AppLoadingSplash({ onFinished }) {
             />
           </svg>
         </div>
-        <span className="text-2xl font-bold tracking-tight text-white font-poppins">
+        <span className="text-xl sm:text-2xl font-bold tracking-tight text-white font-poppins">
           Kaizen Care
         </span>
       </div>
 
-      {/* Center 3D Kaizen Truck Canvas */}
-      <div className="relative z-10 w-full max-w-5xl flex-1 flex flex-col items-center justify-center my-2">
+      {/* Center 3D Truck Container */}
+      <div className="relative z-10 w-full max-w-4xl flex-1 flex flex-col items-center justify-center my-2">
         <div
           ref={containerRef}
-          className="w-full h-[360px] sm:h-[460px] lg:h-[520px]"
+          className="w-full h-[300px] sm:h-[400px] lg:h-[460px] cursor-grab active:cursor-grabbing"
         />
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-xs text-emerald-300 shadow-xl mt-[-10px]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <span>3D Kaizen Mobile Unit Deploying</span>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-xs text-emerald-300 shadow-xl mt-[-10px]">
+          <span
+            className={`w-2 h-2 rounded-full bg-emerald-400 ${
+              prefersReducedMotion ? "" : "animate-ping"
+            }`}
+          />
+          <span>Kaizen 3D Mobile Unit Deploying</span>
         </div>
       </div>
 
       {/* Bottom Progress Bar & Loading Status */}
-      <div className="relative z-10 w-full max-w-md text-center space-y-3 pb-6">
+      <div className="relative z-10 w-full max-w-md text-center space-y-3 pb-4 sm:pb-6">
         <div className="flex justify-between items-center text-xs font-semibold tracking-wider text-emerald-200/90 uppercase">
           <span>{statusText}</span>
           <span>{progress}%</span>
@@ -271,7 +316,7 @@ export default function AppLoadingSplash({ onFinished }) {
         {/* Progress Bar Container */}
         <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden p-0.5 border border-white/10">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-300 transition-all duration-500 ease-out shadow-[0_0_12px_rgba(52,211,153,0.8)]"
+            className="h-full rounded-full bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-300 transition-all duration-300 ease-out shadow-[0_0_12px_rgba(52,211,153,0.8)]"
             style={{ width: `${progress}%` }}
           />
         </div>
