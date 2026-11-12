@@ -26,54 +26,66 @@ export default function AppLoadingSplash({ onFinished }) {
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // Smooth loading lifecycle linked to actual 3D asset preloading
+  // 3-second hard safety fallback timeout so splash never gets stuck
+  useEffect(() => {
+    const safetyTimer = setTimeout(() => {
+      modelLoadedRef.current = true;
+      setModelLoaded(true);
+    }, 3000);
+    return () => clearTimeout(safetyTimer);
+  }, []);
+
+  // Smooth loading lifecycle linked to 3D asset preloading
   useEffect(() => {
     if (prefersReducedMotion) {
       setProgress(100);
       setStatusText("Welcome to Kaizen Care");
-      setTimeout(() => {
+      const t1 = setTimeout(() => {
         setFadeOut(true);
-        setTimeout(() => {
+        const t2 = setTimeout(() => {
           if (onFinished) onFinished();
         }, 150);
-      }, 200);
-      return;
+        return () => clearTimeout(t2);
+      }, 100);
+      return () => clearTimeout(t1);
     }
 
     let p = 0;
     const interval = setInterval(() => {
-      // Step up to 85% while preloading
+      // Step up to 85% smoothly
       if (p < 85) {
-        p += 15;
+        p += 5;
         setProgress(p);
         if (p < 30) setStatusText("Connecting to Telehealth Network...");
         else if (p < 60) setStatusText("Loading 3D Kaizen Mobile Unit...");
         else setStatusText("Preparing Clinical Workspace...");
       } else {
-        // Hold at 85% until 3D model is confirmed loaded (or max timeout)
+        // Hold at 85%-98% until 3D model is confirmed loaded
         if (modelLoadedRef.current || p >= 98) {
           p = 100;
           setProgress(100);
           setStatusText("Welcome to Kaizen Care");
           clearInterval(interval);
 
-          setTimeout(() => {
+          const t1 = setTimeout(() => {
             setFadeOut(true);
-            setTimeout(() => {
+            const t2 = setTimeout(() => {
               if (onFinished) onFinished();
-            }, 600);
-          }, 300);
+            }, 500); // 500ms fade-out transition
+            return () => clearTimeout(t2);
+          }, 200);
+          return () => clearTimeout(t1);
         } else {
           p = Math.min(p + 2, 98);
           setProgress(p);
         }
       }
-    }, 110);
+    }, 40);
 
     return () => clearInterval(interval);
   }, [onFinished, prefersReducedMotion]);
 
-  // 3D Scene Setup
+  // 3D Scene Setup & Framing
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -88,7 +100,7 @@ export default function AppLoadingSplash({ onFinished }) {
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
     camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-    camera.position.set(0, 0.6, 6.5);
+    camera.position.set(0, 0.5, 6.5);
 
     renderer = new THREE.WebGLRenderer({
       alpha: true,
@@ -162,7 +174,7 @@ export default function AppLoadingSplash({ onFinished }) {
 
           // Responsive sizing based on viewport width
           const isMobileViewport = width < 640;
-          const targetSize = isMobileViewport ? 2.4 : 3.8;
+          const targetSize = isMobileViewport ? 2.4 : 3.6;
           const scale = targetSize / maxDim;
           model.scale.set(scale, scale, scale);
 
@@ -185,7 +197,7 @@ export default function AppLoadingSplash({ onFinished }) {
           if (urlToLoad !== "/assets/kaizenx_truck_v3.glb") {
             loadModel("/assets/kaizenx_truck_v3.glb");
           } else {
-            // Fallback so app doesn't hang on slow network
+            // Fallback so splash screen never hangs
             setModelLoaded(true);
           }
         }
@@ -194,11 +206,11 @@ export default function AppLoadingSplash({ onFinished }) {
 
     loadModel(truckUrl || "/assets/kaizenx_truck_v3.glb");
 
-    // Animation Loop
+    // Animation Loop: Move truck strictly within viewport frustum bounds
     const lerp = (start, end, factor) => start + (end - start) * factor;
 
     const isMobileViewport = width < 640;
-    const moveRange = isMobileViewport ? 1.2 : 2.6; // Keep truck 100% inside visible camera frustum
+    const moveRange = isMobileViewport ? 1.0 : 2.4; // Constrained within camera view
     let currentPosX = -moveRange / 2;
 
     const animate = () => {
@@ -211,14 +223,14 @@ export default function AppLoadingSplash({ onFinished }) {
         currentPosX = lerp(currentPosX, targetPosX, 0.08);
 
         wrapperGroup.position.x = currentPosX;
-        wrapperGroup.position.y = -0.2 + Math.sin(Date.now() * 0.003) * 0.06;
+        wrapperGroup.position.y = -0.3 + Math.sin(Date.now() * 0.003) * 0.05;
 
-        // Angle headlights facing Right (towards movement direction) with 3D perspective angle
+        // Angle headlights facing Right (towards movement direction) with 3D perspective
         wrapperGroup.rotation.y = Math.PI / 2 - 0.38;
         wrapperGroup.rotation.z = Math.sin(Date.now() * 0.003) * 0.015;
       } else {
         wrapperGroup.position.x = 0;
-        wrapperGroup.position.y = -0.2;
+        wrapperGroup.position.y = -0.3;
         wrapperGroup.rotation.y = Math.PI / 2 - 0.38;
       }
 
@@ -247,7 +259,7 @@ export default function AppLoadingSplash({ onFinished }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#162623] text-white p-6 sm:p-8 select-none transition-opacity duration-600 ease-out ${
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#162623] text-white p-6 sm:p-8 select-none transition-opacity duration-500 ease-out ${
         fadeOut
           ? "opacity-0 pointer-events-none"
           : "opacity-100 pointer-events-auto"

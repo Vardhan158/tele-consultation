@@ -96,7 +96,13 @@ export default function App() {
   const [navParams, setNavParams] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    try {
+      return !sessionStorage.getItem("kaizen_splash_seen");
+    } catch {
+      return true;
+    }
+  });
   const [entryMode, setEntryMode] = useState(() => entryModeFromLocation());
   const [patient, setPatient] = useState(null);
   const [registeredDoctorEmail, setRegisteredDoctorEmail] = useState("");
@@ -320,10 +326,17 @@ export default function App() {
     );
   };
 
+  const handleSplashFinished = () => {
+    try {
+      sessionStorage.setItem("kaizen_splash_seen", "true");
+    } catch {}
+    setShowSplash(false);
+  };
+
   return (
     <>
       {showSplash && (
-        <AppLoadingSplash onFinished={() => setShowSplash(false)} />
+        <AppLoadingSplash onFinished={handleSplashFinished} />
       )}
       {renderMainContent()}
     </>
