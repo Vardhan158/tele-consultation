@@ -100,8 +100,8 @@ export default function AppLoadingSplash({ onFinished }) {
 
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
-    camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-    camera.position.set(0, 0.5, 6.5);
+    camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
+    camera.position.set(0, 0.3, 8.2);
 
     renderer = new THREE.WebGLRenderer({
       alpha: true,
@@ -173,9 +173,9 @@ export default function AppLoadingSplash({ onFinished }) {
           const center = box.getCenter(new THREE.Vector3());
           const maxDim = Math.max(size.x, size.y, size.z) || 1;
 
-          // Responsive sizing based on viewport width
+          // Responsive sizing based on viewport width to fit COMPLETE truck with padding
           const isMobileViewport = width < 640;
-          const targetSize = isMobileViewport ? 2.4 : 3.6;
+          const targetSize = isMobileViewport ? 1.8 : 2.8;
           const scale = targetSize / maxDim;
           model.scale.set(scale, scale, scale);
 
@@ -211,7 +211,7 @@ export default function AppLoadingSplash({ onFinished }) {
     const lerp = (start, end, factor) => start + (end - start) * factor;
 
     const isMobileViewport = width < 640;
-    const moveRange = isMobileViewport ? 1.0 : 2.4; // Constrained within camera view
+    const moveRange = isMobileViewport ? 0.6 : 1.4; // Constrained movement keeps complete truck 100% inside canvas
     let currentPosX = -moveRange / 2;
 
     const animate = () => {
