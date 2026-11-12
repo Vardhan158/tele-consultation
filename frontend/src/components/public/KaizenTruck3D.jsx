@@ -24,6 +24,7 @@ export default function KaizenTruck3D() {
     let targetScrollProgress = 0;
     let currentRotY = 0;
     let currentRotX = 0;
+    let currentPosX = 0;
     let currentPosY = 0;
 
     // 1. Scene Setup
@@ -83,55 +84,65 @@ export default function KaizenTruck3D() {
     shadowPlane.receiveShadow = true;
     scene.add(shadowPlane);
 
-    // 5. Load GLTF / GLB Model
+    // 5. Load GLTF / GLB Model with fallback
     const loader = new GLTFLoader();
-    loader.load(
-      truckUrl,
-      (gltf) => {
-        model = gltf.scene;
+    const loadModel = (urlToLoad) => {
+      loader.load(
+        urlToLoad,
+        (gltf) => {
+          model = gltf.scene;
 
-        // Auto-center and normalize model bounds
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
+          // Auto-center and normalize model bounds
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
 
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 2.8 / (maxDim || 1);
-        model.scale.set(scale, scale, scale);
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const scale = 3.2 / (maxDim || 1);
+          model.scale.set(scale, scale, scale);
 
-        // Center position
-        model.position.x = -center.x * scale;
-        model.position.y = -center.y * scale - 0.8;
-        model.position.z = -center.z * scale;
+          // Center position
+          model.position.x = -center.x * scale;
+          model.position.y = -center.y * scale - 0.6;
+          model.position.z = -center.z * scale;
 
-        // Enable shadows for all meshes
-        model.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            if (child.material) {
-              child.material.envMapIntensity = 1.2;
+          // Enable shadows and double-sided materials for high visibility
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              if (child.material) {
+                child.material.side = THREE.DoubleSide;
+                child.material.needsUpdate = true;
+              }
             }
+          });
+
+          // Set initial orientation
+          model.rotation.y = Math.PI / 4;
+
+          scene.add(model);
+          setLoading(false);
+        },
+        (xhr) => {
+          if (xhr.total > 0) {
+            setProgress(Math.round((xhr.loaded / xhr.total) * 100));
           }
-        });
-
-        // Set initial orientation
-        model.rotation.y = Math.PI / 5;
-
-        scene.add(model);
-        setLoading(false);
-      },
-      (xhr) => {
-        if (xhr.total > 0) {
-          setProgress(Math.round((xhr.loaded / xhr.total) * 100));
+        },
+        (err) => {
+          console.warn("Primary GLB url failed, attempting public fallback path...", err);
+          if (urlToLoad !== "/assets/kaizenx_truck_v3.glb") {
+            loadModel("/assets/kaizenx_truck_v3.glb");
+          } else {
+            console.error("Failed to load 3D Truck Model from all paths:", err);
+            setError(true);
+            setLoading(false);
+          }
         }
-      },
-      (err) => {
-        console.error("Failed to load 3D Truck Model:", err);
-        setError(true);
-        setLoading(false);
-      }
-    );
+      );
+    };
+
+    loadModel(truckUrl || "/assets/kaizenx_truck_v3.glb");
 
     // 6. Scroll Handler for Target Interpolation
     const handleScroll = () => {
@@ -192,18 +203,21 @@ export default function KaizenTruck3D() {
       );
 
       if (model) {
-        // Target Y-rotation based on full page scroll (multiple 360-degree spins)
+        // Target Y-rotation and X-translation based on scroll
         const targetRotY =
-          Math.PI / 4 + currentScrollProgress * Math.PI * 3 + mouseX * 0.25;
-        const targetRotX = (currentScrollProgress - 0.5) * 0.35 + mouseY * 0.15;
-        const targetPosY = -0.8 + Math.sin(Date.now() * 0.0015) * 0.08;
+          Math.PI / 4 + currentScrollProgress * Math.PI * 4 + mouseX * 0.3;
+        const targetRotX = (currentScrollProgress - 0.5) * 0.25 + mouseY * 0.15;
+        const targetPosX = (currentScrollProgress - 0.5) * 2.2 + mouseX * 0.25;
+        const targetPosY = -0.6 + Math.sin(Date.now() * 0.0018) * 0.08;
 
         currentRotY = lerp(currentRotY, targetRotY, 0.08);
         currentRotX = lerp(currentRotX, targetRotX, 0.08);
-        currentPosY = lerp(currentPosY, targetPosY, 0.05);
+        currentPosX = lerp(currentPosX, targetPosX, 0.06);
+        currentPosY = lerp(currentPosY, targetPosY, 0.06);
 
         model.rotation.y = currentRotY;
         model.rotation.x = currentRotX;
+        model.position.x = currentPosX;
         model.position.y = currentPosY;
       }
 
