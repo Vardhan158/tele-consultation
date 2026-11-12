@@ -28,7 +28,7 @@ export default function HowItWorksScreen() {
     <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623]">
       <PublicNavbar />
       <main>
-        <section className="bg-[#295255] px-6 py-20 text-white lg:px-10 lg:py-28">
+        <section className="bg-[#25836F] px-6 py-20 text-white lg:px-10 lg:py-28">
           <div className="mx-auto max-w-4xl text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F0F5F7]/75">Your care journey</p>
             <h1 className="mt-4 text-4xl font-bold leading-tight text-white sm:text-5xl">How Your Care Journey Works</h1>
@@ -47,7 +47,7 @@ export default function HowItWorksScreen() {
             {journeySteps.map((step, index) => (
               <article key={step.title} className="relative rounded-2xl border border-[rgba(87,120,119,0.15)] bg-white p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)]">
                 <span className="absolute right-5 top-5 text-xs font-semibold text-[#577877]">0{index + 1}</span>
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F0F5F7]"><span className="material-symbols-outlined !text-[#295255] text-2xl">{step.icon}</span></span>
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F0F5F7]"><span className="material-symbols-outlined !text-[#25836F] text-2xl">{step.icon}</span></span>
                 <h3 className="mt-5 text-base font-bold text-[#162623]">{step.title}</h3>
                 <p className="mt-2 text-xs leading-relaxed text-[#577877]">{step.description}</p>
               </article>

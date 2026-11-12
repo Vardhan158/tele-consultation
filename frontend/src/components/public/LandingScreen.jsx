@@ -1,22 +1,117 @@
-import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import Lenis from "lenis";
 import "./landing-theme.css";
 
-const navItems = [
-  { label: "Home", to: "/", route: true },
-  { label: "Find Doctors", to: "/find-doctors", route: true },
-  { label: "How It Works", to: "/how-it-works", route: true },
-  { label: "About Us", to: "/about-us", route: true },
-  { label: "Contact", to: "/contact", route: true },
-];
+// ============================================================================
+// Scroll Animation Hooks & Components
+// ============================================================================
 
-function navLinkClass({ isActive }) {
-  return `rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2 ${
-    isActive
-      ? "bg-[#F0F5F7] text-[#295255]"
-      : "text-[#577877] hover:bg-[#F0F5F7] hover:text-[#162623]"
-  }`;
+function useInView(options = { threshold: 0.15, rootMargin: "0px 0px -40px 0px", triggerOnce: true }) {
+  const [inView, setInView] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setInView(true);
+        if (options.triggerOnce !== false) {
+          observer.unobserve(el);
+        }
+      } else if (options.triggerOnce === false) {
+        setInView(false);
+      }
+    }, options);
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [options.threshold, options.rootMargin, options.triggerOnce]);
+
+  return [ref, inView];
 }
+
+function ScrollReveal({
+  children,
+  animation = "fade-up",
+  delay = 0,
+  duration = 750,
+  className = "",
+}) {
+  const [ref, inView] = useInView();
+
+  const getTransform = () => {
+    if (inView) return "translate-x-0 translate-y-0 scale-100 opacity-100";
+    switch (animation) {
+      case "fade-up":
+        return "translate-y-12 opacity-0";
+      case "fade-down":
+        return "-translate-y-8 opacity-0";
+      case "fade-left":
+        return "-translate-x-14 opacity-0";
+      case "fade-right":
+        return "translate-x-14 opacity-0";
+      case "zoom-in":
+        return "scale-95 opacity-0";
+      default:
+        return "translate-y-10 opacity-0";
+    }
+  };
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        transitionDuration: `${duration}ms`,
+        transitionDelay: `${delay}ms`,
+        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+      }}
+      className={`transform transition-all will-change-transform ${getTransform()} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function AnimatedNumber({ target, suffix = "", duration = 1600 }) {
+  const [ref, inView] = useInView();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    let startTime = null;
+    let frameId;
+
+    const step = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      // easeOutExpo
+      const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      setCount(Math.floor(ease * target));
+      if (progress < 1) {
+        frameId = requestAnimationFrame(step);
+      } else {
+        setCount(target);
+      }
+    };
+
+    frameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameId);
+  }, [inView, target, duration]);
+
+  return (
+    <span ref={ref}>
+      {count}
+      {suffix}
+    </span>
+  );
+}
+
+// ============================================================================
+// Main Landing Screen Component
+// ============================================================================
 
 export default function LandingScreen({
   onSignIn,
@@ -25,7 +120,57 @@ export default function LandingScreen({
   onFindDoctor,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [heroMounted, setHeroMounted] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+
+  const lenisRef = useRef(null);
+
+  // Initialize 60+ FPS inertia smooth scrolling with Lenis
+  useEffect(() => {
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // smooth easeOutExpo
+      orientation: "vertical",
+      gestureOrientation: "vertical",
+      smoothWheel: true,
+      wheelMultiplier: 1,
+      touchMultiplier: 1.5,
+    });
+    lenisRef.current = lenis;
+
+    const onScroll = ({ scroll }) => {
+      setScrolled(scroll > 40);
+    };
+    lenis.on("scroll", onScroll);
+
+    let rafId;
+    function raf(time) {
+      lenis.raf(time);
+      rafId = requestAnimationFrame(raf);
+    }
+    rafId = requestAnimationFrame(raf);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      lenis.destroy();
+      lenisRef.current = null;
+    };
+  }, []);
+
+  // Booking Form State
+  const [bookingName, setBookingName] = useState("");
+  const [bookingEmail, setBookingEmail] = useState("");
+  const [bookingPhone, setBookingPhone] = useState("");
+  const [bookingService, setBookingService] = useState("");
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingSubmitted, setBookingSubmitted] = useState(false);
+
+  useEffect(() => {
+    // Trigger hero entrance animation on mount
+    const timer = setTimeout(() => setHeroMounted(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -36,416 +181,1366 @@ export default function LandingScreen({
   }, []);
 
   useEffect(() => {
-    if (location.hash === "#how-it-works") {
-      requestAnimationFrame(() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    if (location.hash) {
+      const target = document.getElementById(location.hash.slice(1));
+      if (target) {
+        if (lenisRef.current) {
+          lenisRef.current.scrollTo(target, { offset: -80 });
+        } else {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
     }
   }, [location.hash]);
 
   const closeMenu = () => setMenuOpen(false);
 
-  return (
-    <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623]">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-40 border-b border-[rgba(87,120,119,0.15)] bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-4 lg:px-10">
-          <NavLink
-            to="/"
-            aria-label="Kaizentrix Care home"
-            className="flex shrink-0 items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#295255] text-white shadow-sm">
-              <span className="material-symbols-outlined !text-white text-2xl font-bold">
-                health_and_safety
-              </span>
-            </div>
-            <div>
-              <p className="font-headline-sm text-lg font-bold text-[#162623] tracking-tight leading-none">
-                Kaizentrix Care
-              </p>
-              <p className="text-[10px] font-semibold text-[#577877] tracking-widest uppercase mt-0.5">
-                Patient Portal
-              </p>
-            </div>
-          </NavLink>
+  const scrollToSection = (id) => {
+    closeMenu();
+    const el = document.getElementById(id);
+    if (el) {
+      if (lenisRef.current) {
+        lenisRef.current.scrollTo(el, { offset: -80 });
+      } else {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  };
 
-          <nav
-            aria-label="Primary navigation"
-            className="hidden items-center gap-1 xl:flex"
-          >
-            {navItems.map((item) =>
-              item.route ? (
-                <NavLink
-                  key={item.label}
-                  to={item.to}
-                  className={navLinkClass}
-                  end
-                >
-                  {item.label}
-                </NavLink>
-              ) : (
+  const handleBookingSubmit = (e) => {
+    e.preventDefault();
+    setBookingSubmitted(true);
+    setTimeout(() => {
+      onFindDoctor();
+    }, 1200);
+  };
+
+  return (
+    <div className="min-h-screen bg-white font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white overflow-x-hidden">
+      {/* ========================================================= */}
+      {/* 1. HERO SECTION & TOP NAVBAR                              */}
+      {/* ========================================================= */}
+      <section
+        id="home"
+        className="relative w-full overflow-hidden flex flex-col justify-between"
+        style={{
+          background:
+            "linear-gradient(180deg, #1A7D67 0%, #358C79 11%, #519C8C 22%, #6DAC9F 33%, #7BB4A8 38.4%, #86BBAF 44%, #9BC7BC 55%, #B0D4C9 66%, #C5E0D6 77%, #D9EBE3 88%, #EEF6F3 100%)",
+          minHeight: "912px",
+        }}
+      >
+        {/* Top Navbar — 100% Transparent (Initial) & Smooth Transition on Scroll */}
+        <header
+          className={`fixed top-0 left-0 right-0 z-50 w-full transform transition-all duration-500 ease-out will-change-transform ${
+            heroMounted ? "translate-y-0 opacity-100" : "-translate-y-6 opacity-0"
+          } ${
+            scrolled
+              ? "bg-white/85 backdrop-blur-xl shadow-md border-b border-zinc-200/50 py-3.5"
+              : "bg-transparent border-b border-transparent py-5 sm:py-6"
+          }`}
+        >
+          <div className="mx-auto flex max-w-[1440px] items-center justify-between px-6 sm:px-10 lg:px-16 xl:px-20">
+            {/* Brand Logo */}
+            <a
+              href="#home"
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToSection("home");
+              }}
+              className="flex items-center gap-2.5 focus-visible:outline-none transition-transform hover:scale-102"
+              aria-label="Kaizen Care Home"
+            >
+              <svg
+                width="34"
+                height="38"
+                viewBox="0 0 35 42"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className={`h-8 sm:h-9 w-auto shrink-0 select-none transition-colors duration-500 ${
+                  scrolled ? "text-[#1A7D67]" : "text-white"
+                }`}
+                aria-hidden="true"
+              >
+                <path
+                  d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
+                  fill="currentColor"
+                />
+                <rect
+                  width="12.629"
+                  height="32.626"
+                  rx="6.315"
+                  transform="rotate(-45 16.202 6.711)"
+                  fill="currentColor"
+                />
+              </svg>
+              <span
+                className={`text-2xl sm:text-[26px] font-bold tracking-tight select-none transition-colors duration-500 ${
+                  scrolled ? "text-[#162623]" : "text-white"
+                }`}
+              >
+                Kaizen Care
+              </span>
+            </a>
+
+            {/* Center Navigation Links */}
+            <nav
+              aria-label="Primary navigation"
+              className="hidden md:flex items-center gap-9 lg:gap-11 text-sm lg:text-[15px] font-medium"
+            >
+              {[
+                { id: "home", label: "Home" },
+                { id: "about", label: "About" },
+                { id: "services", label: "Services" },
+                { id: "faqs", label: "FAQs" },
+              ].map((item) => (
                 <a
-                  key={item.label}
-                  href={item.to}
-                  className={navLinkClass({ isActive: location.hash === item.to.slice(1) })}
+                  key={item.id}
+                  href={`#${item.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection(item.id);
+                  }}
+                  className={`transition-colors duration-500 relative py-1 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:transition-all ${
+                    scrolled
+                      ? "text-zinc-700 hover:text-[#1A7D67] after:bg-[#1A7D67]"
+                      : "text-white/95 hover:text-white after:bg-white"
+                  }`}
                 >
                   {item.label}
                 </a>
-              ),
-            )}
-          </nav>
+              ))}
+            </nav>
 
-          <div className="hidden items-center gap-3 lg:flex">
-            <button
-              type="button"
-              onClick={onDoctorRegister}
-              className="rounded-lg px-2 py-2 text-xs font-semibold text-[#295255] transition hover:bg-[#F0F5F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
-            >
-              Clinician registration
-            </button>
-            <button
-              type="button"
-              onClick={onSignIn}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(87,120,119,0.35)] bg-white px-4 py-2 text-xs font-semibold text-[#295255] shadow-sm transition hover:border-[#295255] hover:bg-[#F0F5F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={onRegister}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#295255] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(41,82,85,0.2)] transition hover:bg-[#1F3F41] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
-            >
-              Create Account
-            </button>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Toggle navigation menu"
-            aria-expanded={menuOpen}
-            aria-controls="mobile-navigation"
-            onClick={() => setMenuOpen((open) => !open)}
-            className="rounded-lg p-2 text-[#295255] transition hover:bg-[#F0F5F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2 lg:hidden"
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              {menuOpen ? "close" : "menu"}
-            </span>
-          </button>
-        </div>
-        {menuOpen && (
-          <div
-            id="mobile-navigation"
-            className="border-t border-[rgba(87,120,119,0.15)] bg-white px-5 py-4 lg:hidden"
-          >
-            <nav aria-label="Mobile navigation" className="flex flex-col gap-1">
-              {navItems.map((item) =>
-                item.route ? (
-                  <NavLink
-                    key={item.label}
-                    to={item.to}
-                    onClick={closeMenu}
-                    className={navLinkClass}
-                    end
-                  >
-                    {item.label}
-                  </NavLink>
-                ) : (
-                  <a
-                    key={item.label}
-                    href={item.to}
-                    onClick={closeMenu}
-                    className={navLinkClass({ isActive: location.hash === item.to.slice(1) })}
-                  >
-                    {item.label}
-                  </a>
-                ),
-              )}
+            {/* Right Action Button */}
+            <div className="hidden sm:flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  closeMenu();
-                  onDoctorRegister();
-                }}
-                className="rounded-lg px-3 py-2 text-left text-sm font-medium text-[#295255] hover:bg-[#F0F5F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
+                onClick={onSignIn}
+                className={`text-sm font-medium transition-colors duration-500 px-3 py-1.5 rounded-lg cursor-pointer ${
+                  scrolled
+                    ? "text-zinc-700 hover:text-[#1A7D67] hover:bg-zinc-100/60"
+                    : "text-white/95 hover:text-white hover:bg-white/10"
+                }`}
               >
-                Clinician registration
+                Sign In
               </button>
-              <div className="mt-3 flex gap-2 border-t border-[rgba(87,120,119,0.15)] pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeMenu();
-                    onSignIn();
-                  }}
-                  className="inline-flex flex-1 items-center justify-center rounded-xl border border-[rgba(87,120,119,0.35)] bg-white px-4 py-2 text-xs font-semibold text-[#295255] shadow-sm transition hover:bg-[#F0F5F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeMenu();
-                    onRegister();
-                  }}
-                  className="inline-flex flex-1 items-center justify-center rounded-xl bg-[#295255] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1F3F41] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
-                >
-                  Create Account
-                </button>
-              </div>
-            </nav>
-          </div>
-        )}
-      </header>
-
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#295255] px-6 py-20 text-white lg:px-10 lg:py-28">
-        <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2">
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-[#F0F5F7]">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Secure teleconsultation platform
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight">
-              Connected care, thoughtfully delivered.
-            </h1>
-
-            <p className="text-base sm:text-lg text-[#F0F5F7]/85 max-w-xl leading-relaxed">
-              Find the right care, book a convenient appointment, and stay
-              connected with your care team from wherever you are.
-            </p>
-
-            <div className="flex flex-wrap gap-3.5 pt-2">
               <button
                 type="button"
                 onClick={onFindDoctor}
-                className="px-6 py-3.5 rounded-xl bg-[#F0F5F7] text-[#295255] font-semibold text-sm shadow-lg hover:bg-white transition"
+                className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-xs transition-all duration-500 group cursor-pointer hover:-translate-y-0.5 ${
+                  scrolled
+                    ? "bg-[#1A7D67] text-white hover:bg-[#156654] hover:shadow-md"
+                    : "bg-white text-[#162623] hover:bg-white/95 hover:shadow-md"
+                }`}
               >
-                Find a Doctor
-              </button>
-              <button
-                type="button"
-                onClick={onRegister}
-                className="px-6 py-3.5 rounded-xl border border-white/30 text-white font-semibold text-sm hover:bg-white/10 transition"
-              >
-                Create Patient Account
+                <span>Book Appointment</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="transition-transform duration-300 group-hover:translate-x-1"
+                >
+                  <path d="M5 12h14"></path>
+                  <path d="m12 5 7 7-7 7"></path>
+                </svg>
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-6 pt-4 text-xs text-[#F0F5F7]/80">
-              <span className="flex items-center gap-2">
-                <span className="material-symbols-outlined !text-[#F0F5F7] text-lg">
-                  person_search
-                </span>
-                Care that fits your needs
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="material-symbols-outlined !text-[#F0F5F7] text-lg">
-                  calendar_month
-                </span>
-                Flexible appointments
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="material-symbols-outlined !text-[#F0F5F7] text-lg">
-                  support_agent
-                </span>
-                Care team support
+            {/* Mobile Menu Toggle */}
+            <button
+              type="button"
+              aria-label="Toggle navigation menu"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className={`p-2 rounded-lg transition-colors duration-300 md:hidden focus-visible:outline-none ${
+                scrolled
+                  ? "text-zinc-800 hover:bg-zinc-100/50"
+                  : "text-white hover:bg-white/10"
+              }`}
+            >
+              {menuOpen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="12" x2="20" y2="12" />
+                  <line x1="4" y1="6" x2="20" y2="6" />
+                  <line x1="4" y1="18" x2="20" y2="18" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Mobile Drawer */}
+          {menuOpen && (
+            <div
+              className={`fixed inset-x-0 ${
+                scrolled ? "top-[64px]" : "top-[76px]"
+              } z-50 border-b ${
+                scrolled
+                  ? "bg-white/95 backdrop-blur-xl text-zinc-800 shadow-xl border-zinc-200/60"
+                  : "bg-[#1A7D67]/98 backdrop-blur-xl text-white shadow-xl border-white/15"
+              } px-6 py-6 md:hidden animate-in fade-in slide-in-from-top-4 duration-300 transition-all`}
+            >
+              <div className="flex flex-col gap-4 text-base font-medium">
+                <a
+                  href="#home"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("home");
+                  }}
+                  className="py-1 hover:opacity-80"
+                >
+                  Home
+                </a>
+                <a
+                  href="#about"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("about");
+                  }}
+                  className="py-1 hover:opacity-80"
+                >
+                  About
+                </a>
+                <a
+                  href="#services"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("services");
+                  }}
+                  className="py-1 hover:opacity-80"
+                >
+                  Services
+                </a>
+                <a
+                  href="#testimonials"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("testimonials");
+                  }}
+                  className="py-1 hover:opacity-80"
+                >
+                  Testimonials
+                </a>
+                <a
+                  href="#faqs"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("faqs");
+                  }}
+                  className="py-1 hover:opacity-80"
+                >
+                  FAQs
+                </a>
+                <div
+                  className={`pt-4 border-t flex flex-col gap-3 ${
+                    scrolled ? "border-zinc-200" : "border-white/20"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMenu();
+                      onDoctorRegister();
+                    }}
+                    className={`text-left text-sm font-medium ${
+                      scrolled
+                        ? "text-[#1A7D67] hover:underline"
+                        : "text-emerald-100 hover:text-white"
+                    }`}
+                  >
+                    Clinician Registration
+                  </button>
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMenu();
+                        onSignIn();
+                      }}
+                      className={`flex-1 py-2.5 rounded-lg border text-center text-sm font-medium ${
+                        scrolled
+                          ? "border-zinc-300 bg-zinc-50 text-zinc-800"
+                          : "border-white/40 bg-white/10 text-white"
+                      }`}
+                    >
+                      Sign In
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMenu();
+                        onFindDoctor();
+                      }}
+                      className={`flex-1 py-2.5 rounded-lg text-center text-sm font-medium shadow-sm ${
+                        scrolled
+                          ? "bg-[#1A7D67] text-white"
+                          : "bg-white text-[#162623]"
+                      }`}
+                    >
+                      Book Appointment
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </header>
+
+        {/* Hero Content Section */}
+        <div className="relative mx-auto flex-1 flex flex-col lg:flex-row items-center lg:items-end justify-between w-full max-w-[1440px] px-6 sm:px-10 lg:px-16 xl:px-20 pt-24 sm:pt-28 lg:pt-32 pb-0">
+          {/* Left Column Text & CTAs */}
+          <div className="flex-1 max-w-2xl self-center lg:self-center pb-12 lg:pb-24 pt-4 lg:pt-0 z-10">
+            {/* Pill Tag */}
+            <div
+              className={`inline-flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full border border-white/40 bg-white/10 backdrop-blur-sm text-xs sm:text-sm font-medium text-white mb-6 shadow-sm transform transition-all duration-700 delay-100 ${
+                heroMounted ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-white"
+              >
+                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <span>Trusted Medical Clinic</span>
+            </div>
+
+            {/* Display Heading */}
+            <h1
+              className={`text-4xl sm:text-5xl lg:text-[62px] xl:text-[68px] font-bold text-white tracking-tight leading-[1.12] mb-5 transform transition-all duration-800 delay-200 ${
+                heroMounted ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
+              }`}
+            >
+              Exceptional Care for Every Patient
+            </h1>
+
+            {/* Description */}
+            <p
+              className={`text-sm sm:text-base lg:text-[17px] text-white/90 max-w-xl leading-relaxed mb-10 font-normal transform transition-all duration-800 delay-300 ${
+                heroMounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+              }`}
+            >
+              Delivering personalized medical care with experienced doctors,
+              modern treatments and a welcoming clinic focused on your health
+              and well-being.
+            </p>
+
+            {/* Action Buttons */}
+            <div
+              className={`flex flex-wrap items-center gap-4 mb-10 transform transition-all duration-800 delay-400 ${
+                heroMounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={onFindDoctor}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#165849] hover:bg-[#124b3e] text-white text-sm sm:text-base font-medium px-6 py-3.5 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
+              >
+                <span>Book Appointment</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="transition-transform group-hover:translate-x-1"
+                >
+                  <path d="M5 12h14"></path>
+                  <path d="m12 5 7 7-7 7"></path>
+                </svg>
+              </button>
+              <a
+                href="#services"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection("services");
+                }}
+                className="inline-flex items-center justify-center rounded-lg bg-white hover:bg-white/95 text-[#165849] text-sm sm:text-base font-medium px-6 py-3.5 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+              >
+                Explore Services
+              </a>
+            </div>
+
+            {/* Ratings & Social Proof */}
+            <div
+              className={`flex items-center gap-3 text-sm sm:text-base transform transition-all duration-800 delay-500 ${
+                heroMounted ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+              }`}
+            >
+              <div className="flex text-[#F59E0B] tracking-wider text-base sm:text-lg">
+                ★★★★★
+              </div>
+              <span className="text-zinc-400 font-light">|</span>
+              <span className="text-[#1D3E35] font-semibold text-sm sm:text-base tracking-tight">
+                Trusted by 2,000+ Patients
               </span>
             </div>
           </div>
 
-          {/* Illustrative teleconsultation preview */}
-          <div className="rounded-[1.75rem] border border-white/60 bg-white p-4 text-[#162623] shadow-2xl sm:p-6">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#577877]">
-                  Illustrative Preview
-                </p>
-                <h3 className="mt-1 text-sm font-semibold text-[#162623]">
-                  A calmer way to meet your care team
-                </h3>
-              </div>
-              <span className="rounded-full border border-[#577877]/20 bg-[#F0F5F7] px-2.5 py-1 text-[10px] font-semibold text-[#577877]">
-                Preview
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="relative aspect-[1.25] overflow-hidden rounded-2xl bg-[#295255] p-3 text-white">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#577877] via-[#295255] to-[#162623]" />
-                <div className="relative flex h-full flex-col justify-between">
-                  <span className="self-start rounded-md bg-black/20 px-2 py-1 text-[10px] font-medium">
-                    Dr. Sarah Chen
-                  </span>
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/70 bg-[#F0F5F7] text-2xl font-semibold text-[#295255]">
-                    SC
-                  </div>
-                  <span className="text-[10px] text-white/80">
-                    Care specialist
-                  </span>
-                </div>
-              </div>
-              <div className="relative aspect-[1.25] overflow-hidden rounded-2xl bg-[#F0F5F7] p-3">
-                <div className="relative flex h-full flex-col justify-between">
-                  <span className="self-start rounded-md bg-white/80 px-2 py-1 text-[10px] font-medium text-[#577877]">
-                    You
-                  </span>
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-white text-2xl font-semibold text-[#577877] shadow-sm">
-                    YU
-                  </div>
-                  <span className="text-[10px] text-[#577877]">
-                    Patient view
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-center gap-2">
-              {["mic", "videocam"].map((icon) => (
-                <span
-                  key={icon}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F0F5F7] text-[#295255]"
-                >
-                  <span className="material-symbols-outlined text-base !text-[#295255]">
-                    {icon}
-                  </span>
-                </span>
-              ))}
-              <span className="flex h-9 w-12 items-center justify-center rounded-full bg-[#295255] text-white">
-                <span className="material-symbols-outlined text-base !text-white">
-                  call_end
-                </span>
-              </span>
-            </div>
-
-            <div className="mt-5 flex items-center justify-between rounded-2xl border border-[#577877]/15 bg-[#F0F5F7] p-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#577877]">
-                  Upcoming appointment
-                </p>
-                <p className="mt-1 text-xs font-semibold text-[#162623]">
-                  General care · 30 minutes
-                </p>
-              </div>
-              <span className="material-symbols-outlined !text-[#295255]">
-                event_available
-              </span>
-            </div>
+          {/* Right Column Physician Image */}
+          <div
+            className={`flex-1 w-full flex justify-center lg:justify-end items-end self-end z-10 mt-6 lg:mt-0 transform transition-all duration-1000 delay-300 ${
+              heroMounted ? "translate-y-0 opacity-100 scale-100" : "translate-y-12 opacity-0 scale-98"
+            }`}
+          >
+            <img
+              src="/assets/doctor.png"
+              alt="Physician at Kaizen Care"
+              className="w-auto h-auto max-h-[500px] sm:max-h-[580px] lg:max-h-[660px] xl:max-h-[720px] object-contain object-bottom pointer-events-none select-none drop-shadow-sm transition-transform duration-700 hover:scale-[1.01]"
+              loading="eager"
+            />
           </div>
         </div>
       </section>
 
-      {/* Core Portal Modules Feature Grid */}
-      <section id="how-it-works" className="scroll-mt-24 mx-auto max-w-7xl px-6 py-20 lg:px-10 space-y-12">
-        <div className="max-w-2xl space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
-            Enterprise Healthcare Platform
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-bold text-[#162623]">
-            How Your Care Journey Works
-          </h2>
-          <p className="text-sm text-[#577877]">
-            Designed with clinical clarity, intuitive navigation, and robust
-            security for modern patients.
-          </p>
-        </div>
+      {/* ========================================================= */}
+      {/* 2. STATS MARQUEE (NAVBAR COLOR & REFINED OPACITY)         */}
+      {/* ========================================================= */}
+      <section
+        aria-label="Clinical Highlights"
+        className="relative w-full overflow-hidden bg-[#1A7D67] border-y border-white/10 py-5 sm:py-6 select-none shadow-inner"
+      >
+        {/* Soft edge gradient masks */}
+        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 sm:w-28 bg-gradient-to-r from-[#1A7D67] via-[#1A7D67]/80 to-transparent z-10" />
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 sm:w-28 bg-gradient-to-l from-[#1A7D67] via-[#1A7D67]/80 to-transparent z-10" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            {
-              title: "Doctor Discovery",
-              desc: "Search clinic-vetted doctors across multiple specialties with verified fees and credentials.",
-              icon: "person_search",
-            },
-            {
-              title: "Appointment Booking",
-              desc: "Book verified time slots with automated reminders, rescheduling, and cancellation policies.",
-              icon: "calendar_month",
-            },
-            {
-              title: "Video Visits",
-              desc: "Browser teleconsultation with clinical chat, vital review, and screen sharing.",
-              icon: "videocam",
-            },
-            {
-              title: "E-Prescriptions & Rx",
-              desc: "Clinician-signed digital prescriptions with dosage, frequency, and refill counts.",
-              icon: "medication",
-            },
-            {
-              title: "Medical Records Vault",
-              desc: "Secure repository for lab panels, cardiology traces, and radiology scans up to 25 MB.",
-              icon: "folder_shared",
-            },
-            {
-              title: "Payments & Invoicing",
-              desc: "Instant server verification for UPI, cards, and net banking with downloadable GST receipts.",
-              icon: "receipt_long",
-            },
-            {
-              title: "Care Notifications",
-              desc: "Operational updates and appointment alerts via multi-channel in-app and SMS.",
-              icon: "notifications",
-            },
-            {
-              title: "Consent Controls",
-              desc: "Granular consent tracking for video care, records, and diagnostic releases.",
-              icon: "badge",
-            },
-          ].map((item) => (
-            <div key={item.title} className="rounded-2xl border border-[rgba(87,120,119,0.15)] bg-white p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] transition hover:shadow-[0_10px_25px_-3px_rgba(22,38,35,0.08)]">
-              <span className="w-12 h-12 rounded-xl bg-[#F0F5F7] flex items-center justify-center">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
-                  {item.icon}
-                </span>
-              </span>
-              <h3 className="text-base font-bold text-[#162623]">
-                {item.title}
-              </h3>
-              <p className="text-xs text-[#577877] leading-relaxed">
-                {item.desc}
-              </p>
+        <div className="animate-marquee flex items-center">
+          {[...Array(2)].map((_, setIdx) => (
+            <div key={setIdx} className="flex items-center shrink-0">
+              {[
+                { number: "5K+", label: "Patients Treated" },
+                { number: "12+", label: "Years Experience" },
+                { number: "98%", label: "Patient Satisfaction" },
+                { number: "24/7", label: "Emergency & Video Care" },
+                { number: "100%", label: "Verified Clinicians" },
+                { number: "15+", label: "Medical Specialties" },
+              ].map((item, idx) => (
+                <div key={idx} className="flex items-center">
+                  <div className="flex items-center gap-2.5 px-6 sm:px-10">
+                    <span className="font-poppins font-bold text-xl sm:text-2xl text-white opacity-95 tracking-tight">
+                      {item.number}
+                    </span>
+                    <span className="text-xs sm:text-sm font-medium text-emerald-100/85 uppercase tracking-wider">
+                      {item.label}
+                    </span>
+                  </div>
+                  <span
+                    className="inline-block size-1.5 rounded-full bg-white/30 shrink-0"
+                    aria-hidden="true"
+                  />
+                </div>
+              ))}
             </div>
           ))}
         </div>
       </section>
 
-      {/* CTA Footer Banner */}
-      <section className="bg-white border-t border-[#577877]/20 py-16 px-6 lg:px-10">
-        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="text-xl sm:text-2xl font-bold text-[#162623]">
-              Ready to take charge of your care?
-            </h3>
-            <p className="text-xs sm:text-sm text-[#577877] mt-1">
-              Create your account or log in to access your personal patient
-              workspace.
-            </p>
+      {/* ========================================================= */}
+      {/* 3. ABOUT US SECTION (Personalized Care, Trusted Results)   */}
+      {/* ========================================================= */}
+      <section
+        id="about"
+        className="scroll-mt-16 w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 py-24 md:py-32"
+      >
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16">
+          {/* Left: About Image with Fade-Left */}
+          <div className="w-full lg:w-1/2 flex justify-center">
+            <ScrollReveal animation="fade-left" duration={900}>
+              <div className="relative w-full max-w-[530px] overflow-hidden rounded-2xl shadow-xl border border-zinc-200 group">
+                <img
+                  src="/assets/about.png"
+                  alt="Personalized Care, Trusted Results"
+                  className="w-full h-auto object-cover rounded-2xl transition-transform duration-700 group-hover:scale-103"
+                />
+              </div>
+            </ScrollReveal>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={onRegister}
-              className="inline-flex items-center justify-center rounded-xl bg-[#295255] px-6 py-3 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1F3F41] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
-            >
-              Create Patient Account
-            </button>
-            <button
-              onClick={onSignIn}
-              className="inline-flex items-center justify-center rounded-xl border border-[rgba(87,120,119,0.35)] bg-white px-6 py-3 text-xs font-semibold text-[#295255] shadow-sm transition hover:bg-[#F0F5F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#295255] focus-visible:ring-offset-2"
-            >
-              Sign In
-            </button>
+
+          {/* Right: Content with Fade-Right */}
+          <div className="w-full lg:w-1/2 flex flex-col items-start">
+            <ScrollReveal animation="fade-right" duration={900}>
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold mb-6">
+                <span className="size-2 rounded-full bg-[#1A7D67] animate-ping"></span>
+                About Us
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight tracking-tight mb-4 max-w-lg">
+                Personalized Care, Trusted Results
+              </h2>
+
+              <p className="text-zinc-600 text-sm sm:text-base leading-relaxed mb-8 max-w-xl">
+                We believe exceptional healthcare starts with listening. Our
+                clinic provides personalized consultations, preventive care, and
+                modern treatments in a comfortable and welcoming environment.
+                Whether you need routine care or specialized consultations, our
+                board-certified clinical team is here for you.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full mb-8">
+                <div className="flex items-start gap-3 p-3 rounded-xl transition-colors hover:bg-zinc-50">
+                  <div className="h-10 w-10 rounded-xl bg-[#EEF6F3] text-[#1A7D67] flex items-center justify-center shrink-0 shadow-xs">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-[#1A7D67]"
+                    >
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      <path d="m9 12 2 2 4-4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-800">
+                      Experienced Doctors
+                    </h4>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Verified specialists across major clinical specialties.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-xl transition-colors hover:bg-zinc-50">
+                  <div className="h-10 w-10 rounded-xl bg-[#EEF6F3] text-[#1A7D67] flex items-center justify-center shrink-0 shadow-xs">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-[#1A7D67]"
+                    >
+                      <path d="m10 2 4 4-4 4" />
+                      <path d="m14 14 4 4-4 4" />
+                      <path d="M4 14h16" />
+                      <path d="M4 10h16" />
+                      <path d="M14 2v20" />
+                      <path d="M10 2v20" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-800">
+                      Modern Diagnostics
+                    </h4>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Fast turnaround digital lab reports and imaging traces.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={onFindDoctor}
+                  className="bg-[#197C66] hover:bg-[#156755] text-white text-sm font-medium px-6 py-3 rounded-lg transition duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+                >
+                  Meet Our Doctors
+                </button>
+                <button
+                  type="button"
+                  onClick={onRegister}
+                  className="border border-zinc-300 hover:border-zinc-400 bg-white text-zinc-700 text-sm font-medium px-6 py-3 rounded-lg transition duration-300 hover:-translate-y-0.5 cursor-pointer"
+                >
+                  Register As Patient
+                </button>
+              </div>
+            </ScrollReveal>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-[#577877]/20 bg-[#F0F5F7] py-8 px-6 lg:px-10 text-xs text-[#577877]">
-        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 Kaizentrix Care · Patient Portal. All rights reserved.</p>
-          <div className="flex gap-6">
-            <span>Privacy-focused care workflows</span>
-            <span>Privacy Policy</span>
-            <span>Terms of Use</span>
+      {/* ========================================================= */}
+      {/* 4. OUR SERVICES SECTION                                   */}
+      {/* ========================================================= */}
+      <section
+        id="services"
+        className="scroll-mt-16 py-24 md:py-32 bg-[#F9FBFA] border-y border-zinc-200"
+      >
+        <div className="w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 space-y-12">
+          {/* Section Header with Fade-Up */}
+          <ScrollReveal animation="fade-up">
+            <div className="flex flex-col items-center text-center max-w-2xl mx-auto space-y-3">
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
+                <span className="size-2 rounded-full bg-[#1A7D67]"></span>
+                Our Services
+              </div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
+                Healthcare Services Designed for You
+              </h2>
+              <p className="text-zinc-600 text-sm sm:text-base">
+                Explore comprehensive medical care tailored to your family's needs
+                with modern treatments and caring doctors.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          {/* Services Grid with Staggered Cascading Animation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                title: "General Consultation",
+                desc: "Comprehensive consultation for all your primary healthcare needs and acute medical questions.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+                    <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
+                    <circle cx="20" cy="10" r="2" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Preventive Care",
+                desc: "Regular checkups, health screenings, and routine assessments to prevent chronic illnesses.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Cardiac Care",
+                desc: "Expert clinical evaluation, ECG review, and specialized care plans for heart-related conditions.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                    <path d="M12 5v14" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Diagnostic Services",
+                desc: "Advanced diagnostic tests, pathology panel reviews, and fast imaging reports you can trust.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m10 2 4 4-4 4" />
+                    <path d="m14 14 4 4-4 4" />
+                    <path d="M4 14h16" />
+                    <path d="M4 10h16" />
+                    <path d="M14 2v20" />
+                    <path d="M10 2v20" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Vaccination & Immunization",
+                desc: "Safe and effective vaccines for adults and pediatric patients to maintain full protection.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m18 2 4 4" />
+                    <path d="m17 7 3-3" />
+                    <path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" />
+                    <path d="m9 11 4 4" />
+                    <path d="m5 19-3 3" />
+                    <path d="m14 4 6 6" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Follow-up & Support",
+                desc: "Continuous care guidance, digital prescription refills, and follow-up reviews for lasting wellness.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                    <path d="M16 16h5v5" />
+                  </svg>
+                ),
+              },
+            ].map((service, idx) => (
+              <ScrollReveal
+                key={idx}
+                animation="fade-up"
+                delay={idx * 100}
+                duration={700}
+                className="h-full"
+              >
+                <div className="flex flex-col items-center text-center bg-white hover:bg-[#EEF6F3]/50 border border-zinc-200 hover:border-[#1A7D67]/40 rounded-2xl px-8 py-10 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1.5 justify-between h-full group">
+                  <div>
+                    <div className="size-16 rounded-full bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center mb-6 mx-auto transition-colors duration-300 shadow-xs">
+                      {service.svg}
+                    </div>
+                    <h3 className="font-semibold text-lg text-zinc-800 mb-3 group-hover:text-[#1A7D67] transition-colors">
+                      {service.title}
+                    </h3>
+                    <p className="text-zinc-600 text-sm leading-relaxed mb-6">
+                      {service.desc}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onFindDoctor}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1A7D67] hover:text-[#124B3E] transition group/btn cursor-pointer"
+                  >
+                    <span>Book Consultation</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="transition-transform group-hover/btn:translate-x-1.5"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* 5. TESTIMONIALS / WHAT OUR PATIENTS SAY                   */}
+      {/* ========================================================= */}
+      <section
+        id="testimonials"
+        className="scroll-mt-16 w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 py-24 md:py-32"
+      >
+        <ScrollReveal animation="fade-up">
+          <div className="flex flex-col items-center text-center max-w-2xl mx-auto space-y-3 mb-16">
+            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
+              <span className="size-2 rounded-full bg-[#1A7D67]"></span>
+              Trusted by Patients
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
+              What Our Patients Say
+            </h2>
+            <p className="text-zinc-600 text-sm sm:text-base">
+              Real stories from patients who experienced compassionate,
+              high-quality clinical care at Kaizen Care.
+            </p>
+          </div>
+        </ScrollReveal>
+
+        {/* Testimonials Grid with Animations */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[340px_1fr_1fr] gap-6 items-stretch">
+          {/* Feature Video / Image Testimonial */}
+          <ScrollReveal animation="fade-left" delay={100} className="md:row-span-2 h-full">
+            <div className="border border-zinc-200 bg-white rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-lg transition-all duration-300 h-full group">
+              <div>
+                <div className="relative -mx-6 -mt-6 rounded-t-2xl overflow-hidden mb-6 aspect-4/3">
+                  <img
+                    src="/assets/testimonial.png"
+                    alt="Patient testimonial story"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center transition-colors group-hover:bg-black/30">
+                    <div className="size-12 rounded-full bg-white/90 text-[#1A7D67] flex items-center justify-center shadow-md transform transition-transform group-hover:scale-110">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="ml-0.5 text-[#1A7D67]"
+                      >
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
+                <p className="text-zinc-700 text-sm leading-relaxed font-normal">
+                  "The doctor took the time to listen carefully and explained every
+                  step of my treatment. I felt comfortable and genuinely well
+                  cared for from start to finish."
+                </p>
+              </div>
+              <div className="mt-6 pt-4 border-t border-zinc-100">
+                <p className="font-semibold text-sm text-zinc-800">
+                  Elena Rostova
+                </p>
+                <p className="text-xs text-zinc-500">General Consultation</p>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Testimonial Card 2 */}
+          <ScrollReveal animation="fade-up" delay={200}>
+            <div className="border border-zinc-200 bg-white rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 h-full">
+              <div>
+                <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
+                <p className="text-zinc-700 text-sm leading-relaxed">
+                  "Booking an appointment was simple, and the medical staff made the
+                  entire visit smooth and stress-free. Having my prescriptions
+                  instantly available on the portal is amazing."
+                </p>
+              </div>
+              <div className="mt-6 pt-4 border-t border-zinc-100">
+                <p className="font-semibold text-sm text-zinc-800">
+                  Marcus Sterling
+                </p>
+                <p className="text-xs text-zinc-500">Preventive Care</p>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Testimonial Card 3 */}
+          <ScrollReveal animation="fade-up" delay={300}>
+            <div className="border border-zinc-200 bg-white rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 h-full">
+              <div>
+                <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
+                <p className="text-zinc-700 text-sm leading-relaxed">
+                  "Professional doctors, friendly clinic staff, and exceptional
+                  service. The video consult worked seamlessly right in my
+                  browser without installing anything."
+                </p>
+              </div>
+              <div className="mt-6 pt-4 border-t border-zinc-100">
+                <p className="font-semibold text-sm text-zinc-800">
+                  Dr. Priya Sharma
+                </p>
+                <p className="text-xs text-zinc-500">Cardiology Review</p>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Testimonial Card 4 */}
+          <ScrollReveal animation="fade-up" delay={400}>
+            <div className="border border-zinc-200 bg-white rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 h-full">
+              <div>
+                <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
+                <p className="text-zinc-700 text-sm leading-relaxed">
+                  "Every visit has been a great experience. The team is caring,
+                  attentive, and genuinely focused on patient well-being and
+                  long-term health."
+                </p>
+              </div>
+              <div className="mt-6 pt-4 border-t border-zinc-100">
+                <p className="font-semibold text-sm text-zinc-800">
+                  Jonathan Vance
+                </p>
+                <p className="text-xs text-zinc-500">Diagnostic Checkup</p>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Testimonial Card 5 */}
+          <ScrollReveal animation="fade-up" delay={500}>
+            <div className="border border-zinc-200 bg-white rounded-2xl p-6 flex flex-col justify-between shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 h-full">
+              <div>
+                <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
+                <p className="text-zinc-700 text-sm leading-relaxed">
+                  "From consultation to follow-up, everything was handled with
+                  professionalism and compassion. I couldn't ask for better care
+                  for my family."
+                </p>
+              </div>
+              <div className="mt-6 pt-4 border-t border-zinc-100">
+                <p className="font-semibold text-sm text-zinc-800">
+                  Sarah Jenkins
+                </p>
+                <p className="text-xs text-zinc-500">Family Medicine</p>
+              </div>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* 6. APPOINTMENT BOOKING FORM (Schedule Your Visit Today)    */}
+      {/* ========================================================= */}
+      <section
+        id="booking-process"
+        className="scroll-mt-16 py-24 md:py-32 bg-[#F9FBFA] border-t border-zinc-200"
+      >
+        <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 space-y-10">
+          <ScrollReveal animation="fade-up">
+            <div className="flex flex-col items-center text-center space-y-3">
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
+                <span className="size-2 rounded-full bg-[#1A7D67]"></span>
+                Contact & Schedule
+              </div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
+                Schedule Your Visit Today
+              </h2>
+              <p className="text-zinc-600 text-sm sm:text-base max-w-md">
+                Our team is here to help you. We care about your health and we'll
+                get back to you within{" "}
+                <span className="font-semibold text-zinc-800">24 hours</span>.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal animation="zoom-in" delay={150}>
+            {bookingSubmitted ? (
+              <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-8 text-center text-emerald-900 shadow-sm animate-in zoom-in-95 duration-300 flex flex-col items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="44"
+                  height="44"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-emerald-700"
+                >
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <h3 className="mt-2 text-lg font-bold">
+                  Appointment Request Received!
+                </h3>
+                <p className="mt-1 text-sm text-emerald-700">
+                  Redirecting you to select your doctor and slot...
+                </p>
+              </div>
+            ) : (
+              <form
+                onSubmit={handleBookingSubmit}
+                className="bg-white border border-zinc-200 rounded-2xl p-8 sm:p-10 shadow-lg hover:shadow-xl transition-shadow duration-300 space-y-6"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
+                      Your Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={bookingName}
+                      onChange={(e) => setBookingName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 placeholder-zinc-400 bg-transparent focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={bookingEmail}
+                      onChange={(e) => setBookingEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 placeholder-zinc-400 bg-transparent focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={bookingPhone}
+                      onChange={(e) => setBookingPhone(e.target.value)}
+                      placeholder="Enter your phone number"
+                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 placeholder-zinc-400 bg-transparent focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
+                      Service Type
+                    </label>
+                    <select
+                      required
+                      value={bookingService}
+                      onChange={(e) => setBookingService(e.target.value)}
+                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 bg-white focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition cursor-pointer"
+                    >
+                      <option value="" disabled>
+                        Select a service
+                      </option>
+                      <option value="General Consultation">
+                        General Consultation
+                      </option>
+                      <option value="Preventive Care">Preventive Care</option>
+                      <option value="Cardiac Care">Cardiac Care</option>
+                      <option value="Diagnostic Services">
+                        Diagnostic Services
+                      </option>
+                      <option value="Vaccination">Vaccination</option>
+                      <option value="Follow-up & Support">
+                        Follow-up & Support
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
+                      Preferred Date
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={bookingDate}
+                      onChange={(e) => setBookingDate(e.target.value)}
+                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 bg-white focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="bg-[#197C66] hover:bg-[#156755] text-white text-sm font-medium py-3.5 px-8 rounded-lg inline-flex items-center justify-center gap-2 cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 group w-full sm:w-auto"
+                >
+                  <span>Book Appointment</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="transition-transform group-hover:translate-x-1"
+                  >
+                    <path d="M5 12h14"></path>
+                    <path d="m12 5 7 7-7 7"></path>
+                  </svg>
+                </button>
+              </form>
+            )}
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* 7. FREQUENTLY ASKED QUESTIONS                             */}
+      {/* ========================================================= */}
+      <section
+        id="faqs"
+        className="scroll-mt-16 w-full max-w-4xl mx-auto px-6 sm:px-10 py-24 md:py-32"
+      >
+        <ScrollReveal animation="fade-up">
+          <div className="flex flex-col items-center text-center space-y-3 mb-12">
+            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
+              <span className="size-2 rounded-full bg-[#1A7D67]"></span>
+              Common Questions
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-medium text-zinc-800 tracking-tight">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-zinc-600 text-sm sm:text-base">
+              Everything you need to know about booking, medical care, and portal
+              features.
+            </p>
+          </div>
+        </ScrollReveal>
+
+        <div className="space-y-4">
+          {[
+            {
+              q: "How do I book an appointment?",
+              a: "You can book an appointment online through our website by clicking the 'Book Appointment' button or by calling our clinic directly. We will help you select a convenient time slot with your doctor.",
+            },
+            {
+              q: "Do you accept walk-in patients?",
+              a: "Yes, we accept walk-in patients. However, booking an appointment in advance is highly recommended to secure your preferred doctor and minimize your waiting time.",
+            },
+            {
+              q: "What services does your clinic provide?",
+              a: "Our clinic provides general consultations, preventive care, cardiac care, diagnostic tests, vaccinations, and continuous follow-up support tailored to your healthcare needs.",
+            },
+            {
+              q: "Can I reschedule my appointment?",
+              a: "Yes, you can easily reschedule or cancel your appointment. Please contact our support team or use the online portal at least 24 hours prior to your scheduled time.",
+            },
+            {
+              q: "Do you offer online consultations?",
+              a: "Yes, we offer secure online video consultations powered by Daily SDK, allowing you to connect with our specialists directly from your browser at home.",
+            },
+          ].map((faq, idx) => (
+            <ScrollReveal key={idx} animation="fade-up" delay={idx * 80}>
+              <details className="group rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-all duration-300 hover:border-[#1A7D67] hover:shadow-md">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-base font-semibold text-zinc-800">
+                  <span>{faq.q}</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-zinc-500 transition-transform duration-300 group-open:rotate-180 shrink-0"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </summary>
+                <p className="mt-3 text-sm text-zinc-600 leading-relaxed border-t border-zinc-100 pt-3">
+                  {faq.a}
+                </p>
+              </details>
+            </ScrollReveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* 8. EXCEPTIONAL CARE AWAITS YOU CTA                        */}
+      {/* ========================================================= */}
+      <section className="px-6 sm:px-10 lg:px-16 xl:px-20 pb-24 md:pb-32">
+        <ScrollReveal animation="zoom-in" duration={850}>
+          <div className="max-w-5xl mx-auto bg-gradient-to-b from-[#E0FAF4] to-white rounded-[24px] px-8 py-14 sm:py-20 border border-[#29E2B9]/30 text-center space-y-6 shadow-lg hover:shadow-xl transition-shadow duration-500">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight text-zinc-800 max-w-lg mx-auto leading-tight">
+              Exceptional Care{" "}
+              <span className="bg-gradient-to-r from-[#197C66] to-[#29E2B9] bg-clip-text text-transparent">
+                Awaits you
+              </span>
+            </h2>
+            <p className="text-zinc-600 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+              Whether it's a routine visit or ongoing care, we're here to help you
+              stay healthy with confidence.
+            </p>
+            <div className="flex flex-wrap justify-center items-center gap-4 pt-2">
+              <button
+                type="button"
+                onClick={onFindDoctor}
+                className="bg-[#197C66] hover:bg-[#156755] text-white text-sm font-medium px-8 py-3.5 rounded-lg inline-flex items-center gap-2 cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 group"
+              >
+                <span>Book Appointment</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="transition-transform group-hover:translate-x-1"
+                >
+                  <path d="M5 12h14"></path>
+                  <path d="m12 5 7 7-7 7"></path>
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={onRegister}
+                className="border border-zinc-300 hover:border-zinc-400 bg-white text-zinc-700 text-sm font-medium px-8 py-3.5 rounded-lg transition-all duration-300 hover:-translate-y-0.5 cursor-pointer shadow-xs"
+              >
+                Create Account
+              </button>
+            </div>
+          </div>
+        </ScrollReveal>
+      </section>
+
+      {/* ========================================================= */}
+      {/* 9. FOOTER (Kaizen Care)                                   */}
+      {/* ========================================================= */}
+      <footer className="w-full bg-[#162623] text-white pt-16 pb-8 border-t border-zinc-800">
+        <div className="px-6 sm:px-10 lg:px-16 xl:px-20 w-full max-w-[1440px] mx-auto">
+          <div className="flex flex-col md:flex-row flex-wrap justify-between items-start gap-12 pb-16 border-b border-zinc-800">
+            {/* Logo and About */}
+            <div className="flex flex-col items-start max-w-sm">
+              <div className="flex items-center gap-2.5 mb-4 select-none">
+                <svg
+                  width="32"
+                  height="36"
+                  viewBox="0 0 35 42"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-8 w-auto text-white shrink-0"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
+                    fill="#ffffff"
+                  />
+                  <rect
+                    width="12.629"
+                    height="32.626"
+                    rx="6.315"
+                    transform="rotate(-45 16.202 6.711)"
+                    fill="#ffffff"
+                  />
+                </svg>
+                <span className="text-2xl font-bold text-white tracking-tight">
+                  Kaizen Care
+                </span>
+              </div>
+              <p className="text-sm text-zinc-400 leading-relaxed">
+                Providing compassionate healthcare through experienced
+                professionals, modern treatments and patient-first care for every
+                visit.
+              </p>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <p className="font-semibold text-sm text-white mb-4 uppercase tracking-wider">
+                Quick Links
+              </p>
+              <div className="flex flex-col gap-2.5 text-sm text-zinc-400">
+                <a
+                  href="#home"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("home");
+                  }}
+                  className="hover:text-white transition"
+                >
+                  Home
+                </a>
+                <a
+                  href="#about"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("about");
+                  }}
+                  className="hover:text-white transition"
+                >
+                  About
+                </a>
+                <a
+                  href="#services"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("services");
+                  }}
+                  className="hover:text-white transition"
+                >
+                  Services
+                </a>
+                <a
+                  href="#testimonials"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("testimonials");
+                  }}
+                  className="hover:text-white transition"
+                >
+                  Testimonials
+                </a>
+                <a
+                  href="#booking-process"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("booking-process");
+                  }}
+                  className="hover:text-white transition"
+                >
+                  Book Appointment
+                </a>
+              </div>
+            </div>
+
+            {/* Our Services */}
+            <div>
+              <p className="font-semibold text-sm text-white mb-4 uppercase tracking-wider">
+                Our Services
+              </p>
+              <div className="flex flex-col gap-2.5 text-sm text-zinc-400">
+                <span>General Consultation</span>
+                <span>Preventive Care</span>
+                <span>Cardiac Care</span>
+                <span>Diagnostic Services</span>
+                <span>Follow-up & Support</span>
+              </div>
+            </div>
+
+            {/* Get in Touch */}
+            <div>
+              <p className="font-semibold text-sm text-white mb-4 uppercase tracking-wider">
+                Get in Touch
+              </p>
+              <div className="flex flex-col gap-3 text-sm text-zinc-400">
+                <div className="flex items-center gap-2.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#29E2B9] shrink-0">
+                    <rect width="20" height="16" x="2" y="4" rx="2" />
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                  </svg>
+                  <a
+                    href="mailto:hello@kaizencare.com"
+                    className="hover:text-white transition"
+                  >
+                    hello@kaizencare.com
+                  </a>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#29E2B9] shrink-0">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                  <a href="tel:+15551234567" className="hover:text-white transition">
+                    +1 (555) 123-4567
+                  </a>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#29E2B9] shrink-0">
+                    <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  <span>San Francisco, CA, USA</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onDoctorRegister}
+                  className="text-left text-xs font-semibold text-[#29E2B9] hover:underline pt-2 cursor-pointer"
+                >
+                  Clinician Registration Portal →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 text-xs text-zinc-500">
+            <p>© 2026 Kaizen Care · All Right Reserved.</p>
+            <div className="flex gap-6">
+              <span className="hover:text-zinc-400 cursor-pointer">
+                Privacy Policy
+              </span>
+              <span className="hover:text-zinc-400 cursor-pointer">
+                Terms of Service
+              </span>
+              <span className="hover:text-zinc-400 cursor-pointer">
+                Patient Security
+              </span>
+            </div>
           </div>
         </div>
       </footer>
