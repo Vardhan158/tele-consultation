@@ -85,11 +85,34 @@ export default function KaizenTruck3D() {
         (gltf) => {
           model = gltf.scene;
 
-          // Compute bounding box ONLY on mesh geometries to prevent scale shrinkage
-          const box = new THREE.Box3();
+          // Hide floor/road/plane meshes inside the GLB model
           model.traverse((child) => {
             if (child.isMesh && child.geometry) {
               child.geometry.computeBoundingBox();
+              const childBox = child.geometry.boundingBox;
+              const childSize = childBox.getSize(new THREE.Vector3());
+              const name = (child.name || "").toLowerCase();
+
+              // Detect flat ground/road/plane mesh (e.g. name contains floor/plane/road or Y height is flat relative to X/Z)
+              const isGround =
+                name.includes("plane") ||
+                name.includes("floor") ||
+                name.includes("ground") ||
+                name.includes("road") ||
+                name.includes("base") ||
+                name.includes("platform") ||
+                (childSize.y < 0.8 && (childSize.x > 2.5 || childSize.z > 2.5));
+
+              if (isGround) {
+                child.visible = false; // Hide the giant grey floor plane completely!
+              }
+            }
+          });
+
+          // Compute bounding box ONLY on visible truck meshes
+          const box = new THREE.Box3();
+          model.traverse((child) => {
+            if (child.visible && child.isMesh && child.geometry) {
               box.expandByObject(child);
             }
           });
@@ -98,7 +121,7 @@ export default function KaizenTruck3D() {
           const center = box.getCenter(new THREE.Vector3());
 
           const maxDim = Math.max(size.x, size.y, size.z) || 1;
-          const scale = 5.2 / maxDim;
+          const scale = 5.5 / maxDim;
           model.scale.set(scale, scale, scale);
 
           // Center position inside wrapper group
@@ -106,7 +129,7 @@ export default function KaizenTruck3D() {
 
           // Enable shadows and double-sided materials for high visibility
           model.traverse((child) => {
-            if (child.isMesh) {
+            if (child.visible && child.isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
               if (child.material) {

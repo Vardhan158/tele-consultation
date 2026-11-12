@@ -102,11 +102,34 @@ export default function AppLoadingSplash({ onFinished }) {
         (gltf) => {
           const model = gltf.scene;
 
-          // Calculate bounding box ONLY on mesh geometries to prevent huge scale shrinkage
-          const box = new THREE.Box3();
+          // Hide floor/road/plane meshes inside the GLB model
           model.traverse((child) => {
             if (child.isMesh && child.geometry) {
               child.geometry.computeBoundingBox();
+              const childBox = child.geometry.boundingBox;
+              const childSize = childBox.getSize(new THREE.Vector3());
+              const name = (child.name || "").toLowerCase();
+
+              // Detect flat ground/road/plane mesh (e.g. name contains floor/plane/road or Y height is flat relative to X/Z)
+              const isGround =
+                name.includes("plane") ||
+                name.includes("floor") ||
+                name.includes("ground") ||
+                name.includes("road") ||
+                name.includes("base") ||
+                name.includes("platform") ||
+                (childSize.y < 0.8 && (childSize.x > 2.5 || childSize.z > 2.5));
+
+              if (isGround) {
+                child.visible = false; // Hide the giant grey floor plane completely!
+              }
+            }
+          });
+
+          // Compute bounding box ONLY on visible truck meshes
+          const box = new THREE.Box3();
+          model.traverse((child) => {
+            if (child.visible && child.isMesh && child.geometry) {
               box.expandByObject(child);
             }
           });
@@ -115,14 +138,14 @@ export default function AppLoadingSplash({ onFinished }) {
           const center = box.getCenter(new THREE.Vector3());
 
           const maxDim = Math.max(size.x, size.y, size.z) || 1;
-          // Scale model up significantly so it is large, bold and clear
-          const scale = 5.2 / maxDim;
+          // Scale model up significantly so the truck alone is HUGE and clear
+          const scale = 5.5 / maxDim;
           model.scale.set(scale, scale, scale);
 
           model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
 
           model.traverse((child) => {
-            if (child.isMesh) {
+            if (child.visible && child.isMesh) {
               if (child.material) {
                 child.material.side = THREE.DoubleSide;
                 child.material.needsUpdate = true;
