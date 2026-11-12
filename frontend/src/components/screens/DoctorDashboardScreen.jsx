@@ -117,7 +117,7 @@ export default function DoctorDashboardScreen({ onNavigate }) {
             <button
               type="button"
               onClick={() => onNavigate("doctor-appointments")}
-              className="text-xs font-bold text-[#295255] hover:underline cursor-pointer"
+              className="text-xs font-bold text-[#25836F] hover:underline cursor-pointer"
             >
               View All Appointments →
             </button>
@@ -143,7 +143,7 @@ export default function DoctorDashboardScreen({ onNavigate }) {
                         <span className="font-mono text-[#577877] text-[11px]">{displayRef}</span>
                         <span className="font-bold text-[#162623] text-sm">{patientName}</span>
                       </div>
-                      <p className="text-[#295255] font-semibold">{visitType}</p>
+                      <p className="text-[#25836F] font-semibold">{visitType}</p>
                       <p className="text-[#577877]">🗓️ {formatAptDate(item.starts_at)}</p>
                     </div>
 

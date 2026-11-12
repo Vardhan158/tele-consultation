@@ -17,7 +17,6 @@ export default function DoctorManagementTab() {
   const [reasonText, setReasonText] = useState("");
   const [suspendModal, setSuspendModal] = useState(null); // { doctorId: string, doctorName: string }
   const [suspendReason, setSuspendReason] = useState("");
-  const [systemStatus, setSystemStatus] = useState({ connected: false, auditActive: false });
 
   const loadDoctors = () => {
     setLoading(true);
@@ -25,10 +24,8 @@ export default function DoctorManagementTab() {
       .doctors()
       .then((res) => {
         setDoctors(Array.isArray(res) ? res : []);
-        setSystemStatus({ connected: true, auditActive: true });
       })
       .catch((err) => {
-        setSystemStatus({ connected: false, auditActive: false });
         showToast(err.message || "Failed to load clinicians directory.", "error");
       })
       .finally(() => setLoading(false));
@@ -125,7 +122,7 @@ export default function DoctorManagementTab() {
   return (
     <div className="space-y-6 font-sans">
       {/* Cinematic Animated Banner */}
-      <div className="relative min-h-[220px] lg:min-h-[245px] overflow-hidden rounded-2xl bg-gradient-to-r from-[#162623] via-[#295255] to-[#1f3f41] p-6 sm:p-8 text-white shadow-xl border border-[rgba(87,120,119,0.25)] flex flex-col justify-between">
+      <div className="relative min-h-[220px] lg:min-h-[245px] overflow-hidden rounded-2xl bg-gradient-to-r from-[#162623] via-[#25836F] to-[#1d6e5d] p-6 sm:p-8 text-white shadow-xl border border-[rgba(87,120,119,0.25)] flex flex-col justify-between">
         {/* Soft Background Illumination Orbs */}
         <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-[#577877]/30 blur-3xl animate-glow pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-teal-400/20 blur-3xl animate-glow pointer-events-none" />
@@ -183,7 +180,7 @@ export default function DoctorManagementTab() {
                 setFilter("pending");
                 window.scrollTo({ top: 380, behavior: "smooth" });
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-[#295255] shadow-md transition-all hover:bg-[#F0F5F7] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-[#25836F] shadow-md transition-all hover:bg-[#F0F5F7] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
               <span>Review Pending ({pendingCount})</span>
               <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -208,7 +205,7 @@ export default function DoctorManagementTab() {
           <button
             onClick={() => setFilter("all")}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              filter === "all" ? "bg-white text-[#295255] shadow-sm" : "text-[#577877]"
+              filter === "all" ? "bg-white text-[#25836F] shadow-sm" : "text-[#577877]"
             }`}
           >
             All ({doctors.length})
@@ -243,7 +240,7 @@ export default function DoctorManagementTab() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search clinicians by name, registration #, specialty, or email…"
-            className="w-full rounded-xl border border-[#577877]/25 pl-9 pr-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+            className="w-full rounded-xl border border-[#577877]/25 pl-9 pr-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
           />
         </div>
       </div>
@@ -266,8 +263,8 @@ export default function DoctorManagementTab() {
 
             <div className="space-y-3 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-[#295255]">{selectedDoctor.full_name}</span>
-                <span className="rounded-full bg-teal-100 px-2.5 py-0.5 font-bold uppercase text-[#295255]">
+                <span className="font-bold text-sm text-[#25836F]">{selectedDoctor.full_name}</span>
+                <span className="rounded-full bg-teal-100 px-2.5 py-0.5 font-bold uppercase text-[#25836F]">
                   {selectedDoctor.approval_status}
                 </span>
               </div>
@@ -295,7 +292,7 @@ export default function DoctorManagementTab() {
             <div className="pt-2 text-right">
               <button
                 onClick={() => setSelectedDoctor(null)}
-                className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-semibold text-white"
+                className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-semibold text-white"
               >
                 Done
               </button>
@@ -426,7 +423,7 @@ export default function DoctorManagementTab() {
         <div className="space-y-4">
           <div className="grid gap-4">
             {paginatedDoctors.map((doc, idx) => (
-              <div key={`${doc.id || doc.user_id || 'doc'}-${idx}`} className="care-card p-5 transition hover:border-[#295255]/40">
+              <div key={`${doc.id || doc.user_id || 'doc'}-${idx}`} className="care-card p-5 transition hover:border-[#25836F]/40">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -443,7 +440,7 @@ export default function DoctorManagementTab() {
                         {doc.approval_status}
                       </span>
                       {doc.active ? (
-                        <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-bold text-[#295255]">
+                        <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-bold text-[#25836F]">
                           Active
                         </span>
                       ) : (
@@ -463,7 +460,7 @@ export default function DoctorManagementTab() {
                   <div className="flex items-center gap-2 pt-2 lg:pt-0">
                     <button
                       onClick={() => setSelectedDoctor(doc)}
-                      className="rounded-xl border border-[#577877]/30 bg-[#F0F5F7] px-3 py-2 text-xs font-semibold text-[#295255] hover:bg-white"
+                      className="rounded-xl border border-[#577877]/30 bg-[#F0F5F7] px-3 py-2 text-xs font-semibold text-[#25836F] hover:bg-white"
                     >
                       View Credentials
                     </button>
@@ -501,7 +498,7 @@ export default function DoctorManagementTab() {
                           <button
                             onClick={() => handleReactivateDoctor(doc)}
                             disabled={actionLoading === doc.id}
-                            className="rounded-xl bg-[#295255] px-3.5 py-2 text-xs font-semibold text-white shadow transition hover:bg-[#1f3f41] disabled:opacity-50"
+                            className="rounded-xl bg-[#25836F] px-3.5 py-2 text-xs font-semibold text-white shadow transition hover:bg-[#1d6e5d] disabled:opacity-50"
                           >
                             Reactivate Access
                           </button>
@@ -524,14 +521,14 @@ export default function DoctorManagementTab() {
                 <button
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#295255] hover:bg-[#F0F5F7] disabled:opacity-40"
+                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] hover:bg-[#F0F5F7] disabled:opacity-40"
                 >
                   Previous
                 </button>
                 <button
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#295255] hover:bg-[#F0F5F7] disabled:opacity-40"
+                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] hover:bg-[#F0F5F7] disabled:opacity-40"
                 >
                   Next
                 </button>

@@ -3,18 +3,18 @@ import { authApi } from "../../lib/api";
 
 function ClinicianBrandPanel({ onBack }) {
   return (
-    <aside className="relative hidden overflow-hidden bg-[#295255] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
+    <aside className="relative hidden overflow-hidden bg-[#25836F] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
       <div className="space-y-8 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center font-bold shadow-sm">
-              <span className="material-symbols-outlined !text-[#295255] text-2xl font-bold">
+            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#25836F] flex items-center justify-center font-bold shadow-sm">
+              <span className="material-symbols-outlined !text-[#25836F] text-2xl font-bold">
                 mark_email_read
               </span>
             </div>
             <div>
               <p className="text-xl font-bold tracking-tight text-white">
-                Kaizentrix Care
+                Kaizen Care
               </p>
               <p className="text-[10px] tracking-[.18em] uppercase text-[#F0F5F7]/80 font-semibold">
                 Email Verification
@@ -164,7 +164,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#295255] hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#25836F] hover:underline cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">arrow_back</span>
             Back to registration
@@ -190,7 +190,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="doctor@clinic.com"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
               />
             </div>
 
@@ -209,7 +209,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
                     value={digit}
                     onChange={(e) => handleDigitChange(idx, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(idx, e)}
-                    className="h-12 w-11 rounded-xl border border-[#577877]/30 text-center text-xl font-bold text-[#295255] shadow-xs transition focus:border-[#295255] focus:outline-none"
+                    className="h-12 w-11 rounded-xl border border-[#577877]/30 text-center text-xl font-bold text-[#25836F] shadow-xs transition focus:border-[#25836F] focus:outline-none"
                   />
                 ))}
               </div>
@@ -226,7 +226,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
                 className={`rounded-xl p-3 text-xs font-medium ${
                   resendStatus === "error"
                     ? "border border-red-200 bg-red-50 text-red-600"
-                    : "border border-teal-200 bg-teal-50 text-[#295255]"
+                    : "border border-teal-200 bg-teal-50 text-[#25836F]"
                 }`}
               >
                 {resendStatus === "sent" ? "✅ " : "ℹ️ "}
@@ -237,7 +237,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
             <button
               type="submit"
               disabled={status === "submitting"}
-              className="w-full rounded-xl bg-[#295255] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1f3f41] disabled:opacity-50 cursor-pointer"
+              className="w-full rounded-xl bg-[#25836F] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
             >
               {status === "submitting" ? "Verifying OTP…" : "Verify OTP Code"}
             </button>
@@ -249,7 +249,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
               type="button"
               onClick={handleResend}
               disabled={resendStatus === "sending"}
-              className="font-bold text-[#295255] hover:underline disabled:opacity-50 cursor-pointer"
+              className="font-bold text-[#25836F] hover:underline disabled:opacity-50 cursor-pointer"
             >
               {resendStatus === "sending" ? "Resending…" : "Resend OTP"}
             </button>
@@ -257,7 +257,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
         </div>
 
         <footer className="pt-8 text-center text-xs text-[#577877]">
-          © 2026 Kaizentrix Care · Clinician Credentialing Workspace.
+          © 2026 Kaizen Care · Clinician Credentialing Workspace.
         </footer>
       </main>
     </div>

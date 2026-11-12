@@ -177,7 +177,7 @@ export default function ScheduleManagementTab() {
               }
               setShiftModal(true);
             }}
-            className="rounded-xl bg-[#295255] px-4 py-2.5 text-xs font-semibold text-white shadow transition hover:bg-[#1f3f41] cursor-pointer flex items-center gap-1.5"
+            className="rounded-xl bg-[#25836F] px-4 py-2.5 text-xs font-semibold text-white shadow transition hover:bg-[#1d6e5d] cursor-pointer flex items-center gap-1.5"
           >
             <span className="text-sm font-bold">+</span> Add Doctor Shift
           </button>
@@ -198,7 +198,7 @@ export default function ScheduleManagementTab() {
           <select
             value={selectedDoctorId}
             onChange={(e) => setSelectedDoctorId(e.target.value)}
-            className="rounded-xl border border-[#577877]/25 px-3 py-1.5 text-xs bg-white focus:border-[#295255] focus:outline-none"
+            className="rounded-xl border border-[#577877]/25 px-3 py-1.5 text-xs bg-white focus:border-[#25836F] focus:outline-none"
           >
             <option value="all">All Clinicians Overview</option>
             {doctors.map(([id, name]) => (
@@ -214,7 +214,7 @@ export default function ScheduleManagementTab() {
           <button
             onClick={() => setCalendarView("weekly")}
             className={`rounded-lg px-3 py-1 text-xs font-semibold transition cursor-pointer ${
-              calendarView === "weekly" ? "bg-[#295255] text-white" : "text-[#577877]"
+              calendarView === "weekly" ? "bg-[#25836F] text-white" : "text-[#577877]"
             }`}
           >
             Weekly Calendar
@@ -222,7 +222,7 @@ export default function ScheduleManagementTab() {
           <button
             onClick={() => setCalendarView("monthly")}
             className={`rounded-lg px-3 py-1 text-xs font-semibold transition cursor-pointer ${
-              calendarView === "monthly" ? "bg-[#295255] text-white" : "text-[#577877]"
+              calendarView === "monthly" ? "bg-[#25836F] text-white" : "text-[#577877]"
             }`}
           >
             Monthly Grid
@@ -230,7 +230,7 @@ export default function ScheduleManagementTab() {
           <button
             onClick={() => setCalendarView("list")}
             className={`rounded-lg px-3 py-1 text-xs font-semibold transition cursor-pointer ${
-              calendarView === "list" ? "bg-[#295255] text-white" : "text-[#577877]"
+              calendarView === "list" ? "bg-[#25836F] text-white" : "text-[#577877]"
             }`}
           >
             Slots Table
@@ -241,7 +241,7 @@ export default function ScheduleManagementTab() {
       {/* Add Doctor Shift Modal Dialog */}
       {shiftModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/60 backdrop-blur-xs p-4">
-          <div className="care-card max-w-lg w-full p-6 space-y-4 shadow-2xl border border-[#295255]/30">
+          <div className="care-card max-w-lg w-full p-6 space-y-4 shadow-2xl border border-[#25836F]/30">
             <div className="flex items-center justify-between border-b border-[#577877]/15 pb-3">
               <h3 className="text-base font-bold text-[#162623]">Add Doctor Working Shift</h3>
               <button
@@ -365,7 +365,7 @@ export default function ScheduleManagementTab() {
                 <button
                   type="submit"
                   disabled={scheduling}
-                  className="rounded-xl bg-[#295255] px-5 py-2 text-xs font-semibold text-white shadow hover:bg-[#1f3f41] disabled:opacity-50 cursor-pointer"
+                  className="rounded-xl bg-[#25836F] px-5 py-2 text-xs font-semibold text-white shadow hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
                 >
                   {scheduling ? "Generating Slots…" : "Create Doctor Shift"}
                 </button>
@@ -389,7 +389,7 @@ export default function ScheduleManagementTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-[#577877]/15 pt-3">
               <button type="button" onClick={() => setUnblockTarget(null)} disabled={unblocking} className="rounded-xl border border-[#577877]/30 px-4 py-2 text-xs font-semibold text-[#577877]">Cancel</button>
-              <button type="button" onClick={handleUnblockDate} disabled={unblocking} className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#1f3f41] disabled:cursor-not-allowed disabled:opacity-50">{unblocking ? "Unblocking…" : "Confirm Unblock"}</button>
+              <button type="button" onClick={handleUnblockDate} disabled={unblocking} className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#1d6e5d] disabled:cursor-not-allowed disabled:opacity-50">{unblocking ? "Unblocking…" : "Confirm Unblock"}</button>
             </div>
           </div>
         </div>
@@ -480,7 +480,7 @@ export default function ScheduleManagementTab() {
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-[#577877]/15 pb-3">
                 <h2 className="text-sm font-bold text-[#162623] flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#295255] text-lg">view_week</span>
+                  <span className="material-symbols-outlined text-[#25836F] text-lg">view_week</span>
                   Weekly Doctor Schedules & Shift Slots
                 </h2>
                 <span className="text-xs text-[#577877] font-semibold">
@@ -522,10 +522,10 @@ export default function ScheduleManagementTab() {
                               key={slot.id}
                               className={`p-1.5 rounded-lg border text-[10px] flex items-center justify-between ${
                                 slot.booked
-                                  ? "bg-[#295255] text-white border-[#162623]"
+                                  ? "bg-[#25836F] text-white border-[#162623]"
                                   : slot.blocked
                                   ? "bg-amber-50 text-amber-900 border-amber-300"
-                                  : "bg-white text-[#162623] border-[#577877]/20 hover:border-[#295255]"
+                                  : "bg-white text-[#162623] border-[#577877]/20 hover:border-[#25836F]"
                               }`}
                             >
                               <div>
@@ -569,7 +569,7 @@ export default function ScheduleManagementTab() {
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-[#577877]/15 pb-3">
                 <h2 className="text-sm font-bold text-[#162623] flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#295255] text-lg">calendar_month</span>
+                  <span className="material-symbols-outlined text-[#25836F] text-lg">calendar_month</span>
                   Monthly Schedule Grid Overview
                 </h2>
                 <span className="text-xs text-[#577877] font-semibold">Current Month</span>
@@ -607,7 +607,7 @@ export default function ScheduleManagementTab() {
                         <div className="text-[9px] font-bold text-amber-800">🚫 Blocked</div>
                       ) : daySlots.length > 0 ? (
                         <div className="text-[9px] text-[#577877]">
-                          <span className="font-bold text-[#295255]">{daySlots.length}</span> slots
+                          <span className="font-bold text-[#25836F]">{daySlots.length}</span> slots
                           {bookedCount > 0 && <span className="text-amber-700 block font-bold">({bookedCount} booked)</span>}
                         </div>
                       ) : (
@@ -623,7 +623,7 @@ export default function ScheduleManagementTab() {
           {calendarView === "list" && (
             <div className="space-y-4">
               <h2 className="text-sm font-bold text-[#162623] flex items-center gap-2 border-b border-[#577877]/15 pb-3">
-                <span className="material-symbols-outlined text-[#295255] text-lg">list</span>
+                <span className="material-symbols-outlined text-[#25836F] text-lg">list</span>
                 Shift Slots Ledger ({slots.length})
               </h2>
 

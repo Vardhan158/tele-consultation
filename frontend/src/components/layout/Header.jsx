@@ -141,7 +141,7 @@ export default function Header({
             <span className="material-symbols-outlined !text-[#577877] text-xl">
               notifications
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-[#E5EEF1] text-[#295255] font-bold text-[11px]">
+            <span className="px-2 py-0.5 rounded-full bg-[#E5EEF1] text-[#25836F] font-bold text-[11px]">
               {unreadCount} new
             </span>
           </button>
@@ -149,7 +149,7 @@ export default function Header({
 
         <div className="flex items-center gap-2 pl-2 border-l border-[#577877]/20">
           <div className="flex items-center gap-2 p-1">
-            <div className="w-8 h-8 rounded-full bg-[#295255] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-[#25836F] text-white flex items-center justify-center font-bold text-xs shadow-sm">
               {initials}
             </div>
             <span className="font-semibold text-[#162623] hidden md:inline">

@@ -13,9 +13,9 @@ export default function AboutUsScreen() {
       <main>
         <section className="bg-[#25836F] px-6 py-20 text-white lg:px-10 lg:py-28">
           <div className="mx-auto max-w-4xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F0F5F7]/75">About Kaizentrix Care</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F0F5F7]/75">About Kaizen Care</p>
             <h1 className="mt-4 text-4xl font-bold leading-tight text-white sm:text-5xl">Care that feels connected, personal, and clear.</h1>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#F0F5F7]/85 sm:text-lg">Kaizentrix Care brings the essential parts of a modern healthcare journey together so patients can spend less time navigating systems and more time focusing on their wellbeing.</p>
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#F0F5F7]/85 sm:text-lg">Kaizen Care brings the essential parts of a modern healthcare journey together so patients can spend less time navigating systems and more time focusing on their wellbeing.</p>
           </div>
         </section>
 
@@ -42,7 +42,7 @@ export default function AboutUsScreen() {
           </div>
         </section>
       </main>
-      <footer className="border-t border-[#577877]/20 bg-[#F0F5F7] px-6 py-8 text-xs text-[#577877] lg:px-10"><div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row"><p>© 2026 Kaizentrix Care · Patient Portal. All rights reserved.</p><div className="flex gap-6"><span>Privacy Policy</span><span>Terms of Use</span></div></div></footer>
+      <footer className="border-t border-[#577877]/20 bg-[#F0F5F7] px-6 py-8 text-xs text-[#577877] lg:px-10"><div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row"><p>© 2026 Kaizen Care · Patient Portal. All rights reserved.</p><div className="flex gap-6"><span>Privacy Policy</span><span>Terms of Use</span></div></div></footer>
     </div>
   );
 }

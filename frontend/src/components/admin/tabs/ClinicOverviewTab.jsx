@@ -28,7 +28,7 @@ export default function ClinicOverviewTab({ onSelectTab }) {
   return (
     <div className="space-y-6 font-sans">
       {/* Top Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#295255] to-[#162623] p-6 text-white shadow-md border border-[rgba(87,120,119,0.15)] sm:p-8">
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] to-[#162623] p-6 text-white shadow-md border border-[rgba(87,120,119,0.15)] sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white">
@@ -44,7 +44,7 @@ export default function ClinicOverviewTab({ onSelectTab }) {
           <div className="flex gap-2 shrink-0">
             <button
               onClick={() => onSelectTab("doctors")}
-              className="rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-[#295255] shadow transition hover:bg-[#F0F5F7]"
+              className="rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-[#25836F] shadow transition hover:bg-[#F0F5F7]"
             >
               Verify Doctors ({kpis.pending_approvals || 0})
             </button>
@@ -55,7 +55,7 @@ export default function ClinicOverviewTab({ onSelectTab }) {
       {/* KPI Grid - Responsive 7 cards layout wrapping cleanly without overflow */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
         <div className="care-card p-4 text-center min-w-0">
-          <div className="text-2xl font-bold text-[#295255] truncate">{kpis.total_doctors || 0}</div>
+          <div className="text-2xl font-bold text-[#25836F] truncate">{kpis.total_doctors || 0}</div>
           <div className="mt-1 text-[11px] font-medium text-[#577877] truncate">Total Doctors</div>
         </div>
         <div className="care-card p-4 text-center min-w-0">
@@ -79,7 +79,7 @@ export default function ClinicOverviewTab({ onSelectTab }) {
           <div className="mt-1 text-[11px] font-medium text-[#577877] truncate">Total Bookings</div>
         </div>
         <div className="care-card p-4 text-center min-w-0">
-          <div className="text-2xl font-bold text-[#295255] truncate">
+          <div className="text-2xl font-bold text-[#25836F] truncate">
             ₹{(kpis.total_revenue || 0).toLocaleString("en-IN")}
           </div>
           <div className="mt-1 text-[11px] font-medium text-[#577877] truncate">Total Revenue</div>
@@ -109,7 +109,7 @@ export default function ClinicOverviewTab({ onSelectTab }) {
                   className={`rounded-xl p-3 text-xs font-medium flex items-start gap-2.5 ${
                     alert.type === "warning"
                       ? "bg-amber-50 text-amber-800 border border-amber-200"
-                      : "bg-teal-50 text-[#295255] border border-teal-200"
+                      : "bg-teal-50 text-[#25836F] border border-teal-200"
                   }`}
                 >
                   <span className="mt-0.5 font-bold">
@@ -126,7 +126,7 @@ export default function ClinicOverviewTab({ onSelectTab }) {
         <div className="care-card p-6 space-y-4 min-w-0">
           <div className="flex items-center justify-between border-b border-[#577877]/15 pb-3">
             <h2 className="text-base font-bold text-[#162623] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#295255]">history</span>
+              <span className="material-symbols-outlined text-[#25836F]">history</span>
               Recent Activity Log
             </h2>
             <span className="text-xs text-[#577877]">Today</span>

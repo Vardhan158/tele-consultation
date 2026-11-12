@@ -158,14 +158,6 @@ export default function LandingScreen({
     };
   }, []);
 
-  // Booking Form State
-  const [bookingName, setBookingName] = useState("");
-  const [bookingEmail, setBookingEmail] = useState("");
-  const [bookingPhone, setBookingPhone] = useState("");
-  const [bookingService, setBookingService] = useState("");
-  const [bookingDate, setBookingDate] = useState("");
-  const [bookingSubmitted, setBookingSubmitted] = useState(false);
-
   useEffect(() => {
     // Trigger hero entrance animation on mount
     const timer = setTimeout(() => setHeroMounted(true), 50);
@@ -205,14 +197,6 @@ export default function LandingScreen({
         el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }
-  };
-
-  const handleBookingSubmit = (e) => {
-    e.preventDefault();
-    setBookingSubmitted(true);
-    setTimeout(() => {
-      onFindDoctor();
-    }, 1200);
   };
 
   return (
@@ -326,7 +310,7 @@ export default function LandingScreen({
               </button>
               <button
                 type="button"
-                onClick={onFindDoctor}
+                onClick={onRegister}
                 className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-xs transition-all duration-500 group cursor-pointer hover:-translate-y-0.5 ${
                   scrolled
                     ? "bg-[#1A7D67] text-white hover:bg-[#156654] hover:shadow-md"
@@ -478,7 +462,7 @@ export default function LandingScreen({
                       type="button"
                       onClick={() => {
                         closeMenu();
-                        onFindDoctor();
+                        onRegister();
                       }}
                       className={`flex-1 py-2.5 rounded-lg text-center text-sm font-medium shadow-sm ${
                         scrolled
@@ -551,7 +535,7 @@ export default function LandingScreen({
             >
               <button
                 type="button"
-                onClick={onFindDoctor}
+                onClick={onRegister}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#165849] hover:bg-[#124b3e] text-white text-sm sm:text-base font-medium px-6 py-3.5 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
               >
                 <span>Book Appointment</span>
@@ -1078,174 +1062,7 @@ export default function LandingScreen({
       </section>
 
       {/* ========================================================= */}
-      {/* 6. APPOINTMENT BOOKING FORM (Schedule Your Visit Today)    */}
-      {/* ========================================================= */}
-      <section
-        id="booking-process"
-        className="scroll-mt-16 py-24 md:py-32 bg-[#F9FBFA] border-t border-zinc-200"
-      >
-        <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 space-y-10">
-          <ScrollReveal animation="fade-up">
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
-                <span className="size-2 rounded-full bg-[#1A7D67]"></span>
-                Contact & Schedule
-              </div>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
-                Schedule Your Visit Today
-              </h2>
-              <p className="text-zinc-600 text-sm sm:text-base max-w-md">
-                Our team is here to help you. We care about your health and we'll
-                get back to you within{" "}
-                <span className="font-semibold text-zinc-800">24 hours</span>.
-              </p>
-            </div>
-          </ScrollReveal>
-
-          <ScrollReveal animation="zoom-in" delay={150}>
-            {bookingSubmitted ? (
-              <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-8 text-center text-emerald-900 shadow-sm animate-in zoom-in-95 duration-300 flex flex-col items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="44"
-                  height="44"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-emerald-700"
-                >
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <h3 className="mt-2 text-lg font-bold">
-                  Appointment Request Received!
-                </h3>
-                <p className="mt-1 text-sm text-emerald-700">
-                  Redirecting you to select your doctor and slot...
-                </p>
-              </div>
-            ) : (
-              <form
-                onSubmit={handleBookingSubmit}
-                className="bg-white border border-zinc-200 rounded-2xl p-8 sm:p-10 shadow-lg hover:shadow-xl transition-shadow duration-300 space-y-6"
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
-                      Your Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={bookingName}
-                      onChange={(e) => setBookingName(e.target.value)}
-                      placeholder="Enter your full name"
-                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 placeholder-zinc-400 bg-transparent focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={bookingEmail}
-                      onChange={(e) => setBookingEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 placeholder-zinc-400 bg-transparent focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={bookingPhone}
-                      onChange={(e) => setBookingPhone(e.target.value)}
-                      placeholder="Enter your phone number"
-                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 placeholder-zinc-400 bg-transparent focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
-                      Service Type
-                    </label>
-                    <select
-                      required
-                      value={bookingService}
-                      onChange={(e) => setBookingService(e.target.value)}
-                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 bg-white focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition cursor-pointer"
-                    >
-                      <option value="" disabled>
-                        Select a service
-                      </option>
-                      <option value="General Consultation">
-                        General Consultation
-                      </option>
-                      <option value="Preventive Care">Preventive Care</option>
-                      <option value="Cardiac Care">Cardiac Care</option>
-                      <option value="Diagnostic Services">
-                        Diagnostic Services
-                      </option>
-                      <option value="Vaccination">Vaccination</option>
-                      <option value="Follow-up & Support">
-                        Follow-up & Support
-                      </option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 mb-2 block">
-                      Preferred Date
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={bookingDate}
-                      onChange={(e) => setBookingDate(e.target.value)}
-                      className="w-full px-4 py-3 border border-zinc-300 rounded-lg text-sm text-zinc-800 bg-white focus:outline-none focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/20 transition cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="bg-[#197C66] hover:bg-[#156755] text-white text-sm font-medium py-3.5 px-8 rounded-lg inline-flex items-center justify-center gap-2 cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 group w-full sm:w-auto"
-                >
-                  <span>Book Appointment</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="transition-transform group-hover:translate-x-1"
-                  >
-                    <path d="M5 12h14"></path>
-                    <path d="m12 5 7 7-7 7"></path>
-                  </svg>
-                </button>
-              </form>
-            )}
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* ========================================================= */}
-      {/* 7. FREQUENTLY ASKED QUESTIONS                             */}
+      {/* 6. FREQUENTLY ASKED QUESTIONS                             */}
       {/* ========================================================= */}
       <section
         id="faqs"
@@ -1337,7 +1154,7 @@ export default function LandingScreen({
             <div className="flex flex-wrap justify-center items-center gap-4 pt-2">
               <button
                 type="button"
-                onClick={onFindDoctor}
+                onClick={onRegister}
                 className="bg-[#197C66] hover:bg-[#156755] text-white text-sm font-medium px-8 py-3.5 rounded-lg inline-flex items-center gap-2 cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 group"
               >
                 <span>Book Appointment</span>
@@ -1456,16 +1273,13 @@ export default function LandingScreen({
                 >
                   Testimonials
                 </a>
-                <a
-                  href="#booking-process"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    scrollToSection("booking-process");
-                  }}
-                  className="hover:text-white transition"
+                <button
+                  type="button"
+                  onClick={onRegister}
+                  className="text-left hover:text-white transition cursor-pointer"
                 >
                   Book Appointment
-                </a>
+                </button>
               </div>
             </div>
 

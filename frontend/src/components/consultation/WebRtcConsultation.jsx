@@ -381,8 +381,8 @@ export default function WebRtcConsultation({
           <p className="font-semibold">Camera unavailable</p>
           <p className="mt-1">You can continue the consultation with audio only.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => { setError(""); setStatus("connecting"); startRef.current?.(false); }} className="rounded-xl border border-[#295255] px-4 py-2 text-xs font-bold text-[#295255]">Retry Camera</button>
-            <button type="button" onClick={() => { setError(""); setStatus("connecting"); startRef.current?.(true); }} className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-bold text-white">Continue audio only</button>
+            <button type="button" onClick={() => { setError(""); setStatus("connecting"); startRef.current?.(false); }} className="rounded-xl border border-[#25836F] px-4 py-2 text-xs font-bold text-[#25836F]">Retry Camera</button>
+            <button type="button" onClick={() => { setError(""); setStatus("connecting"); startRef.current?.(true); }} className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-bold text-white">Continue audio only</button>
           </div>
         </div>
       )}
@@ -418,7 +418,7 @@ export default function WebRtcConsultation({
             <button
               type="button"
               onClick={() => socketRef.current?.emit("admit_patient")}
-              className="bg-[#295255] hover:bg-[#1f3f41] text-white px-4 py-2 rounded-xl text-xs font-bold shadow cursor-pointer"
+              className="bg-[#25836F] hover:bg-[#1d6e5d] text-white px-4 py-2 rounded-xl text-xs font-bold shadow cursor-pointer"
             >
               Admit Patient
             </button>

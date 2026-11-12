@@ -9,9 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pymongo.errors import DuplicateKeyError
 
 from teleconsult.config.settings import get_settings
-from teleconsult.kernel.authz.policy import Principal, get_principal
+from teleconsult.kernel.authz.policy import Principal, get_principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.identity.auth_routes import auth_database_session
@@ -19,7 +20,11 @@ from teleconsult.modules.identity.models import UserAccount
 from teleconsult.modules.patient_portal.models import Appointment, Doctor, Patient
 from teleconsult.modules.payments.models import PaymentTransaction
 
-router = APIRouter(prefix="/admin", tags=["clinic-admin"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["clinic-admin"],
+    dependencies=[Depends(require("clinic:admin"))],
+)
 
 
 async def _verify_admin(request: Request) -> Principal:
@@ -668,7 +673,13 @@ async def block_clinic_date(
             "tenant_id": settings.default_tenant_id,
             "created_at": now.isoformat(),
         }
-        await db["blocked_dates"].insert_one(dict(item))
+        try:
+            await db["blocked_dates"].insert_one(dict(item))
+        except DuplicateKeyError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This clinic date is already blocked.",
+            ) from None
         local_day_start = datetime.combine(datetime.strptime(payload.date, "%Y-%m-%d").date(), time.min, tzinfo=clinic_timezone).astimezone(UTC)
         local_day_end = local_day_start + timedelta(days=1)
         await db["doctor_availability"].update_many(

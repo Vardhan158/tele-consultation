@@ -206,7 +206,7 @@ export default function ConsentScreen({ onNavigate }) {
             onClick={handleDownloadRecord}
             className="btn-secondary !px-5 !py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs shrink-0"
           >
-            <span className="material-symbols-outlined !text-[#295255] text-base">
+            <span className="material-symbols-outlined !text-[#25836F] text-base">
               download
             </span>
             <span>Download consent record</span>
@@ -215,7 +215,7 @@ export default function ConsentScreen({ onNavigate }) {
 
         {/* Up-to-date Status Banner from Screenshot */}
         <div className="p-4 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start sm:items-center gap-3">
-          <span className="material-symbols-outlined !text-[#295255] text-xl shrink-0 mt-0.5 sm:mt-0">
+          <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5 sm:mt-0">
             check_circle
           </span>
           <div className="text-xs">
@@ -256,7 +256,7 @@ export default function ConsentScreen({ onNavigate }) {
                       <span
                         className={`inline-flex items-center text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
                           perm.granted
-                            ? "bg-[#E7F3F1] text-[#295255]"
+                            ? "bg-[#E7F3F1] text-[#25836F]"
                             : "bg-[#F0F5F7] text-[#577877]"
                         }`}
                       >
@@ -271,8 +271,8 @@ export default function ConsentScreen({ onNavigate }) {
                     role="switch"
                     aria-checked={perm.granted}
                     onClick={() => handleToggle(perm.id)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#295255]/20 ${
-                      perm.granted ? "bg-[#295255]" : "bg-[#C5D5D7]"
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#25836F]/20 ${
+                      perm.granted ? "bg-[#25836F]" : "bg-[#C5D5D7]"
                     }`}
                   >
                     <span
@@ -296,7 +296,7 @@ export default function ConsentScreen({ onNavigate }) {
               </h3>
 
               <div>
-                <span className="inline-flex items-center text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E7F3F1] text-[#295255]">
+                <span className="inline-flex items-center text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E7F3F1] text-[#25836F]">
                   You are in control
                 </span>
               </div>
@@ -323,7 +323,7 @@ export default function ConsentScreen({ onNavigate }) {
                 <button
                   type="button"
                   onClick={() => onNavigate("support")}
-                  className="text-xs font-semibold text-[#295255] hover:underline block mx-auto text-center"
+                  className="text-xs font-semibold text-[#25836F] hover:underline block mx-auto text-center"
                 >
                   Ask a privacy question
                 </button>
@@ -332,7 +332,7 @@ export default function ConsentScreen({ onNavigate }) {
 
             {/* Card 2: Before your next video visit banner */}
             <div className="p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3">
-              <span className="material-symbols-outlined !text-[#295255] text-lg shrink-0 mt-0.5">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg shrink-0 mt-0.5">
                 info
               </span>
               <div className="text-xs space-y-1">
@@ -383,7 +383,7 @@ export default function ConsentScreen({ onNavigate }) {
 
         {/* Global Footer */}
         <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-          <p>© 2026 Kaizentrix Care · Your health, thoughtfully connected.</p>
+          <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
           <div className="flex items-center gap-4">
             <span
               className="hover:text-[#162623] cursor-pointer"
@@ -410,11 +410,11 @@ export default function ConsentScreen({ onNavigate }) {
           <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   policy
                 </span>
                 <h3 className="text-base font-bold text-[#162623]">
-                  Kaizentrix Care Privacy Notice
+                  Kaizen Care Privacy Notice
                 </h3>
               </div>
               <button

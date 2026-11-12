@@ -186,10 +186,10 @@ export default function FollowUpCareScreen({ onNavigate }) {
 
         {/* Cyan Announcement Banner matching Screenshot */}
         {tasks.length > 0 && (
-          <div className="rounded-2xl p-4 sm:p-5 bg-[#E8F3F3] border border-[#295255]/20 flex items-start gap-3.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-full bg-[#295255]/10 flex items-center justify-center shrink-0 mt-0.5">
+          <div className="rounded-2xl p-4 sm:p-5 bg-[#E8F3F3] border border-[#25836F]/20 flex items-start gap-3.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-full bg-[#25836F]/10 flex items-center justify-center shrink-0 mt-0.5">
               <svg
-                className="w-5 h-5 text-[#295255]"
+                className="w-5 h-5 text-[#25836F]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -244,7 +244,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
               {/* Progress bar matching Screenshot */}
               <div className="w-full h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#295255] rounded-full transition-all duration-300"
+                  className="h-full bg-[#25836F] rounded-full transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -265,8 +265,8 @@ export default function FollowUpCareScreen({ onNavigate }) {
                         aria-label={`Toggle ${task.title}`}
                         className={`w-5 h-5 rounded mt-0.5 flex items-center justify-center transition shrink-0 ${
                           task.completed
-                            ? "bg-[#295255] text-white"
-                            : "border border-[#577877]/40 bg-white hover:border-[#295255]"
+                            ? "bg-[#25836F] text-white"
+                            : "border border-[#577877]/40 bg-white hover:border-[#25836F]"
                         }`}
                       >
                         {task.completed && (
@@ -332,7 +332,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
               {/* Trend Chart Area matching Screenshot */}
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[#295255]">
+                  <span className="font-semibold text-[#25836F]">
                     Systolic · mmHg
                   </span>
                   <span className="text-[#577877]">
@@ -380,19 +380,19 @@ export default function FollowUpCareScreen({ onNavigate }) {
                     <path
                       d="M 10 20 L 100 45 L 200 55 L 290 85 L 390 70 L 490 100"
                       fill="none"
-                      stroke="#295255"
+                      stroke="#25836F"
                       strokeWidth="2.75"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
 
                     {/* Data Points */}
-                    <circle cx="10" cy="20" r="3.5" fill="#295255" />
-                    <circle cx="100" cy="45" r="3.5" fill="#295255" />
-                    <circle cx="200" cy="55" r="3.5" fill="#295255" />
-                    <circle cx="290" cy="85" r="3.5" fill="#295255" />
-                    <circle cx="390" cy="70" r="3.5" fill="#295255" />
-                    <circle cx="490" cy="100" r="3.5" fill="#295255" />
+                    <circle cx="10" cy="20" r="3.5" fill="#25836F" />
+                    <circle cx="100" cy="45" r="3.5" fill="#25836F" />
+                    <circle cx="200" cy="55" r="3.5" fill="#25836F" />
+                    <circle cx="290" cy="85" r="3.5" fill="#25836F" />
+                    <circle cx="390" cy="70" r="3.5" fill="#25836F" />
+                    <circle cx="490" cy="100" r="3.5" fill="#25836F" />
                   </svg>
 
                   {/* Dates underneath graph matching Screenshot */}
@@ -437,7 +437,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
                     type="text"
                     value={dateTime}
                     onChange={(e) => setDateTime(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255] bg-white transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
                   />
                 </div>
 
@@ -451,7 +451,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
                       type="number"
                       value={systolic}
                       onChange={(e) => setSystolic(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255] bg-white transition"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
                     />
                   </div>
 
@@ -463,7 +463,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
                       type="number"
                       value={diastolic}
                       onChange={(e) => setDiastolic(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255] bg-white transition"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
                     />
                   </div>
                 </div>
@@ -477,7 +477,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
                     type="number"
                     value={pulse}
                     onChange={(e) => setPulse(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255] bg-white transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
                   />
                 </div>
 
@@ -490,7 +490,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
                     type="text"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255] bg-white transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
                   />
                 </div>
 

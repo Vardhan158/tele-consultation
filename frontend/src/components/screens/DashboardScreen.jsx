@@ -72,7 +72,7 @@ export default function DashboardScreen({ onNavigate }) {
   if (state === "loading") {
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center p-8 text-[#577877]">
-        <div className="w-10 h-10 border-4 border-[#295255]/20 border-t-[#295255] rounded-full animate-spin mb-4" />
+        <div className="w-10 h-10 border-4 border-[#25836F]/20 border-t-[#25836F] rounded-full animate-spin mb-4" />
         <p className="text-sm font-medium text-[#162623]">
           Loading your patient workspace…
         </p>
@@ -219,7 +219,7 @@ export default function DashboardScreen({ onNavigate }) {
               onClick={() => onNavigate("medical-records")}
               className="btn-secondary"
             >
-              <span className="material-symbols-outlined !text-[#295255] text-lg">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg">
                 upload_file
               </span>
               Upload Record
@@ -230,10 +230,10 @@ export default function DashboardScreen({ onNavigate }) {
         {/* Hero Upcoming Appointment Banner */}
         {nextVisit ? (
           <div className="rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.06)] relative overflow-hidden">
-            <div className="absolute right-0 top-0 bottom-0 w-2 bg-[#295255]" />
+            <div className="absolute right-0 top-0 bottom-0 w-2 bg-[#25836F]" />
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div className="space-y-3 max-w-2xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F0F5F7] border border-[#577877]/25 text-xs font-semibold text-[#295255]">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F0F5F7] border border-[#577877]/25 text-xs font-semibold text-[#25836F]">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                   {isPendingPayment ? "Payment Pending" : nextVisit.status}
                 </div>
@@ -242,7 +242,7 @@ export default function DashboardScreen({ onNavigate }) {
                 </h2>
                 <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-[#577877]">
                   <span className="flex items-center gap-1.5 font-semibold text-[#162623]">
-                    <span className="material-symbols-outlined !text-[#295255] text-lg">
+                    <span className="material-symbols-outlined !text-[#25836F] text-lg">
                       calendar_today
                     </span>
                     {visitDateFormatted}
@@ -342,11 +342,11 @@ export default function DashboardScreen({ onNavigate }) {
           >
             <div className="flex items-center justify-between">
               <span className="w-12 h-12 rounded-xl bg-[#F0F5F7] flex items-center justify-center">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   calendar_month
                 </span>
               </span>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F5F7] text-[#295255]">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F5F7] text-[#25836F]">
                 Scheduled
               </span>
             </div>
@@ -370,11 +370,11 @@ export default function DashboardScreen({ onNavigate }) {
           >
             <div className="flex items-center justify-between">
               <span className="w-12 h-12 rounded-xl bg-[#F0F5F7] flex items-center justify-center">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   folder_shared
                 </span>
               </span>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F5F7] text-[#295255]">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F5F7] text-[#25836F]">
                 Verified
               </span>
             </div>
@@ -399,11 +399,11 @@ export default function DashboardScreen({ onNavigate }) {
           >
             <div className="flex items-center justify-between">
               <span className="w-12 h-12 rounded-xl bg-[#F0F5F7] flex items-center justify-center">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   medication
                 </span>
               </span>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F5F7] text-[#295255]">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F5F7] text-[#25836F]">
                 Active Rx
               </span>
             </div>
@@ -426,11 +426,11 @@ export default function DashboardScreen({ onNavigate }) {
           >
             <div className="flex items-center justify-between">
               <span className="w-12 h-12 rounded-xl bg-[#F0F5F7] flex items-center justify-center">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   task_alt
                 </span>
               </span>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F5F7] text-[#295255]">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F0F5F7] text-[#25836F]">
                 {tasks.length ? `${progressPercent}%` : "—"}
               </span>
             </div>
@@ -464,7 +464,7 @@ export default function DashboardScreen({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => onNavigate("follow-up")}
-                className="text-xs font-semibold text-[#295255] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#25836F] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 Care Guidance
                 <span className="material-symbols-outlined text-sm">
@@ -479,13 +479,13 @@ export default function DashboardScreen({ onNavigate }) {
                 <span className="font-semibold text-[#162623]">
                   Blood Pressure &amp; Metabolic Routine
                 </span>
-                <span className="font-bold text-[#295255]">
+                <span className="font-bold text-[#25836F]">
                   {completedTaskCount} of {tasks.length} Completed
                 </span>
               </div>
               <div className="w-full h-2.5 bg-white rounded-full overflow-hidden border border-[#577877]/20">
                 <div
-                  className="h-full bg-[#295255] rounded-full transition-all duration-500"
+                  className="h-full bg-[#25836F] rounded-full transition-all duration-500"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -508,14 +508,14 @@ export default function DashboardScreen({ onNavigate }) {
                     className={`flex items-start gap-3.5 p-3.5 rounded-xl border transition-all cursor-pointer ${
                       task.done
                         ? "bg-white border-[#577877]/15 opacity-80"
-                        : "bg-[#F0F5F7]/70 border-[#577877]/30 hover:border-[#295255]"
+                        : "bg-[#F0F5F7]/70 border-[#577877]/30 hover:border-[#25836F]"
                     }`}
                   >
                     <button
                       type="button"
                       className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center border transition ${
                         task.done
-                          ? "bg-[#295255] border-[#295255] text-white"
+                          ? "bg-[#25836F] border-[#25836F] text-white"
                           : "border-[#577877] bg-white"
                       }`}
                     >
@@ -536,7 +536,7 @@ export default function DashboardScreen({ onNavigate }) {
                       </p>
                     </div>
                     <span
-                      className={`text-[11px] px-2 py-0.5 rounded font-medium ${task.done ? "bg-[#F0F5F7] text-[#577877]" : "bg-[#295255]/10 text-[#295255]"}`}
+                      className={`text-[11px] px-2 py-0.5 rounded font-medium ${task.done ? "bg-[#F0F5F7] text-[#577877]" : "bg-[#25836F]/10 text-[#25836F]"}`}
                     >
                       {task.done ? "Done" : "Pending"}
                     </span>
@@ -601,11 +601,11 @@ export default function DashboardScreen({ onNavigate }) {
                   key={item.title}
                   type="button"
                   onClick={() => onNavigate(item.tab, item.params)}
-                  className="w-full flex items-center justify-between p-3.5 rounded-xl border border-[#577877]/15 hover:border-[#295255] hover:bg-[#F0F5F7] transition text-left group cursor-pointer"
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl border border-[#577877]/15 hover:border-[#25836F] hover:bg-[#F0F5F7] transition text-left group cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-lg bg-[#F0F5F7] group-hover:bg-[#295255] transition flex items-center justify-center">
-                      <span className="material-symbols-outlined !text-[#295255] group-hover:!text-white text-xl transition">
+                    <span className="w-9 h-9 rounded-lg bg-[#F0F5F7] group-hover:bg-[#25836F] transition flex items-center justify-center">
+                      <span className="material-symbols-outlined !text-[#25836F] group-hover:!text-white text-xl transition">
                         {item.icon}
                       </span>
                     </span>
@@ -618,7 +618,7 @@ export default function DashboardScreen({ onNavigate }) {
                       </p>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined !text-[#577877] group-hover:!text-[#295255] text-lg transition">
+                  <span className="material-symbols-outlined !text-[#577877] group-hover:!text-[#25836F] text-lg transition">
                     chevron_right
                   </span>
                 </button>
@@ -628,7 +628,7 @@ export default function DashboardScreen({ onNavigate }) {
             <button
               type="button"
               onClick={() => onNavigate("payments")}
-              className="w-full p-3.5 rounded-xl border border-[#577877]/15 hover:border-[#295255] hover:bg-[#F0F5F7] transition text-left cursor-pointer"
+              className="w-full p-3.5 rounded-xl border border-[#577877]/15 hover:border-[#25836F] hover:bg-[#F0F5F7] transition text-left cursor-pointer"
             >
               <p className="text-xs font-semibold text-[#162623]">
                 Pending payments
@@ -643,7 +643,7 @@ export default function DashboardScreen({ onNavigate }) {
             {/* Emergency Info Card */}
             <div className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/20 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined !text-[#295255] text-base">
+                <span className="material-symbols-outlined !text-[#25836F] text-base">
                   emergency
                 </span>
                 <span className="text-xs font-bold text-[#162623]">
@@ -675,7 +675,7 @@ export default function DashboardScreen({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => onNavigate("medical-records")}
-                className="text-xs font-semibold text-[#295255] hover:underline cursor-pointer"
+                className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer"
               >
                 All Records →
               </button>
@@ -689,7 +689,7 @@ export default function DashboardScreen({ onNavigate }) {
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-10 h-10 rounded-lg bg-[#F0F5F7] flex items-center justify-center">
-                      <span className="material-symbols-outlined !text-[#295255] text-xl">
+                      <span className="material-symbols-outlined !text-[#25836F] text-xl">
                         note_alt
                       </span>
                     </span>
@@ -723,7 +723,7 @@ export default function DashboardScreen({ onNavigate }) {
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-10 h-10 rounded-lg bg-[#F0F5F7] flex items-center justify-center">
-                      <span className="material-symbols-outlined !text-[#295255] text-xl">
+                      <span className="material-symbols-outlined !text-[#25836F] text-xl">
                         description
                       </span>
                     </span>
@@ -764,7 +764,7 @@ export default function DashboardScreen({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => onNavigate("notifications")}
-                className="text-xs font-semibold text-[#295255] hover:underline cursor-pointer"
+                className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer"
               >
                 View All →
               </button>
@@ -777,7 +777,7 @@ export default function DashboardScreen({ onNavigate }) {
                   className="p-3.5 rounded-xl border border-[#577877]/15 bg-white space-y-1"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#295255] px-2 py-0.5 rounded bg-[#F0F5F7]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#25836F] px-2 py-0.5 rounded bg-[#F0F5F7]">
                       {n.event_type.replace("_", " ")}
                     </span>
                     <span className="text-[11px] text-[#577877]">
@@ -807,7 +807,7 @@ export default function DashboardScreen({ onNavigate }) {
             <div className="flex items-center justify-between pb-4 border-b border-[#577877]/20">
               <div className="flex items-center gap-3">
                 <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center">
-                  <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                  <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                     verified_user
                   </span>
                 </span>

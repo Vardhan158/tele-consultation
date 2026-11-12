@@ -20,7 +20,7 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-sm font-semibold text-[#295255] shadow-sm hover:bg-[#F0F5F7] transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-sm font-semibold text-[#25836F] shadow-sm hover:bg-[#F0F5F7] transition-colors"
         >
           ← Back to Appointments
         </button>
@@ -45,7 +45,7 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
             />
           ) : !error ? (
             <div className="p-12 text-center text-[#577877] space-y-3">
-              <span className="material-symbols-outlined animate-spin text-4xl text-[#295255]">
+              <span className="material-symbols-outlined animate-spin text-4xl text-[#25836F]">
                 sync
               </span>
               <p className="text-sm font-bold text-[#162623]">

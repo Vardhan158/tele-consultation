@@ -127,7 +127,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
               onClick={() => setFilter(value)}
               className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
                 filter === value
-                  ? "bg-[#295255] text-white font-bold shadow-xs"
+                  ? "bg-[#25836F] text-white font-bold shadow-xs"
                   : "bg-white border border-[#577877]/25 text-[#577877] hover:text-[#162623]"
               }`}
             >
@@ -136,7 +136,6 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
           ))}
         </div>
       </div>
-
       {error && (
         <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-medium">
           ⚠️ {error}
@@ -144,7 +143,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
       )}
 
       {message && (
-        <div className="p-4 rounded-xl border border-teal-200 bg-teal-50 text-[#295255] text-xs font-medium">
+        <div className="p-4 rounded-xl border border-teal-200 bg-teal-50 text-[#25836F] text-xs font-medium">
           ✅ {message}
         </div>
       )}
@@ -170,7 +169,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
             return (
               <div
                 key={`${item.id}-${idx}`}
-                className="care-card p-5 rounded-2xl bg-white border border-[#577877]/15 flex flex-col lg:flex-row lg:items-center justify-between gap-4 text-xs hover:border-[#295255]/40 transition"
+                className="care-card p-5 rounded-2xl bg-white border border-[#577877]/15 flex flex-col lg:flex-row lg:items-center justify-between gap-4 text-xs hover:border-[#25836F]/40 transition"
               >
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
@@ -184,7 +183,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
                     </span>
                   </div>
 
-                  <p className="text-xs font-semibold text-[#295255]">{visitType}</p>
+                  <p className="text-xs font-semibold text-[#25836F]">{visitType}</p>
                   <p className="text-[#577877]">🗓️ {formatAptDate(item.starts_at)}</p>
 
                   {isWindowExpired && (
@@ -202,7 +201,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
                       onClick={() => onNavigate("doctor-consultation", item)}
                       className={`px-4 py-2 rounded-xl text-xs font-bold shadow transition cursor-pointer ${
                         !isWindowExpired
-                          ? "bg-[#295255] hover:bg-[#1f3f41] text-white"
+                          ? "bg-[#25836F] hover:bg-[#1d6e5d] text-white"
                           : "bg-gray-200 text-gray-500 cursor-not-allowed border border-gray-300"
                       }`}
                       title={isWindowExpired ? "Permitted joining window has expired" : "Enter video consultation"}
@@ -215,7 +214,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
                     <button
                       type="button"
                       onClick={() => openNote(item)}
-                      className="border border-[#577877]/30 bg-white px-3.5 py-2 rounded-xl font-semibold text-[#295255] hover:bg-[#F0F5F7] cursor-pointer text-xs"
+                      className="border border-[#577877]/30 bg-white px-3.5 py-2 rounded-xl font-semibold text-[#25836F] hover:bg-[#F0F5F7] cursor-pointer text-xs"
                     >
                       Clinical Note
                     </button>
@@ -253,7 +252,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
           <textarea
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
-            className="w-full min-h-32 rounded-xl border border-[#577877]/25 p-3 text-xs text-[#162623] focus:border-[#295255] focus:outline-none"
+            className="w-full min-h-32 rounded-xl border border-[#577877]/25 p-3 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
             placeholder="Document consultation findings, diagnosis, and prescription details..."
           />
 
@@ -263,7 +262,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
                 type="button"
                 disabled={!noteText.trim()}
                 onClick={saveDraft}
-                className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1f3f41] disabled:opacity-50 cursor-pointer"
+                className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
               >
                 Save Draft
               </button>
@@ -273,7 +272,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
               <button
                 type="button"
                 onClick={finalize}
-                className="rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-xs font-semibold text-[#295255] hover:bg-[#F0F5F7] cursor-pointer"
+                className="rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-xs font-semibold text-[#25836F] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 Finalize Note
               </button>
@@ -283,7 +282,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
               <button
                 type="button"
                 onClick={amend}
-                className="rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-xs font-semibold text-[#295255] hover:bg-[#F0F5F7] cursor-pointer"
+                className="rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-xs font-semibold text-[#25836F] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 Record Amendment
               </button>
@@ -295,7 +294,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
               <h3 className="font-bold text-xs text-[#162623]">Amendment History</h3>
               {amendments.map((item) => (
                 <div key={item.id} className="border-t border-[#577877]/10 py-2 text-xs space-y-0.5">
-                  <div className="font-semibold text-[#295255]">
+                  <div className="font-semibold text-[#25836F]">
                     Version {item.version} · {new Date(item.created_at).toLocaleString()}
                   </div>
                   <p className="text-[#577877]">{item.content_reference}</p>

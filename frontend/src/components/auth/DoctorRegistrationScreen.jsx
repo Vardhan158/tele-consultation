@@ -3,18 +3,18 @@ import { doctorApi } from "../../lib/api";
 
 function ClinicianBrandPanel({ onBack }) {
   return (
-    <aside className="relative hidden overflow-hidden bg-[#295255] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
+    <aside className="relative hidden overflow-hidden bg-[#25836F] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
       <div className="space-y-8 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center font-bold shadow-sm">
-              <span className="material-symbols-outlined !text-[#295255] text-2xl font-bold">
+            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#25836F] flex items-center justify-center font-bold shadow-sm">
+              <span className="material-symbols-outlined !text-[#25836F] text-2xl font-bold">
                 stethoscope
               </span>
             </div>
             <div>
               <p className="text-xl font-bold tracking-tight text-white">
-                Kaizentrix Care
+                Kaizen Care
               </p>
               <p className="text-[10px] tracking-[.18em] uppercase text-[#F0F5F7]/80 font-semibold">
                 Clinician Workspace
@@ -161,7 +161,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
         <div className="max-w-xl w-full mx-auto space-y-6">
           {/* Header Switcher Pills */}
           <div className="flex items-center justify-between">
-            <div className="inline-flex rounded-xl bg-[#295255]/10 p-1 border border-[#577877]/15">
+            <div className="inline-flex rounded-xl bg-[#25836F]/10 p-1 border border-[#577877]/15">
               <button
                 type="button"
                 onClick={onSwitchToPatientAuth || onBack}
@@ -171,7 +171,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-[#295255] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs cursor-default"
+                className="rounded-lg bg-[#25836F] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs cursor-default"
               >
                 Clinician Registration
               </button>
@@ -181,7 +181,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
               <button
                 type="button"
                 onClick={onBack}
-                className="lg:hidden text-xs font-semibold text-[#295255] hover:underline cursor-pointer flex items-center gap-1"
+                className="lg:hidden text-xs font-semibold text-[#25836F] hover:underline cursor-pointer flex items-center gap-1"
               >
                 <span className="material-symbols-outlined text-sm">arrow_back</span>
                 Home
@@ -211,7 +211,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   value={form.full_name}
                   onChange={update}
                   placeholder="Dr. Harshavardhan m v"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -226,7 +226,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   value={form.email}
                   onChange={update}
                   placeholder="doctor@clinic.com"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -241,7 +241,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   value={form.mobile_number}
                   onChange={update}
                   placeholder="+91 9876543210"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -256,7 +256,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   value={form.password}
                   onChange={update}
                   placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -271,7 +271,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   value={form.specialty}
                   onChange={update}
                   placeholder="e.g. ENT, Cardiology, Internal Medicine"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -285,8 +285,8 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   type="text"
                   value={form.clinic_name}
                   onChange={update}
-                  placeholder="Kaizentrix Care Telehealth"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  placeholder="Kaizen Care Telehealth"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -298,7 +298,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   <button
                     type="button"
                     onClick={handleAutoGenerateReg}
-                    className="text-[10px] font-bold text-[#295255] hover:underline cursor-pointer flex items-center gap-0.5"
+                    className="text-[10px] font-bold text-[#25836F] hover:underline cursor-pointer flex items-center gap-0.5"
                     title="Auto-generate registration number based on name and mobile number"
                   >
                     <span>⚡ Auto-Generate</span>
@@ -311,7 +311,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   value={form.registration_number}
                   onChange={update}
                   placeholder="KMC-HAR3210"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -327,7 +327,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   max="60"
                   value={form.experience_years}
                   onChange={update}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -342,7 +342,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   value={form.qualifications}
                   onChange={update}
                   placeholder="MBBS, MS (ENT), DNB (comma separated)"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
 
@@ -357,7 +357,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   value={form.languages}
                   onChange={update}
                   placeholder="English, Hindi, Kannada (comma separated)"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
             </div>
@@ -367,7 +367,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 className={`p-3 rounded-xl border text-xs font-medium ${
                   state === "error"
                     ? "bg-red-50 text-red-600 border-red-200"
-                    : "bg-teal-50 text-[#295255] border-teal-200"
+                    : "bg-teal-50 text-[#25836F] border-teal-200"
                 }`}
               >
                 {state === "error" ? "⚠️ " : "✅ "}
@@ -378,7 +378,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
             <button
               type="submit"
               disabled={state === "loading"}
-              className="w-full rounded-xl bg-[#295255] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1f3f41] disabled:opacity-50 cursor-pointer"
+              className="w-full rounded-xl bg-[#25836F] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
             >
               {state === "loading" ? "Submitting Registration…" : "Submit Clinician Registration"}
             </button>
@@ -389,7 +389,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
             <button
               type="button"
               onClick={onSwitchToPatientAuth || onBack}
-              className="font-bold text-[#295255] hover:underline cursor-pointer"
+              className="font-bold text-[#25836F] hover:underline cursor-pointer"
             >
               Sign in to your account
             </button>
@@ -397,7 +397,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
         </div>
 
         <footer className="pt-8 text-center text-xs text-[#577877]">
-          © 2026 Kaizentrix Care · Clinician Credentialing Workspace.
+          © 2026 Kaizen Care · Clinician Credentialing Workspace.
         </footer>
       </main>
     </div>

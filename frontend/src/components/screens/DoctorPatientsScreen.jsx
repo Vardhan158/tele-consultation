@@ -36,7 +36,7 @@ export default function DoctorPatientsScreen() {
                   .then(setSelected)
                   .catch((err) => setError(err.message))
               }
-              className="w-full text-left rounded-2xl bg-white border border-[#577877]/15 p-5 hover:border-[#295255]"
+              className="w-full text-left rounded-2xl bg-white border border-[#577877]/15 p-5 hover:border-[#25836F]"
             >
               <p className="font-semibold">{item.full_name}</p>
               <p className="text-sm text-[#577877]">

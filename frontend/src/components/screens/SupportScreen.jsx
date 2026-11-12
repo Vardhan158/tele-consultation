@@ -153,7 +153,7 @@ export default function SupportScreen({ onNavigate }) {
                   </p>
                   <p className="text-[#577877]">{ticket.id}</p>
                 </div>
-                <span className="rounded-full bg-[#E8F3F3] px-3 py-1 font-semibold text-[#295255]">
+                <span className="rounded-full bg-[#E8F3F3] px-3 py-1 font-semibold text-[#25836F]">
                   {ticket.status}
                 </span>
               </div>
@@ -182,7 +182,7 @@ export default function SupportScreen({ onNavigate }) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder='Try "reschedule" or "join a video visit"'
-                className="w-full bg-white text-[#162623] placeholder-[#577877]/70 text-xs sm:text-sm rounded-xl py-3 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-[#295255] transition shadow-sm"
+                className="w-full bg-white text-[#162623] placeholder-[#577877]/70 text-xs sm:text-sm rounded-xl py-3 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-[#25836F] transition shadow-sm"
               />
             </div>
           </div>
@@ -195,11 +195,11 @@ export default function SupportScreen({ onNavigate }) {
             onClick={() => handleCategoryClick("appointments", "appointments")}
             className={`bg-white rounded-2xl border p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-2 cursor-pointer transition ${
               selectedCategory === "appointments"
-                ? "border-[#295255] ring-2 ring-[#295255]/20"
-                : "border-[#577877]/15 hover:border-[#295255]/40"
+                ? "border-[#25836F] ring-2 ring-[#25836F]/20"
+                : "border-[#577877]/15 hover:border-[#25836F]/40"
             }`}
           >
-            <span className="material-symbols-outlined !text-[#295255] text-2xl block">
+            <span className="material-symbols-outlined !text-[#25836F] text-2xl block">
               calendar_month
             </span>
             <h3 className="text-sm sm:text-base font-bold text-[#162623] pt-1">
@@ -209,7 +209,7 @@ export default function SupportScreen({ onNavigate }) {
               Booking, changes &amp; cancellations
             </p>
             <div className="pt-2">
-              <span className="text-xs font-semibold text-[#295255] hover:underline inline-flex items-center gap-1">
+              <span className="text-xs font-semibold text-[#25836F] hover:underline inline-flex items-center gap-1">
                 Explore answers →
               </span>
             </div>
@@ -220,11 +220,11 @@ export default function SupportScreen({ onNavigate }) {
             onClick={() => handleCategoryClick("video", "appointments")}
             className={`bg-white rounded-2xl border p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-2 cursor-pointer transition ${
               selectedCategory === "video"
-                ? "border-[#295255] ring-2 ring-[#295255]/20"
-                : "border-[#577877]/15 hover:border-[#295255]/40"
+                ? "border-[#25836F] ring-2 ring-[#25836F]/20"
+                : "border-[#577877]/15 hover:border-[#25836F]/40"
             }`}
           >
-            <span className="material-symbols-outlined !text-[#295255] text-2xl block">
+            <span className="material-symbols-outlined !text-[#25836F] text-2xl block">
               videocam
             </span>
             <h3 className="text-sm sm:text-base font-bold text-[#162623] pt-1">
@@ -234,7 +234,7 @@ export default function SupportScreen({ onNavigate }) {
               Devices, connection &amp; joining
             </p>
             <div className="pt-2">
-              <span className="text-xs font-semibold text-[#295255] hover:underline inline-flex items-center gap-1">
+              <span className="text-xs font-semibold text-[#25836F] hover:underline inline-flex items-center gap-1">
                 Explore answers →
               </span>
             </div>
@@ -245,11 +245,11 @@ export default function SupportScreen({ onNavigate }) {
             onClick={() => handleCategoryClick("payments", "payments")}
             className={`bg-white rounded-2xl border p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-2 cursor-pointer transition ${
               selectedCategory === "payments"
-                ? "border-[#295255] ring-2 ring-[#295255]/20"
-                : "border-[#577877]/15 hover:border-[#295255]/40"
+                ? "border-[#25836F] ring-2 ring-[#25836F]/20"
+                : "border-[#577877]/15 hover:border-[#25836F]/40"
             }`}
           >
-            <span className="material-symbols-outlined !text-[#295255] text-2xl block">
+            <span className="material-symbols-outlined !text-[#25836F] text-2xl block">
               credit_card
             </span>
             <h3 className="text-sm sm:text-base font-bold text-[#162623] pt-1">
@@ -259,7 +259,7 @@ export default function SupportScreen({ onNavigate }) {
               Receipts, charges &amp; refunds
             </p>
             <div className="pt-2">
-              <span className="text-xs font-semibold text-[#295255] hover:underline inline-flex items-center gap-1">
+              <span className="text-xs font-semibold text-[#25836F] hover:underline inline-flex items-center gap-1">
                 Explore answers →
               </span>
             </div>
@@ -278,7 +278,7 @@ export default function SupportScreen({ onNavigate }) {
                 <button
                   type="button"
                   onClick={() => setSelectedCategory(null)}
-                  className="text-xs text-[#295255] font-semibold hover:underline cursor-pointer"
+                  className="text-xs text-[#25836F] font-semibold hover:underline cursor-pointer"
                 >
                   Clear filter
                 </button>
@@ -302,7 +302,7 @@ export default function SupportScreen({ onNavigate }) {
                         onClick={() => toggleFaq(faq.id)}
                         className="w-full flex items-center justify-between gap-4 text-left cursor-pointer group"
                       >
-                        <span className="text-xs sm:text-sm font-bold text-[#162623] group-hover:text-[#295255] transition">
+                        <span className="text-xs sm:text-sm font-bold text-[#162623] group-hover:text-[#25836F] transition">
                           {faq.question}
                         </span>
                         <span className="material-symbols-outlined text-[#577877] text-lg shrink-0">
@@ -439,7 +439,7 @@ export default function SupportScreen({ onNavigate }) {
                   <select
                     value={ticketCategory}
                     onChange={(e) => setTicketCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#295255]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F]"
                   >
                     <option value="video_connection">
                       Video &amp; audio connection
@@ -463,7 +463,7 @@ export default function SupportScreen({ onNavigate }) {
                     placeholder="Brief description of the issue"
                     value={ticketSubject}
                     onChange={(e) => setTicketSubject(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F]"
                   />
                 </div>
 
@@ -477,7 +477,7 @@ export default function SupportScreen({ onNavigate }) {
                     placeholder="Describe what happened or what assistance you need..."
                     value={ticketDescription}
                     onChange={(e) => setTicketDescription(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255] resize-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] resize-none"
                   />
                 </div>
 

@@ -181,7 +181,7 @@ export default function App() {
       return (
         <FindDoctorsScreen
           onNavigate={handleNavigate}
-          onRequireAuth={() => navigateEntry("login")}
+          onRequireAuth={() => navigateEntry("register")}
           authenticated={false}
         />
       );
