@@ -15,6 +15,7 @@ export default function KaizenTruck3D() {
 
     let animationFrameId;
     let scene, camera, renderer, model;
+    let wrapperGroup = new THREE.Group();
     let isMouseOver = false;
     let mouseX = 0;
     let mouseY = 0;
@@ -29,12 +30,13 @@ export default function KaizenTruck3D() {
 
     // 1. Scene Setup
     scene = new THREE.Scene();
+    scene.add(wrapperGroup);
 
     // 2. Camera Setup
     const width = container.clientWidth;
     const height = container.clientHeight;
     camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-    camera.position.set(0, 1.8, 7.5);
+    camera.position.set(0, 1.2, 6.5);
 
     // 3. Renderer Setup with Antialiasing & Shadow Support
     renderer = new THREE.WebGLRenderer({
@@ -101,10 +103,8 @@ export default function KaizenTruck3D() {
           const scale = 3.2 / (maxDim || 1);
           model.scale.set(scale, scale, scale);
 
-          // Center position
-          model.position.x = -center.x * scale;
-          model.position.y = -center.y * scale - 0.6;
-          model.position.z = -center.z * scale;
+          // Center position inside wrapper group
+          model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
 
           // Enable shadows and double-sided materials for high visibility
           model.traverse((child) => {
@@ -118,10 +118,7 @@ export default function KaizenTruck3D() {
             }
           });
 
-          // Set initial orientation
-          model.rotation.y = Math.PI / 4;
-
-          scene.add(model);
+          wrapperGroup.add(model);
           setLoading(false);
         },
         (xhr) => {
@@ -195,6 +192,11 @@ export default function KaizenTruck3D() {
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
+      // Poll scroll position 60fps
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      const totalHeight = (document.documentElement.scrollHeight - window.innerHeight) || 1;
+      targetScrollProgress = Math.min(Math.max(scrollY / totalHeight, 0), 1);
+
       // Smooth scroll progress lerp
       currentScrollProgress = lerp(
         currentScrollProgress,
@@ -202,23 +204,23 @@ export default function KaizenTruck3D() {
         0.06
       );
 
-      if (model) {
+      if (wrapperGroup) {
         // Target Y-rotation and X-translation based on scroll
         const targetRotY =
           Math.PI / 4 + currentScrollProgress * Math.PI * 4 + mouseX * 0.3;
         const targetRotX = (currentScrollProgress - 0.5) * 0.25 + mouseY * 0.15;
         const targetPosX = (currentScrollProgress - 0.5) * 2.2 + mouseX * 0.25;
-        const targetPosY = -0.6 + Math.sin(Date.now() * 0.0018) * 0.08;
+        const targetPosY = -0.2 + Math.sin(Date.now() * 0.0018) * 0.08;
 
         currentRotY = lerp(currentRotY, targetRotY, 0.08);
         currentRotX = lerp(currentRotX, targetRotX, 0.08);
         currentPosX = lerp(currentPosX, targetPosX, 0.06);
         currentPosY = lerp(currentPosY, targetPosY, 0.06);
 
-        model.rotation.y = currentRotY;
-        model.rotation.x = currentRotX;
-        model.position.x = currentPosX;
-        model.position.y = currentPosY;
+        wrapperGroup.rotation.y = currentRotY;
+        wrapperGroup.rotation.x = currentRotX;
+        wrapperGroup.position.x = currentPosX;
+        wrapperGroup.position.y = currentPosY;
       }
 
       renderer.render(scene, camera);
