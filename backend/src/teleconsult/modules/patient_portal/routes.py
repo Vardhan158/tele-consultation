@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from collections.abc import AsyncIterator
+from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -680,7 +681,7 @@ def _to_uuid(val: Any) -> UUID:
             return UUID(val_str)
         except ValueError:
             pass
-    raw_bytes = hashlib.md5(val_str.encode()).digest()
+    raw_bytes = hashlib.md5(val_str.encode(), usedforsecurity=False).digest()
     return UUID(bytes=raw_bytes)
 
 

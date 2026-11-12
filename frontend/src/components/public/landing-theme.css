@@ -6,14 +6,14 @@
   --font-poppins: "Poppins", sans-serif;
 
   /* The 4 Exact Core Brand Colors */
-  --color-deep-teal: #295255;
+  --color-deep-teal: #25836f;
   --color-ice-white: #f0f5f7;
   --color-dark-forest: #162623;
   --color-muted-teal: #577877;
 
   /* Semantic Application Mappings */
-  --color-primary: #295255;
-  --color-primary-container: #295255;
+  --color-primary: #25836f;
+  --color-primary-container: #25836f;
   --color-on-primary: #ffffff;
   --color-on-primary-container: #f0f5f7;
 
@@ -47,6 +47,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 80px;
+  }
   html,
   body {
     margin: 0;
@@ -56,6 +60,8 @@
     color: #162623;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
   }
 
   *,
@@ -82,3 +88,55 @@
     font-family: "Poppins", sans-serif;
   }
 }
+
+/* Lenis Smooth Scroll Engine recommended CSS */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* 60fps Smooth GPU Acceleration Utilities */
+.gpu-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+

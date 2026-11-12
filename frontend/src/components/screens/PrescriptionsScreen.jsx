@@ -239,7 +239,7 @@ export default function PrescriptionsScreen({
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-white border border-[#295255]/30 shadow-sm flex items-center justify-between text-xs text-[#295255] font-semibold">
+          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
             <span className="flex items-center gap-2">
               <span className="material-symbols-outlined text-base">
                 check_circle
@@ -276,7 +276,7 @@ export default function PrescriptionsScreen({
             onClick={handleDownloadMedList}
             className="bg-white border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer self-start sm:self-auto"
           >
-            <span className="material-symbols-outlined !text-[#295255] text-base">
+            <span className="material-symbols-outlined !text-[#25836F] text-base">
               download
             </span>
             <span>Download medication list</span>
@@ -285,7 +285,7 @@ export default function PrescriptionsScreen({
 
         {/* Top Reassurance / Safety Banner matching Screenshot */}
         <div className="p-4 sm:p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3.5">
-          <span className="material-symbols-outlined !text-[#295255] text-xl shrink-0 mt-0.5">
+          <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5">
             health_and_safety
           </span>
           <div className="text-xs space-y-0.5">
@@ -326,13 +326,13 @@ export default function PrescriptionsScreen({
                 }}
                 className={`transition pb-3 relative cursor-pointer ${
                   isTabActive
-                    ? "text-[#295255] font-bold"
+                    ? "text-[#25836F] font-bold"
                     : "text-[#577877] hover:text-[#162623]"
                 }`}
               >
                 <span>{tab.label}</span>
                 {isTabActive && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#295255] rounded-full" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#25836F] rounded-full" />
                 )}
               </button>
             );
@@ -354,8 +354,8 @@ export default function PrescriptionsScreen({
                     {/* Header Row: Pill icon + Name + Subtitle + Badge */}
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-[#E0F0EC] text-[#295255] flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined !text-[#295255] text-xl">
+                        <div className="w-10 h-10 rounded-xl bg-[#E0F0EC] text-[#25836F] flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined !text-[#25836F] text-xl">
                             pill
                           </span>
                         </div>
@@ -377,12 +377,12 @@ export default function PrescriptionsScreen({
                           </span>
                         )}
                         {med.statusType === "active" && (
-                          <span className="inline-block text-xs font-semibold px-3 py-1 rounded-full bg-[#E8F3F3] text-[#295255]">
+                          <span className="inline-block text-xs font-semibold px-3 py-1 rounded-full bg-[#E8F3F3] text-[#25836F]">
                             {med.statusBadge}
                           </span>
                         )}
                         {med.statusType === "neutral" && (
-                          <span className="inline-block text-xs font-semibold px-3 py-1 rounded-full bg-[#E8F3F3] text-[#295255]">
+                          <span className="inline-block text-xs font-semibold px-3 py-1 rounded-full bg-[#E8F3F3] text-[#25836F]">
                             {med.statusBadge}
                           </span>
                         )}
@@ -520,8 +520,8 @@ export default function PrescriptionsScreen({
             {/* TAB: REFILL REQUESTS */}
             {currentMode === "prescriptions" && activeSubTab === "refills" && (
               <div className="care-card p-8 rounded-2xl bg-white border border-[#577877]/15 text-center space-y-3">
-                <span className="w-12 h-12 rounded-full bg-[#E0F0EC] text-[#295255] flex items-center justify-center mx-auto">
-                  <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="w-12 h-12 rounded-full bg-[#E0F0EC] text-[#25836F] flex items-center justify-center mx-auto">
+                  <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                     autorenew
                   </span>
                 </span>
@@ -575,7 +575,7 @@ export default function PrescriptionsScreen({
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-[#F0F5F7] text-xs text-[#162623] leading-relaxed space-y-1">
-                      <span className="font-bold text-[#295255]">
+                      <span className="font-bold text-[#25836F]">
                         Clinical Assessment:
                       </span>
                       <p className="text-[#577877]">{sum.notes}</p>
@@ -621,7 +621,7 @@ export default function PrescriptionsScreen({
 
               {/* Pin icon + Pharmacy Details */}
               <div className="space-y-1.5 pt-1">
-                <span className="material-symbols-outlined !text-[#295255] text-xl block">
+                <span className="material-symbols-outlined !text-[#25836F] text-xl block">
                   location_on
                 </span>
                 <h4 className="font-bold text-sm text-[#162623] pt-1">
@@ -698,7 +698,7 @@ export default function PrescriptionsScreen({
           <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   medication
                 </span>
                 <div>
@@ -752,7 +752,7 @@ export default function PrescriptionsScreen({
               </div>
               <div className="flex justify-between">
                 <span className="text-[#577877]">Pharmacy:</span>
-                <span className="font-semibold text-[#295255]">
+                <span className="font-semibold text-[#25836F]">
                   {pharmacy.name}
                 </span>
               </div>
@@ -797,7 +797,7 @@ export default function PrescriptionsScreen({
           <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   autorenew
                 </span>
                 <h3 className="text-base font-bold text-[#162623]">
@@ -828,7 +828,7 @@ export default function PrescriptionsScreen({
               </div>
               <div className="flex justify-between">
                 <span className="text-[#577877]">Fulfillment Pharmacy:</span>
-                <span className="font-semibold text-[#295255]">
+                <span className="font-semibold text-[#25836F]">
                   {pharmacy.name}
                 </span>
               </div>
@@ -871,7 +871,7 @@ export default function PrescriptionsScreen({
           <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   local_pharmacy
                 </span>
                 <h3 className="text-base font-bold text-[#162623]">
@@ -922,8 +922,8 @@ export default function PrescriptionsScreen({
                     }}
                     className={`p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
                       isSelected
-                        ? "border-2 border-[#295255] bg-[#E8F3F3]"
-                        : "border-[#577877]/20 hover:border-[#295255] bg-white"
+                        ? "border-2 border-[#25836F] bg-[#E8F3F3]"
+                        : "border-[#577877]/20 hover:border-[#25836F] bg-white"
                     }`}
                   >
                     <div>
@@ -934,7 +934,7 @@ export default function PrescriptionsScreen({
                       <p className="text-[#577877] text-[11px]">{p.phone}</p>
                     </div>
                     {isSelected && (
-                      <span className="material-symbols-outlined !text-[#295255] text-lg">
+                      <span className="material-symbols-outlined !text-[#25836F] text-lg">
                         check_circle
                       </span>
                     )}

@@ -145,7 +145,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                 Clinical Teleconsultation
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs text-[#295255] font-semibold">
+              <span className="text-xs text-[#25836F] font-semibold">
                 WebRTC 256-Bit TLS Secured
               </span>
             </div>
@@ -160,7 +160,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
 
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#577877]/20 text-xs font-semibold text-[#162623] shadow-sm">
-              <span className="material-symbols-outlined !text-[#295255] text-base">
+              <span className="material-symbols-outlined !text-[#25836F] text-base">
                 verified
               </span>
               Dr. Sarah Chen, MD
@@ -195,7 +195,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                     <p className="text-xs">Camera is currently disabled</p>
                   </div>
                 ) : (
-                  <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-tr from-[#162623] to-[#295255]">
+                  <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-tr from-[#162623] to-[#25836F]">
                     <div className="text-center text-white space-y-2">
                       <div className="w-20 h-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mx-auto text-2xl font-bold">
                         EM
@@ -239,7 +239,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                     key={d.label}
                     className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/20 text-center space-y-1"
                   >
-                    <span className="material-symbols-outlined !text-[#295255] text-xl">
+                    <span className="material-symbols-outlined !text-[#25836F] text-xl">
                       {d.icon}
                     </span>
                     <p className="text-xs font-semibold text-[#162623]">
@@ -258,7 +258,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   onClick={handleTestDevices}
                   className="btn-secondary text-xs"
                 >
-                  <span className="material-symbols-outlined !text-[#295255] text-base">
+                  <span className="material-symbols-outlined !text-[#25836F] text-base">
                     autorenew
                   </span>
                   Re-test Devices
@@ -316,7 +316,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#577877]">Consultation Mode:</span>
-                  <span className="font-semibold text-[#295255]">
+                  <span className="font-semibold text-[#25836F]">
                     Direct Encrypted Video
                   </span>
                 </div>
@@ -345,14 +345,14 @@ export default function VideoConsultationScreen({ onNavigate }) {
         {/* PHASE 2: Waiting Room Admission */}
         {roomState === "WAITING_ROOM" && (
           <div className="care-card p-8 sm:p-12 max-w-2xl mx-auto text-center space-y-6">
-            <div className="w-16 h-16 rounded-full bg-[#F0F5F7] border border-[#295255]/30 flex items-center justify-center mx-auto animate-pulse">
-              <span className="material-symbols-outlined !text-[#295255] text-4xl">
+            <div className="w-16 h-16 rounded-full bg-[#F0F5F7] border border-[#25836F]/30 flex items-center justify-center mx-auto animate-pulse">
+              <span className="material-symbols-outlined !text-[#25836F] text-4xl">
                 hourglass_top
               </span>
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#F0F5F7] text-[#295255] uppercase tracking-wider">
+              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#F0F5F7] text-[#25836F] uppercase tracking-wider">
                 Private Waiting Room Active
               </span>
               <h2 className="text-2xl font-bold text-[#162623]">
@@ -371,7 +371,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#577877]">Estimated Wait Time:</span>
-                <span className="font-bold text-[#295255]">Under 1 minute</span>
+                <span className="font-bold text-[#25836F]">Under 1 minute</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[#577877]">Room Encryption:</span>
@@ -435,7 +435,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   </div>
 
                   {/* Picture-in-Picture Local Patient View */}
-                  <div className="absolute bottom-4 right-4 w-36 sm:w-44 aspect-video rounded-xl bg-[#295255] border-2 border-white/60 shadow-lg overflow-hidden flex items-center justify-center">
+                  <div className="absolute bottom-4 right-4 w-36 sm:w-44 aspect-video rounded-xl bg-[#25836F] border-2 border-white/60 shadow-lg overflow-hidden flex items-center justify-center">
                     {cameraOff ? (
                       <div className="text-center text-white/70">
                         <span className="material-symbols-outlined text-lg">
@@ -444,7 +444,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                         <p className="text-[9px]">Camera Off</p>
                       </div>
                     ) : (
-                      <div className="relative w-full h-full bg-gradient-to-tr from-[#162623] to-[#295255] flex items-center justify-center text-white">
+                      <div className="relative w-full h-full bg-gradient-to-tr from-[#162623] to-[#25836F] flex items-center justify-center text-white">
                         <span className="text-xs font-semibold">
                           Emma (You)
                         </span>
@@ -465,7 +465,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   className={`p-3.5 rounded-xl transition ${
                     muted
                       ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-[#F0F5F7] text-[#295255] hover:bg-[#295255] hover:text-white"
+                      : "bg-[#F0F5F7] text-[#25836F] hover:bg-[#25836F] hover:text-white"
                   }`}
                   title={muted ? "Unmute microphone" : "Mute microphone"}
                 >
@@ -480,7 +480,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   className={`p-3.5 rounded-xl transition ${
                     cameraOff
                       ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-[#F0F5F7] text-[#295255] hover:bg-[#295255] hover:text-white"
+                      : "bg-[#F0F5F7] text-[#25836F] hover:bg-[#25836F] hover:text-white"
                   }`}
                   title={cameraOff ? "Turn camera on" : "Turn camera off"}
                 >
@@ -494,7 +494,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   onClick={() =>
                     alert("Screen sharing enabled for consultation review.")
                   }
-                  className="p-3.5 rounded-xl bg-[#F0F5F7] text-[#295255] hover:bg-[#295255] hover:text-white transition"
+                  className="p-3.5 rounded-xl bg-[#F0F5F7] text-[#25836F] hover:bg-[#25836F] hover:text-white transition"
                   title="Share screen / report"
                 >
                   <span className="material-symbols-outlined text-xl">
@@ -530,7 +530,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                     onClick={() => setActiveSideTab(tab.id)}
                     className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
                       activeSideTab === tab.id
-                        ? "bg-[#295255] text-white shadow-sm"
+                        ? "bg-[#25836F] text-white shadow-sm"
                         : "text-[#577877] hover:text-[#162623]"
                     }`}
                   >
@@ -552,7 +552,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                           key={i}
                           className={`p-3 rounded-xl text-xs space-y-1 ${
                             msg.sender.includes("You")
-                              ? "bg-[#295255] text-white ml-6"
+                              ? "bg-[#25836F] text-white ml-6"
                               : "bg-[#F0F5F7] text-[#162623] mr-6 border border-[#577877]/15"
                           }`}
                         >
@@ -574,7 +574,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                         value={inputMessage}
                         onChange={(e) => setInputMessage(e.target.value)}
                         placeholder="Type a clinical question…"
-                        className="flex-1 px-3 py-2 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                        className="flex-1 px-3 py-2 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                       />
                       <button
                         type="submit"
@@ -679,14 +679,14 @@ export default function VideoConsultationScreen({ onNavigate }) {
         {/* PHASE 4: Consultation Ended Summary */}
         {roomState === "ENDED" && (
           <div className="care-card p-8 sm:p-12 max-w-xl mx-auto text-center space-y-6">
-            <div className="w-16 h-16 rounded-full bg-[#F0F5F7] border border-[#295255]/30 flex items-center justify-center mx-auto">
-              <span className="material-symbols-outlined !text-[#295255] text-4xl">
+            <div className="w-16 h-16 rounded-full bg-[#F0F5F7] border border-[#25836F]/30 flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined !text-[#25836F] text-4xl">
                 task_alt
               </span>
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#F0F5F7] text-[#295255] uppercase tracking-wider">
+              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#F0F5F7] text-[#25836F] uppercase tracking-wider">
                 Consultation Concluded
               </span>
               <h2 className="text-2xl font-bold text-[#162623]">

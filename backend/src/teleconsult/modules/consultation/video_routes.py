@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, UTC
+from collections.abc import AsyncIterator
 import secrets
 from uuid import UUID
 

@@ -3,6 +3,8 @@ on: [pull_request, push]
 jobs:
   scans:
     runs-on: ubuntu-latest
+    env:
+      UV_CACHE_DIR: ${{ runner.temp }}/uv-cache
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -10,7 +12,7 @@ jobs:
       - name: SAST (bandit)
         run: cd backend && uv sync --frozen && uv run bandit -r src -ll
       - name: Dependency vulnerabilities
-        run: cd backend && uv run pip-audit
+        run: cd backend && uv run pip-audit --cache-dir "$RUNNER_TEMP/pip-audit-cache"
       - name: Secret scan
         uses: gitleaks/gitleaks-action@v2
       - name: Container scan (build then scan)

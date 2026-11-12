@@ -11,7 +11,7 @@ export default function AboutUsScreen() {
     <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623]">
       <PublicNavbar />
       <main>
-        <section className="bg-[#295255] px-6 py-20 text-white lg:px-10 lg:py-28">
+        <section className="bg-[#25836F] px-6 py-20 text-white lg:px-10 lg:py-28">
           <div className="mx-auto max-w-4xl text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F0F5F7]/75">About Kaizentrix Care</p>
             <h1 className="mt-4 text-4xl font-bold leading-tight text-white sm:text-5xl">Care that feels connected, personal, and clear.</h1>
@@ -30,7 +30,7 @@ export default function AboutUsScreen() {
             <p className="text-xs font-semibold uppercase tracking-wider text-[#577877]">The platform</p>
             <h3 className="mt-3 text-xl font-bold text-[#162623]">One place for your healthcare journey</h3>
             <div className="mt-6 space-y-4 text-sm text-[#577877]">
-              {['Find care specialists by what matters to you', 'Choose appointment times that fit your life', 'Meet your care team through a simple patient portal', 'Keep follow-up details close at hand'].map((item) => <div key={item} className="flex items-start gap-3"><span className="material-symbols-outlined !text-[#295255] text-lg">check_circle</span><span>{item}</span></div>)}
+              {['Find care specialists by what matters to you', 'Choose appointment times that fit your life', 'Meet your care team through a simple patient portal', 'Keep follow-up details close at hand'].map((item) => <div key={item} className="flex items-start gap-3"><span className="material-symbols-outlined !text-[#25836F] text-lg">check_circle</span><span>{item}</span></div>)}
             </div>
           </div>
         </section>
@@ -38,7 +38,7 @@ export default function AboutUsScreen() {
         <section className="border-y border-[#577877]/15 bg-white px-6 py-20 lg:px-10">
           <div className="mx-auto max-w-7xl">
             <div className="max-w-2xl"><span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">What guides us</span><h2 className="mt-3 text-2xl font-bold text-[#162623] sm:text-3xl">Built around the patient experience</h2></div>
-            <div className="mt-10 grid gap-6 md:grid-cols-3">{principles.map((principle) => <article key={principle.title} className="rounded-2xl border border-[rgba(87,120,119,0.15)] bg-[#F0F5F7] p-6"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white"><span className="material-symbols-outlined !text-[#295255]">{principle.icon}</span></span><h3 className="mt-5 text-base font-bold text-[#162623]">{principle.title}</h3><p className="mt-2 text-xs leading-relaxed text-[#577877]">{principle.description}</p></article>)}</div>
+            <div className="mt-10 grid gap-6 md:grid-cols-3">{principles.map((principle) => <article key={principle.title} className="rounded-2xl border border-[rgba(87,120,119,0.15)] bg-[#F0F5F7] p-6"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white"><span className="material-symbols-outlined !text-[#25836F]">{principle.icon}</span></span><h3 className="mt-5 text-base font-bold text-[#162623]">{principle.title}</h3><p className="mt-2 text-xs leading-relaxed text-[#577877]">{principle.description}</p></article>)}</div>
           </div>
         </section>
       </main>

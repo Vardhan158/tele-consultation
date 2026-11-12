@@ -7,7 +7,7 @@ const tabs = [
   ['audit', 'Audit logs'], ['settings', 'Clinic settings'],
 ];
 
-function Card({ label, value }) { return <div className="rounded-2xl bg-white border border-[#577877]/15 p-5"><p className="text-xs uppercase tracking-wide text-[#577877]">{label}</p><p className="mt-2 text-3xl font-bold text-[#295255]">{value ?? '—'}</p></div>; }
+function Card({ label, value }) { return <div className="rounded-2xl bg-white border border-[#577877]/15 p-5"><p className="text-xs uppercase tracking-wide text-[#577877]">{label}</p><p className="mt-2 text-3xl font-bold text-[#25836F]">{value ?? '—'}</p></div>; }
 
 export default function ClinicAdminScreen() {
   const [tab, setTab] = useState('dashboard'); const [data, setData] = useState(null); const [items, setItems] = useState([]); const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false); const [settings, setSettings] = useState({ name: '', contact_email: '', contact_phone: '', timezone: 'Asia/Calcutta', specialties: [], operating_hours: {}, holidays: [] });

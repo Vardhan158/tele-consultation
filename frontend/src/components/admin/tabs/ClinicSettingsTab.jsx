@@ -223,11 +223,11 @@ export default function ClinicSettingsTab() {
               <label className="block text-xs font-semibold text-[#162623]">{title}</label>
               <div className="flex max-w-lg gap-2">
                 <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs" />
-                <button type="button" onClick={() => addBookingOption(key, value, setValue)} className="rounded-xl bg-[#295255] px-3 py-2 text-xs font-semibold text-white">Add</button>
+                <button type="button" onClick={() => addBookingOption(key, value, setValue)} className="rounded-xl bg-[#25836F] px-3 py-2 text-xs font-semibold text-white">Add</button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {form[key].map((option, index) => (
-                  <span key={`${option.label}-${index}`} className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs ${option.enabled ? "border-[#295255]/20 bg-[#E8F3F3] text-[#295255]" : "border-[#577877]/15 bg-[#F0F5F7] text-[#577877] line-through"}`}>
+                  <span key={`${option.label}-${index}`} className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs ${option.enabled ? "border-[#25836F]/20 bg-[#E8F3F3] text-[#25836F]" : "border-[#577877]/15 bg-[#F0F5F7] text-[#577877] line-through"}`}>
                     {option.label}
                     <button type="button" onClick={() => setForm((curr) => ({ ...curr, [key]: curr[key].map((item, itemIndex) => itemIndex === index ? { ...item, enabled: !item.enabled } : item) }))} className="font-semibold no-underline">{option.enabled ? "Disable" : "Enable"}</button>
                     <button type="button" onClick={() => setForm((curr) => ({ ...curr, [key]: curr[key].filter((_, itemIndex) => itemIndex !== index) }))} className="font-bold text-rose-700">×</button>
@@ -258,7 +258,7 @@ export default function ClinicSettingsTab() {
             <button
               type="button"
               onClick={handleAddAdmin}
-              className="rounded-xl bg-[#295255] px-3.5 py-2 text-xs font-semibold text-white shrink-0 cursor-pointer"
+              className="rounded-xl bg-[#25836F] px-3.5 py-2 text-xs font-semibold text-white shrink-0 cursor-pointer"
             >
               Add Admin
             </button>
@@ -268,7 +268,7 @@ export default function ClinicSettingsTab() {
             {form.authorized_administrators.map((email) => (
               <span
                 key={email}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#F0F5F7] px-2.5 py-1 text-xs font-semibold text-[#295255] border border-[#577877]/15"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#F0F5F7] px-2.5 py-1 text-xs font-semibold text-[#25836F] border border-[#577877]/15"
               >
                 {email}
                 {form.authorized_administrators.length > 1 && (
@@ -297,7 +297,7 @@ export default function ClinicSettingsTab() {
                 type="checkbox"
                 checked={form.email_alerts_new_doctor}
                 onChange={(e) => setForm({ ...form, email_alerts_new_doctor: e.target.checked })}
-                className="rounded text-[#295255]"
+                className="rounded text-[#25836F]"
               />
               Email alerts when a new clinician registers and awaits approval
             </label>
@@ -307,7 +307,7 @@ export default function ClinicSettingsTab() {
                 type="checkbox"
                 checked={form.email_alerts_daily_summary}
                 onChange={(e) => setForm({ ...form, email_alerts_daily_summary: e.target.checked })}
-                className="rounded text-[#295255]"
+                className="rounded text-[#25836F]"
               />
               Daily operational summary report email (booking counts & revenue)
             </label>
@@ -317,7 +317,7 @@ export default function ClinicSettingsTab() {
                 type="checkbox"
                 checked={form.email_alerts_payment_failures}
                 onChange={(e) => setForm({ ...form, email_alerts_payment_failures: e.target.checked })}
-                className="rounded text-[#295255]"
+                className="rounded text-[#25836F]"
               />
               Immediate notification alerts on payment gateway failures or refunds
             </label>
@@ -327,7 +327,7 @@ export default function ClinicSettingsTab() {
         <div className="pt-2 text-right">
           <button
             disabled={saving}
-            className="rounded-xl bg-[#295255] px-6 py-2.5 text-xs font-semibold text-white shadow transition hover:bg-[#1f3f41] disabled:opacity-50 cursor-pointer"
+            className="rounded-xl bg-[#25836F] px-6 py-2.5 text-xs font-semibold text-white shadow transition hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
           >
             {saving ? "Saving…" : "Save Clinic Settings"}
           </button>

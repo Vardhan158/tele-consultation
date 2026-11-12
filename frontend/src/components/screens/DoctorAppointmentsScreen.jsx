@@ -85,7 +85,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
         )}
       </div>
       {error && <p className="rounded-xl bg-white p-4 text-red-700">{error}</p>}
-      {message && <p className="text-sm text-[#295255]">{message}</p>}
+      {message && <p className="text-sm text-[#25836F]">{message}</p>}
       {visible.length === 0 && (
         <div className="rounded-2xl bg-white p-8 text-[#577877]">
           No {filter === "all" ? "" : `${filter.replace("_", " ")} `}

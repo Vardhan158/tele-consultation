@@ -147,12 +147,7 @@ export default function FindDoctorsScreen({
     ],
     visit_formats: ["Video consultation", "Audio consultation"],
   });
-  const [bookingOptionsLoading, setBookingOptionsLoading] = useState(false);
-  const [bookingOptionsError, setBookingOptionsError] = useState("");
-
   useEffect(() => {
-    setBookingOptionsLoading(true);
-    setBookingOptionsError("");
     patientApi
       .bookingOptions()
       .then((data) => {
@@ -160,12 +155,7 @@ export default function FindDoctorsScreen({
           setBookingOptions(data);
         }
       })
-      .catch((err) => {
-        setBookingOptionsError(
-          err.message || "Failed to load booking options",
-        );
-      })
-      .finally(() => setBookingOptionsLoading(false));
+      .catch(() => {});
   }, []);
 
   const [patientProfile, setPatientProfile] = useState(null);
@@ -250,10 +240,9 @@ export default function FindDoctorsScreen({
       const dateParts = new Intl.DateTimeFormat("en-US", {
         timeZone: timezone,
         year: "numeric",
-        month: "numeric",
+        month: "long",
         day: "numeric",
         weekday: "short",
-        month: "long",
       }).formatToParts(slotDate);
       const dateFields = Object.fromEntries(
         dateParts.map(({ type, value }) => [type, value]),
@@ -428,7 +417,7 @@ export default function FindDoctorsScreen({
         handler: async function (response) {
           try {
             setBookingLoading(true);
-            const verified = await patientApi.verifyPayment({
+            await patientApi.verifyPayment({
               payment_id: orderRes.payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
@@ -461,7 +450,7 @@ export default function FindDoctorsScreen({
           email: patientProfile?.email || "patient@teleconsult.local",
         },
         theme: {
-          color: "#295255",
+          color: "#25836F",
         },
       };
 
@@ -477,7 +466,7 @@ export default function FindDoctorsScreen({
   return (
     <div className="space-y-6 font-sans text-[#162623]">
       {/* Header Banner */}
-      <div className="care-card p-6 sm:p-8 bg-gradient-to-r from-[#295255] to-[#162623] text-white">
+      <div className="care-card p-6 sm:p-8 bg-gradient-to-r from-[#25836F] to-[#162623] text-white">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
           Find Doctors &amp; Specialists
         </h1>
@@ -510,7 +499,7 @@ export default function FindDoctorsScreen({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Doctor name, specialty, or clinic…"
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
               />
             </div>
 
@@ -527,7 +516,7 @@ export default function FindDoctorsScreen({
                       type="checkbox"
                       checked={selectedSpecialties.includes(spec)}
                       onChange={() => toggleSpecialty(spec)}
-                      className="rounded border-[#577877]/30 text-[#295255]"
+                      className="rounded border-[#577877]/30 text-[#25836F]"
                     />
                     <span>{spec}</span>
                   </label>
@@ -549,7 +538,7 @@ export default function FindDoctorsScreen({
                       name="availability"
                       checked={availabilityFilter === af}
                       onChange={() => setAvailabilityFilter(af)}
-                      className="text-[#295255]"
+                      className="text-[#25836F]"
                     />
                     <span>{af}</span>
                   </label>
@@ -570,7 +559,7 @@ export default function FindDoctorsScreen({
                       type="checkbox"
                       checked={selectedLanguages.includes(lang)}
                       onChange={() => toggleLanguage(lang)}
-                      className="rounded border-[#577877]/30 text-[#295255]"
+                      className="rounded border-[#577877]/30 text-[#25836F]"
                     />
                     <span>{lang}</span>
                   </label>
@@ -618,10 +607,10 @@ export default function FindDoctorsScreen({
           ) : (
             <div className="space-y-4">
               {paginatedDoctors.map((doc) => (
-                <div key={doc.id} className="care-card p-6 transition hover:border-[#295255]/40 space-y-4">
+                <div key={doc.id} className="care-card p-6 transition hover:border-[#25836F]/40 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div className="flex gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-[#295255] text-white flex items-center justify-center text-lg font-bold shadow-sm shrink-0">
+                      <div className="w-14 h-14 rounded-2xl bg-[#25836F] text-white flex items-center justify-center text-lg font-bold shadow-sm shrink-0">
                         {doc.fullName
                           .split(/\s+/)
                           .map((n) => n[0])
@@ -637,7 +626,7 @@ export default function FindDoctorsScreen({
                             verified
                           </span>
                         </div>
-                        <div className="text-xs font-semibold text-[#295255]">{doc.specialty}</div>
+                        <div className="text-xs font-semibold text-[#25836F]">{doc.specialty}</div>
                         <div className="text-xs text-[#577877]">{doc.clinic}</div>
                         <div className="text-[11px] text-[#577877]">
                           Languages: {doc.languages.join(", ") || "English"}
@@ -646,7 +635,7 @@ export default function FindDoctorsScreen({
                     </div>
 
                     <div className="text-right space-y-1 sm:self-center shrink-0">
-                      <div className="text-lg font-bold text-[#295255]">{doc.feeDisplay}</div>
+                      <div className="text-lg font-bold text-[#25836F]">{doc.feeDisplay}</div>
                       <div className="text-[11px] text-[#577877]">Next available:</div>
                       <div className="text-xs font-semibold text-[#162623]">{doc.nextSlotLabel}</div>
                     </div>
@@ -660,7 +649,7 @@ export default function FindDoctorsScreen({
                     <button
                       type="button"
                       onClick={() => startBooking(doc)}
-                      className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1f3f41] cursor-pointer"
+                      className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] cursor-pointer"
                     >
                       Book Appointment
                     </button>
@@ -678,14 +667,14 @@ export default function FindDoctorsScreen({
                     <button
                       disabled={page === 1}
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#295255] disabled:opacity-40"
+                      className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] disabled:opacity-40"
                     >
                       Previous
                     </button>
                     <button
                       disabled={page === totalPages}
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#295255] disabled:opacity-40"
+                      className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] disabled:opacity-40"
                     >
                       Next
                     </button>
@@ -703,7 +692,7 @@ export default function FindDoctorsScreen({
           <div className="care-card max-w-3xl w-full p-6 space-y-6 shadow-2xl my-8">
             <div className="flex items-center justify-between border-b border-[#577877]/15 pb-4">
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-[#295255]">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#25836F]">
                   Schedule Teleconsultation
                 </span>
                 <h3 className="text-lg font-bold text-[#162623]">
@@ -728,7 +717,7 @@ export default function FindDoctorsScreen({
                   <select
                     value={appointmentType}
                     onChange={(e) => setAppointmentType(e.target.value)}
-                    className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#295255] focus:outline-none"
+                    className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
                   >
                     <option value="" disabled>Select appointment type</option>
                     {(bookingOptions.appointment_types || []).map((type) => (
@@ -745,7 +734,7 @@ export default function FindDoctorsScreen({
                   <select
                     value={visitFormat}
                     onChange={(e) => setVisitFormat(e.target.value)}
-                    className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#295255] focus:outline-none"
+                    className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
                   >
                     <option value="" disabled>Select visit format</option>
                     {(bookingOptions.visit_formats || []).map((fmt) => (
@@ -780,8 +769,8 @@ export default function FindDoctorsScreen({
                           onClick={() => setSelectedTimeSlot(slotTime)}
                           className={`py-2 px-3 rounded-xl text-center text-xs font-semibold transition cursor-pointer ${
                             isSelected
-                              ? "bg-[#295255] text-white shadow-xs font-bold"
-                              : "border border-[#577877]/25 bg-white text-[#162623] hover:border-[#295255]"
+                              ? "bg-[#25836F] text-white shadow-xs font-bold"
+                              : "border border-[#577877]/25 bg-white text-[#162623] hover:border-[#25836F]"
                           }`}
                         >
                           {slotTime}
@@ -800,7 +789,7 @@ export default function FindDoctorsScreen({
                       value={visitReason}
                       onChange={(e) => setVisitReason(e.target.value)}
                       placeholder="Briefly describe your symptoms or visit reason…"
-                      className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+                      className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
                     />
                   </div>
 
@@ -810,7 +799,7 @@ export default function FindDoctorsScreen({
                       value={doctorNotes}
                       onChange={(e) => setDoctorNotes(e.target.value)}
                       placeholder="Medical history or questions for the doctor…"
-                      className="w-full rounded-xl border border-[#577877]/25 p-3 text-xs h-20 focus:border-[#295255] focus:outline-none"
+                      className="w-full rounded-xl border border-[#577877]/25 p-3 text-xs h-20 focus:border-[#25836F] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -818,7 +807,7 @@ export default function FindDoctorsScreen({
 
               {/* Right Column: Booking Summary & Razorpay Action */}
               <div className="space-y-4 rounded-2xl bg-[#F0F5F7] p-5 border border-[#577877]/15">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#295255]">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#25836F]">
                   Booking Review &amp; Fee Breakdown
                 </h4>
 
@@ -869,7 +858,7 @@ export default function FindDoctorsScreen({
                         : "Fee unavailable"}
                     </strong>
                   </div>
-                  <div className="flex justify-between border-t border-[#577877]/15 pt-2 text-sm font-bold text-[#295255]">
+                  <div className="flex justify-between border-t border-[#577877]/15 pt-2 text-sm font-bold text-[#25836F]">
                     <span>Total Payable</span>
                     <strong>
                       {bookingPricing
@@ -891,7 +880,7 @@ export default function FindDoctorsScreen({
                       type="checkbox"
                       checked={policyAgreed}
                       onChange={(e) => setPolicyAgreed(e.target.checked)}
-                      className="mt-0.5 rounded text-[#295255]"
+                      className="mt-0.5 rounded text-[#25836F]"
                     />
                     <span>I agree to the 24-hour appointment cancellation policy.</span>
                   </label>
@@ -901,7 +890,7 @@ export default function FindDoctorsScreen({
                       type="checkbox"
                       checked={consentGranted}
                       onChange={(e) => setConsentGranted(e.target.checked)}
-                      className="mt-0.5 rounded text-[#295255]"
+                      className="mt-0.5 rounded text-[#25836F]"
                     />
                     <span>I grant consent for telehealth consultation &amp; data processing.</span>
                   </label>
@@ -925,7 +914,7 @@ export default function FindDoctorsScreen({
                     bookingLoading
                   }
                   onClick={handleConfirmBooking}
-                  className="w-full rounded-xl bg-[#295255] py-3 text-xs font-bold text-white shadow hover:bg-[#1f3f41] disabled:opacity-40 cursor-pointer"
+                  className="w-full rounded-xl bg-[#25836F] py-3 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] disabled:opacity-40 cursor-pointer"
                 >
                   {bookingLoading
                     ? "Initiating Razorpay Checkout…"
@@ -960,7 +949,7 @@ export default function FindDoctorsScreen({
               </div>
               <div className="flex justify-between">
                 <span className="text-[#577877]">Attending Doctor:</span>
-                <span className="font-bold text-[#295255]">
+                <span className="font-bold text-[#25836F]">
                   {paymentConfirmationData.doctor?.full_name || paymentConfirmationData.doctor?.fullName} ({paymentConfirmationData.doctor?.specialty})
                 </span>
               </div>
@@ -982,7 +971,7 @@ export default function FindDoctorsScreen({
                   ₹{(paymentConfirmationData.platform_fee_paise / 100).toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between border-t border-[#577877]/15 pt-2 text-sm font-bold text-[#295255]">
+              <div className="flex justify-between border-t border-[#577877]/15 pt-2 text-sm font-bold text-[#25836F]">
                 <span>Total Amount Paid:</span>
                 <span>
                   ₹{(paymentConfirmationData.amount_paise / 100).toFixed(2)}
@@ -1000,7 +989,7 @@ export default function FindDoctorsScreen({
                   setPaymentConfirmationData(null);
                   onNavigate("appointments");
                 }}
-                className="w-full rounded-xl bg-[#295255] py-3 text-xs font-bold text-white shadow hover:bg-[#1f3f41] cursor-pointer"
+                className="w-full rounded-xl bg-[#25836F] py-3 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] cursor-pointer"
               >
                 Go to My Appointments
               </button>

@@ -132,7 +132,7 @@ export default function SettingsScreen({ onNavigate }) {
             onClick={() => setActiveTab("account")}
             className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
               activeTab === "account"
-                ? "text-[#295255] border-b-2 border-[#295255]"
+                ? "text-[#25836F] border-b-2 border-[#25836F]"
                 : "text-[#577877] hover:text-[#162623]"
             }`}
           >
@@ -144,7 +144,7 @@ export default function SettingsScreen({ onNavigate }) {
             onClick={() => setActiveTab("accessibility")}
             className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
               activeTab === "accessibility"
-                ? "text-[#295255] border-b-2 border-[#295255]"
+                ? "text-[#25836F] border-b-2 border-[#25836F]"
                 : "text-[#577877] hover:text-[#162623]"
             }`}
           >
@@ -158,7 +158,7 @@ export default function SettingsScreen({ onNavigate }) {
             }
             className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
               activeTab === "privacy"
-                ? "text-[#295255] border-b-2 border-[#295255]"
+                ? "text-[#25836F] border-b-2 border-[#25836F]"
                 : "text-[#577877] hover:text-[#162623]"
             }`}
           >
@@ -236,7 +236,7 @@ export default function SettingsScreen({ onNavigate }) {
                       Add a one-time code at login for another layer of
                       protection.
                     </p>
-                    <span className="bg-[#E8F3F3] text-[#295255] text-xs font-medium px-2.5 py-0.5 rounded-full mt-2 inline-block">
+                    <span className="bg-[#E8F3F3] text-[#25836F] text-xs font-medium px-2.5 py-0.5 rounded-full mt-2 inline-block">
                       {twoStepEnabled ? "Enabled" : "Not enabled"}
                     </span>
                   </div>
@@ -247,7 +247,7 @@ export default function SettingsScreen({ onNavigate }) {
                     onClick={() => setTwoStepEnabled(!twoStepEnabled)}
                     aria-label="Toggle two-step verification"
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none mt-1 ${
-                      twoStepEnabled ? "bg-[#295255]" : "bg-[#E5E7EB]"
+                      twoStepEnabled ? "bg-[#25836F]" : "bg-[#E5E7EB]"
                     }`}
                   >
                     <span
@@ -284,7 +284,7 @@ export default function SettingsScreen({ onNavigate }) {
                     onClick={() => setEmailReminders(!emailReminders)}
                     aria-label="Toggle email reminders"
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      emailReminders ? "bg-[#295255]" : "bg-[#E5E7EB]"
+                      emailReminders ? "bg-[#25836F]" : "bg-[#E5E7EB]"
                     }`}
                   >
                     <span
@@ -314,7 +314,7 @@ export default function SettingsScreen({ onNavigate }) {
                     onClick={() => setSmsReminders(!smsReminders)}
                     aria-label="Toggle SMS reminders"
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      smsReminders ? "bg-[#295255]" : "bg-[#E5E7EB]"
+                      smsReminders ? "bg-[#25836F]" : "bg-[#E5E7EB]"
                     }`}
                   >
                     <span
@@ -343,7 +343,7 @@ export default function SettingsScreen({ onNavigate }) {
                     onClick={() => setWellnessUpdates(!wellnessUpdates)}
                     aria-label="Toggle optional wellness updates"
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      wellnessUpdates ? "bg-[#295255]" : "bg-[#E5E7EB]"
+                      wellnessUpdates ? "bg-[#25836F]" : "bg-[#E5E7EB]"
                     }`}
                   >
                     <span
@@ -376,7 +376,7 @@ export default function SettingsScreen({ onNavigate }) {
                     <select
                       value={language}
                       onChange={(e) => setLanguage(e.target.value)}
-                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#295255] cursor-pointer"
+                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F] cursor-pointer"
                     >
                       <option value="English (US)">English (US)</option>
                       <option value="Spanish (Español)">
@@ -401,7 +401,7 @@ export default function SettingsScreen({ onNavigate }) {
                     <select
                       value={timeZone}
                       onChange={(e) => setTimeZone(e.target.value)}
-                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#295255] cursor-pointer"
+                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F] cursor-pointer"
                     >
                       <option value="Pacific Time (US & Canada)">
                         Pacific Time (US & Canada)
@@ -488,12 +488,12 @@ export default function SettingsScreen({ onNavigate }) {
             </div>
 
             {/* CARD 2: Control your information matching Screenshot */}
-            <div className="rounded-2xl p-5 bg-[#E8F3F3] border border-[#295255]/20 flex items-start gap-3.5 shadow-2xs">
-              <span className="material-symbols-outlined !text-[#295255] text-lg shrink-0 mt-0.5">
+            <div className="rounded-2xl p-5 bg-[#E8F3F3] border border-[#25836F]/20 flex items-start gap-3.5 shadow-2xs">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg shrink-0 mt-0.5">
                 verified_user
               </span>
               <div>
-                <h3 className="text-xs sm:text-sm font-bold text-[#295255]">
+                <h3 className="text-xs sm:text-sm font-bold text-[#25836F]">
                   Control your information
                 </h3>
                 <p className="text-xs text-[#577877] mt-1 leading-relaxed">
@@ -503,7 +503,7 @@ export default function SettingsScreen({ onNavigate }) {
                 <button
                   type="button"
                   onClick={() => onNavigate && onNavigate("consent")}
-                  className="mt-2 text-xs font-semibold text-[#295255] hover:underline cursor-pointer inline-flex items-center gap-1"
+                  className="mt-2 text-xs font-semibold text-[#25836F] hover:underline cursor-pointer inline-flex items-center gap-1"
                 >
                   <span>Open consent settings →</span>
                 </button>
@@ -561,7 +561,7 @@ export default function SettingsScreen({ onNavigate }) {
                   required
                   value={tempEmail}
                   onChange={(e) => setTempEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
               <p className="text-[11px] text-[#577877]">
@@ -614,7 +614,7 @@ export default function SettingsScreen({ onNavigate }) {
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
               <div>
@@ -626,7 +626,7 @@ export default function SettingsScreen({ onNavigate }) {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">

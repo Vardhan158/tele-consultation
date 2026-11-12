@@ -82,7 +82,7 @@ export default function AppointmentManagementTab() {
               key={f}
               onClick={() => setFilter(f)}
               className={`rounded-lg px-2.5 py-1 text-xs font-semibold capitalize transition ${
-                filter === f ? "bg-white text-[#295255] shadow-sm" : "text-[#577877]"
+                filter === f ? "bg-white text-[#25836F] shadow-sm" : "text-[#577877]"
               }`}
             >
               {f.replace("_", " ")}
@@ -102,7 +102,7 @@ export default function AppointmentManagementTab() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by patient name or doctor name…"
-            className="w-full rounded-xl border border-[#577877]/25 pl-9 pr-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+            className="w-full rounded-xl border border-[#577877]/25 pl-9 pr-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
           />
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function AppointmentManagementTab() {
               <div><strong>Scheduled Date/Time:</strong> {new Date(selectedApt.starts_at).toLocaleString()}</div>
               <div><strong>Duration:</strong> {selectedApt.duration_minutes || 30} minutes</div>
               <div><strong>Consultation Type:</strong> {selectedApt.type || "Video Consultation"}</div>
-              <div><strong>Status:</strong> <span className="font-bold uppercase text-[#295255]">{selectedApt.status}</span></div>
+              <div><strong>Status:</strong> <span className="font-bold uppercase text-[#25836F]">{selectedApt.status}</span></div>
               {selectedApt.cancel_reason && (
                 <div className="text-red-700"><strong>Cancellation Reason:</strong> {selectedApt.cancel_reason}</div>
               )}
@@ -138,7 +138,7 @@ export default function AppointmentManagementTab() {
             <div className="text-right">
               <button
                 onClick={() => setSelectedApt(null)}
-                className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-semibold text-white"
+                className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-semibold text-white"
               >
                 Done
               </button>
@@ -216,13 +216,13 @@ export default function AppointmentManagementTab() {
                       </div>
                     </td>
                     <td className="p-3 font-semibold text-[#162623]">{apt.patient_name}</td>
-                    <td className="p-3 font-semibold text-[#295255]">{apt.doctor_name}</td>
+                    <td className="p-3 font-semibold text-[#25836F]">{apt.doctor_name}</td>
                     <td className="p-3 text-[#577877]">{apt.type || "Video Call"}</td>
                     <td className="p-3">
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                           apt.status === "confirmed"
-                            ? "bg-teal-100 text-[#295255]"
+                            ? "bg-teal-100 text-[#25836F]"
                             : apt.status === "completed"
                               ? "bg-emerald-100 text-emerald-800"
                               : "bg-red-100 text-red-800"
@@ -234,7 +234,7 @@ export default function AppointmentManagementTab() {
                     <td className="p-3 text-right space-x-2">
                       <button
                         onClick={() => setSelectedApt(apt)}
-                        className="rounded-lg border border-[#577877]/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#295255] hover:bg-[#F0F5F7]"
+                        className="rounded-lg border border-[#577877]/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#25836F] hover:bg-[#F0F5F7]"
                       >
                         Details
                       </button>
@@ -264,14 +264,14 @@ export default function AppointmentManagementTab() {
                 <button
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#295255] hover:bg-[#F0F5F7] disabled:opacity-40"
+                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] hover:bg-[#F0F5F7] disabled:opacity-40"
                 >
                   Previous
                 </button>
                 <button
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#295255] hover:bg-[#F0F5F7] disabled:opacity-40"
+                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] hover:bg-[#F0F5F7] disabled:opacity-40"
                 >
                   Next
                 </button>

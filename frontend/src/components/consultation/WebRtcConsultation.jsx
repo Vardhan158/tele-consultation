@@ -229,7 +229,7 @@ export default function WebRtcConsultation({
           autoPlay
           muted
           playsInline
-          className="aspect-video w-full rounded-2xl bg-[#295255] object-cover"
+          className="aspect-video w-full rounded-2xl bg-[#25836F] object-cover"
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">

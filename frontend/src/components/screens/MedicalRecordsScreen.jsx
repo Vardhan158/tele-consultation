@@ -274,7 +274,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Toast */}
         {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-white border border-[#295255]/30 shadow-sm flex items-center justify-between text-xs text-[#295255] font-semibold">
+          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
             <span className="flex items-center gap-2">
               <span className="material-symbols-outlined text-base">
                 check_circle
@@ -317,8 +317,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {/* Card 1: All records */}
           <div className="care-card p-5 sm:p-6 rounded-2xl bg-white border border-[#577877]/15 flex items-center gap-4">
-            <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined !text-[#295255] text-xl">
+            <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#25836F] flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined !text-[#25836F] text-xl">
                 description
               </span>
             </span>
@@ -332,8 +332,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
           {/* Card 2: Lab reports */}
           <div className="care-card p-5 sm:p-6 rounded-2xl bg-white border border-[#577877]/15 flex items-center gap-4">
-            <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined !text-[#295255] text-xl">
+            <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#25836F] flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined !text-[#25836F] text-xl">
                 science
               </span>
             </span>
@@ -347,8 +347,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
           {/* Card 3: Imaging */}
           <div className="care-card p-5 sm:p-6 rounded-2xl bg-white border border-[#577877]/15 flex items-center gap-4">
-            <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined !text-[#295255] text-xl">
+            <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#25836F] flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined !text-[#25836F] text-xl">
                 filter_center_focus
               </span>
             </span>
@@ -362,8 +362,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
           {/* Card 4: Clinical documents */}
           <div className="care-card p-5 sm:p-6 rounded-2xl bg-white border border-[#577877]/15 flex items-center gap-4">
-            <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined !text-[#295255] text-xl">
+            <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#25836F] flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined !text-[#25836F] text-xl">
                 assignment
               </span>
             </span>
@@ -396,13 +396,13 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                     onClick={() => setActiveCategory(tab.id)}
                     className={`transition pb-1 relative cursor-pointer ${
                       isTabActive
-                        ? "text-[#295255] font-bold"
+                        ? "text-[#25836F] font-bold"
                         : "text-[#577877] hover:text-[#162623]"
                     }`}
                   >
                     <span>{tab.label}</span>
                     {isTabActive && (
-                      <span className="absolute -bottom-3 left-0 right-0 h-0.5 bg-[#295255] rounded-full" />
+                      <span className="absolute -bottom-3 left-0 right-0 h-0.5 bg-[#25836F] rounded-full" />
                     )}
                   </button>
                 );
@@ -423,7 +423,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search by document, provider or date"
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] placeholder-[#577877]/70 focus:outline-none focus:border-[#295255]"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] placeholder-[#577877]/70 focus:outline-none focus:border-[#25836F]"
                 />
               </div>
             </div>
@@ -455,7 +455,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                         {rec.addedBy}
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 text-xs text-[#295255] font-medium">
+                        <div className="flex items-center gap-1.5 text-xs text-[#25836F] font-medium">
                           <button
                             type="button"
                             onClick={() => setPreviewRecord(rec)}
@@ -478,7 +478,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                             className="hover:underline cursor-pointer flex items-center gap-1"
                           >
                             <span>Download</span>
-                            <span className="material-symbols-outlined !text-[#295255] text-xs">
+                            <span className="material-symbols-outlined !text-[#25836F] text-xs">
                               open_in_new
                             </span>
                           </button>
@@ -584,7 +584,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                   <select
                     value={selectedFileType}
                     onChange={(e) => setSelectedFileType(e.target.value)}
-                    className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] font-medium focus:outline-none focus:border-[#295255] cursor-pointer pr-8"
+                    className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] font-medium focus:outline-none focus:border-[#25836F] cursor-pointer pr-8"
                   >
                     <option value="Imaging report">Imaging report</option>
                     <option value="Lab report">Lab report</option>
@@ -606,7 +606,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                   className={`w-full py-2.5 rounded-xl font-semibold text-xs text-center transition select-none ${
                     isTooLarge || !selectedFileName || isUploading
                       ? "bg-[#F0F5F7] text-[#577877] cursor-not-allowed border border-[#577877]/10"
-                      : "bg-[#295255] text-white hover:bg-[#1f3f42] cursor-pointer shadow-sm"
+                      : "bg-[#25836F] text-white hover:bg-[#1f3f42] cursor-pointer shadow-sm"
                   }`}
                 >
                   {isUploading ? "Uploading..." : "Upload record"}
@@ -615,7 +615,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
               {/* Shared with your care team Badge */}
               <div className="pt-1">
-                <span className="inline-block text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#E8F3F3] text-[#295255]">
+                <span className="inline-block text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#E8F3F3] text-[#25836F]">
                   Shared with your care team
                 </span>
               </div>
@@ -629,7 +629,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
             {/* CARD 2: Looking for results? matching Screenshot */}
             <div className="p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3">
-              <span className="material-symbols-outlined !text-[#295255] text-lg shrink-0 mt-0.5">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg shrink-0 mt-0.5">
                 info
               </span>
               <div className="text-xs space-y-1">
@@ -669,7 +669,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   description
                 </span>
                 <h3 className="text-base font-bold text-[#162623]">
@@ -700,7 +700,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
               </div>
               <div className="flex justify-between">
                 <span className="text-[#577877]">Category:</span>
-                <span className="font-semibold text-[#295255]">
+                <span className="font-semibold text-[#25836F]">
                   {previewRecord.categoryDisplay}
                 </span>
               </div>
@@ -719,7 +719,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
             </div>
 
             <div className="p-6 rounded-xl border border-dashed border-[#577877]/30 text-center space-y-2 bg-[#F8FAFB]">
-              <span className="material-symbols-outlined !text-[#295255] text-4xl">
+              <span className="material-symbols-outlined !text-[#25836F] text-4xl">
                 picture_as_pdf
               </span>
               <p className="text-xs font-semibold text-[#162623]">

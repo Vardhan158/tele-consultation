@@ -88,7 +88,7 @@ export default function OperationalReportsTab() {
                 key={val}
                 onClick={() => setTimeRange(val)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
-                  timeRange === val ? "bg-[#295255] text-white" : "text-[#577877]"
+                  timeRange === val ? "bg-[#25836F] text-white" : "text-[#577877]"
                 }`}
               >
                 {label}
@@ -98,7 +98,7 @@ export default function OperationalReportsTab() {
 
           <button
             onClick={handleExportCSV}
-            className="rounded-xl bg-[#295255] px-3.5 py-2 text-xs font-semibold text-white shadow transition hover:bg-[#1f3f41] flex items-center gap-1.5 cursor-pointer"
+            className="rounded-xl bg-[#25836F] px-3.5 py-2 text-xs font-semibold text-white shadow transition hover:bg-[#1d6e5d] flex items-center gap-1.5 cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">download</span>
             Export CSV
@@ -109,7 +109,7 @@ export default function OperationalReportsTab() {
       {/* Summary Operational Metrics */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <div className="care-card p-4 text-center">
-          <div className="text-2xl font-bold text-[#295255]">
+          <div className="text-2xl font-bold text-[#25836F]">
             {summary.total_consultations || 154}
           </div>
           <div className="text-xs text-[#577877]">Total Consultations</div>
@@ -160,7 +160,7 @@ export default function OperationalReportsTab() {
                 </div>
                 <div className="h-2 w-full rounded-full bg-[#F0F5F7]">
                   <div
-                    className="h-2 rounded-full bg-[#295255]"
+                    className="h-2 rounded-full bg-[#25836F]"
                     style={{ width: `${Math.min(100, (item.count / 50) * 100)}%` }}
                   ></div>
                 </div>
@@ -177,7 +177,7 @@ export default function OperationalReportsTab() {
               <div key={m.month} className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-[#F0F5F7]">
                 <span className="font-bold text-[#162623]">{m.month}</span>
                 <span className="text-[#577877]">{m.consultations} consultations</span>
-                <span className="font-bold text-[#295255]">₹{m.revenue.toLocaleString()}</span>
+                <span className="font-bold text-[#25836F]">₹{m.revenue.toLocaleString()}</span>
               </div>
             ))}
           </div>

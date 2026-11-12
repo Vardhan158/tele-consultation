@@ -67,7 +67,7 @@ export default function DoctorDashboardScreen({ onNavigate }) {
             <button
               type="button"
               onClick={() => onNavigate("doctor-appointments")}
-              className="text-xs font-semibold text-[#295255]"
+              className="text-xs font-semibold text-[#25836F]"
             >
               View all
             </button>

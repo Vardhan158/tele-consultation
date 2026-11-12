@@ -12,7 +12,8 @@ from teleconsult.config.settings import get_settings
 
 
 @pytest.mark.asyncio
-async def test_razorpay_payment_workflow_end_to_end() -> None:
+@pytest.mark.mongodb_integration
+async def test_razorpay_payment_workflow_end_to_end(mongodb_test_database) -> None:
     settings = get_settings()
     if settings.mongodb_enabled:
         await mongo_database.connect()

@@ -55,9 +55,9 @@ export default function Sidebar({
           className="flex items-center gap-3 cursor-pointer group"
           onClick={() => onSelectTab(isAdmin ? "clinic-overview" : "dashboard")}
         >
-          <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center text-[#295255] shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center text-[#25836F] shadow-sm">
             <svg
-              className="w-6 h-6 text-[#295255]"
+              className="w-6 h-6 text-[#25836F]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -104,13 +104,13 @@ export default function Sidebar({
               }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all text-xs font-medium cursor-pointer ${
                 isActive
-                  ? "bg-[#F0F5F7] text-[#295255] font-bold shadow-xs"
+                  ? "bg-[#F0F5F7] text-[#25836F] font-bold shadow-xs"
                   : "text-[#F0F5F7]/85 hover:bg-white/10 hover:text-white"
               }`}
             >
               <span
                 className={`material-symbols-outlined text-[19px] ${
-                  isActive ? "!text-[#295255]" : "!text-[#F0F5F7]/80"
+                  isActive ? "!text-[#25836F]" : "!text-[#F0F5F7]/80"
                 }`}
               >
                 {item.icon}
@@ -139,14 +139,14 @@ export default function Sidebar({
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all text-xs font-medium cursor-pointer ${
                   isActive
-                    ? "bg-[#F0F5F7] text-[#295255] font-bold shadow-xs"
+                    ? "bg-[#F0F5F7] text-[#25836F] font-bold shadow-xs"
                     : "text-[#F0F5F7]/85 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <span
                     className={`material-symbols-outlined text-[19px] ${
-                      isActive ? "!text-[#295255]" : "!text-[#F0F5F7]/80"
+                      isActive ? "!text-[#25836F]" : "!text-[#F0F5F7]/80"
                     }`}
                   >
                     {item.icon}
@@ -161,8 +161,8 @@ export default function Sidebar({
 
       {!isDoctor && !isAdmin && (
         <div className="mt-6 p-4 rounded-2xl bg-white/10 border border-white/15 space-y-2">
-          <div className="w-8 h-8 rounded-lg bg-[#F0F5F7] flex items-center justify-center text-[#295255] shadow-2xs">
-            <span className="material-symbols-outlined !text-[#295255] text-lg">
+          <div className="w-8 h-8 rounded-lg bg-[#F0F5F7] flex items-center justify-center text-[#25836F] shadow-2xs">
+            <span className="material-symbols-outlined !text-[#25836F] text-lg">
               volunteer_activism
             </span>
           </div>
@@ -197,14 +197,14 @@ export default function Sidebar({
           className="fixed inset-0 bg-[#162623]/60 backdrop-blur-xs z-50 lg:hidden"
           onClick={onCloseMobile}
         >
-          <aside className="fixed left-0 top-0 h-full w-72 bg-[#295255] text-white border-r border-[#162623]/30 flex flex-col justify-between shadow-xl">
+          <aside className="fixed left-0 top-0 h-full w-72 bg-[#25836F] text-white border-r border-[#162623]/30 flex flex-col justify-between shadow-xl">
             {sidebarContent}
           </aside>
         </div>
       )}
 
       {/* Desktop Persistent Flex Sidebar */}
-      <aside className="hidden lg:flex lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:z-30 bg-[#295255] text-white border-r border-[#162623]/30 flex-col justify-between shadow-xl">
+      <aside className="hidden lg:flex lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:z-30 bg-[#25836F] text-white border-r border-[#162623]/30 flex-col justify-between shadow-xl">
         {sidebarContent}
       </aside>
     </>

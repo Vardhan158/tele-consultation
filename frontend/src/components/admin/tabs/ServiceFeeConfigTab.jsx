@@ -173,8 +173,9 @@ export default function ServiceFeeConfigTab() {
 
   return (
     <div className="space-y-6 font-sans">
-      {/* Premium Cinematic Animated Banner */}
-      <div className="relative min-h-[220px] lg:min-h-[240px] overflow-hidden rounded-2xl bg-gradient-to-r from-[#162623] via-[#295255] to-[#1f3f41] p-6 sm:p-8 text-white shadow-xl border border-[rgba(87,120,119,0.25)] flex flex-col justify-between">
+      {/* Premium Cinematic Animated SaaS Banner */}
+      <div className="relative min-h-[220px] lg:min-h-[240px] overflow-hidden rounded-2xl bg-gradient-to-r from-[#162623] via-[#25836F] to-[#1d6e5d] p-6 sm:p-8 text-white shadow-xl border border-[rgba(87,120,119,0.25)] flex flex-col justify-between">
+        {/* Soft Background Illumination Glow Orbs */}
         <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-[#577877]/30 blur-3xl animate-glow pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-teal-400/20 blur-3xl animate-glow pointer-events-none" />
 
@@ -209,7 +210,7 @@ export default function ServiceFeeConfigTab() {
 
             <button
               onClick={openNewService}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-[#295255] shadow-md transition-all hover:bg-[#F0F5F7] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-[#25836F] shadow-md transition-all hover:bg-[#F0F5F7] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
               <span className="text-sm font-bold">+</span>
               <span>Add New Clinical Service</span>
@@ -283,7 +284,7 @@ export default function ServiceFeeConfigTab() {
       {/* Modal Popup Dialog for Add / Edit Clinical Service */}
       {editingService && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/60 backdrop-blur-xs p-4">
-          <div className="care-card max-h-[90vh] max-w-2xl w-full overflow-y-auto no-scrollbar p-6 space-y-4 shadow-2xl border border-[#295255]/30">
+          <div className="care-card max-h-[90vh] max-w-2xl w-full overflow-y-auto no-scrollbar p-6 space-y-4 shadow-2xl border border-[#25836F]/30">
             <div className="flex items-center justify-between border-b border-[#577877]/15 pb-3">
               <h3 className="text-base font-bold text-[#162623]">
                 {form.id ? `Edit Clinical Service #${form.id}` : "Create New Clinical Service"}
@@ -305,7 +306,7 @@ export default function ServiceFeeConfigTab() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="e.g. Cardiology Follow-up"
-                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
                 />
               </div>
 
@@ -317,7 +318,7 @@ export default function ServiceFeeConfigTab() {
                   value={form.specialty}
                   onChange={(e) => setForm({ ...form, specialty: e.target.value })}
                   placeholder="e.g. Cardiology"
-                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
                 />
               </div>
 
@@ -330,7 +331,7 @@ export default function ServiceFeeConfigTab() {
                   max="240"
                   value={form.duration_minutes}
                   onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
                 />
               </div>
 
@@ -339,7 +340,7 @@ export default function ServiceFeeConfigTab() {
                 <select
                   value={form.currency}
                   onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#295255] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
                 >
                   <option value="INR">INR (₹)</option>
                   <option value="USD">USD ($)</option>
@@ -354,7 +355,7 @@ export default function ServiceFeeConfigTab() {
                   min="0"
                   value={form.base_fee}
                   onChange={(e) => setForm({ ...form, base_fee: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
                 />
               </div>
 
@@ -366,7 +367,7 @@ export default function ServiceFeeConfigTab() {
                   min="0"
                   value={form.platform_fee}
                   onChange={(e) => setForm({ ...form, platform_fee: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
                 />
               </div>
 
@@ -377,7 +378,7 @@ export default function ServiceFeeConfigTab() {
                   type="date"
                   value={form.effective_date}
                   onChange={(e) => setForm({ ...form, effective_date: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
                 />
               </div>
 
@@ -386,7 +387,7 @@ export default function ServiceFeeConfigTab() {
                 <select
                   value={form.active ? "true" : "false"}
                   onChange={(e) => setForm({ ...form, active: e.target.value === "true" })}
-                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#295255] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
                 >
                   <option value="true">Active &amp; Available</option>
                   <option value="false">Inactive / Archived</option>
@@ -399,7 +400,7 @@ export default function ServiceFeeConfigTab() {
                   <label className="block text-xs font-bold text-[#162623]">
                     Assigned Clinicians <span className="text-red-600">*</span>
                   </label>
-                  <span className="px-2.5 py-0.5 rounded-full bg-[#295255] text-white font-bold text-[10px]">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#25836F] text-white font-bold text-[10px]">
                     {form.assigned_doctors.length} Selected
                   </span>
                 </div>
@@ -412,7 +413,7 @@ export default function ServiceFeeConfigTab() {
                   value={doctorSearch}
                   onChange={(e) => setDoctorSearch(e.target.value)}
                   placeholder="Search doctors by name or specialty..."
-                  className="w-full rounded-xl border border-[#577877]/25 bg-white px-3 py-1.5 text-xs focus:border-[#295255] focus:outline-none"
+                  className="w-full rounded-xl border border-[#577877]/25 bg-white px-3 py-1.5 text-xs focus:border-[#25836F] focus:outline-none"
                 />
 
                 <div className="space-y-1.5 max-h-36 overflow-y-auto no-scrollbar p-1">
@@ -433,7 +434,7 @@ export default function ServiceFeeConfigTab() {
                             onClick={() => toggleDoctor(doctor.id)}
                             className={`flex items-center justify-between p-2 rounded-xl cursor-pointer text-xs transition border ${
                               isSelected
-                                ? "bg-[#295255] text-white font-semibold border-[#162623] shadow-xs"
+                                ? "bg-[#25836F] text-white font-semibold border-[#162623] shadow-xs"
                                 : "bg-white text-[#162623] border-[#577877]/20 hover:bg-[#F0F5F7]"
                             }`}
                           >
@@ -441,7 +442,7 @@ export default function ServiceFeeConfigTab() {
                               <span
                                 className={`w-4 h-4 rounded flex items-center justify-center text-[10px] shrink-0 ${
                                   isSelected
-                                    ? "bg-white text-[#295255] font-bold"
+                                    ? "bg-white text-[#25836F] font-bold"
                                     : "border border-[#577877]/40 bg-white"
                                 }`}
                               >
@@ -469,7 +470,7 @@ export default function ServiceFeeConfigTab() {
                   <label className="block text-xs font-bold text-[#162623]">
                     Applicable Appointment Types
                   </label>
-                  <span className="px-2.5 py-0.5 rounded-full bg-[#295255] text-white font-bold text-[10px]">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#25836F] text-white font-bold text-[10px]">
                     {form.appointment_types.length} Selected
                   </span>
                 </div>
@@ -491,14 +492,14 @@ export default function ServiceFeeConfigTab() {
                           onClick={() => toggleAppointmentType(type)}
                           className={`flex items-center gap-2 p-2 rounded-xl cursor-pointer text-xs transition border ${
                             isSelected
-                              ? "bg-[#295255] text-white font-semibold border-[#162623] shadow-xs"
+                              ? "bg-[#25836F] text-white font-semibold border-[#162623] shadow-xs"
                               : "bg-white text-[#162623] border-[#577877]/20 hover:bg-[#F0F5F7]"
                           }`}
                         >
                           <span
                             className={`w-4 h-4 rounded flex items-center justify-center text-[10px] shrink-0 ${
                               isSelected
-                                ? "bg-white text-[#295255] font-bold"
+                                ? "bg-white text-[#25836F] font-bold"
                                 : "border border-[#577877]/40 bg-white"
                             }`}
                           >
@@ -523,7 +524,7 @@ export default function ServiceFeeConfigTab() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-[#295255] px-5 py-2 text-xs font-semibold text-white shadow hover:bg-[#1f3f41] disabled:opacity-50 cursor-pointer"
+                  className="rounded-xl bg-[#25836F] px-5 py-2 text-xs font-semibold text-white shadow hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? "Saving…" : "Save Service Config"}
                 </button>
@@ -572,7 +573,7 @@ export default function ServiceFeeConfigTab() {
               {services.map((srv, idx) => (
                 <tr key={`${srv.id || 'srv'}-${idx}`} className="hover:bg-[#F0F5F7]/50">
                   <td className="p-3 font-bold text-[#162623]">{srv.name}</td>
-                  <td className="p-3 text-[#295255] font-semibold">{srv.specialty}</td>
+                  <td className="p-3 text-[#25836F] font-semibold">{srv.specialty}</td>
                   <td className="p-3 text-[#577877]">{srv.duration_minutes || 30} mins</td>
                   <td className="p-3 font-semibold text-[#162623]">
                     {srv.currency === "USD" ? "$" : "₹"}{srv.base_fee}
@@ -580,7 +581,7 @@ export default function ServiceFeeConfigTab() {
                   <td className="p-3 text-[#577877]">
                     {srv.currency === "USD" ? "$" : "₹"}{srv.platform_fee}
                   </td>
-                  <td className="p-3 font-bold text-[#295255]">
+                  <td className="p-3 font-bold text-[#25836F]">
                     {srv.currency === "USD" ? "$" : "₹"}{(srv.base_fee || 0) + (srv.platform_fee || 0)}
                   </td>
                   <td className="p-3 text-[#577877]">{srv.effective_date || "2026-01-01"}</td>
@@ -596,7 +597,7 @@ export default function ServiceFeeConfigTab() {
                   <td className="p-3 text-right space-x-2">
                     <button
                       onClick={() => openEditService(srv)}
-                      className="rounded-lg border border-[#577877]/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#295255] hover:bg-[#F0F5F7] cursor-pointer"
+                      className="rounded-lg border border-[#577877]/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#25836F] hover:bg-[#F0F5F7] cursor-pointer"
                     >
                       Edit
                     </button>

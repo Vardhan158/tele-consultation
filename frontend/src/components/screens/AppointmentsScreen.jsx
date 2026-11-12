@@ -264,7 +264,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
           name: "Patient",
         },
         theme: {
-          color: "#295255",
+          color: "#25836F",
         },
       };
 
@@ -317,7 +317,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 font-sans text-[#162623]">
       {toastMessage && (
-        <div className="fixed top-20 right-4 z-50 rounded-xl bg-[#295255] text-white p-4 shadow-xl text-xs font-semibold">
+        <div className="fixed top-20 right-4 z-50 rounded-xl bg-[#25836F] text-white p-4 shadow-xl text-xs font-semibold">
           ℹ️ {toastMessage}
         </div>
       )}
@@ -338,7 +338,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
             <button
               type="button"
               onClick={() => onNavigate("find-doctors")}
-              className="rounded-xl bg-[#295255] px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-[#1f3f41] cursor-pointer"
+              className="rounded-xl bg-[#25836F] px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] cursor-pointer"
             >
               + Book New Appointment
             </button>
@@ -355,12 +355,12 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`pb-2 relative transition cursor-pointer ${
-                  activeTab === tab.id ? "text-[#295255] font-bold" : "text-[#577877]"
+                  activeTab === tab.id ? "text-[#25836F] font-bold" : "text-[#577877]"
                 }`}
               >
                 <span>{tab.label}</span>
                 {activeTab === tab.id && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#295255] rounded-full" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#25836F] rounded-full" />
                 )}
               </button>
             ))}
@@ -379,7 +379,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                 </div>
               ) : (
                 activeUpcomingList.map((apt, idx) => (
-                  <div key={`${apt.id || 'apt'}-${idx}`} className="care-card p-6 space-y-4 shadow-sm hover:border-[#295255]/30">
+                  <div key={`${apt.id || 'apt'}-${idx}`} className="care-card p-6 space-y-4 shadow-sm hover:border-[#25836F]/30">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-mono text-[#577877]">{apt.displayId}</span>
                       <div className="flex items-center gap-2">
@@ -407,7 +407,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <h3 className="text-base font-bold text-[#162623]">{apt.doctor.name}</h3>
-                        <p className="text-xs font-semibold text-[#295255]">{apt.doctor.specialty}</p>
+                        <p className="text-xs font-semibold text-[#25836F]">{apt.doctor.specialty}</p>
                         <p className="text-xs text-[#577877]">{apt.reason}</p>
                         <p className="text-xs text-[#162623] font-medium pt-1">
                           🗓️ {apt.dateShort} at {apt.timeRange}
@@ -415,7 +415,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                       </div>
 
                       <div className="text-right space-y-2">
-                        <div className="text-lg font-bold text-[#295255]">{apt.fee}</div>
+                        <div className="text-lg font-bold text-[#25836F]">{apt.fee}</div>
 
                         <div className="flex items-center justify-end gap-2 pt-1">
                           {apt.isPendingPayment ? (
@@ -428,7 +428,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                           ) : apt.canJoinVideo ? (
                             <button
                               onClick={() => handleJoinWaitingRoom(apt)}
-                              className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1f3f41] cursor-pointer"
+                              className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] cursor-pointer"
                             >
                               Join Video Room
                             </button>

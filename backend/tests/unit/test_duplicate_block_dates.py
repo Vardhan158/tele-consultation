@@ -8,7 +8,8 @@ from teleconsult.config.settings import get_settings
 
 
 @pytest.mark.asyncio
-async def test_duplicate_and_concurrent_block_date_requests() -> None:
+@pytest.mark.mongodb_integration
+async def test_duplicate_and_concurrent_block_date_requests(mongodb_test_database) -> None:
     settings = get_settings()
     if settings.mongodb_enabled:
         await mongo_database.connect()
