@@ -2419,6 +2419,7 @@ name = "teleconsult"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi" },
@@ -2435,7 +2436,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "aiohttp" },
     { name = "bandit" },
     { name = "httpx" },
     { name = "import-linter" },
@@ -2448,6 +2448,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.10" },
     { name = "alembic", specifier = ">=1.13" },
     { name = "asyncpg", specifier = ">=0.29" },
     { name = "fastapi", specifier = ">=0.110" },
@@ -2464,7 +2465,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "aiohttp", specifier = ">=3.10" },
     { name = "bandit", specifier = ">=1.7" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "import-linter", specifier = ">=2.0" },
