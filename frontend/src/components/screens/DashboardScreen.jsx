@@ -582,7 +582,8 @@ export default function DashboardScreen({ onNavigate }) {
                 {
                   title: "Upload Health Report",
                   subtitle: "PDF, JPG up to 25 MB",
-                  icon: "medical-records",
+                  icon: "upload_file",
+                  tab: "medical-records",
                 },
                 {
                   title: "Prescriptions & Rx",

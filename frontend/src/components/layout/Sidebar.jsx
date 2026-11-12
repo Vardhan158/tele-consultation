@@ -52,33 +52,44 @@ export default function Sidebar({
   const navigation = roleNavigation[role];
 
   const sidebarContent = (
-    <div className="flex flex-col flex-1 overflow-y-auto px-4 py-5 relative z-10 select-none">
+    <div
+      className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden no-scrollbar px-4 py-5 relative z-10 select-none"
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+    >
       {/* Logo & Brand matching brand palette */}
       <div className="flex items-center justify-between pb-6">
         <div
-          className="flex items-center gap-3 cursor-pointer group"
-          onClick={() => onSelectTab(isAdmin ? "clinic-overview" : "dashboard")}
+          className="flex items-center gap-3 cursor-pointer group min-w-0"
+          onClick={() => onSelectTab(isAdmin ? "clinic-overview" : isDoctor ? "doctor-dashboard" : "dashboard")}
         >
-          <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center text-[#25836F] shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center text-[#185A4D] shadow-sm shrink-0">
             <svg
-              className="w-6 h-6 text-[#25836F]"
+              width="24"
+              height="28"
+              viewBox="0 0 35 42"
               fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-auto text-[#185A4D]"
+              aria-hidden="true"
             >
               <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2.2"
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
+                fill="currentColor"
+              />
+              <rect
+                width="12.629"
+                height="32.626"
+                rx="6.315"
+                transform="rotate(-45 16.202 6.711)"
+                fill="currentColor"
               />
             </svg>
           </div>
-          <div className="flex flex-col">
-            <span className="font-headline-sm text-base text-white tracking-tight font-bold leading-tight">
+          <div className="flex flex-col min-w-0">
+            <span className="font-headline-sm text-base text-white tracking-tight font-bold leading-tight truncate">
               Kaizen Care
             </span>
-            <span className="text-[10px] text-[#F0F5F7]/80 tracking-widest uppercase font-semibold mt-0.5">
+            <span className="text-[10px] text-[#F0F5F7]/80 tracking-widest uppercase font-semibold mt-0.5 truncate">
               {isAdmin ? "Clinic Admin Workspace" : isDoctor ? "Doctor Portal" : "Patient Portal"}
             </span>
           </div>
@@ -87,8 +98,9 @@ export default function Sidebar({
         {/* Mobile close */}
         <button
           type="button"
-          className="lg:hidden p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10"
+          className="lg:hidden p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 cursor-pointer shrink-0"
           onClick={onCloseMobile}
+          aria-label="Close menu"
         >
           <span className="material-symbols-outlined text-lg">close</span>
         </button>
@@ -103,20 +115,19 @@ export default function Sidebar({
               key={item.id}
               type="button"
               aria-current={isActive ? "page" : undefined}
-              title={item.label}
               onClick={() => {
                 onSelectTab(item.id);
                 if (onCloseMobile) onCloseMobile();
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all text-xs font-medium cursor-pointer ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-xl transition-all text-xs font-medium cursor-pointer ${
                 isActive
-                  ? "bg-[#F0F5F7] text-[#25836F] font-bold shadow-xs"
+                  ? "bg-[#F0F5F7] text-[#185A4D] font-bold shadow-xs"
                   : "text-[#F0F5F7]/85 hover:bg-white/10 hover:text-white"
               }`}
             >
               <span
-                className={`material-symbols-outlined text-[19px] ${
-                  isActive ? "!text-[#25836F]" : "!text-[#F0F5F7]/80"
+                className={`material-symbols-outlined text-[19px] shrink-0 ${
+                  isActive ? "!text-[#185A4D]" : "!text-[#F0F5F7]/80"
                 }`}
               >
                 {item.icon}
@@ -139,22 +150,21 @@ export default function Sidebar({
               <button
                 key={item.id}
                 type="button"
-                  aria-current={isActive ? "page" : undefined}
-                  title={item.label}
+                aria-current={isActive ? "page" : undefined}
                 onClick={() => {
                   onSelectTab(item.id);
                   if (onCloseMobile) onCloseMobile();
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all text-xs font-medium cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2 text-left rounded-xl transition-all text-xs font-medium cursor-pointer ${
                   isActive
-                    ? "bg-[#F0F5F7] text-[#25836F] font-bold shadow-xs"
+                    ? "bg-[#F0F5F7] text-[#185A4D] font-bold shadow-xs"
                     : "text-[#F0F5F7]/85 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <span
-                    className={`material-symbols-outlined text-[19px] ${
-                      isActive ? "!text-[#25836F]" : "!text-[#F0F5F7]/80"
+                    className={`material-symbols-outlined text-[19px] shrink-0 ${
+                      isActive ? "!text-[#185A4D]" : "!text-[#F0F5F7]/80"
                     }`}
                   >
                     {item.icon}
@@ -167,10 +177,11 @@ export default function Sidebar({
         </nav>
       )}
 
+      {/* Bottom Support section */}
       {!isDoctor && !isAdmin && (
         <div className="mt-6 p-4 rounded-2xl bg-white/10 border border-white/15 space-y-2">
-          <div className="w-8 h-8 rounded-lg bg-[#F0F5F7] flex items-center justify-center text-[#25836F] shadow-2xs">
-            <span className="material-symbols-outlined !text-[#25836F] text-lg">
+          <div className="w-8 h-8 rounded-lg bg-[#F0F5F7] flex items-center justify-center text-[#185A4D] shadow-2xs">
+            <span className="material-symbols-outlined !text-[#185A4D] text-lg">
               volunteer_activism
             </span>
           </div>
@@ -205,14 +216,21 @@ export default function Sidebar({
           className="fixed inset-0 bg-[#162623]/60 backdrop-blur-xs z-50 lg:hidden"
           onClick={onCloseMobile}
         >
-          <aside className="fixed left-0 top-0 h-full w-72 bg-[#25836F] text-white border-r border-[#162623]/30 flex flex-col justify-between shadow-xl">
+          <aside
+            className="fixed left-0 top-0 h-full w-72 bg-[#185A4D] text-white border-r border-[#162623]/30 flex flex-col justify-between shadow-xl no-scrollbar"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {sidebarContent}
           </aside>
         </div>
       )}
 
       {/* Desktop Persistent Flex Sidebar */}
-      <aside className="hidden lg:flex lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:z-30 bg-[#25836F] text-white border-r border-[#162623]/30 flex-col justify-between shadow-xl">
+      <aside
+        className="hidden lg:flex lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:z-30 bg-[#185A4D] text-white border-r border-[#162623]/30 flex-col justify-between shadow-xl no-scrollbar"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
         {sidebarContent}
       </aside>
     </>
