@@ -3,8 +3,6 @@ import { notificationApi } from "../../lib/api";
 
 export default function Header({
   onOpenMobile,
-  collapsed = false,
-  onToggleCollapse,
   onSelectTab,
   onSignOut,
   activeTab = "dashboard",
@@ -108,19 +106,6 @@ export default function Header({
           title="Menu"
         >
           <span className="material-symbols-outlined text-xl">menu</span>
-        </button>
-
-        {/* Desktop collapse/expand toggle */}
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className="hidden lg:flex p-1.5 rounded-lg text-[#577877] hover:text-[#162623] hover:bg-white transition cursor-pointer"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <span className="material-symbols-outlined text-xl">
-            {collapsed ? "menu_open" : "menu"}
-          </span>
         </button>
 
         <div className="flex items-center gap-2 text-xs font-medium text-[#577877]">
