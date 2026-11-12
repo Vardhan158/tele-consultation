@@ -8,13 +8,19 @@ export default function AppLoadingSplash({ onFinished }) {
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("Initializing Kaizen Care...");
   const [fadeOut, setFadeOut] = useState(false);
+  const progressRef = useRef(0);
+
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
 
   // Simulated progress timer for ultra-smooth splash feel
   useEffect(() => {
     const steps = [
-      { p: 25, text: "Connecting to Telehealth Network..." },
-      { p: 55, text: "Loading 3D Kaizen Mobile Unit..." },
-      { p: 85, text: "Preparing Clinical Workspace..." },
+      { p: 15, text: "Connecting to Telehealth Network..." },
+      { p: 40, text: "Deploying 3D Kaizen Mobile Unit..." },
+      { p: 70, text: "Preparing Clinical Workspace..." },
+      { p: 90, text: "Finalizing Security Credentials..." },
       { p: 100, text: "Welcome to Kaizen Care" },
     ];
 
@@ -33,7 +39,7 @@ export default function AppLoadingSplash({ onFinished }) {
           }, 600);
         }, 400);
       }
-    }, 450);
+    }, 400);
 
     return () => clearInterval(interval);
   }, [onFinished]);
@@ -52,8 +58,8 @@ export default function AppLoadingSplash({ onFinished }) {
 
     const width = container.clientWidth;
     const height = container.clientHeight;
-    camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-    camera.position.set(0, 1.2, 6.0);
+    camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    camera.position.set(0, 0.2, 7.0);
 
     renderer = new THREE.WebGLRenderer({
       alpha: true,
@@ -62,41 +68,31 @@ export default function AppLoadingSplash({ onFinished }) {
     });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.35;
 
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
     container.appendChild(renderer.domElement);
 
-    // Studio Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    // Bright Studio Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 2.8);
-    mainLight.position.set(6, 12, 8);
-    mainLight.castShadow = true;
+    const mainLight = new THREE.DirectionalLight(0xffffff, 3.5);
+    mainLight.position.set(8, 12, 10);
     scene.add(mainLight);
 
-    const fillLight = new THREE.DirectionalLight(0x70b0a0, 1.4);
-    fillLight.position.set(-8, 6, -6);
+    const fillLight = new THREE.DirectionalLight(0x70b0a0, 1.8);
+    fillLight.position.set(-10, 6, -6);
     scene.add(fillLight);
 
-    const rimLight = new THREE.PointLight(0x38bdf8, 2.5, 20);
-    rimLight.position.set(0, 6, -5);
+    const rimLight = new THREE.PointLight(0x38bdf8, 3.0, 25);
+    rimLight.position.set(0, 8, -6);
     scene.add(rimLight);
 
-    // Shadow Plane
-    const shadowGeo = new THREE.PlaneGeometry(10, 10);
-    const shadowMat = new THREE.ShadowMaterial({ opacity: 0.25 });
-    const shadowPlane = new THREE.Mesh(shadowGeo, shadowMat);
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -1.1;
-    shadowPlane.receiveShadow = true;
-    scene.add(shadowPlane);
+    // NO GRAY SHADOW PLANE TO KEEP BACKGROUND 100% CLEAN & TRANSPARENT
 
     // Load Model
     const loader = new GLTFLoader();
@@ -105,22 +101,31 @@ export default function AppLoadingSplash({ onFinished }) {
         urlToLoad,
         (gltf) => {
           const model = gltf.scene;
-          const box = new THREE.Box3().setFromObject(model);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
 
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 3.4 / (maxDim || 1);
+          // Calculate bounding box ONLY on mesh geometries to prevent huge scale shrinkage
+          const box = new THREE.Box3();
+          model.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+              child.geometry.computeBoundingBox();
+              box.expandByObject(child);
+            }
+          });
+
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+
+          const maxDim = Math.max(size.x, size.y, size.z) || 1;
+          // Scale model up significantly so it is large, bold and clear
+          const scale = 5.2 / maxDim;
           model.scale.set(scale, scale, scale);
 
           model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
 
           model.traverse((child) => {
             if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
               if (child.material) {
                 child.material.side = THREE.DoubleSide;
+                child.material.needsUpdate = true;
               }
             }
           });
@@ -138,14 +143,25 @@ export default function AppLoadingSplash({ onFinished }) {
 
     loadModel(truckUrl || "/assets/kaizenx_truck_v3.glb");
 
-    // Continuous 360 Spin & Floating Motion
-    let rot = Math.PI / 4;
+    // Smooth Lerp Animation: Drive from Right (+6.5) to Left (-6.5)
+    const lerp = (start, end, factor) => start + (end - start) * factor;
+    let currentPosX = 6.5;
+
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
-      rot += 0.012;
-      wrapperGroup.rotation.y = rot;
-      wrapperGroup.rotation.x = Math.sin(rot * 0.5) * 0.08;
-      wrapperGroup.position.y = -0.2 + Math.sin(Date.now() * 0.002) * 0.08;
+
+      // Map progress 0% -> 100% to X position from Right (+6.5) to Left (-6.5)
+      const p = Math.min(Math.max(progressRef.current / 100, 0), 1);
+      const targetPosX = 6.5 - p * 13.0;
+
+      currentPosX = lerp(currentPosX, targetPosX, 0.08);
+
+      wrapperGroup.position.x = currentPosX;
+      wrapperGroup.position.y = -0.3 + Math.sin(Date.now() * 0.003) * 0.06;
+
+      // Angle headlights facing Left (towards movement direction) with slight 3D perspective angle
+      wrapperGroup.rotation.y = -Math.PI / 2 + 0.38;
+      wrapperGroup.rotation.z = Math.sin(Date.now() * 0.003) * 0.015;
 
       renderer.render(scene, camera);
     };
@@ -178,8 +194,8 @@ export default function AppLoadingSplash({ onFinished }) {
     >
       {/* Background Cinematic Mesh & Glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[140px]" />
-        <div className="absolute bottom-10 right-10 w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-[120px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-emerald-500/10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[130px]" />
       </div>
 
       {/* Top Brand Header */}
@@ -211,14 +227,14 @@ export default function AppLoadingSplash({ onFinished }) {
       </div>
 
       {/* Center 3D Kaizen Truck Canvas */}
-      <div className="relative z-10 w-full max-w-2xl flex-1 flex flex-col items-center justify-center my-4">
+      <div className="relative z-10 w-full max-w-5xl flex-1 flex flex-col items-center justify-center my-2">
         <div
           ref={containerRef}
-          className="w-full h-[320px] sm:h-[400px] lg:h-[460px] cursor-grab active:cursor-grabbing"
+          className="w-full h-[360px] sm:h-[460px] lg:h-[520px]"
         />
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-xs text-emerald-300 shadow-xl mt-[-20px]">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-xs text-emerald-300 shadow-xl mt-[-10px]">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <span>Kaizen 3D Mobile Unit Active</span>
+          <span>3D Kaizen Mobile Unit Deploying</span>
         </div>
       </div>
 

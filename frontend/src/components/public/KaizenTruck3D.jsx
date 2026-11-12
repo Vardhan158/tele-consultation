@@ -77,15 +77,6 @@ export default function KaizenTruck3D() {
     rimLight.position.set(0, 8, -6);
     scene.add(rimLight);
 
-    // Subtle Ground Shadow Plane
-    const shadowGeo = new THREE.PlaneGeometry(10, 10);
-    const shadowMat = new THREE.ShadowMaterial({ opacity: 0.18 });
-    const shadowPlane = new THREE.Mesh(shadowGeo, shadowMat);
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -1.2;
-    shadowPlane.receiveShadow = true;
-    scene.add(shadowPlane);
-
     // 5. Load GLTF / GLB Model with fallback
     const loader = new GLTFLoader();
     const loadModel = (urlToLoad) => {
@@ -94,13 +85,20 @@ export default function KaizenTruck3D() {
         (gltf) => {
           model = gltf.scene;
 
-          // Auto-center and normalize model bounds
-          const box = new THREE.Box3().setFromObject(model);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
+          // Compute bounding box ONLY on mesh geometries to prevent scale shrinkage
+          const box = new THREE.Box3();
+          model.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+              child.geometry.computeBoundingBox();
+              box.expandByObject(child);
+            }
+          });
 
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 3.2 / (maxDim || 1);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+
+          const maxDim = Math.max(size.x, size.y, size.z) || 1;
+          const scale = 5.2 / maxDim;
           model.scale.set(scale, scale, scale);
 
           // Center position inside wrapper group
