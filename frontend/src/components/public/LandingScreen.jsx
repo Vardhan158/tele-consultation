@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Lenis from "lenis";
+import KaizenTruck3D from "./KaizenTruck3D";
 import "./landing-theme.css";
 
 // ============================================================================
@@ -761,6 +762,63 @@ export default function LandingScreen({
                 </button>
               </div>
             </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* 3.5 3D KAIZEN MOBILE UNIT SHOWCASE SECTION                 */}
+      {/* ========================================================= */}
+      <section className="relative w-full overflow-hidden bg-gradient-to-b from-[#162623] via-[#1c332e] to-[#162623] py-20 lg:py-28 border-y border-white/10 text-white select-none">
+        <div className="w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+            {/* Left Column: Text & Features */}
+            <div className="lg:col-span-5 space-y-6">
+              <ScrollReveal animation="fade-right">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-xs sm:text-sm font-semibold text-emerald-300 uppercase tracking-wider mb-2">
+                  <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span>3D Interactive Mobile Telehealth</span>
+                </div>
+
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white leading-tight mb-4">
+                  Healthcare Delivered directly to Your Doorstep
+                </h2>
+
+                <p className="text-emerald-100/80 text-sm sm:text-base leading-relaxed mb-6">
+                  Our state-of-the-art Kaizen Mobile Telehealth Unit brings fully equipped clinical diagnostic suites, cold-chain pharmacy storage, and high-speed satellite teleconsultations directly to remote communities and corporate campuses.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 mb-6">
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                    <div className="text-emerald-400 font-bold text-sm mb-1">On-Site Diagnostics</div>
+                    <div className="text-xs text-white/70 leading-normal">ECG, Point-of-Care Blood Testing, and Digital Otoscopy on wheels.</div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                    <div className="text-emerald-400 font-bold text-sm mb-1">Satellite Link</div>
+                    <div className="text-xs text-white/70 leading-normal">Instant live consultations with hospital specialists in real-time.</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={onFindDoctor}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-0.5 cursor-pointer"
+                  >
+                    Book Mobile Care
+                  </button>
+                </div>
+              </ScrollReveal>
+            </div>
+
+            {/* Right Column: 3D Interactive Truck Model Canvas */}
+            <div className="lg:col-span-7 relative flex items-center justify-center">
+              <ScrollReveal animation="fade-left" duration={900}>
+                <div className="w-full rounded-3xl overflow-hidden bg-gradient-to-tr from-black/60 via-zinc-900/40 to-black/60 border border-white/15 shadow-2xl p-2 sm:p-4 relative">
+                  <KaizenTruck3D />
+                </div>
+              </ScrollReveal>
+            </div>
           </div>
         </div>
       </section>
