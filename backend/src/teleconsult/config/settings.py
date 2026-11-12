@@ -4,8 +4,6 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PRODUCTION_FRONTEND_ORIGINS = ("https://tele-consultation-five.vercel.app",)
-
 
 class TenancyMode(StrEnum):
     POOLED = "pooled"   # shared schema + row-level security (implemented)
@@ -33,7 +31,7 @@ class Settings(BaseSettings):
     clinical_record_retention_days: int = 2555
     clinic_model: str = "clinic_network"
     frontend_origins: str = Field(
-        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://localhost:5173,https://127.0.0.1:5173,https://tele-consultation-five.vercel.app",
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://localhost:5173,https://127.0.0.1:5173",
         validation_alias="FRONTEND_ORIGINS",
     )
 
@@ -79,7 +77,7 @@ class Settings(BaseSettings):
             for origin in self.frontend_origins.split(",")
             if origin.strip().strip('"[]')
         ]
-        return list(dict.fromkeys([*configured, *PRODUCTION_FRONTEND_ORIGINS]))
+        return list(dict.fromkeys(configured))
 
 
 @lru_cache

@@ -36,7 +36,7 @@ GENERIC_AUTH_ERROR = "Unable to authenticate with those details"
 
 
 def session_cookie_options() -> dict[str, object]:
-    """Use a cross-site cookie in production for the Vercel-to-Render deployment."""
+    """Use secure cookie attributes outside local development."""
     secure = get_settings().environment not in {"dev", "local"}
     return {
         "httponly": True,
