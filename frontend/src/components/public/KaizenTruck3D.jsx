@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import truckUrl from "../../assets/kaizenx_truck_v3.glb";
+import truckUrl from "../../assets/kaizenx_truck_v3.glb?url";
 
 export default function KaizenTruck3D() {
   const containerRef = useRef(null);

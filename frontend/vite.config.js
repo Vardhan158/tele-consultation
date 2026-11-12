@@ -7,6 +7,7 @@ import path from 'node:path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  assetsInclude: ['**/*.glb'],
   server: process.env.VITE_HTTPS === '1' ? {
     https: {
       key: fs.readFileSync(path.resolve('../backend/.certs/localhost-key.pem')),
