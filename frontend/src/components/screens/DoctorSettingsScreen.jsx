@@ -62,7 +62,7 @@ export default function DoctorSettingsScreen() {
             </form>
           </>
         )}
-        {message && <p className="text-sm text-[#295255]">{message}</p>}
+        {message && <p className="text-sm text-[#25836F]">{message}</p>}
       </div>
     </div>
   );

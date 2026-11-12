@@ -1,4 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
 
 .material-symbols-outlined {
   font-family: "Material Symbols Outlined";
@@ -14,7 +15,6 @@
   direction: ltr;
   -webkit-font-feature-settings: "liga";
   -webkit-font-smoothing: antialiased;
-  color: #577877;
 }
 
 /* Premium Card System */
@@ -44,8 +44,8 @@
 }
 
 .care-card-interactive:hover {
-  border-color: #295255;
-  box-shadow: 0 12px 28px -4px rgba(41, 82, 85, 0.12);
+  border-color: #25836F;
+  box-shadow: 0 12px 28px -4px rgba(37, 131, 111, 0.12);
   transform: translateY(-2px);
 }
 
@@ -55,7 +55,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background-color: #295255;
+  background-color: #25836F;
   color: #ffffff;
   font-family: "Poppins", sans-serif;
   font-weight: 500;
@@ -64,14 +64,14 @@
   padding: 0.625rem 1.25rem;
   border-radius: 0.75rem;
   border: 1px solid transparent;
-  box-shadow: 0 2px 8px rgba(41, 82, 85, 0.2);
+  box-shadow: 0 2px 8px rgba(37, 131, 111, 0.2);
   transition: all 0.18s ease-in-out;
   cursor: pointer;
 }
 
 .btn-primary:hover {
-  background-color: #1f3f41;
-  box-shadow: 0 4px 14px rgba(41, 82, 85, 0.3);
+  background-color: #1d6e5d;
+  box-shadow: 0 4px 14px rgba(37, 131, 111, 0.3);
   transform: translateY(-1px);
 }
 
@@ -93,7 +93,7 @@
   justify-content: center;
   gap: 0.5rem;
   background-color: #ffffff;
-  color: #295255;
+  color: #25836F;
   font-family: "Poppins", sans-serif;
   font-weight: 500;
   font-size: 0.875rem;
@@ -108,7 +108,7 @@
 
 .btn-secondary:hover {
   background-color: #f0f5f7;
-  border-color: #295255;
+  border-color: #25836F;
   color: #162623;
   transform: translateY(-1px);
 }
@@ -126,7 +126,7 @@
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #295255;
+  background: #25836F;
 }
 
 /* Typography Helpers for Poppins */

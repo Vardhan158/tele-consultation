@@ -206,7 +206,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
             email: receiptEmail || "emma.mitchell@example.com",
             contact: "+14155550142",
           },
-          theme: { color: "#295255" },
+          theme: { color: "#25836F" },
           handler: async (resp) => {
             try {
               await paymentApi.verify(
@@ -288,7 +288,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
         <div className="mx-auto max-w-7xl space-y-6">
           {/* Toast Notification */}
           {toastMessage && (
-            <div className="p-3.5 rounded-xl bg-white border border-[#295255]/30 shadow-sm flex items-center justify-between text-xs text-[#295255] font-semibold">
+            <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
               <span className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-base">
                   check_circle
@@ -336,7 +336,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               {/* Receipt Header: Brand + Receipt ID */}
               <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#295255] flex items-center justify-center text-white shadow-2xs shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-[#25836F] flex items-center justify-center text-white shadow-2xs shrink-0">
                     <span className="material-symbols-outlined text-2xl">
                       vital_signs
                     </span>
@@ -524,7 +524,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
               {/* Card 2: Need a billing correction? */}
               <div className="p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3">
-                <span className="material-symbols-outlined !text-[#295255] text-lg shrink-0 mt-0.5">
+                <span className="material-symbols-outlined !text-[#25836F] text-lg shrink-0 mt-0.5">
                   info
                 </span>
                 <div className="text-xs space-y-1">
@@ -534,7 +534,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                   <p className="text-[#577877] leading-relaxed">
                     <span
                       onClick={() => onNavigate("support")}
-                      className="text-[#295255] font-semibold hover:underline cursor-pointer"
+                      className="text-[#25836F] font-semibold hover:underline cursor-pointer"
                     >
                       Contact billing support
                     </span>{" "}
@@ -583,7 +583,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               onClick={() => onNavigate("find-doctors")}
               className="btn-secondary !px-3.5 !py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs"
             >
-              <span className="material-symbols-outlined !text-[#295255] text-sm">
+              <span className="material-symbols-outlined !text-[#25836F] text-sm">
                 arrow_back
               </span>
               <span>Back to appointment booking</span>
@@ -592,7 +592,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
             <button
               type="button"
               onClick={() => setView("billing")}
-              className="text-xs font-semibold text-[#295255] hover:underline"
+              className="text-xs font-semibold text-[#25836F] hover:underline"
             >
               View past statements &amp; billing history →
             </button>
@@ -651,7 +651,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                     type="checkbox"
                     checked={useDifferentCard}
                     onChange={(e) => setUseDifferentCard(e.target.checked)}
-                    className="w-4 h-4 rounded border-[#577877]/40 text-[#295255] focus:ring-[#295255] accent-[#295255]"
+                    className="w-4 h-4 rounded border-[#577877]/40 text-[#25836F] focus:ring-[#25836F] accent-[#25836F]"
                   />
                   <span>Use a different card</span>
                 </label>
@@ -722,7 +722,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                     type="checkbox"
                     checked={saveForFuture}
                     onChange={(e) => setSaveForFuture(e.target.checked)}
-                    className="w-4 h-4 rounded border-[#577877]/40 text-[#295255] focus:ring-[#295255] accent-[#295255]"
+                    className="w-4 h-4 rounded border-[#577877]/40 text-[#25836F] focus:ring-[#25836F] accent-[#25836F]"
                   />
                   <span className="font-semibold">
                     Save this payment method for future appointments
@@ -737,7 +737,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
               {/* Card 3: No surprise charges callout matching Screenshot */}
               <div className="p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3">
-                <span className="material-symbols-outlined !text-[#295255] text-xl shrink-0 mt-0.5">
+                <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5">
                   credit_card
                 </span>
                 <div className="text-xs space-y-1">
@@ -762,14 +762,14 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
                 {/* Doctor Row */}
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-full bg-[#E0F0EC] text-[#295255] font-bold text-sm flex items-center justify-center shrink-0">
+                  <div className="w-11 h-11 rounded-full bg-[#E0F0EC] text-[#25836F] font-bold text-sm flex items-center justify-center shrink-0">
                     {checkoutApt.doctor.initials || "SC"}
                   </div>
                   <div>
                     <h4 className="font-bold text-sm text-[#162623]">
                       {checkoutApt.doctor.name}
                     </h4>
-                    <p className="text-xs font-semibold text-[#295255]">
+                    <p className="text-xs font-semibold text-[#25836F]">
                       {checkoutApt.doctor.specialty}
                     </p>
                     <p className="text-[11px] text-[#577877]">
@@ -846,7 +846,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                       type="checkbox"
                       checked={agreeCancellation}
                       onChange={(e) => setAgreeCancellation(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-[#577877]/40 text-[#295255] focus:ring-[#295255] accent-[#295255]"
+                      className="mt-0.5 w-4 h-4 rounded border-[#577877]/40 text-[#25836F] focus:ring-[#25836F] accent-[#25836F]"
                     />
                     <div className="text-xs">
                       <span className="font-semibold text-[#162623]">
@@ -928,7 +928,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-white border border-[#295255]/30 shadow-sm flex items-center justify-between text-xs text-[#295255] font-semibold">
+          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
             <span className="flex items-center gap-2">
               <span className="material-symbols-outlined text-base">
                 check_circle
@@ -974,7 +974,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               onClick={handleDownloadStatement}
               className="btn-secondary !px-4 !py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs shrink-0"
             >
-              <span className="material-symbols-outlined !text-[#295255] text-base">
+              <span className="material-symbols-outlined !text-[#25836F] text-base">
                 download
               </span>
               <span>Download statement</span>
@@ -990,7 +990,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               <span className="text-xs text-[#577877] font-medium">
                 Outstanding balance
               </span>
-              <span className="material-symbols-outlined !text-[#295255] text-lg">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg">
                 check_circle
               </span>
             </div>
@@ -1006,7 +1006,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               <span className="text-xs text-[#577877] font-medium">
                 Paid this year
               </span>
-              <span className="material-symbols-outlined !text-[#295255] text-lg">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg">
                 account_balance_wallet
               </span>
             </div>
@@ -1022,7 +1022,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               <span className="text-xs text-[#577877] font-medium">
                 Refunds in progress
               </span>
-              <span className="material-symbols-outlined !text-[#295255] text-lg">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg">
                 sync
               </span>
             </div>
@@ -1050,13 +1050,13 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                   onClick={() => setActiveBillingTab(tab.id)}
                   className={`pb-3 font-semibold transition-all relative ${
                     isActive
-                      ? "text-[#295255]"
+                      ? "text-[#25836F]"
                       : "text-[#577877] hover:text-[#162623]"
                   }`}
                 >
                   <span>{tab.label}</span>
                   {isActive && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#295255] rounded-full" />
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#25836F] rounded-full" />
                   )}
                 </button>
               );
@@ -1130,7 +1130,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                             onClick={() => {
                               setSelectedReceipt(item);
                             }}
-                            className="font-medium text-[#162623] hover:text-[#295255] inline-flex items-center gap-1 cursor-pointer transition"
+                            className="font-medium text-[#162623] hover:text-[#25836F] inline-flex items-center gap-1 cursor-pointer transition"
                           >
                             <span>View receipt</span>
                             <span className="material-symbols-outlined text-xs">
@@ -1196,7 +1196,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               </h3>
               <div className="p-4 rounded-xl border border-[#577877]/20 bg-[#F0F5F7]/30 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="px-2.5 py-1 rounded bg-[#EBF5F5] text-[#295255] font-bold text-xs tracking-wider border border-[#295255]/20">
+                  <span className="px-2.5 py-1 rounded bg-[#EBF5F5] text-[#25836F] font-bold text-xs tracking-wider border border-[#25836F]/20">
                     VISA
                   </span>
                   <div>
@@ -1222,7 +1222,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                 onClick={() => setShowManageCard(true)}
                 className="btn-secondary !px-4 !py-2 text-xs font-semibold rounded-xl flex items-center gap-2"
               >
-                <span className="material-symbols-outlined !text-[#295255] text-base">
+                <span className="material-symbols-outlined !text-[#25836F] text-base">
                   add
                 </span>
                 <span>Add payment method</span>
@@ -1284,7 +1284,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center">
-                <span className="px-2.5 py-1 rounded bg-[#EBF5F5] text-[#295255] font-bold text-xs tracking-wider border border-[#295255]/20">
+                <span className="px-2.5 py-1 rounded bg-[#EBF5F5] text-[#25836F] font-bold text-xs tracking-wider border border-[#25836F]/20">
                   VISA
                 </span>
                 <span className="text-xs font-medium text-[#162623] ml-3">
@@ -1318,7 +1318,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               <button
                 type="button"
                 onClick={() => onNavigate("support")}
-                className="text-xs font-semibold text-[#295255] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-[#25836F] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Contact billing support</span>
                 <span>→</span>
@@ -1351,7 +1351,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined !text-[#295255] text-xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-xl">
                   receipt_long
                 </span>
                 <h3 className="text-base font-bold text-[#162623]">
@@ -1400,7 +1400,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               </div>
               <div className="flex justify-between pt-2 border-t border-[#577877]/15">
                 <span className="font-bold text-[#162623]">Amount Paid:</span>
-                <span className="font-bold text-base text-[#295255]">
+                <span className="font-bold text-base text-[#25836F]">
                   {selectedReceipt.amount}
                 </span>
               </div>
@@ -1438,7 +1438,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined !text-[#295255] text-xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-xl">
                   credit_card
                 </span>
                 <h3 className="text-base font-bold text-[#162623]">
@@ -1455,9 +1455,9 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-3.5 rounded-xl border-2 border-[#295255] bg-[#E8F3F3] flex items-center justify-between">
+              <div className="p-3.5 rounded-xl border-2 border-[#25836F] bg-[#E8F3F3] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="px-2 py-0.5 rounded bg-white text-[#295255] font-bold text-xs tracking-wider">
+                  <span className="px-2 py-0.5 rounded bg-white text-[#25836F] font-bold text-xs tracking-wider">
                     VISA
                   </span>
                   <div>
@@ -1467,7 +1467,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                     </p>
                   </div>
                 </div>
-                <span className="text-[#295255] font-bold">✓</span>
+                <span className="text-[#25836F] font-bold">✓</span>
               </div>
 
               <div className="space-y-2 pt-1">
@@ -1477,7 +1477,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                 <input
                   type="text"
                   defaultValue="94115"
-                  className="w-full px-3 py-2 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#295255]"
+                  className="w-full px-3 py-2 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
             </div>

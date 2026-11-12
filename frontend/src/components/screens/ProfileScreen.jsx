@@ -262,9 +262,9 @@ export default function ProfileScreen({
       return "w-full rounded-xl border border-red-500 bg-red-50/25 px-4 py-2.5 text-sm text-[#162623] focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-500 transition shadow-2xs";
     }
     if (isOk) {
-      return "w-full rounded-xl border border-emerald-600/40 bg-white px-4 py-2.5 text-sm text-[#162623] focus:border-[#295255] focus:outline-none transition shadow-2xs";
+      return "w-full rounded-xl border border-emerald-600/40 bg-white px-4 py-2.5 text-sm text-[#162623] focus:border-[#25836F] focus:outline-none transition shadow-2xs";
     }
-    return "w-full rounded-xl border border-[#577877]/25 bg-white px-4 py-2.5 text-sm text-[#162623] focus:border-[#295255] focus:outline-none transition shadow-2xs";
+    return "w-full rounded-xl border border-[#577877]/25 bg-white px-4 py-2.5 text-sm text-[#162623] focus:border-[#25836F] focus:outline-none transition shadow-2xs";
   };
 
   const getInitials = () => {
@@ -316,12 +316,12 @@ export default function ProfileScreen({
             className={`p-3.5 rounded-xl bg-white border ${
               isErrorToast
                 ? "border-red-500 text-red-700"
-                : "border-[#295255]/30 text-[#295255]"
+                : "border-[#25836F]/30 text-[#25836F]"
             } text-xs font-semibold flex items-center justify-between shadow-sm`}
           >
             <span className="flex items-center gap-2">
               <span
-                className={`material-symbols-outlined text-base ${isErrorToast ? "!text-red-600" : "!text-[#295255]"}`}
+                className={`material-symbols-outlined text-base ${isErrorToast ? "!text-red-600" : "!text-[#25836F]"}`}
               >
                 {isErrorToast ? "error" : "check_circle"}
               </span>
@@ -353,13 +353,13 @@ export default function ProfileScreen({
                 onClick={() => setActiveTab(tab.id)}
                 className={`pb-3 font-semibold transition-all relative cursor-pointer ${
                   isActive
-                    ? "text-[#295255]"
+                    ? "text-[#25836F]"
                     : "text-[#577877] hover:text-[#162623]"
                 }`}
               >
                 {tab.label}
                 {isActive && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#295255] rounded-full" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#25836F] rounded-full" />
                 )}
               </button>
             );
@@ -374,7 +374,7 @@ export default function ProfileScreen({
               {/* Profile Card */}
               <div className="care-card p-8 text-center space-y-4">
                 {/* Large Avatar Badge */}
-                <div className="w-24 h-24 rounded-full bg-[#E4EDF0] text-[#295255] flex items-center justify-center font-bold text-2xl mx-auto ring-4 ring-[#F0F5F7]">
+                <div className="w-24 h-24 rounded-full bg-[#E4EDF0] text-[#25836F] flex items-center justify-center font-bold text-2xl mx-auto ring-4 ring-[#F0F5F7]">
                   {getInitials()}
                 </div>
 
@@ -390,7 +390,7 @@ export default function ProfileScreen({
                 </div>
 
                 <div>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E7F3F1] text-[#295255] text-xs font-semibold">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E7F3F1] text-[#25836F] text-xs font-semibold">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                     {profile.email
                       ? "Verified patient account"
@@ -443,7 +443,7 @@ export default function ProfileScreen({
 
               {/* Privacy Callout Card */}
               <div className="p-5 rounded-2xl bg-[#E8F1F3] border border-[#577877]/20 flex items-start gap-3.5">
-                <span className="material-symbols-outlined !text-[#295255] text-xl shrink-0 mt-0.5">
+                <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5">
                   verified_user
                 </span>
                 <div className="text-xs space-y-1">
@@ -459,7 +459,7 @@ export default function ProfileScreen({
                           ? onNavigate("consent")
                           : setActiveTab("consent")
                       }
-                      className="text-[#295255] font-semibold underline hover:text-[#162623] cursor-pointer"
+                      className="text-[#25836F] font-semibold underline hover:text-[#162623] cursor-pointer"
                     >
                       Consent management
                     </button>
@@ -807,7 +807,7 @@ export default function ProfileScreen({
                 <button
                   type="button"
                   onClick={() => onNavigate && onNavigate("prescriptions")}
-                  className="text-[11px] text-[#295255] font-semibold underline cursor-pointer"
+                  className="text-[11px] text-[#25836F] font-semibold underline cursor-pointer"
                 >
                   View active e-Rx →
                 </button>
@@ -841,12 +841,12 @@ export default function ProfileScreen({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
-              <div className="p-5 rounded-2xl border border-[#295255]/30 bg-[#F0F5F7] space-y-2">
+              <div className="p-5 rounded-2xl border border-[#25836F]/30 bg-[#F0F5F7] space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm text-[#162623]">
                     James Mitchell
                   </span>
-                  <span className="px-2 py-0.5 rounded-full bg-[#295255] text-white text-[10px] font-semibold">
+                  <span className="px-2 py-0.5 rounded-full bg-[#25836F] text-white text-[10px] font-semibold">
                     Primary Contact
                   </span>
                 </div>

@@ -2,12 +2,12 @@ import { useState } from "react";
 
 function ClinicianBrandPanel({ onSignOut }) {
   return (
-    <aside className="relative hidden overflow-hidden bg-[#295255] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
+    <aside className="relative hidden overflow-hidden bg-[#25836F] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
       <div className="space-y-8 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center font-bold shadow-sm">
-              <span className="material-symbols-outlined !text-[#295255] text-2xl font-bold">
+            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#25836F] flex items-center justify-center font-bold shadow-sm">
+              <span className="material-symbols-outlined !text-[#25836F] text-2xl font-bold">
                 verified
               </span>
             </div>
@@ -87,15 +87,15 @@ export default function DoctorPendingApprovalScreen({ patient, onRefresh, onSign
             </span>
             <button
               onClick={onSignOut}
-              className="text-xs font-semibold text-[#577877] hover:text-[#295255] hover:underline cursor-pointer"
+              className="text-xs font-semibold text-[#577877] hover:text-[#25836F] hover:underline cursor-pointer"
             >
               Sign out
             </button>
           </div>
 
           <div className="space-y-2 text-center">
-            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#295255]/10 text-[#295255]">
-              <span className="material-symbols-outlined text-3xl text-[#295255]">
+            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#25836F]/10 text-[#25836F]">
+              <span className="material-symbols-outlined text-3xl text-[#25836F]">
                 medical_services
               </span>
             </div>
@@ -113,7 +113,7 @@ export default function DoctorPendingApprovalScreen({ patient, onRefresh, onSign
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-white text-[10px]">✓</span>
               <span>Email verification complete</span>
             </div>
-            <div className="flex items-center gap-2.5 font-medium text-[#295255]">
+            <div className="flex items-center gap-2.5 font-medium text-[#25836F]">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white text-[10px]">⏳</span>
               <span>Clinic Administrator review in progress</span>
             </div>
@@ -128,7 +128,7 @@ export default function DoctorPendingApprovalScreen({ patient, onRefresh, onSign
               type="button"
               onClick={handleRefresh}
               disabled={checking}
-              className="w-full rounded-xl bg-[#295255] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1f3f41] disabled:opacity-50 cursor-pointer"
+              className="w-full rounded-xl bg-[#25836F] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
             >
               {checking ? "Checking Approval Status…" : "Check Approval Status"}
             </button>
@@ -136,7 +136,7 @@ export default function DoctorPendingApprovalScreen({ patient, onRefresh, onSign
             <button
               type="button"
               onClick={onSignOut}
-              className="w-full rounded-xl border border-[#577877]/30 bg-white py-2.5 text-xs font-semibold text-[#577877] transition hover:border-[#295255] hover:text-[#162623] cursor-pointer"
+              className="w-full rounded-xl border border-[#577877]/30 bg-white py-2.5 text-xs font-semibold text-[#577877] transition hover:border-[#25836F] hover:text-[#162623] cursor-pointer"
             >
               Sign Out &amp; Return Later
             </button>

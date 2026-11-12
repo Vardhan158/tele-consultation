@@ -278,7 +278,7 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Toast */}
         {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-white border border-[#295255]/30 shadow-sm flex items-center justify-between text-xs text-[#295255] font-semibold">
+          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
             <span className="flex items-center gap-2">
               <span className="material-symbols-outlined text-base">
                 check_circle
@@ -311,7 +311,7 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
             onClick={handleAuthorizedDownload}
             className="bg-white border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer self-start sm:self-auto"
           >
-            <span className="material-symbols-outlined !text-[#295255] text-base">
+            <span className="material-symbols-outlined !text-[#25836F] text-base">
               download
             </span>
             <span>Download summary</span>
@@ -335,12 +335,12 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
                     onClick={() => setSelectedConsultationId(item.id)}
                     className={`rounded-2xl p-5 transition cursor-pointer ${
                       isSelected
-                        ? "border-2 border-[#295255] bg-white shadow-sm"
-                        : "border border-[#577877]/20 bg-white hover:border-[#295255]/50 hover:shadow-2xs"
+                        ? "border-2 border-[#25836F] bg-white shadow-sm"
+                        : "border border-[#577877]/20 bg-white hover:border-[#25836F]/50 hover:shadow-2xs"
                     }`}
                   >
                     <span
-                      className={`text-xs block ${isSelected ? "text-[#295255] font-semibold" : "text-[#577877]"}`}
+                      className={`text-xs block ${isSelected ? "text-[#25836F] font-semibold" : "text-[#577877]"}`}
                     >
                       {item.dateDisplay}
                     </span>
@@ -370,21 +370,21 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
                 <h2 className="text-xl sm:text-2xl font-bold text-[#162623]">
                   {activeConsultation.title}
                 </h2>
-                <span className="inline-block text-xs font-semibold px-3.5 py-1 rounded-full bg-[#E8F3F3] text-[#295255] self-start sm:self-auto">
+                <span className="inline-block text-xs font-semibold px-3.5 py-1 rounded-full bg-[#E8F3F3] text-[#25836F] self-start sm:self-auto">
                   {activeConsultation.signedStatus}
                 </span>
               </div>
 
               {/* Doctor Row matching Screenshot */}
               <div className="flex items-center gap-3.5 pt-1">
-                <div className="w-11 h-11 rounded-full bg-[#E0F0EC] text-[#295255] font-bold text-sm flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-full bg-[#E0F0EC] text-[#25836F] font-bold text-sm flex items-center justify-center shrink-0">
                   {activeConsultation.doctor.initials}
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-[#162623]">
                     {activeConsultation.doctor.name}
                   </h3>
-                  <p className="text-xs font-semibold text-[#295255]">
+                  <p className="text-xs font-semibold text-[#25836F]">
                     {activeConsultation.doctor.specialty}
                   </p>
                   <p className="text-[11px] text-[#577877]">
@@ -474,7 +474,7 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
                   onClick={() => onNavigate && onNavigate("prescriptions")}
                   className="border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer"
                 >
-                  <span className="material-symbols-outlined !text-[#295255] text-base">
+                  <span className="material-symbols-outlined !text-[#25836F] text-base">
                     pill
                   </span>
                   <span>View prescription</span>
@@ -506,7 +506,7 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
 
             {/* CARD 2: Questions about your care plan? matching Screenshot */}
             <div className="p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3">
-              <span className="material-symbols-outlined !text-[#295255] text-lg shrink-0 mt-0.5">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg shrink-0 mt-0.5">
                 info
               </span>
               <div className="text-xs space-y-1">
@@ -547,7 +547,7 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
           <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#295255] text-2xl">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
                   assignment_turned_in
                 </span>
                 <h3 className="text-base font-bold text-[#162623]">
@@ -574,7 +574,7 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
                     key={idx}
                     className="p-3 rounded-xl bg-[#F0F5F7] flex items-start gap-2.5"
                   >
-                    <span className="text-[#295255] font-bold mt-0.5">✓</span>
+                    <span className="text-[#25836F] font-bold mt-0.5">✓</span>
                     <span className="text-[#162623] font-medium leading-relaxed">
                       {task}
                     </span>

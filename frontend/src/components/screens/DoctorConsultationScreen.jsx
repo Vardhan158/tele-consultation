@@ -20,7 +20,7 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
         <button
           type="button"
           onClick={onBack}
-          className="text-sm text-[#295255]"
+          className="text-sm text-[#25836F]"
         >
           ← Back
         </button>

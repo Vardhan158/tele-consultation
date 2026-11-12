@@ -13,12 +13,12 @@ const initialForm = {
 
 function BrandPanel({ onBack }) {
   return (
-    <aside className="relative hidden overflow-hidden bg-[#295255] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
+    <aside className="relative hidden overflow-hidden bg-[#25836F] text-white lg:flex lg:flex-col justify-between p-10 lg:p-14 xl:p-16 min-h-screen">
       <div className="space-y-8 relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#295255] flex items-center justify-center font-bold shadow-sm">
-              <span className="material-symbols-outlined !text-[#295255] text-2xl font-bold">
+            <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#25836F] flex items-center justify-center font-bold shadow-sm">
+              <span className="material-symbols-outlined !text-[#25836F] text-2xl font-bold">
                 health_and_safety
               </span>
             </div>
@@ -176,7 +176,7 @@ export default function AuthScreen({
   };
 
   const inputClass =
-    "mt-1.5 w-full rounded-xl border border-[#577877]/30 bg-[#F0F5F7] px-3.5 py-2.5 text-xs text-[#162623] outline-none focus:border-[#295255] focus:bg-white transition";
+    "mt-1.5 w-full rounded-xl border border-[#577877]/30 bg-[#F0F5F7] px-3.5 py-2.5 text-xs text-[#162623] outline-none focus:border-[#25836F] focus:bg-white transition";
 
   const isRegister = mode === "register";
   const isRecovery = mode === "recovery";
@@ -194,7 +194,7 @@ export default function AuthScreen({
                   <button
                     type="button"
                     onClick={onBack}
-                    className="lg:hidden inline-flex items-center gap-1 text-xs font-semibold text-[#295255] hover:underline"
+                    className="lg:hidden inline-flex items-center gap-1 text-xs font-semibold text-[#25836F] hover:underline"
                   >
                     <span className="material-symbols-outlined text-sm">
                       arrow_back
@@ -268,7 +268,7 @@ export default function AuthScreen({
                       ref={(element) => {
                         otpRefs.current[idx] = element;
                       }}
-                      className="h-12 w-full rounded-xl border border-[#577877]/30 text-center text-xl font-bold text-[#162623] outline-none focus:border-[#295255] focus:bg-[#F0F5F7]"
+                      className="h-12 w-full rounded-xl border border-[#577877]/30 text-center text-xl font-bold text-[#162623] outline-none focus:border-[#25836F] focus:bg-[#F0F5F7]"
                     />
                   ))}
                 </div>
@@ -277,7 +277,7 @@ export default function AuthScreen({
 
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-[#295255] hover:bg-[#162623] text-white text-xs font-semibold py-3 transition shadow-sm cursor-pointer"
+                  className="w-full rounded-xl bg-[#25836F] hover:bg-[#162623] text-white text-xs font-semibold py-3 transition shadow-sm cursor-pointer"
                 >
                   Verify & Enter Patient Portal
                 </button>
@@ -293,7 +293,7 @@ export default function AuthScreen({
                         "Please request a new code after restarting registration.",
                       )
                     }
-                    className="font-semibold text-[#295255] hover:underline"
+                    className="font-semibold text-[#25836F] hover:underline"
                   >
                     Resend code
                   </button>
@@ -333,7 +333,7 @@ export default function AuthScreen({
                 <button
                   type="button"
                   onClick={onBack}
-                  className="lg:hidden inline-flex items-center gap-1 text-xs font-semibold text-[#295255] hover:underline"
+                  className="lg:hidden inline-flex items-center gap-1 text-xs font-semibold text-[#25836F] hover:underline"
                 >
                   <span className="material-symbols-outlined text-sm">
                     arrow_back
@@ -444,7 +444,7 @@ export default function AuthScreen({
                       <button
                         type="button"
                         onClick={() => changeMode("recovery")}
-                        className="text-[11px] text-[#295255] hover:underline cursor-pointer"
+                        className="text-[11px] text-[#25836F] hover:underline cursor-pointer"
                       >
                         Forgot password?
                       </button>
@@ -505,7 +505,7 @@ export default function AuthScreen({
                       name="terms_accepted"
                       checked={form.terms_accepted}
                       onChange={update}
-                      className="mt-0.5 accent-[#295255]"
+                      className="mt-0.5 accent-[#25836F]"
                     />
                     <span>
                       I accept the Terms of Service and Privacy Policy.
@@ -520,7 +520,7 @@ export default function AuthScreen({
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full rounded-xl bg-[#295255] hover:bg-[#162623] text-white text-xs font-semibold py-3 mt-2 transition shadow-sm cursor-pointer disabled:opacity-60"
+                className="w-full rounded-xl bg-[#25836F] hover:bg-[#162623] text-white text-xs font-semibold py-3 mt-2 transition shadow-sm cursor-pointer disabled:opacity-60"
               >
                 {busy
                   ? "Processing…"
@@ -541,7 +541,7 @@ export default function AuthScreen({
                   <button
                     type="button"
                     onClick={() => changeMode("login")}
-                    className="font-semibold text-[#295255] hover:underline cursor-pointer"
+                    className="font-semibold text-[#25836F] hover:underline cursor-pointer"
                   >
                     Sign in
                   </button>
@@ -552,7 +552,7 @@ export default function AuthScreen({
                   <button
                     type="button"
                     onClick={() => changeMode("register")}
-                    className="font-semibold text-[#295255] hover:underline cursor-pointer"
+                    className="font-semibold text-[#25836F] hover:underline cursor-pointer"
                   >
                     Create an account
                   </button>

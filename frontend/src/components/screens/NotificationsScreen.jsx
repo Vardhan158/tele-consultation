@@ -222,7 +222,7 @@ export default function NotificationsScreen({ onNavigate }) {
                 onClick={() => setActiveFilter("all")}
                 className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
                   activeFilter === "all"
-                    ? "text-[#295255] border-b-2 border-[#295255]"
+                    ? "text-[#25836F] border-b-2 border-[#25836F]"
                     : "text-[#577877] hover:text-[#162623]"
                 }`}
               >
@@ -234,7 +234,7 @@ export default function NotificationsScreen({ onNavigate }) {
                 onClick={() => setActiveFilter("unread")}
                 className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   activeFilter === "unread"
-                    ? "text-[#295255] border-b-2 border-[#295255]"
+                    ? "text-[#25836F] border-b-2 border-[#25836F]"
                     : "text-[#577877] hover:text-[#162623]"
                 }`}
               >
@@ -242,7 +242,7 @@ export default function NotificationsScreen({ onNavigate }) {
                 <span
                   className={`text-[11px] px-1.5 py-0.2 rounded-full ${
                     activeFilter === "unread"
-                      ? "bg-[#295255] text-white"
+                      ? "bg-[#25836F] text-white"
                       : "bg-[#E5E7EB] text-[#577877]"
                   }`}
                 >
@@ -255,7 +255,7 @@ export default function NotificationsScreen({ onNavigate }) {
                 onClick={() => setActiveFilter("appointments")}
                 className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
                   activeFilter === "appointments"
-                    ? "text-[#295255] border-b-2 border-[#295255]"
+                    ? "text-[#25836F] border-b-2 border-[#25836F]"
                     : "text-[#577877] hover:text-[#162623]"
                 }`}
               >
@@ -267,7 +267,7 @@ export default function NotificationsScreen({ onNavigate }) {
                 onClick={() => setActiveFilter("care")}
                 className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
                   activeFilter === "care"
-                    ? "text-[#295255] border-b-2 border-[#295255]"
+                    ? "text-[#25836F] border-b-2 border-[#25836F]"
                     : "text-[#577877] hover:text-[#162623]"
                 }`}
               >
@@ -279,7 +279,7 @@ export default function NotificationsScreen({ onNavigate }) {
                 onClick={() => setActiveFilter("billing")}
                 className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
                   activeFilter === "billing"
-                    ? "text-[#295255] border-b-2 border-[#295255]"
+                    ? "text-[#25836F] border-b-2 border-[#25836F]"
                     : "text-[#577877] hover:text-[#162623]"
                 }`}
               >
@@ -386,8 +386,8 @@ export default function NotificationsScreen({ onNavigate }) {
             </div>
 
             {/* CARD 2: Keep your details current matching Screenshot */}
-            <div className="rounded-2xl p-5 bg-[#E8F3F3] border border-[#295255]/20 flex items-start gap-3.5 shadow-2xs">
-              <span className="material-symbols-outlined !text-[#295255] text-lg shrink-0 mt-0.5">
+            <div className="rounded-2xl p-5 bg-[#E8F3F3] border border-[#25836F]/20 flex items-start gap-3.5 shadow-2xs">
+              <span className="material-symbols-outlined !text-[#25836F] text-lg shrink-0 mt-0.5">
                 info
               </span>
               <div>
@@ -401,7 +401,7 @@ export default function NotificationsScreen({ onNavigate }) {
                 <button
                   type="button"
                   onClick={() => onNavigate && onNavigate("profile")}
-                  className="mt-2 text-xs font-semibold text-[#295255] hover:underline cursor-pointer inline-flex items-center gap-1"
+                  className="mt-2 text-xs font-semibold text-[#25836F] hover:underline cursor-pointer inline-flex items-center gap-1"
                 >
                   <span>Review profile & contacts →</span>
                 </button>
@@ -417,7 +417,7 @@ export default function NotificationsScreen({ onNavigate }) {
           <div className="bg-white w-full max-w-md rounded-2xl border border-[#577877]/20 shadow-xl p-6 space-y-5 animate-in fade-in duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#295255]/10 flex items-center justify-center text-[#295255]">
+                <div className="w-8 h-8 rounded-lg bg-[#25836F]/10 flex items-center justify-center text-[#25836F]">
                   <span className="material-symbols-outlined text-lg">
                     tune
                   </span>
@@ -468,7 +468,7 @@ export default function NotificationsScreen({ onNavigate }) {
                       emailSummary: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 accent-[#295255] rounded cursor-pointer"
+                  className="w-4 h-4 accent-[#25836F] rounded cursor-pointer"
                 />
               </div>
 
@@ -490,7 +490,7 @@ export default function NotificationsScreen({ onNavigate }) {
                       smsAlerts: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 accent-[#295255] rounded cursor-pointer"
+                  className="w-4 h-4 accent-[#25836F] rounded cursor-pointer"
                 />
               </div>
 
@@ -512,7 +512,7 @@ export default function NotificationsScreen({ onNavigate }) {
                       inPortalAlerts: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 accent-[#295255] rounded cursor-pointer"
+                  className="w-4 h-4 accent-[#25836F] rounded cursor-pointer"
                 />
               </div>
 
@@ -535,7 +535,7 @@ export default function NotificationsScreen({ onNavigate }) {
                       labResults: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 accent-[#295255] rounded cursor-pointer"
+                  className="w-4 h-4 accent-[#25836F] rounded cursor-pointer"
                 />
               </div>
             </div>

@@ -114,7 +114,7 @@ export default function PaymentOversightTab() {
         <div className="flex gap-2">
           <button
             onClick={handleExportCSV}
-            className="rounded-xl border border-[#577877]/30 bg-white px-3.5 py-2 text-xs font-semibold text-[#295255] hover:bg-[#F0F5F7] flex items-center gap-1.5 cursor-pointer"
+            className="rounded-xl border border-[#577877]/30 bg-white px-3.5 py-2 text-xs font-semibold text-[#25836F] hover:bg-[#F0F5F7] flex items-center gap-1.5 cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">download</span>
             Export CSV
@@ -131,7 +131,7 @@ export default function PaymentOversightTab() {
                 key={st}
                 onClick={() => setFilter(st)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                  filter === st ? "bg-[#295255] text-white" : "bg-[#F0F5F7] text-[#577877]"
+                  filter === st ? "bg-[#25836F] text-white" : "bg-[#F0F5F7] text-[#577877]"
                 }`}
               >
                 {st}
@@ -141,7 +141,7 @@ export default function PaymentOversightTab() {
 
           <div className="text-right text-xs">
             <span className="text-[#577877]">Net Captured Revenue: </span>
-            <span className="font-bold text-lg text-[#295255]">
+            <span className="font-bold text-lg text-[#25836F]">
               ₹{totalCaptured.toLocaleString("en-IN")}
             </span>
           </div>
@@ -157,7 +157,7 @@ export default function PaymentOversightTab() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by Payment ID, Patient Name, or Razorpay Order ID…"
-              className="w-full rounded-xl border border-[#577877]/25 pl-9 pr-3 py-2 text-xs focus:border-[#295255] focus:outline-none"
+              className="w-full rounded-xl border border-[#577877]/25 pl-9 pr-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
             />
           </div>
         </div>
@@ -195,7 +195,7 @@ export default function PaymentOversightTab() {
             <div className="text-right">
               <button
                 onClick={() => setSelectedPayment(null)}
-                className="rounded-xl bg-[#295255] px-4 py-2 text-xs font-semibold text-white"
+                className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-semibold text-white"
               >
                 Done
               </button>
@@ -276,7 +276,7 @@ export default function PaymentOversightTab() {
                     <td className="p-3 text-[#577877] font-mono text-[10px]">
                       {p.razorpay_order_id || p.provider_transaction_id || "N/A"}
                     </td>
-                    <td className="p-3 font-bold text-[#295255]">₹{p.amount}</td>
+                    <td className="p-3 font-bold text-[#25836F]">₹{p.amount}</td>
                     <td className="p-3">
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
@@ -293,7 +293,7 @@ export default function PaymentOversightTab() {
                     <td className="p-3 text-right space-x-2">
                       <button
                         onClick={() => setSelectedPayment(p)}
-                        className="rounded-lg border border-[#577877]/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#295255] hover:bg-[#F0F5F7]"
+                        className="rounded-lg border border-[#577877]/30 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#25836F] hover:bg-[#F0F5F7]"
                       >
                         Receipt
                       </button>
@@ -323,14 +323,14 @@ export default function PaymentOversightTab() {
                 <button
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#295255] hover:bg-[#F0F5F7] disabled:opacity-40"
+                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] hover:bg-[#F0F5F7] disabled:opacity-40"
                 >
                   Previous
                 </button>
                 <button
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#295255] hover:bg-[#F0F5F7] disabled:opacity-40"
+                  className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] hover:bg-[#F0F5F7] disabled:opacity-40"
                 >
                   Next
                 </button>

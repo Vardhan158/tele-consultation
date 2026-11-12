@@ -59,7 +59,7 @@ export default function DoctorAvailabilityScreen() {
           Add slot
         </button>
       </form>
-      {message && <p className="text-sm text-[#295255]">{message}</p>}
+      {message && <p className="text-sm text-[#25836F]">{message}</p>}
       <div className="space-y-2">
         {items.map((item) => (
           <div
