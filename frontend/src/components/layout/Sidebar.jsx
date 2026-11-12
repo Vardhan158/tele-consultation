@@ -62,9 +62,9 @@ export default function Sidebar({
           className="flex items-center gap-3 cursor-pointer group min-w-0"
           onClick={() => onSelectTab(isAdmin ? "clinic-overview" : isDoctor ? "doctor-dashboard" : "dashboard")}
         >
-          <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center text-[#1C735E] shadow-sm shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center text-[#103F36] shadow-sm shrink-0">
             <svg
-              className="w-6 h-6 text-[#1C735E]"
+              className="w-6 h-6 text-[#103F36]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -113,13 +113,13 @@ export default function Sidebar({
               }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-xl transition-all text-xs font-medium cursor-pointer ${
                 isActive
-                  ? "bg-[#F0F5F7] text-[#1C735E] font-bold shadow-xs"
+                  ? "bg-[#F0F5F7] text-[#103F36] font-bold shadow-xs"
                   : "text-[#F0F5F7]/85 hover:bg-white/10 hover:text-white"
               }`}
             >
               <span
                 className={`material-symbols-outlined text-[19px] shrink-0 ${
-                  isActive ? "!text-[#1C735E]" : "!text-[#F0F5F7]/80"
+                  isActive ? "!text-[#103F36]" : "!text-[#F0F5F7]/80"
                 }`}
               >
                 {item.icon}
@@ -149,14 +149,14 @@ export default function Sidebar({
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2 text-left rounded-xl transition-all text-xs font-medium cursor-pointer ${
                   isActive
-                    ? "bg-[#F0F5F7] text-[#1C735E] font-bold shadow-xs"
+                    ? "bg-[#F0F5F7] text-[#103F36] font-bold shadow-xs"
                     : "text-[#F0F5F7]/85 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <span
                     className={`material-symbols-outlined text-[19px] shrink-0 ${
-                      isActive ? "!text-[#1C735E]" : "!text-[#F0F5F7]/80"
+                      isActive ? "!text-[#103F36]" : "!text-[#F0F5F7]/80"
                     }`}
                   >
                     {item.icon}
@@ -172,8 +172,8 @@ export default function Sidebar({
       {/* Bottom Support section */}
       {!isDoctor && !isAdmin && (
         <div className="mt-6 p-4 rounded-2xl bg-white/10 border border-white/15 space-y-2">
-          <div className="w-8 h-8 rounded-lg bg-[#F0F5F7] flex items-center justify-center text-[#1C735E] shadow-2xs">
-            <span className="material-symbols-outlined !text-[#1C735E] text-lg">
+          <div className="w-8 h-8 rounded-lg bg-[#F0F5F7] flex items-center justify-center text-[#103F36] shadow-2xs">
+            <span className="material-symbols-outlined !text-[#103F36] text-lg">
               volunteer_activism
             </span>
           </div>
@@ -209,7 +209,7 @@ export default function Sidebar({
           onClick={onCloseMobile}
         >
           <aside
-            className="fixed left-0 top-0 h-full w-72 bg-[#1C735E] text-white border-r border-[#162623]/30 flex flex-col justify-between shadow-xl no-scrollbar"
+            className="fixed left-0 top-0 h-full w-72 bg-[#103F36] text-white border-r border-[#162623]/30 flex flex-col justify-between shadow-xl no-scrollbar"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -220,7 +220,7 @@ export default function Sidebar({
 
       {/* Desktop Persistent Flex Sidebar */}
       <aside
-        className="hidden lg:flex lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:z-30 bg-[#1C735E] text-white border-r border-[#162623]/30 flex-col justify-between shadow-xl no-scrollbar"
+        className="hidden lg:flex lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:z-30 bg-[#103F36] text-white border-r border-[#162623]/30 flex-col justify-between shadow-xl no-scrollbar"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {sidebarContent}
