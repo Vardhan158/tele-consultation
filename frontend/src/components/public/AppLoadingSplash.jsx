@@ -182,8 +182,8 @@ export default function AppLoadingSplash({ onFinished }) {
       wrapperGroup.position.x = currentPosX;
       wrapperGroup.position.y = -0.3 + Math.sin(Date.now() * 0.003) * 0.06;
 
-      // Angle headlights facing Right (towards movement direction) with 3D perspective angle
-      wrapperGroup.rotation.y = Math.PI / 2 - 0.38;
+      // Rotated 180 degrees
+      wrapperGroup.rotation.y = Math.PI / 2 - 0.38 + Math.PI;
       wrapperGroup.rotation.z = Math.sin(Date.now() * 0.003) * 0.015;
 
       renderer.render(scene, camera);
