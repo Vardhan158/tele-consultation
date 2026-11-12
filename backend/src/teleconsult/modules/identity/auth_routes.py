@@ -37,11 +37,13 @@ GENERIC_AUTH_ERROR = "Unable to authenticate with those details"
 
 def session_cookie_options() -> dict[str, object]:
     """Use secure cookie attributes outside local development."""
-    secure = get_settings().environment not in {"dev", "local"}
+    # Always use Secure and SameSite=none to support cross-domain deployment
+    # (like frontend and backend being on different Render domains, or localhost -> Render).
+    # Modern browsers perfectly support Secure cookies on http://localhost.
     return {
         "httponly": True,
-        "secure": secure,
-        "samesite": "none" if secure else "lax",
+        "secure": True,
+        "samesite": "none",
         "max_age": 8 * 3600,
         "path": "/",
     }

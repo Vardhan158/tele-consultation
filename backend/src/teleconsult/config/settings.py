@@ -77,7 +77,17 @@ class Settings(BaseSettings):
             for origin in self.frontend_origins.split(",")
             if origin.strip().strip('"[]')
         ]
-        return list(dict.fromkeys(configured))
+
+        # Always allow local development origins to prevent CORS errors during hybrid testing
+        # (e.g., local frontend -> deployed backend)
+        always_allow = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ]
+
+        return list(dict.fromkeys(configured + always_allow))
 
 
 @lru_cache
