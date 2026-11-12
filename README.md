@@ -111,3 +111,8 @@ docs/       ADRs, security artefacts, compliance records, runbooks, ENGINEERING_
 
 Read `docs/ENGINEERING_RULES.md` next.
 # Teleconsultation
+
+# Backend deployment
+
+The repository includes a Render Blueprint for the backend. Create a Blueprint
+from this repository and provide the `MONGODB_URI` secret in Render.

@@ -1,21 +1,20 @@
-from datetime import datetime, timedelta, UTC
-from collections.abc import AsyncIterator
+import hashlib
 import secrets
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
+from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.consultation.video_models import VideoSession
 from teleconsult.modules.consultation.video_schemas import VideoJoinResponse, VideoStatusResponse
 from teleconsult.modules.patient_portal.models import Appointment
-from teleconsult.config.settings import get_settings
-from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.notifications.models import Notification
-from teleconsult.modules.patient_portal.consent_guard import require_active_consent
 
 router = APIRouter(prefix="/patient/consultations", tags=["video-consultation"])
 
@@ -89,6 +88,18 @@ async def join_waiting_room(
             else:
                 raise HTTPException(status_code=404, detail="Appointment not found")
 
+        # Enforce appointment ownership: patient_id must match principal.user_id
+        apt_patient_id = str(apt_doc.get("patient_id", ""))
+        if (
+            "patient" in principal.roles
+            and apt_patient_id
+            and apt_patient_id != str(principal.user_id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorized to access this consultation room.",
+            )
+
         status_val = apt_doc.get("status")
         pay_status = (apt_doc.get("payment_status") or "").lower()
         payment_doc = await db["payments"].find_one(
@@ -106,6 +117,29 @@ async def join_waiting_room(
                 detail="Payment is required before joining the consultation room.",
             )
 
+        # Validate permitted joining window on backend
+        starts_at_str = apt_doc.get("starts_at")
+        ends_at_str = apt_doc.get("ends_at")
+        if starts_at_str and settings.environment not in {"dev", "local_test"}:
+            try:
+                starts_dt = datetime.fromisoformat(str(starts_at_str).replace("Z", "+00:00"))
+                if ends_at_str:
+                    ends_dt = datetime.fromisoformat(str(ends_at_str).replace("Z", "+00:00"))
+                else:
+                    ends_dt = starts_dt + timedelta(minutes=30)
+
+                join_window_start = starts_dt - timedelta(minutes=30)
+                join_window_end = ends_dt
+
+                if now < join_window_start or now > join_window_end:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Consultation join window is closed. Permitted joining window has expired.",
+                    )
+            except ValueError:
+                pass
+
+        raw_token = secrets.token_urlsafe(24)
         video_doc = await db["video_sessions"].find_one({
             "tenant_id": principal.tenant_id,
             "appointment_id": str(appointment_id),
@@ -120,34 +154,55 @@ async def join_waiting_room(
                 "room_id": f"teleconsult-{appointment_id}",
                 "provider": "webrtc",
                 "status": "waiting",
+                "patient_token_hash": hashlib.sha256(raw_token.encode()).hexdigest(),
                 "created_at": now.isoformat(),
             }
             await db["video_sessions"].insert_one(dict(video_doc))
+
+        await db["video_sessions"].update_one(
+            {"id": video_doc["id"]},
+            {"$set": {"patient_token_hash": hashlib.sha256(raw_token.encode()).hexdigest()}},
+        )
 
         return VideoJoinResponse(
             session_id=UUID(int=hash(video_doc["id"]) & 0xffffffffffffffffffffffffffffffff) if len(video_doc["id"]) != 36 else UUID(video_doc["id"]),
             room_id=video_doc.get("room_id", f"teleconsult-{appointment_id}"),
             room_url=None,
-            token=secrets.token_urlsafe(24),
+            token=raw_token,
             token_expires_at=now + timedelta(minutes=15),
             status=video_doc.get("status", "waiting"),
         )
+    appointment = await session.scalar(select(Appointment).where(
+        Appointment.id == (UUID(appointment_id) if len(appointment_id) == 36 else appointment_id),
+        Appointment.tenant_id == UUID(principal.tenant_id),
+        Appointment.patient_id == UUID(principal.user_id)
+    ))
+    if appointment is None:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    if appointment.payment_status not in {"captured", "success", "not_required", "no_payment_required", "not_needed"}:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Payment is required before joining the consultation room.",
+        )
+
+    video = await session.scalar(select(VideoSession).where(
+        VideoSession.appointment_id == appointment.id, VideoSession.patient_id == UUID(principal.user_id)
+    ))
+    if video is None:
+        video = VideoSession(tenant_id=appointment.tenant_id, appointment_id=appointment.id,
+            patient_id=UUID(principal.user_id), room_id=f"teleconsult-{appointment.id}", provider="webrtc", status="checking")
+        session.add(video)
+        await session.flush()
+
+    raw_token = secrets.token_urlsafe(48)
+    video.status = "waiting"
     appointment.status = "checked_in"
-    existing_reminder = await session.scalar(select(Notification).where(
-        Notification.tenant_id == appointment.tenant_id, Notification.patient_id == appointment.patient_id,
-        Notification.event_type == "video_consultation_reminder", Notification.body.contains(str(appointment.id))))
-    if existing_reminder is None:
-        session.add(Notification(
-            tenant_id=appointment.tenant_id, patient_id=appointment.patient_id,
-            event_type="video_consultation_reminder", channel="in_app", status="queued",
-            subject="Your video consultation is ready",
-            body=f"Your secure waiting room is ready for appointment {appointment.id}."))
     return VideoJoinResponse(
         session_id=video.id,
         room_id=video.room_id,
         room_url=None,
         token=raw_token,
-        token_expires_at=video.token_expires_at,
+        token_expires_at=now + timedelta(minutes=15),
         status=video.status
     )
 

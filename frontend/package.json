@@ -4,11 +4,22 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test": "npm run test:e2e",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test tests/authentication.spec.js",
+    "test:e2e:module": "playwright test tests/teleconsult-modules.spec.js",
+    "test:e2e:auth": "playwright test tests/authentication.spec.js",
+    "test:e2e:profile": "playwright test tests/teleconsult-modules.spec.js -g '02 patient profile'",
+    "test:e2e:discovery": "playwright test tests/teleconsult-modules.spec.js -g '03 doctor discovery'",
+    "test:e2e:booking": "playwright test tests/teleconsult-modules.spec.js -g '04 booking'",
+    "test:e2e:payment": "playwright test tests/teleconsult-modules.spec.js -g '05 sandbox payment'",
+    "test:e2e:doctor": "playwright test tests/teleconsult-modules.spec.js -g '06 doctor portal'",
+    "test:e2e:webrtc": "playwright test tests/teleconsult-modules.spec.js -g '07 WebRTC'",
+    "test:e2e:completion": "playwright test tests/teleconsult-modules.spec.js -g '08 consultation completion'",
+    "test:e2e:security": "playwright test tests/teleconsult-modules.spec.js -g '09 security'",
     "test:e2e:live": "playwright test --config=playwright.live.config.js"
   },
   "dependencies": {

@@ -3,7 +3,7 @@ import { consultationApi, patientApi } from "../../lib/api";
 
 export default function VideoConsultationScreen({ onNavigate }) {
   const [appointmentId] = useState(
-    () => localStorage.getItem("teleconsult_appointment_id") || "apt-101",
+    () => localStorage.getItem("teleconsult_appointment_id") || "",
   );
   const [appointment, setAppointment] = useState(null);
   const [roomState, setRoomState] = useState("READINESS"); // 'READINESS' | 'WAITING_ROOM' | 'IN_CALL' | 'ENDED'
@@ -17,13 +17,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
   const [cameraOff, setCameraOff] = useState(false);
   const [activeSideTab, setActiveSideTab] = useState("chat"); // 'chat' | 'vitals' | 'notes'
   const [callDuration, setCallDuration] = useState(0);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      sender: "Dr. Sarah Chen",
-      text: "Hello Emma, I am reviewing your blood pressure log from this morning. Let us discuss the readings.",
-      time: "04:31 PM",
-    },
-  ]);
+  const [chatMessages, setChatMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const timerRef = useRef(null);
 

@@ -1,5 +1,5 @@
-from datetime import UTC, datetime
 import os
+from datetime import UTC, datetime
 from typing import Any
 
 from pymongo import ASCENDING, DESCENDING
@@ -86,7 +86,7 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
 }
 
 
-async def ensure_clinic_seeded(db=None) -> None:
+async def ensure_clinic_seeded(db: Any = None) -> None:
     db = mongo_database.database() if db is None else db
     settings = get_settings()
     tenant_id = settings.default_tenant_id or "1"
@@ -169,65 +169,14 @@ async def ensure_clinic_seeded(db=None) -> None:
         upsert=True,
     )
 
-    # 3. Seed / Upsert Default Clinician (Dr. Harshavardhan m v)
-    doc_id = "51ae2a4f-3fe9-4ca0-a106-3266454e4171"
-    await db["doctors"].update_one(
-        {"tenant_id": tenant_id, "id": doc_id},
-        {
-            "$set": {
-                "id": doc_id,
-                "user_id": doc_id,
-                "user_account_id": doc_id,
-                "tenant_id": tenant_id,
-                "full_name": "Harshavardhan m v",
-                "specialty": "ENT",
-                "clinic_name": clinic_name,
-                "registration_number": "KMC-HAR3210",
-                "qualifications": ["MBBS", "MS (ENT)"],
-                "experience_years": 10,
-                "languages": ["English", "Hindi", "Kannada"],
-                "supported_languages": ["English", "Hindi", "Kannada"],
-                "active": True,
-                "approved_for_consultation": True,
-                "approval_status": "approved",
-                "timezone": clinic_tz,
-                "fee_paise": 40000,
-                "created_at": now_iso,
-            }
-        },
-        upsert=True,
-    )
-
-    # 4. Seed / Upsert Default Clinical Service (ENT Follow-up Consultation)
-    await db["services"].update_one(
-        {"tenant_id": tenant_id, "id": "srv-4df86248"},
-        {
-            "$set": {
-                "id": "srv-4df86248",
-                "tenant_id": tenant_id,
-                "name": "ENT Follow-up Consultation",
-                "specialty": "ENT",
-                "duration_minutes": 30,
-                "currency": "INR",
-                "base_fee": 400,
-                "platform_fee": 75,
-                "active": True,
-                "effective_date": "2026-01-01",
-                "assigned_doctors": [doc_id],
-                "appointment_types": ["Follow-up Consultation"],
-            }
-        },
-        upsert=True,
-    )
-
     import logging
     logging.getLogger("uvicorn").info(
-        f"Clinic credentials ({admin_email}), clinic settings ({clinic_name}), "
-        f"clinician ({doc_id}), and services seeded successfully into database."
+        f"Clinic credentials ({admin_email}) and clinic settings ({clinic_name}) "
+        f"seeded successfully into database."
     )
 
 
-async def ensure_schema(db=None) -> dict[str, Any]:
+async def ensure_schema(db: Any = None) -> dict[str, Any]:
     db = mongo_database.database() if db is None else db
     existing = await db.list_collection_names()
     created = []

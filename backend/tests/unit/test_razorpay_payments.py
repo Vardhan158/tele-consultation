@@ -1,14 +1,15 @@
-import asyncio
 import hashlib
 import hmac
 import json
 import os
 import secrets
+
 import pytest
-from httpx import AsyncClient, ASGITransport
-from teleconsult.main import app
-from teleconsult.kernel.mongodb.client import mongo_database
+from httpx import ASGITransport, AsyncClient
+
 from teleconsult.config.settings import get_settings
+from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.main import app
 
 
 @pytest.mark.asyncio

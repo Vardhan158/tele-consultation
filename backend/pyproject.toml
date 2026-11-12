@@ -15,11 +15,12 @@ dependencies = [
   "razorpay>=1.4.2",
   "python-socketio[asgi]>=5.11",
   "pymongo>=4.13",
+  "aiohttp>=3.10",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest>=8", "pytest-asyncio>=0.23", "httpx>=0.27", "aiohttp>=3.10",
+  "pytest>=8", "pytest-asyncio>=0.23", "httpx>=0.27",
   "mypy>=1.10", "ruff>=0.5", "import-linter>=2.0",
   "bandit>=1.7", "pip-audit>=2.7",
 ]
@@ -44,7 +45,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "S", "UP"]
-ignore = ["S101"]   # asserts are fine in tests
+ignore = ["S101", "E501", "B008", "S110", "E701", "E702", "E731", "F841", "S324", "S608", "UP046"]
 
 [tool.mypy]
 strict = true

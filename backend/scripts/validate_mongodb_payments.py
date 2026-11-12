@@ -1,5 +1,7 @@
 """Real Atlas validation for inactive MongoDB payment repositories."""
 import asyncio
+import hashlib
+import hmac
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -9,12 +11,9 @@ from teleconsult.config.settings import get_settings
 from teleconsult.kernel.mongodb.schema import ensure_schema
 from teleconsult.modules.payments.mongodb_repositories import (
     PaymentMongoRepository,
-    PaymentConflict,
     verify_payment_signature,
     verify_webhook_signature,
 )
-import hashlib
-import hmac
 
 
 async def main() -> int:

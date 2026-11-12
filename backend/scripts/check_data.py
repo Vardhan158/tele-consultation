@@ -1,6 +1,9 @@
 import asyncio
+
 import asyncpg
+
 from teleconsult.config.settings import get_settings
+
 
 async def main():
     settings = get_settings()

@@ -1,20 +1,30 @@
-from datetime import datetime, UTC, timedelta
-import base64, hashlib, hmac, secrets, struct, time
+import base64
+import hashlib
+import hmac
+import secrets
+import struct
+import time
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
-from teleconsult.modules.identity.auth_routes import auth_database_session, password_hash, send_verification_email, token_hash
-from teleconsult.modules.identity.models import AuthSession, RecoveryToken, UserAccount
-from teleconsult.modules.patient_portal.models import Doctor
-from teleconsult.config.settings import get_settings
 from teleconsult.kernel.mongodb.client import mongo_database
-from pymongo.errors import DuplicateKeyError
+from teleconsult.modules.identity.auth_routes import (
+    auth_database_session,
+    password_hash,
+    send_verification_email,
+    token_hash,
+)
+from teleconsult.modules.identity.models import RecoveryToken, UserAccount
+from teleconsult.modules.patient_portal.models import Doctor
 
 router = APIRouter(prefix="/doctor", tags=["doctor-onboarding"])
 OTP_EXPIRY_MINUTES = 5

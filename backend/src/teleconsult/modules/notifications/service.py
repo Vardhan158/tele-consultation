@@ -1,5 +1,7 @@
 from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from teleconsult.modules.notifications.models import Notification
 
 

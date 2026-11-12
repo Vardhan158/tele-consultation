@@ -1,6 +1,6 @@
 """Clinic Administrator endpoints for the 8-screen admin dashboard."""
 import secrets
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -14,11 +14,11 @@ from pymongo.errors import DuplicateKeyError
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.identity.auth_routes import auth_database_session
 from teleconsult.modules.identity.models import UserAccount
 from teleconsult.modules.patient_portal.models import Appointment, Doctor, Patient
 from teleconsult.modules.payments.models import PaymentTransaction
-from teleconsult.modules.audit.models import AuditRecord
 
 router = APIRouter(
     prefix="/admin",
@@ -798,7 +798,6 @@ async def create_doctor_shift(
             raise HTTPException(status_code=422, detail="Clinic timezone is not configured correctly.") from exc
 
         for dt in target_dates:
-            dt_str = dt.strftime("%Y-%m-%d")
             shift_start = datetime.combine(dt, time(start_h, start_m), tzinfo=clinic_timezone).astimezone(UTC)
             shift_end = datetime.combine(dt, time(end_h, end_m), tzinfo=clinic_timezone).astimezone(UTC)
             break_start = datetime.combine(dt, time(b_start_h, b_start_m), tzinfo=clinic_timezone).astimezone(UTC)
@@ -1176,48 +1175,121 @@ async def refund_payment_admin(
 
 # --- 07. Operational Reports ---
 @router.get("/reports")
-async def get_reports(request: Request, time_range: str = "30d") -> dict[str, Any]:
+async def get_reports(
+    request: Request,
+    time_range: str = "30d",
+    session: AsyncSession | None = Depends(auth_database_session),
+) -> dict[str, Any]:
     await _verify_admin(request)
     settings = get_settings()
+    if time_range not in {"7d", "30d", "90d", "ytd"}:
+        raise HTTPException(status_code=422, detail="Unsupported report time range")
 
-    consultations_by_specialty = [
-        {"specialty": "General Medicine", "count": 48, "revenue": 24000},
-        {"specialty": "Cardiology", "count": 22, "revenue": 26400},
-        {"specialty": "Dermatology", "count": 35, "revenue": 28000},
-        {"specialty": "Pediatrics", "count": 19, "revenue": 11400},
-        {"specialty": "Neurology", "count": 14, "revenue": 21000},
-        {"specialty": "Orthopedics", "count": 16, "revenue": 14400},
-    ]
+    end_at = datetime.now(UTC)
+    if time_range == "7d":
+        start_at = end_at - timedelta(days=7)
+    elif time_range == "90d":
+        start_at = end_at - timedelta(days=90)
+    elif time_range == "ytd":
+        start_at = datetime(end_at.year, 1, 1, tzinfo=UTC)
+    else:
+        start_at = end_at - timedelta(days=30)
 
-    monthly_revenue = [
-        {"month": "Oct", "revenue": 78000, "consultations": 110},
-        {"month": "Nov", "revenue": 92000, "consultations": 135},
-        {"month": "Dec", "revenue": 105000, "consultations": 148},
-        {"month": "Jan", "revenue": 118000, "consultations": 162},
-        {"month": "Feb", "revenue": 125000, "consultations": 170},
-        {"month": "Mar", "revenue": 134000, "consultations": 182},
-    ]
+    def parse_datetime(value: Any) -> datetime | None:
+        if isinstance(value, datetime):
+            return value if value.tzinfo else value.replace(tzinfo=UTC)
+        if isinstance(value, str):
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+            except ValueError:
+                return None
+        return None
+
+    def percent(value: int, total: int) -> str | None:
+        return f"{(value / total) * 100:.1f}%" if total else None
 
     if settings.mongodb_enabled:
         db = mongo_database.database()
-        t_id = settings.default_tenant_id
-        total_apts = await db["appointments"].count_documents({"tenant_id": t_id})
+        tenant_id = settings.default_tenant_id
+        raw_appointments = await db["appointments"].find({"tenant_id": tenant_id}).to_list(10000)
+        doctors = {
+            item.get("id"): item
+            for item in await db["doctors"].find({"tenant_id": tenant_id}).to_list(10000)
+        }
+        raw_payments = await db["payments"].find({"tenant_id": tenant_id, "status": "captured"}).to_list(10000)
     else:
-        total_apts = 154
+        if session is None:
+            raise HTTPException(status_code=503, detail="No database configured")
+        tenant_id = UUID(settings.default_tenant_id)
+        raw_appointments = list(await session.scalars(select(Appointment).where(Appointment.tenant_id == tenant_id)))
+        doctors = {
+            str(item.id): {"specialty": item.specialty}
+            for item in await session.scalars(select(Doctor).where(Doctor.tenant_id == tenant_id))
+        }
+        raw_payments = list(await session.scalars(select(PaymentTransaction).where(
+            PaymentTransaction.tenant_id == tenant_id,
+            PaymentTransaction.status == "captured",
+        )))
 
+    appointments = []
+    for appointment in raw_appointments:
+        starts_at = parse_datetime(appointment.get("starts_at") if isinstance(appointment, dict) else appointment.starts_at)
+        if starts_at and start_at <= starts_at <= end_at:
+            appointments.append(appointment)
+
+    def field(item: Any, name: str, default: Any = None) -> Any:
+        return item.get(name, default) if isinstance(item, dict) else getattr(item, name, default)
+
+    payment_by_appointment = {
+        str(field(payment, "appointment_id")): int(field(payment, "amount_paise", 0) or 0) / 100
+        for payment in raw_payments
+    }
+    by_specialty: dict[str, dict[str, Any]] = {}
+    by_month: dict[tuple[int, int], dict[str, Any]] = {}
+    status_counts: dict[str, int] = {}
+    total_minutes = 0
+    completed = cancelled = no_show = 0
+    for appointment in appointments:
+        status_value = field(appointment, "status", "unknown")
+        status_counts[status_value] = status_counts.get(status_value, 0) + 1
+        completed += status_value == "completed"
+        cancelled += status_value == "cancelled"
+        no_show += status_value in {"no_show", "no-show"}
+        starts_at = parse_datetime(field(appointment, "starts_at"))
+        ends_at = parse_datetime(field(appointment, "ends_at"))
+        if starts_at and ends_at:
+            total_minutes += max(0, int((ends_at - starts_at).total_seconds() / 60))
+        doctor = doctors.get(str(field(appointment, "doctor_id")), {})
+        specialty = doctor.get("specialty") if isinstance(doctor, dict) else None
+        if not specialty:
+            specialty = "Unspecified"
+        revenue = field(appointment, "total_payable_paise")
+        revenue = float(revenue) / 100 if revenue is not None else payment_by_appointment.get(str(field(appointment, "id")), 0)
+        row = by_specialty.setdefault(specialty, {"specialty": specialty, "count": 0, "revenue": 0})
+        row["count"] += 1
+        row["revenue"] += revenue
+        if starts_at:
+            month = by_month.setdefault((starts_at.year, starts_at.month), {"month": starts_at.strftime("%b %Y"), "revenue": 0, "consultations": 0})
+            month["consultations"] += 1
+            month["revenue"] += revenue
+
+    total = len(appointments)
+    active = total - cancelled
     return {
         "time_range": time_range,
         "summary": {
-            "total_consultations": total_apts or 154,
-            "doctor_utilization_rate": "84.2%",
-            "completion_rate": "92.5%",
-            "cancellation_rate": "5.2%",
-            "no_show_rate": "2.3%",
-            "avg_consultation_duration": "24 mins",
-            "patient_satisfaction": "4.9 / 5.0",
+            "total_consultations": total,
+            "doctor_utilization_rate": percent(completed, active),
+            "completion_rate": percent(completed, total),
+            "cancellation_rate": percent(cancelled, total),
+            "no_show_rate": percent(no_show, total),
+            "avg_consultation_duration": f"{round(total_minutes / total)} mins" if total else None,
+            "patient_satisfaction": None,
+            "by_status": status_counts,
         },
-        "by_specialty": consultations_by_specialty,
-        "monthly_revenue": monthly_revenue,
+        "by_specialty": sorted(by_specialty.values(), key=lambda item: item["count"], reverse=True),
+        "monthly_revenue": [by_month[key] for key in sorted(by_month)],
     }
 
 

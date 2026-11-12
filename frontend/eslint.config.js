@@ -7,7 +7,11 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist']),
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['playwright*.config.js', 'tests/**/*.js', 'vite.config.js', 'eslint.config.js'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['**/*.{js,jsx,ts,tsx}'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,
@@ -18,12 +22,12 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
     rules: {
-      // Existing data-loading effects intentionally update local state when
-      // synchronizing with the API. Keep these patterns valid under the
-      // current react-hooks plugin until the components are migrated.
-      "react-hooks/set-state-in-effect": "off",
-      "react-hooks/purity": "off",
-      "react-refresh/only-export-components": "off",
+      'no-unused-vars': 'warn',
+      'no-dupe-keys': 'error',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-refresh/only-export-components': 'off',
     },
   },
 ])

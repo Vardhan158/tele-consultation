@@ -8,7 +8,6 @@ import re
 
 from pymongo import AsyncMongoClient
 
-
 SAFE_NAME = re.compile(r"^kaizentrix_admin_test_[a-z0-9_-]+$")
 
 

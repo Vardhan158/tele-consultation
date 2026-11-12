@@ -548,7 +548,7 @@ export default function ServiceFeeConfigTab() {
           </p>
           <button
             onClick={openNewService}
-            className="rounded-xl bg-[#295255] px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-[#1f3f41] cursor-pointer"
+            className="rounded-xl bg-[#25836F] px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] cursor-pointer"
           >
             + Add New Clinical Service
           </button>

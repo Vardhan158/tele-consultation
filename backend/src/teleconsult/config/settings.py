@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     mobile_launch_mode: str = "responsive_web"
     clinical_record_retention_days: int = 2555
     clinic_model: str = "clinic_network"
+    frontend_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://localhost:5173,https://127.0.0.1:5173",
+        validation_alias="FRONTEND_ORIGINS",
+    )
 
     # Email delivery
     email_host: str = Field(default="", validation_alias="EMAIL_HOST")
@@ -64,6 +68,26 @@ class Settings(BaseSettings):
     mongodb_max_pool_size: int = Field(default=50, validation_alias="MONGODB_MAX_POOL_SIZE")
     mongodb_min_pool_size: int = Field(default=0, validation_alias="MONGODB_MIN_POOL_SIZE")
     mongodb_repositories_enabled: bool = Field(default=False, validation_alias="MONGODB_REPOSITORIES_ENABLED")
+
+    @property
+    def allowed_frontend_origins(self) -> list[str]:
+        """Return the configured browser origins with whitespace removed."""
+        configured = [
+            origin.strip().strip('"[]').rstrip("/")
+            for origin in self.frontend_origins.split(",")
+            if origin.strip().strip('"[]')
+        ]
+
+        # Always allow local development origins to prevent CORS errors during hybrid testing
+        # (e.g., local frontend -> deployed backend)
+        always_allow = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ]
+
+        return list(dict.fromkeys(configured + always_allow))
 
 
 @lru_cache

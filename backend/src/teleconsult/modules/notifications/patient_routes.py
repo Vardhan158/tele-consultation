@@ -1,15 +1,15 @@
-from datetime import datetime, UTC
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from uuid import UUID
 
-from collections.abc import AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.config.settings import get_settings
 from teleconsult.modules.notifications.models import Notification
 from teleconsult.modules.notifications.schemas import NotificationResponse
 

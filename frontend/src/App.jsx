@@ -191,11 +191,14 @@ export default function App() {
         onBack={() => navigateEntry("landing")}
         initialMode={routedEntryMode}
         onAuthenticated={() => {
-          setAuthenticated(true);
           refreshUser().then((res) => {
-            if (res?.role === "clinic_admin") {
+            if (!res?.authenticated) {
+              setAuthenticated(false);
+              setPatient(null);
+              navigate("/login", { replace: true });
+            } else if (res.role === "clinic_admin") {
               navigate("/clinic/overview", { replace: true });
-            } else if (res?.role === "doctor") {
+            } else if (res.role === "doctor") {
               navigate("/doctor/dashboard", { replace: true });
             } else {
               setActiveTab("dashboard");

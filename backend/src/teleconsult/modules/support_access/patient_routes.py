@@ -1,17 +1,19 @@
-from uuid import UUID
 from collections.abc import AsyncIterator
+from datetime import datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
-from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.config.settings import get_settings
-from teleconsult.modules.support_access.patient_models import FollowUpAction, SupportTicket
 from teleconsult.modules.notifications.models import Notification
 from teleconsult.modules.notifications.service import queue_patient_notification
+from teleconsult.modules.support_access.patient_models import FollowUpAction, SupportTicket
 
 router = APIRouter(prefix="/patient", tags=["follow-up-support"])
 

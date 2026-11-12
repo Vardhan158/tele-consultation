@@ -298,7 +298,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   <button
                     type="button"
                     onClick={handleAutoGenerateReg}
-                    className="text-[10px] font-bold text-[#295255] hover:underline cursor-pointer flex items-center gap-0.5"
+                    className="text-[10px] font-bold text-[#25836F] hover:underline cursor-pointer flex items-center gap-0.5"
                     title="Auto-generate registration number based on name and mobile number"
                   >
                     <span>⚡ Auto-Generate</span>

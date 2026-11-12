@@ -33,23 +33,49 @@ export default function WebRtcConsultation({
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [audioOnlyAvailable, setAudioOnlyAvailable] = useState(false);
+  const startRef = useRef(null);
+  const startingRef = useRef(false);
+  const remoteKindsRef = useRef(new Set());
+  const remoteStreamRef = useRef(null);
+
+  // Re-bind streams when DOM mounts or toggles
+  useEffect(() => {
+    if (status === "in_progress" && remoteVideo.current && remoteStreamRef.current) {
+      remoteVideo.current.srcObject = remoteStreamRef.current;
+      remoteVideo.current.play?.().catch(() => {});
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (!cameraOff && localVideo.current && streamRef.current) {
+      localVideo.current.srcObject = streamRef.current;
+    }
+  }, [cameraOff]);
 
   useEffect(() => {
     let active = true;
     let cleaned = false;
     const diagnostic = (event, value) => {
-      if (import.meta.env.DEV)
-        console.debug(`[WebRTC:${role}] ${event}`, value ?? "");
+      if (import.meta.env.DEV) {
+        const details = value && typeof value === "object" ? value : { value };
+        console.debug("[WebRTC]", { appointmentId, role, event, ...details });
+      }
     };
     const setRemoteStream = (stream) => {
+      remoteStreamRef.current = stream;
       if (!remoteVideo.current || !stream) return;
       remoteVideo.current.srcObject = stream;
       remoteVideo.current
         .play?.()
         .catch(() => diagnostic("remote-play-blocked"));
     };
-    const start = async () => {
+    const start = async (audioOnly = false) => {
+      if (startingRef.current) return;
+      startingRef.current = true;
       try {
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
         const room =
           authorization ||
           (await (role === "doctor"
@@ -61,16 +87,27 @@ export default function WebRtcConsultation({
         const ice = await consultationApi
           .config()
           .catch(() => ({ ice_servers: fallbackIceServers }));
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: !audioOnly, audio: true });
+        } catch (mediaError) {
+          if (!audioOnly && ["NotReadableError", "NotAllowedError", "OverconstrainedError"].includes(mediaError.name)) {
+            setError("Camera unavailable. You can continue with audio only.");
+            setStatus("device_unavailable");
+            setAudioOnlyAvailable(true);
+            startingRef.current = false;
+            return;
+          }
+          throw mediaError;
+        }
         if (!active) {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
-        if (!stream.getAudioTracks().length || !stream.getVideoTracks().length)
-          throw new Error("Camera and microphone tracks are required.");
+        if (!stream.getAudioTracks().length)
+          throw new Error("Microphone is unavailable. Check browser permissions and device connections.");
+        setCameraOff(audioOnly);
+        setAudioOnlyAvailable(false);
         streamRef.current = stream;
         if (localVideo.current) localVideo.current.srcObject = stream;
         const peer = new RTCPeerConnection({
@@ -80,13 +117,16 @@ export default function WebRtcConsultation({
         stream.getTracks().forEach((track) => peer.addTrack(track, stream));
         peer.ontrack = (event) => {
           diagnostic("track", event.track.kind);
+          remoteKindsRef.current.add(event.track.kind);
           setRemoteStream(event.streams?.[0] || new MediaStream([event.track]));
+          if (peer.connectionState === "connected") setStatus("in_progress");
         };
         peer.onicecandidate = (event) => {
           if (event.candidate)
             socketRef.current?.emit("ice_candidate", {
               candidate: event.candidate,
             });
+          if (event.candidate) diagnostic("ice-candidate-sent", { hasCandidate: true });
         };
         peer.onicecandidateerror = (event) =>
           diagnostic("ice-candidate-error", event.errorCode);
@@ -97,11 +137,10 @@ export default function WebRtcConsultation({
         peer.onconnectionstatechange = () => {
           diagnostic("connection-state", peer.connectionState);
           if (!active) return;
-          if (peer.connectionState === "connected") setStatus("in_progress");
+          if (peer.connectionState === "connected" && remoteKindsRef.current.size > 0) setStatus("in_progress");
           if (peer.connectionState === "disconnected")
             setStatus("reconnecting");
-          if (["failed", "closed"].includes(peer.connectionState))
-            setStatus("error");
+          if (peer.connectionState === "failed") setStatus("disconnected");
         };
         const socket = io(API_BASE_URL, {
           withCredentials: true,
@@ -120,42 +159,50 @@ export default function WebRtcConsultation({
           }
         };
         socket.on("connect", () => {
-          diagnostic("socket-connected");
-          socket.emit("join_room", { appointmentId, role });
+          diagnostic("socket-connected", { socketId: socket.id });
+          socket.emit("join_room", { appointmentId, role }, (ack) => diagnostic("room-join-ack", ack || { acknowledged: true }));
           if (active) setStatus("waiting");
         });
-        socket.on("reconnect", () => diagnostic("socket-reconnected"));
+        socket.on("room_joined", (info) => diagnostic("room-joined", info));
+        socket.on("peer_presence", (info) => { diagnostic("peer-presence", info); if (active) setStatus("connecting"); });
+        socket.on("signaling_error", (info) => { diagnostic("signaling-error", info); if (active) { setError("Consultation room authorization failed."); setStatus("error"); } });
+        socket.on("reconnect", () => diagnostic("socket-reconnected", { socketId: socket.id }));
         socket.on("disconnect", () => {
-          if (active) setStatus("reconnecting");
+          if (active) setStatus("disconnected");
         });
         socket.on("status", ({ status: next }) => {
-          if (active) setStatus(next);
+          diagnostic("server-status", { status: next });
+          if (active && ["waiting", "connecting", "completed"].includes(next)) setStatus(next);
+          if (active && next === "in_progress" && peer.connectionState !== "connected") setStatus("connecting");
         });
         socket.on("peer_ready", async () => {
           if (role !== "doctor" || cleaned || peer.signalingState !== "stable")
             return;
           const offer = await peer.createOffer();
           await peer.setLocalDescription(offer);
-          diagnostic("offer-created");
+          diagnostic("offer-created", { signalingState: peer.signalingState });
           socket.emit("offer", { offer });
         });
         socket.on("offer", async ({ offer }) => {
           if (cleaned) return;
+          diagnostic("offer-received", { type: offer?.type });
           await peer.setRemoteDescription(offer);
           await flushIce();
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
-          diagnostic("answer-created");
+          diagnostic("answer-created", { signalingState: peer.signalingState });
           socket.emit("answer", { answer });
         });
         socket.on("answer", async ({ answer }) => {
           if (!cleaned) {
             await peer.setRemoteDescription(answer);
+            diagnostic("answer-received", { signalingState: peer.signalingState });
             await flushIce();
           }
         });
         socket.on("ice_candidate", async ({ candidate }) => {
           if (!candidate || cleaned) return;
+          diagnostic("ice-candidate-received", { hasCandidate: true });
           if (!peer.remoteDescription) pendingIceRef.current.push(candidate);
           else {
             try {
@@ -169,9 +216,10 @@ export default function WebRtcConsultation({
           if (active) setStatus("waiting");
         });
         socket.on("connect_error", (err) => {
+          diagnostic("socket-connect-error", { message: err.message, code: err.data?.code });
           if (active) {
-            setError(err.message);
-            setStatus("error");
+            setError(err.data?.code ? `Connection rejected (${err.data.code}).` : err.message);
+            setStatus("disconnected");
           }
         });
         socket.on("connect", () => socket.emit("signaling_ready"));
@@ -180,8 +228,10 @@ export default function WebRtcConsultation({
           setError(err.message || "Unable to access the consultation.");
           setStatus("error");
         }
+        startingRef.current = false;
       }
     };
+    startRef.current = start;
     start();
     return () => {
       active = false;
@@ -194,6 +244,8 @@ export default function WebRtcConsultation({
       socketRef.current = null;
       peerRef.current = null;
       streamRef.current = null;
+      startingRef.current = false;
+      startRef.current = null;
     };
   }, [appointmentId, authorization, role]);
 
@@ -206,66 +258,179 @@ export default function WebRtcConsultation({
     if (kind === "audio") setMuted(!track.enabled);
     else setCameraOff(!track.enabled);
   };
+
   const end = () => {
     socketRef.current?.emit(
       role === "doctor" ? "end_consultation" : "leave_room",
     );
     streamRef.current?.getTracks().forEach((track) => track.stop());
+    peerRef.current?.close();
+    streamRef.current = null;
+    peerRef.current = null;
     setStatus("ended");
     onEnded?.();
   };
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <video
-          ref={remoteVideo}
-          autoPlay
-          playsInline
-          className="aspect-video w-full rounded-2xl bg-[#162623] object-cover"
-        />
-        <video
-          ref={localVideo}
-          autoPlay
-          muted
-          playsInline
-          className="aspect-video w-full rounded-2xl bg-[#25836F] object-cover"
-        />
+    <div className="space-y-4 font-sans text-[#162623]">
+      {/* Top Live Status Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#F0F5F7] p-3.5 rounded-xl border border-[#577877]/15 text-xs font-semibold">
+        <div className="flex items-center gap-2">
+          {status === "in_progress" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+              Connected · Live Consultation
+            </span>
+          ) : status === "waiting" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              {role === "doctor" ? "Waiting for Patient to Join" : "Waiting for Doctor to Join"}
+            </span>
+          ) : status === "connecting" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-100 text-teal-800 font-bold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-teal-600 animate-pulse" />
+              Connecting to WebRTC Room…
+            </span>
+          ) : status === "reconnecting" || status === "disconnected" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-bold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+              Doctor Disconnected · Reconnecting…
+            </span>
+          ) : status === "device_unavailable" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-900 font-bold uppercase tracking-wider">Device Unavailable</span>
+          ) : status === "completed" || status === "ended" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-800 font-bold uppercase tracking-wider">
+              Consultation Ended
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-900 font-bold uppercase tracking-wider">Connection Error</span>
+          )}
+        </div>
+
+        {error && (
+          <div className="text-xs font-semibold text-rose-600">
+            ⚠️ {error}
+          </div>
+        )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-[#577877]">
-          {status === "in_progress" ? "Connected" : status}
-        </span>
-        {error && <span className="text-sm text-red-700">{error}</span>}
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => toggleTrack("audio")}
-        >
-          {muted ? "Unmute" : "Mute"}
-        </button>
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => toggleTrack("video")}
-        >
-          {cameraOff ? "Camera on" : "Camera off"}
-        </button>
-        {role === "doctor" && status === "waiting" && (
+
+      {/* Main Video View Container */}
+      <div className="relative rounded-2xl overflow-hidden bg-[#162623] shadow-lg aspect-16/10 flex flex-col justify-between">
+        {/* Remote Doctor Stream or Waiting Overlay */}
+        <div className="w-full h-full relative flex items-center justify-center bg-[#162623]">
+          {status === "in_progress" ? (
+            <video
+              ref={remoteVideo}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-white/80 bg-[#162623] p-6 text-center space-y-2">
+              <span className="material-symbols-outlined text-5xl text-teal-400 animate-pulse">
+                stethoscope
+              </span>
+              <h4 className="text-base font-bold text-white">
+                {status === "waiting"
+                  ? role === "doctor" ? "Waiting for Patient to Join" : "Waiting for Doctor to Join"
+                  : status === "connecting"
+                  ? "Connecting to Doctor…"
+                  : status === "device_unavailable"
+                  ? "Camera or microphone unavailable"
+                  : status === "disconnected" || status === "reconnecting"
+                  ? "Disconnected — trying to reconnect"
+                  : "Consultation ended"}
+              </h4>
+              <p className="text-xs text-white/70 max-w-sm">
+                {role === "patient"
+                  ? "Your secure video room is active. Your clinician will invite you in shortly."
+                  : "Waiting for patient to connect to video room."}
+              </p>
+            </div>
+          )}
+
+          {/* Bottom Left Badge */}
+          <div className="absolute bottom-4 left-4 z-20 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm text-white text-xs border border-white/10">
+            {role === "patient" ? "Remote: Clinician Video" : "Remote: Patient Video"}
+          </div>
+
+          {/* Picture-in-Picture Local Self Camera (Bottom Right) */}
+          <div className="absolute bottom-4 right-4 z-20 rounded-xl overflow-hidden shadow-2xl border-2 border-white w-32 sm:w-44 aspect-16/10 bg-[#162623]">
+            {!cameraOff ? (
+              <video
+                ref={localVideo}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white/70 text-xs bg-[#1F2937]">
+                Camera Off
+              </div>
+            )}
+            <div className="absolute bottom-1 left-1.5 px-2 py-0.5 rounded bg-black/60 text-[10px] text-white font-medium">
+              You ({role === "doctor" ? "Doctor" : "Patient"})
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {audioOnlyAvailable && (
+        <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900">
+          <p className="font-semibold">Camera unavailable</p>
+          <p className="mt-1">You can continue the consultation with audio only.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setError(""); setStatus("connecting"); startRef.current?.(false); }} className="rounded-xl border border-[#25836F] px-4 py-2 text-xs font-bold text-[#25836F]">Retry Camera</button>
+            <button type="button" onClick={() => { setError(""); setStatus("connecting"); startRef.current?.(true); }} className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-bold text-white">Continue audio only</button>
+          </div>
+        </div>
+      )}
+
+      {/* Control Bar */}
+      <div className="care-card p-4 rounded-2xl bg-white border border-[#577877]/15 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className="btn-primary"
-            onClick={() => socketRef.current?.emit("admit_patient")}
+            onClick={() => toggleTrack("audio")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer ${
+              !muted
+                ? "border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7]"
+                : "bg-rose-600 text-white hover:bg-rose-700"
+            }`}
           >
-            Admit patient
+            {!muted ? "Mic On" : "Mic Muted"}
           </button>
-        )}
+
+          <button
+            type="button"
+            onClick={() => toggleTrack("video")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer ${
+              !cameraOff
+                ? "border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7]"
+                : "bg-rose-600 text-white hover:bg-rose-700"
+            }`}
+          >
+            {!cameraOff ? "Camera On" : "Camera Off"}
+          </button>
+
+          {role === "doctor" && status === "waiting" && (
+            <button
+              type="button"
+              onClick={() => socketRef.current?.emit("admit_patient")}
+              className="bg-[#25836F] hover:bg-[#1d6e5d] text-white px-4 py-2 rounded-xl text-xs font-bold shadow cursor-pointer"
+            >
+              Admit Patient
+            </button>
+          )}
+        </div>
+
         <button
           type="button"
-          className="btn-secondary text-red-700"
           onClick={end}
+          className="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow cursor-pointer"
         >
-          End call
+          {role === "doctor" ? "End Consultation" : "Leave Call"}
         </button>
       </div>
     </div>

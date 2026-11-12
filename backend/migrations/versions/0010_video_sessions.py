@@ -1,6 +1,6 @@
 """Add secure video session state and short-lived room tokens."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0010_video_sessions"
 down_revision = "0009_notifications"

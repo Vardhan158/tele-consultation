@@ -1,6 +1,6 @@
 """Add released consultation summaries and prescriptions."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0012_clinical_outputs"
 down_revision = "0011_patient_documents"

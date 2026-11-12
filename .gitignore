@@ -17,4 +17,5 @@ dist/
 .terraform/
 .vite/
 frontend/output/
+output/
 .idea/

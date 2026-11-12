@@ -1,27 +1,32 @@
-from datetime import datetime, UTC
-from collections.abc import AsyncIterator
-from uuid import UUID, uuid4
-import os
-import re
-import secrets
 import hashlib
 import hmac
 import json
+import os
+import re
+import secrets
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.modules.notifications.service import queue_patient_notification
 from teleconsult.modules.patient_portal.models import Appointment, Doctor
 from teleconsult.modules.payments.models import PaymentTransaction
-from teleconsult.modules.payments.schemas import PaymentInitiateRequest, PaymentResponse, PaymentVerifyRequest, RefundResponse
-from teleconsult.modules.notifications.service import queue_patient_notification
-from teleconsult.config.settings import get_settings
+from teleconsult.modules.payments.schemas import (
+    PaymentInitiateRequest,
+    PaymentResponse,
+    PaymentVerifyRequest,
+    RefundResponse,
+)
 
 try:
     import razorpay

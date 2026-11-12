@@ -1,6 +1,5 @@
-from datetime import datetime, UTC
-from pathlib import Path
 from collections.abc import AsyncIterator
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -8,13 +7,13 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.config.settings import get_settings
+from teleconsult.modules.patient_portal.consent_guard import require_active_consent
 from teleconsult.modules.records.patient_models import PatientDocument
 from teleconsult.modules.records.patient_schemas import DocumentResponse
-from teleconsult.modules.patient_portal.consent_guard import require_active_consent
 
 router = APIRouter(prefix="/patient/documents", tags=["medical-records"])
 ALLOWED_TYPES = {"application/pdf", "image/jpeg", "image/png"}

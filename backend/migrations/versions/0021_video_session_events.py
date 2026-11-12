@@ -1,6 +1,6 @@
 """Persist non-media consultation lifecycle events."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0021_video_session_events"
 down_revision = "0020_video_participant_tokens"

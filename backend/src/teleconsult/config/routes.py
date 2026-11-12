@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from teleconsult.config.settings import get_settings
 
 router = APIRouter(prefix="/config", tags=["configuration"])

@@ -1,30 +1,58 @@
+import base64
 import hashlib
 import hmac
+import logging
 import secrets
-import base64
 import struct
-from datetime import datetime, timedelta, UTC
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
+from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from teleconsult.kernel.db.session import tenant_session
-from teleconsult.modules.identity.models import AuthSession, RecoveryToken, UserAccount
-from teleconsult.modules.identity.schemas import LoginRequest, RecoveryRequest, RegisterRequest, ResetPasswordRequest, VerifyEmailRequest
-from teleconsult.modules.patient_portal.models import Patient
-from teleconsult.modules.patient_portal.consent import PatientConsent
+from teleconsult.adapters.email.templates import (
+    render_recovery_email_html,
+    render_verification_email_html,
+)
 from teleconsult.config.settings import get_settings
+from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from uuid import UUID
+from teleconsult.modules.identity.models import AuthSession, RecoveryToken, UserAccount
+from teleconsult.modules.identity.schemas import (
+    LoginRequest,
+    RecoveryRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    VerifyEmailRequest,
+)
+from teleconsult.modules.patient_portal.consent import PatientConsent
+from teleconsult.modules.patient_portal.models import Doctor, Patient
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 GENERIC_AUTH_ERROR = "Unable to authenticate with those details"
 
 
-async def auth_database_session() -> AsyncSession | None:
-    """Use SQL only when explicitly configured; Mongo mode must not initialize SQL."""
-    if not get_settings().database_url.strip():
+def session_cookie_options() -> dict[str, object]:
+    """Use secure cookie attributes outside local development."""
+    # Always use Secure and SameSite=none to support cross-domain deployment
+    # (like frontend and backend being on different Render domains, or localhost -> Render).
+    # Modern browsers perfectly support Secure cookies on http://localhost.
+    return {
+        "httponly": True,
+        "secure": True,
+        "samesite": "none",
+        "max_age": 8 * 3600,
+        "path": "/",
+    }
+
+
+async def auth_database_session() -> AsyncIterator[AsyncSession | None]:
+    """Use SQL only when MongoDB is disabled and PostgreSQL database_url is explicitly configured."""
+    settings = get_settings()
+    if settings.mongodb_enabled or not settings.database_url.strip():
         yield None
         return
     async for session in tenant_session():
@@ -61,12 +89,6 @@ def valid_totp(secret: str, code: str) -> bool:
     return False
 
 
-from teleconsult.adapters.email.templates import (
-    render_recovery_email_html,
-    render_verification_email_html,
-)
-
-
 async def send_verification_email(email: str, code: str) -> None:
     html = render_verification_email_html(code)
     await send_brevo_email(
@@ -87,6 +109,21 @@ async def send_recovery_email(email: str, token: str) -> None:
     )
 
 
+async def _rollback_mongodb_registration(database: Any, user_id: str) -> None:
+    """Remove documents created by a registration attempt that did not complete."""
+    try:
+        await database["recovery_tokens"].delete_many({"user_id": user_id})
+        await database["consents"].delete_many({"patient_id": user_id})
+        await database["patients"].delete_many(
+            {"$or": [{"user_id": user_id}, {"id": user_id}]}
+        )
+        await database["users"].delete_one({"id": user_id})
+    except Exception:
+        logging.getLogger("teleconsult.auth").exception(
+            "Could not fully roll back failed registration for user %s", user_id
+        )
+
+
 async def send_brevo_email(
     email: str, subject: str, text: str, html_content: str | None = None
 ) -> None:
@@ -105,18 +142,25 @@ async def send_brevo_email(
         payload["htmlContent"] = html_content
 
     timeout = aiohttp.ClientTimeout(total=15)
-    async with aiohttp.ClientSession(timeout=timeout) as client:
-        async with client.post(
-            "https://api.brevo.com/v3/smtp/email",
-            headers={
-                "accept": "application/json",
-                "api-key": settings.brevo_api_key,
-                "content-type": "application/json",
-            },
-            json=payload,
-        ) as result:
-            if result.status >= 400:
-                raise HTTPException(status_code=503, detail="Brevo could not deliver the email")
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as client:
+            async with client.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "accept": "application/json",
+                    "api-key": settings.brevo_api_key,
+                    "content-type": "application/json",
+                },
+                json=payload,
+            ) as result:
+                if result.status >= 400:
+                    raise HTTPException(status_code=503, detail="Verification email could not be delivered")
+    except (aiohttp.ClientError, TimeoutError):
+        logging.getLogger("teleconsult.auth").exception("Brevo email request failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Verification email service is temporarily unavailable; please retry",
+        ) from None
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -135,11 +179,40 @@ async def register(payload: RegisterRequest, response: Response, session: AsyncS
             raise HTTPException(status_code=503, detail="MongoDB is enabled but not connected")
         if not settings.brevo_api_key or not (settings.brevo_sender_email or settings.email_from):
             raise HTTPException(status_code=503, detail="Email delivery is not configured")
-        from pymongo.errors import DuplicateKeyError
         from uuid import uuid4
 
+        from pymongo.errors import DuplicateKeyError
+
         database = mongo_database.database()
-        if await database["users"].find_one({"tenant_id": settings.default_tenant_id, "email": email}):
+        existing_user = await database["users"].find_one(
+            {"tenant_id": settings.default_tenant_id, "email": email}
+        )
+        if existing_user and existing_user.get("verified_at") is None:
+            now = datetime.now(UTC)
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            token_id = str(uuid4())
+            await database["recovery_tokens"].insert_one(
+                {
+                    "id": token_id,
+                    "user_id": existing_user["id"],
+                    "token_hash": token_hash(code),
+                    "expires_at": now + timedelta(minutes=10),
+                    "used_at": None,
+                    "attempts": 0,
+                    "created_at": now,
+                }
+            )
+            try:
+                await send_verification_email(email, code)
+            except HTTPException:
+                await database["recovery_tokens"].delete_one({"id": token_id})
+                raise
+            return {
+                "status": "verification_required",
+                "user_id": existing_user["id"],
+                "email": email,
+            }
+        if existing_user:
             raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in.")
         user_id = str(uuid4())
         now = datetime.now(UTC)
@@ -158,26 +231,45 @@ async def register(payload: RegisterRequest, response: Response, session: AsyncS
             "mfa_enabled": False,
             "created_at": now,
         }
+        registration_stage = "user"
         try:
             await database["users"].insert_one(user)
+            registration_stage = "patient"
             await database["patients"].insert_one({
                 "id": user_id, "user_id": user_id, "tenant_id": settings.default_tenant_id,
                 "full_name": user["full_name"], "email": email,
                 "phone": payload.mobile_number, "created_at": now,
             })
+            registration_stage = "consent"
             await database["consents"].insert_one({
                 "id": str(uuid4()), "tenant_id": settings.default_tenant_id,
                 "patient_id": user_id, "consent_type": "registration_terms",
                 "version": payload.terms_version, "created_at": now,
             })
+            registration_stage = "verification_token"
             await database["recovery_tokens"].insert_one({
                 "id": str(uuid4()), "user_id": user_id,
                 "token_hash": token_hash(code),
                 "expires_at": now + timedelta(minutes=10), "used_at": None,
+                "attempts": 0, "created_at": now,
             })
+            registration_stage = "verification_email"
             await send_verification_email(email, code)
         except DuplicateKeyError:
+            await _rollback_mongodb_registration(database, user_id)
             raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in.") from None
+        except HTTPException:
+            await _rollback_mongodb_registration(database, user_id)
+            raise
+        except Exception:
+            logging.getLogger("teleconsult.auth").exception(
+                "Patient registration failed during %s", registration_stage
+            )
+            await _rollback_mongodb_registration(database, user_id)
+            raise HTTPException(
+                status_code=503,
+                detail=f"Registration service is temporarily unavailable during {registration_stage}; please retry",
+            ) from None
         return {"status": "verification_required", "user_id": user_id, "email": email}
 
     if session is None:
@@ -254,7 +346,7 @@ async def login(payload: LoginRequest, response: Response, session: AsyncSession
             "mfa_verified": bool(user.get("role") != "doctor" or not user.get("mfa_enabled") or payload.mfa_code),
             "created_at": now,
         })
-        response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
+        response.set_cookie("teleconsult_session", raw_token, **session_cookie_options())
         return {
             "status": "authenticated", "user_id": user["id"],
             "full_name": user.get("full_name", "User"), "email": user.get("email", ""),
@@ -285,7 +377,7 @@ async def login(payload: LoginRequest, response: Response, session: AsyncSession
 
     raw_token = secrets.token_urlsafe(48)
     session.add(AuthSession(user_id=user.id, token_hash=token_hash(raw_token), expires_at=datetime.now(UTC) + timedelta(hours=8), mfa_verified=bool(user.role != "doctor" or not user.mfa_enabled or payload.mfa_code)))
-    response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
+    response.set_cookie("teleconsult_session", raw_token, **session_cookie_options())
     return {"status": "authenticated", "user_id": str(user.id), "full_name": user.full_name, "email": user.email, "role": user.role}
 
 
@@ -318,7 +410,7 @@ async def verify_email(payload: VerifyEmailRequest, response: Response, session:
             "expires_at": now + timedelta(hours=8), "mfa_verified": False,
             "created_at": now,
         })
-        response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
+        response.set_cookie("teleconsult_session", raw_token, **session_cookie_options())
         doctor = await database["doctors"].find_one({"tenant_id": settings.default_tenant_id, "$or": [{"id": user["id"]}, {"user_id": user["id"]}]}) if user.get("role") == "doctor" else None
         return {"status": "authenticated", "user_id": user["id"], "full_name": user["full_name"], "email": user["email"], "approval_status": doctor.get("approval_status", "pending") if doctor else "approved"}
     if session is None:
@@ -340,7 +432,7 @@ async def verify_email(payload: VerifyEmailRequest, response: Response, session:
     user.verified_at = datetime.now(UTC)
     raw_token = secrets.token_urlsafe(48)
     session.add(AuthSession(user_id=user.id, token_hash=token_hash(raw_token), expires_at=datetime.now(UTC) + timedelta(hours=8)))
-    response.set_cookie("teleconsult_session", raw_token, httponly=True, secure=False, samesite="lax", max_age=8 * 3600)
+    response.set_cookie("teleconsult_session", raw_token, **session_cookie_options())
     return {"status": "authenticated", "user_id": str(user.id), "full_name": user.full_name, "email": user.email}
 
 
@@ -425,14 +517,24 @@ async def logout(request: Request, response: Response, session: AsyncSession | N
                     {"token_hash": token_hash(raw_token), "tenant_id": get_settings().default_tenant_id},
                     {"$set": {"revoked_at": datetime.now(UTC)}},
                 )
-            response.delete_cookie("teleconsult_session")
+            response.delete_cookie(
+                "teleconsult_session",
+                path="/",
+                secure=bool(session_cookie_options()["secure"]),
+                samesite=str(session_cookie_options()["samesite"]),
+            )
             return
         if session is None:
             raise HTTPException(status_code=503, detail="No application database is configured")
         auth_session = await session.scalar(select(AuthSession).where(AuthSession.token_hash == token_hash(raw_token)))
         if auth_session:
             auth_session.revoked_at = datetime.now(UTC)
-    response.delete_cookie("teleconsult_session")
+    response.delete_cookie(
+        "teleconsult_session",
+        path="/",
+        secure=bool(session_cookie_options()["secure"]),
+        samesite=str(session_cookie_options()["samesite"]),
+    )
 
 
 @router.post("/recovery")

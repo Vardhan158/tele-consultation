@@ -1,7 +1,6 @@
 """Explicit application-level authorization for MongoDB repositories."""
 from dataclasses import dataclass
 
-
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "patient": frozenset({"patient:read:self", "patient:write:self", "appointment:create:self"}),
     "doctor": frozenset({"doctor:read:self", "doctor:write:self", "clinical:read:authorized"}),

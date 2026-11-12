@@ -1,15 +1,11 @@
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-const DEV_PATIENT_ID = import.meta.env.VITE_DEV_PATIENT_ID;
-const DEV_TENANT_ID = import.meta.env.VITE_DEV_TENANT_ID;
 
 export async function apiRequest(path, options = {}) {
   const headers =
     options.body instanceof FormData
       ? { ...(options.headers || {}) }
       : { "Content-Type": "application/json", ...(options.headers || {}) };
-  if (DEV_PATIENT_ID) headers["X-Dev-Patient-Id"] = DEV_PATIENT_ID;
-  if (DEV_TENANT_ID) headers["X-Dev-Tenant-Id"] = DEV_TENANT_ID;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
@@ -262,8 +258,6 @@ export const recordsApi = {
   remove: (id) => apiRequest(`/patient/documents/${id}`, { method: "DELETE" }),
   download: async (id) => {
     const headers = {};
-    if (DEV_PATIENT_ID) headers["X-Dev-Patient-Id"] = DEV_PATIENT_ID;
-    if (DEV_TENANT_ID) headers["X-Dev-Tenant-Id"] = DEV_TENANT_ID;
     const response = await fetch(
       `${API_BASE_URL}/patient/documents/${id}/download`,
       { credentials: "include", headers },

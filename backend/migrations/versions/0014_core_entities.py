@@ -1,6 +1,6 @@
 """Add logical core entities for clinics, specialties, refunds, and encounters."""
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0014_core_entities"
 down_revision = "0013_followup_support"

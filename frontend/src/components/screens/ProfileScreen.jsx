@@ -100,7 +100,7 @@ export default function ProfileScreen({
             ...p,
             first_name: p.full_name
               ? p.full_name.split(" ")[0]
-              : prev.first_name || "Emma",
+              : prev.first_name || "",
             last_name: p.full_name
               ? p.full_name.split(" ").slice(1).join(" ")
               : prev.last_name || "Mitchell",
@@ -118,7 +118,7 @@ export default function ProfileScreen({
             primary_care_provider:
               p.primary_care_provider ||
               prev.primary_care_provider ||
-              "Dr. Sarah Chen, MD",
+      "",
             member_since:
               p.member_since || prev.member_since || "November 2026",
             allergies: p.allergies || prev.allergies || "Penicillin · Rash",
@@ -271,7 +271,7 @@ export default function ProfileScreen({
     const name =
       profile.full_name ||
       `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
-      "Emma Mitchell";
+      "";
     return (
       name
         .split(/\s+/)
@@ -416,7 +416,7 @@ export default function ProfileScreen({
                       Primary care provider
                     </span>
                     <span className="font-semibold text-[#162623] mt-0.5 block">
-                      {profile.primary_care_provider || "Dr. Sarah Chen, MD"}
+                      {profile.primary_care_provider || "Not provided"}
                     </span>
                   </div>
 
@@ -773,7 +773,7 @@ export default function ProfileScreen({
               </h3>
               <p className="text-xs text-[#577877] mt-1">
                 Monitored by{" "}
-                {profile.primary_care_provider || "Dr. Sarah Chen, MD"} and
+                {profile.primary_care_provider || "your care team"} and
                 verified clinical staff.
               </p>
             </div>
