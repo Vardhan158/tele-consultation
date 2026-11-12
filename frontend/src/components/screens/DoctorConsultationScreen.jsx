@@ -16,31 +16,44 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
   }, [appointment]);
   return (
     <div className="min-h-screen bg-[#F0F5F7] p-6 text-[#162623]">
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="mx-auto max-w-4xl space-y-4">
         <button
           type="button"
           onClick={onBack}
-          className="text-sm text-[#295255]"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-sm font-semibold text-[#295255] shadow-sm hover:bg-[#F0F5F7] transition-colors"
         >
-          ← Back
+          ← Back to Appointments
         </button>
-        <h1 className="text-2xl font-bold">Doctor consultation</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Consultation Room</h1>
+          <div className="text-sm font-semibold text-[#577877]">
+            Patient: {appointment?.patient_name || "Patient"}
+          </div>
+        </div>
         {error && (
-          <div className="rounded-xl border border-red-200 bg-white p-4 text-sm text-red-700">
+          <div className="rounded-xl border border-red-200 bg-white p-4 text-sm text-red-700 shadow-sm">
             {error}
           </div>
         )}
-        {room && (
-          <WebRtcConsultation
-            appointmentId={appointment.id}
-            authorization={room}
-            role="doctor"
-            onEnded={onBack}
-          />
-        )}
-        {!room && !error && (
-          <p className="text-sm text-[#577877]">Authorizing consultation…</p>
-        )}
+        <div className="rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl">
+          {room ? (
+            <WebRtcConsultation
+              appointmentId={appointment.id}
+              authorization={room}
+              role="doctor"
+              onEnded={onBack}
+            />
+          ) : !error ? (
+            <div className="p-12 text-center text-[#577877] space-y-3">
+              <span className="material-symbols-outlined animate-spin text-4xl text-[#295255]">
+                sync
+              </span>
+              <p className="text-sm font-bold text-[#162623]">
+                Authorizing video consultation room…
+              </p>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
