@@ -279,16 +279,6 @@
   animation-delay: -8s;
 }
 
-/* Hide scrollbar utility */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
 @keyframes cinematicWaveOne {
   from { transform: translate3d(-10%, 0, 0) rotate(18deg); }
   to { transform: translate3d(260%, 0, 0) rotate(18deg); }
@@ -327,6 +317,16 @@
 @keyframes pendingKpiGlow {
   0%, 100% { opacity: 0.35; transform: scale(0.94); }
   50% { opacity: 0.8; transform: scale(1.08); }
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 @keyframes slideInRight {

@@ -54,7 +54,10 @@ export default function Sidebar({
   const navigation = roleNavigation[role];
 
   const renderContent = (isColl) => (
-    <div className={`flex flex-col flex-1 overflow-y-auto overflow-x-hidden no-scrollbar ${isColl ? "px-2.5 py-5" : "px-4 py-5"} relative z-10 select-none`}>
+    <div
+      className={`flex flex-col flex-1 overflow-y-auto overflow-x-hidden no-scrollbar ${isColl ? "px-2.5 py-5" : "px-4 py-5"} relative z-10 select-none`}
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+    >
       {/* Logo & Brand matching brand palette */}
       {isColl ? (
         <div className="flex flex-col items-center gap-3 pb-5">
@@ -291,6 +294,7 @@ export default function Sidebar({
         >
           <aside
             className="fixed left-0 top-0 h-full w-72 bg-[#25836F] text-white border-r border-[#162623]/30 flex flex-col justify-between shadow-xl no-scrollbar"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             onClick={(e) => e.stopPropagation()}
           >
             {renderContent(false)}
@@ -303,6 +307,7 @@ export default function Sidebar({
         className={`hidden lg:flex ${
           collapsed ? "lg:w-20" : "lg:w-72"
         } lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:z-30 bg-[#25836F] text-white border-r border-[#162623]/30 flex-col justify-between shadow-xl transition-[width] duration-300 ease-in-out no-scrollbar`}
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {renderContent(collapsed)}
       </aside>
