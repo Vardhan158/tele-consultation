@@ -37,6 +37,21 @@ export default function WebRtcConsultation({
   const startRef = useRef(null);
   const startingRef = useRef(false);
   const remoteKindsRef = useRef(new Set());
+  const remoteStreamRef = useRef(null);
+
+  // Re-bind streams when DOM mounts or toggles
+  useEffect(() => {
+    if (status === "in_progress" && remoteVideo.current && remoteStreamRef.current) {
+      remoteVideo.current.srcObject = remoteStreamRef.current;
+      remoteVideo.current.play?.().catch(() => {});
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (!cameraOff && localVideo.current && streamRef.current) {
+      localVideo.current.srcObject = streamRef.current;
+    }
+  }, [cameraOff]);
 
   useEffect(() => {
     let active = true;
@@ -48,6 +63,7 @@ export default function WebRtcConsultation({
       }
     };
     const setRemoteStream = (stream) => {
+      remoteStreamRef.current = stream;
       if (!remoteVideo.current || !stream) return;
       remoteVideo.current.srcObject = stream;
       remoteVideo.current
