@@ -195,12 +195,9 @@ export default function Header({
           {profileOpen && (
             <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-white border border-[#577877]/20 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
               {/* User info snippet */}
-              <div className="px-4 py-2.5 border-b border-[#577877]/10">
+              <div className="px-4 py-2.5 border-b border-[#577877]/10 flex items-center justify-between gap-2">
                 <p className="text-xs font-bold text-[#162623] truncate">{name}</p>
-                {email && (
-                  <p className="text-[11px] text-[#577877] truncate mt-0.5">{email}</p>
-                )}
-                <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#F0F5F7] text-[#185A4D]">
+                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#F0F5F7] text-[#185A4D] shrink-0">
                   {roleLabel}
                 </span>
               </div>
