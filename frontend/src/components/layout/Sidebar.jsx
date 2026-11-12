@@ -64,16 +64,24 @@ export default function Sidebar({
         >
           <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center text-[#125747] shadow-sm shrink-0">
             <svg
-              className="w-6 h-6 text-[#125747]"
+              width="24"
+              height="28"
+              viewBox="0 0 35 42"
               fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-auto text-[#125747]"
+              aria-hidden="true"
             >
               <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2.2"
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
+                fill="currentColor"
+              />
+              <rect
+                width="12.629"
+                height="32.626"
+                rx="6.315"
+                transform="rotate(-45 16.202 6.711)"
+                fill="currentColor"
               />
             </svg>
           </div>
