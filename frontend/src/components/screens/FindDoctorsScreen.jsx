@@ -66,13 +66,25 @@ export default function FindDoctorsScreen({
       .doctors()
       .then(async (items) => {
         if (!Array.isArray(items)) return;
+        const now = new Date();
         const mapped = await Promise.all(
           items.map(async (doctor) => {
-            const slots = await patientApi
+            const rawSlots = await patientApi
               .availability(doctor.id)
               .catch(() => []);
-            const nextSlot =
-              Array.isArray(slots) && slots.length ? slots[0] : null;
+
+            // Filter to ONLY future bookable slots (starts_at > now)
+            const futureSlots = Array.isArray(rawSlots)
+              ? rawSlots.filter(
+                  (slot) => slot && slot.starts_at && new Date(slot.starts_at) > now,
+                )
+              : [];
+
+            futureSlots.sort(
+              (a, b) => new Date(a.starts_at) - new Date(b.starts_at),
+            );
+
+            const nextSlot = futureSlots.length ? futureSlots[0] : null;
 
             const qualList = Array.isArray(doctor.qualifications)
               ? doctor.qualifications.join(", ")
@@ -102,12 +114,12 @@ export default function FindDoctorsScreen({
                 doctor.fee_paise == null
                   ? "₹400.00 per video visit"
                   : `${doctor.currency || "INR"} ${(doctor.fee_paise / 100).toFixed(2)} per video visit`,
-              availability: Array.isArray(slots) ? slots : [],
+              availability: futureSlots,
               timezone: doctor.timezone || "Asia/Kolkata",
               availableToday: Boolean(
                 nextSlot &&
                   new Date(nextSlot.starts_at).toDateString() ===
-                    new Date().toDateString(),
+                    now.toDateString(),
               ),
               nextSlot,
               nextSlotLabel: nextSlot
@@ -118,7 +130,7 @@ export default function FindDoctorsScreen({
                     hour: "numeric",
                     minute: "2-digit",
                   })
-                : "No upcoming slots",
+                : "No upcoming slots available",
             };
           }),
         );
