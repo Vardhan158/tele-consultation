@@ -269,30 +269,89 @@ export default function LandingScreen({
             {/* Center Navigation Links */}
             <nav
               aria-label="Primary navigation"
-              className="hidden md:flex items-center gap-9 lg:gap-11 text-sm lg:text-[15px] font-medium"
+              className="hidden md:flex items-center gap-7 lg:gap-9 text-sm lg:text-[15px] font-medium"
             >
-              {[
-                { id: "home", label: "Home" },
-                { id: "about", label: "About" },
-                { id: "services", label: "Services" },
-                { id: "faqs", label: "FAQs" },
-              ].map((item) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    scrollToSection(item.id);
-                  }}
-                  className={`transition-colors duration-500 relative py-1 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:transition-all ${
-                    scrolled
-                      ? "text-zinc-700 hover:text-[#1A7D67] after:bg-[#1A7D67]"
-                      : "text-white/95 hover:text-white after:bg-white"
-                  }`}
-                >
-                  {item.label}
-                </a>
-              ))}
+              <a
+                href="#home"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection("home");
+                }}
+                className={`transition-colors duration-500 relative py-1 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:transition-all ${
+                  scrolled
+                    ? "text-zinc-700 hover:text-[#1A7D67] after:bg-[#1A7D67]"
+                    : "text-white/95 hover:text-white after:bg-white"
+                }`}
+              >
+                Home
+              </a>
+              <button
+                type="button"
+                onClick={onFindDoctor}
+                className={`transition-colors duration-500 relative py-1 cursor-pointer after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:transition-all ${
+                  scrolled
+                    ? "text-zinc-700 hover:text-[#1A7D67] after:bg-[#1A7D67]"
+                    : "text-white/95 hover:text-white after:bg-white"
+                }`}
+              >
+                Find Doctors
+              </button>
+              <a
+                href="#how-it-works"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection("how-it-works");
+                }}
+                className={`transition-colors duration-500 relative py-1 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:transition-all ${
+                  scrolled
+                    ? "text-zinc-700 hover:text-[#1A7D67] after:bg-[#1A7D67]"
+                    : "text-white/95 hover:text-white after:bg-white"
+                }`}
+              >
+                How It Works
+              </a>
+              <a
+                href="#services"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection("services");
+                }}
+                className={`transition-colors duration-500 relative py-1 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:transition-all ${
+                  scrolled
+                    ? "text-zinc-700 hover:text-[#1A7D67] after:bg-[#1A7D67]"
+                    : "text-white/95 hover:text-white after:bg-white"
+                }`}
+              >
+                Services
+              </a>
+              <a
+                href="#about"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection("about");
+                }}
+                className={`transition-colors duration-500 relative py-1 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:transition-all ${
+                  scrolled
+                    ? "text-zinc-700 hover:text-[#1A7D67] after:bg-[#1A7D67]"
+                    : "text-white/95 hover:text-white after:bg-white"
+                }`}
+              >
+                About
+              </a>
+              <a
+                href="#faqs"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection("faqs");
+                }}
+                className={`transition-colors duration-500 relative py-1 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:transition-all ${
+                  scrolled
+                    ? "text-zinc-700 hover:text-[#1A7D67] after:bg-[#1A7D67]"
+                    : "text-white/95 hover:text-white after:bg-white"
+                }`}
+              >
+                FAQs
+              </a>
             </nav>
 
             {/* Right Action Button */}
@@ -310,7 +369,7 @@ export default function LandingScreen({
               </button>
               <button
                 type="button"
-                onClick={onRegister}
+                onClick={onFindDoctor}
                 className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-xs transition-all duration-500 group cursor-pointer hover:-translate-y-0.5 ${
                   scrolled
                     ? "bg-[#1A7D67] text-white hover:bg-[#156654] hover:shadow-md"
@@ -384,15 +443,25 @@ export default function LandingScreen({
                 >
                   Home
                 </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMenu();
+                    onFindDoctor();
+                  }}
+                  className="text-left py-1 hover:opacity-80 font-medium"
+                >
+                  Find Doctors
+                </button>
                 <a
-                  href="#about"
+                  href="#how-it-works"
                   onClick={(e) => {
                     e.preventDefault();
-                    scrollToSection("about");
+                    scrollToSection("how-it-works");
                   }}
                   className="py-1 hover:opacity-80"
                 >
-                  About
+                  How It Works
                 </a>
                 <a
                   href="#services"
@@ -405,14 +474,14 @@ export default function LandingScreen({
                   Services
                 </a>
                 <a
-                  href="#testimonials"
+                  href="#about"
                   onClick={(e) => {
                     e.preventDefault();
-                    scrollToSection("testimonials");
+                    scrollToSection("about");
                   }}
                   className="py-1 hover:opacity-80"
                 >
-                  Testimonials
+                  About
                 </a>
                 <a
                   href="#faqs"
@@ -462,7 +531,7 @@ export default function LandingScreen({
                       type="button"
                       onClick={() => {
                         closeMenu();
-                        onRegister();
+                        onFindDoctor();
                       }}
                       className={`flex-1 py-2.5 rounded-lg text-center text-sm font-medium shadow-sm ${
                         scrolled
@@ -504,7 +573,7 @@ export default function LandingScreen({
                 <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
                 <path d="m9 12 2 2 4-4" />
               </svg>
-              <span>Trusted Medical Clinic</span>
+              <span>Verified Telehealth Platform</span>
             </div>
 
             {/* Display Heading */}
@@ -513,7 +582,7 @@ export default function LandingScreen({
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
               }`}
             >
-              Exceptional Care for Every Patient
+              Quality Healthcare, Wherever You Are.
             </h1>
 
             {/* Description */}
@@ -522,9 +591,8 @@ export default function LandingScreen({
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
               }`}
             >
-              Delivering personalized medical care with experienced doctors,
-              modern treatments and a welcoming clinic focused on your health
-              and well-being.
+              Connect with verified specialists through seamless online doctor consultations,
+              easy appointment booking, and encrypted HD video consultations from the comfort of your home.
             </p>
 
             {/* Action Buttons */}
@@ -535,7 +603,7 @@ export default function LandingScreen({
             >
               <button
                 type="button"
-                onClick={onRegister}
+                onClick={onFindDoctor}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#165849] hover:bg-[#124b3e] text-white text-sm sm:text-base font-medium px-6 py-3.5 transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
               >
                 <span>Book Appointment</span>
@@ -556,29 +624,28 @@ export default function LandingScreen({
                 </svg>
               </button>
               <a
-                href="#services"
+                href="#how-it-works"
                 onClick={(e) => {
                   e.preventDefault();
-                  scrollToSection("services");
+                  scrollToSection("how-it-works");
                 }}
                 className="inline-flex items-center justify-center rounded-lg bg-white hover:bg-white/95 text-[#165849] text-sm sm:text-base font-medium px-6 py-3.5 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
               >
-                Explore Services
+                How It Works
               </a>
             </div>
 
-            {/* Ratings & Social Proof */}
+            {/* Factual Messaging & Security Proof */}
             <div
-              className={`flex items-center gap-3 text-sm sm:text-base transform transition-all duration-300 ${
+              className={`flex items-center gap-2.5 text-sm sm:text-base transform transition-all duration-300 ${
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
               }`}
             >
-              <div className="flex text-[#F59E0B] tracking-wider text-base sm:text-lg">
-                ★★★★★
-              </div>
-              <span className="text-zinc-400 font-light">|</span>
-              <span className="text-[#1D3E35] font-semibold text-sm sm:text-base tracking-tight">
-                Trusted by 2,000+ Patients
+              <span className="material-symbols-outlined text-emerald-300 text-lg">
+                verified_user
+              </span>
+              <span className="text-[#D9EBE3] font-semibold text-xs sm:text-sm tracking-tight">
+                Encrypted Video Calls · Verified Specialists · Digital Prescriptions
               </span>
             </div>
           </div>
@@ -600,7 +667,7 @@ export default function LandingScreen({
       </section>
 
       {/* ========================================================= */}
-      {/* 2. STATS MARQUEE (NAVBAR COLOR & REFINED OPACITY)         */}
+      {/* 2. STATS MARQUEE (PLATFORM HIGHLIGHTS)                     */}
       {/* ========================================================= */}
       <section
         aria-label="Clinical Highlights"
@@ -614,29 +681,121 @@ export default function LandingScreen({
           {[...Array(2)].map((_, setIdx) => (
             <div key={setIdx} className="flex items-center shrink-0">
               {[
-                { number: "5K+", label: "Patients Treated" },
-                { number: "12+", label: "Years Experience" },
-                { number: "98%", label: "Patient Satisfaction" },
-                { number: "24/7", label: "Emergency & Video Care" },
-                { number: "100%", label: "Verified Clinicians" },
-                { number: "15+", label: "Medical Specialties" },
-              ].map((item, idx) => (
+                "100% Verified Clinicians",
+                "Encrypted HD Video Calls",
+                "Instant Digital Prescriptions",
+                "Seamless Slot Booking",
+                "Secure Medical Records",
+                "HIPAA Data Compliant",
+              ].map((text, idx) => (
                 <div key={idx} className="flex items-center">
                   <div className="flex items-center gap-2.5 px-6 sm:px-10">
-                    <span className="font-poppins font-bold text-xl sm:text-2xl text-white opacity-95 tracking-tight">
-                      {item.number}
-                    </span>
-                    <span className="text-xs sm:text-sm font-medium text-emerald-100/85 uppercase tracking-wider">
-                      {item.label}
+                    <span className="font-poppins font-semibold text-sm sm:text-base text-white opacity-95 tracking-wide uppercase">
+                      {text}
                     </span>
                   </div>
                   <span
-                    className="inline-block size-1.5 rounded-full bg-white/30 shrink-0"
+                    className="inline-block size-1.5 rounded-full bg-white/40 shrink-0"
                     aria-hidden="true"
                   />
                 </div>
               ))}
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* HOW IT WORKS SECTION (4-Step Process)                     */}
+      {/* ========================================================= */}
+      <section
+        id="how-it-works"
+        className="scroll-mt-16 w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 py-20 md:py-28"
+      >
+        <ScrollReveal animation="fade-up">
+          <div className="flex flex-col items-center text-center max-w-2xl mx-auto space-y-3 mb-16">
+            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
+              <span className="size-2 rounded-full bg-[#1A7D67]"></span>
+              Simple 4-Step Process
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
+              How Kaizen Care Works
+            </h2>
+            <p className="text-zinc-600 text-sm sm:text-base">
+              Get quality medical care in four easy steps from anywhere.
+            </p>
+          </div>
+        </ScrollReveal>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {[
+            {
+              step: "01",
+              title: "Find a Doctor",
+              desc: "Search verified medical specialists by specialty, language, or consultation availability.",
+              icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+              ),
+            },
+            {
+              step: "02",
+              title: "Book Appointment",
+              desc: "Select a convenient date and time slot with instant appointment confirmation.",
+              icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                  <line x1="16" x2="16" y1="2" y2="6" />
+                  <line x1="8" x2="8" y1="2" y2="6" />
+                  <line x1="3" x2="21" y1="10" y2="10" />
+                </svg>
+              ),
+            },
+            {
+              step: "03",
+              title: "Consult Online",
+              desc: "Join high-definition, encrypted WebRTC video sessions with your doctor from any device.",
+              icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect width="15" height="14" x="1" y="5" rx="2" ry="2" />
+                </svg>
+              ),
+            },
+            {
+              step: "04",
+              title: "Access Records",
+              desc: "Instantly view and download digital prescriptions, clinical notes, and medical records.",
+              icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+              ),
+            },
+          ].map((item, idx) => (
+            <ScrollReveal key={idx} animation="fade-up" delay={idx * 100}>
+              <div className="relative p-6 rounded-2xl bg-[#F9FBFA] border border-zinc-200/80 hover:border-[#1A7D67]/40 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 h-full flex flex-col justify-between group">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="size-12 rounded-xl bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center transition-colors duration-300 shadow-xs">
+                      {item.icon}
+                    </div>
+                    <span className="text-2xl font-bold font-poppins text-zinc-300 group-hover:text-[#1A7D67]/40 transition-colors">
+                      {item.step}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-lg text-zinc-800 mb-2 group-hover:text-[#1A7D67] transition-colors">
+                    {item.title}
+                  </h3>
+                  <p className="text-zinc-600 text-sm leading-relaxed">
+                    {item.desc}
+                  </p>
+                </div>
+              </div>
+            </ScrollReveal>
           ))}
         </div>
       </section>
