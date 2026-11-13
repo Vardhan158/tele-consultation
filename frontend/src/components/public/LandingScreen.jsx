@@ -1284,7 +1284,7 @@ export default function LandingScreen({
               </span>
             </h2>
             <p className="text-zinc-600 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
-              Whether it's a routine visit or ongoing care, we're here to help you
+              Whether it's a routine consultation or ongoing care, we're here to help you
               stay healthy with confidence.
             </p>
             <div className="flex flex-wrap justify-center items-center gap-4 pt-2">
@@ -1357,8 +1357,7 @@ export default function LandingScreen({
                 </span>
               </div>
               <p className="text-sm text-zinc-400 leading-relaxed">
-                Providing accessible teleconsultation healthcare through qualified
-                healthcare professionals, secure video consultations, and patient-first digital care.
+                Connecting patients with qualified healthcare professionals through online doctor consultations, easy appointment booking, and secure digital healthcare services.
               </p>
             </div>
 
