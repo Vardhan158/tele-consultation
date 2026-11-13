@@ -591,7 +591,7 @@ export default function LandingScreen({
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
               }`}
             >
-              Connect with verified specialists through seamless online doctor consultations,
+              Connect with qualified healthcare professionals through seamless online doctor consultations,
               easy appointment booking, and secure video consultations from the comfort of your home.
             </p>
 
@@ -645,7 +645,7 @@ export default function LandingScreen({
                 verified_user
               </span>
               <span className="text-[#D9EBE3] font-semibold text-xs sm:text-sm tracking-tight">
-                Secure Video Consultations · Verified Specialists · Digital Prescriptions
+                Secure Video Consultations · Qualified Healthcare Professionals · Digital Prescriptions
               </span>
             </div>
           </div>
@@ -732,7 +732,7 @@ export default function LandingScreen({
             {
               step: "01",
               title: "Find a Doctor",
-              desc: "Search verified medical specialists by specialty, language, or consultation availability.",
+              desc: "Search qualified healthcare professionals by specialty, language, or consultation availability.",
               icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8" />
@@ -865,7 +865,7 @@ export default function LandingScreen({
                       Experienced Doctors
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Verified specialists across major clinical specialties.
+                      Qualified healthcare professionals across major clinical specialties.
                     </p>
                   </div>
                 </div>
