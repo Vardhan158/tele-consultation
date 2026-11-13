@@ -291,24 +291,27 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           </div>
         )}
 
-        {/* Page Heading & Top Action Row matching Screenshot */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
+        {/* Compact Heading Banner matching Find Doctors style */}
+        <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+              Secure Health Vault · Medical Records
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
               Your health story, together
             </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              Safely organize your documents and share relevant records with
-              your care team.
+            <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+              Safely organize your documents and share relevant records with your care team.
             </p>
           </div>
 
           <button
             type="button"
             onClick={handleBrowseFiles}
-            className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0"
+            className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0 self-start sm:self-center"
           >
-            <span className="material-symbols-outlined text-base">upload</span>
+            <span className="material-symbols-outlined text-base !text-[#185A4D]">upload</span>
             <span>Upload a record</span>
           </button>
         </div>
@@ -520,8 +523,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
 
               {/* Dashed Drag & Drop Box */}
               <div className="border-2 border-dashed border-[#577877]/25 rounded-2xl p-6 text-center space-y-2 bg-[#F8FAFB]">
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#2563EB] flex items-center justify-center mx-auto">
-                  <span className="material-symbols-outlined text-2xl !text-[#2563EB]">
+                <div className="w-10 h-10 rounded-full bg-[#E8F3F3] text-[#25836F] flex items-center justify-center mx-auto">
+                  <span className="material-symbols-outlined text-2xl !text-[#25836F]">
                     cloud_upload
                   </span>
                 </div>
@@ -606,7 +609,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                   className={`w-full py-2.5 rounded-xl font-semibold text-xs text-center transition select-none ${
                     isTooLarge || !selectedFileName || isUploading
                       ? "bg-[#F0F5F7] text-[#577877] cursor-not-allowed border border-[#577877]/10"
-                      : "bg-[#25836F] text-white hover:bg-[#1f3f42] cursor-pointer shadow-sm"
+                      : "bg-[#25836F] text-white hover:bg-[#185A4D] cursor-pointer shadow-sm"
                   }`}
                 >
                   {isUploading ? "Uploading..." : "Upload record"}

@@ -1,11 +1,17 @@
 import { useState, useEffect, useMemo } from "react";
 import { patientApi } from "../../lib/api";
 
-const AVAILABILITY_FILTERS = [
+const AVAILABILITY_OPTIONS = [
   "Any time",
   "Available today",
   "Available this week",
   "Weekend availability",
+];
+
+const SORT_OPTIONS = [
+  "Recommended",
+  "Fee: Low to High",
+  "Fee: High to Low",
 ];
 
 function slotTimeInZone(value, timeZone) {
@@ -121,8 +127,6 @@ export default function FindDoctorsScreen({
     ],
     visit_formats: ["Video consultation", "Audio consultation"],
   });
-  const [bookingOptionsLoading, setBookingOptionsLoading] = useState(false);
-  const [bookingOptionsError, setBookingOptionsError] = useState("");
   useEffect(() => {
     patientApi
       .bookingOptions()
@@ -143,11 +147,25 @@ export default function FindDoctorsScreen({
       .catch(() => {});
   }, [authenticated]);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSpecialties, setSelectedSpecialties] = useState([]);
+  // Filters State
+  // We keep draft filters and applied filters so "Apply Filters" operates cleanly
+  const [searchInput, setSearchInput] = useState("");
+  const [selectedSpecialty, setSelectedSpecialty] = useState("all");
   const [availabilityFilter, setAvailabilityFilter] = useState("Any time");
-  const [selectedLanguages, setSelectedLanguages] = useState([]);
+  const [selectedLanguage, setSelectedLanguage] = useState("all");
   const [sortOption, setSortOption] = useState("Recommended");
+
+  // Applied filter state
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: "",
+    specialty: "all",
+    availability: "Any time",
+    language: "all",
+    sort: "Recommended",
+  });
+
+  // Mobile filters collapsible state
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
 
   // Booking Flow State
@@ -167,24 +185,110 @@ export default function FindDoctorsScreen({
   const [bookingError, setBookingError] = useState("");
   const [paymentConfirmationData, setPaymentConfirmationData] = useState(null);
 
-  const toggleSpecialty = (spec) => {
-    setSelectedSpecialties((prev) =>
-      prev.includes(spec) ? prev.filter((s) => s !== spec) : [...prev, spec],
-    );
+  // Dynamic filter options extracted from API data
+  const specialties = useMemo(() => {
+    return [...new Set(doctors.map((d) => d.specialty).filter(Boolean))].sort();
+  }, [doctors]);
+
+  const languages = useMemo(() => {
+    return [...new Set(doctors.flatMap((d) => d.languages || []).filter(Boolean))].sort();
+  }, [doctors]);
+
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      search: searchInput.trim(),
+      specialty: selectedSpecialty,
+      availability: availabilityFilter,
+      language: selectedLanguage,
+      sort: sortOption,
+    });
+    setPage(1);
+    setMobileFiltersOpen(false);
   };
 
-  const toggleLanguage = (lang) => {
-    setSelectedLanguages((prev) =>
-      prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang],
-    );
-  };
-
-  const clearAllFilters = () => {
-    setSearchQuery("");
-    setSelectedSpecialties([]);
+  const handleClearFilters = () => {
+    setSearchInput("");
+    setSelectedSpecialty("all");
     setAvailabilityFilter("Any time");
-    setSelectedLanguages([]);
+    setSelectedLanguage("all");
+    setSortOption("Recommended");
+    setAppliedFilters({
+      search: "",
+      specialty: "all",
+      availability: "Any time",
+      language: "all",
+      sort: "Recommended",
+    });
+    setPage(1);
+    setMobileFiltersOpen(false);
   };
+
+  const hasActiveFilters =
+    appliedFilters.search !== "" ||
+    appliedFilters.specialty !== "all" ||
+    appliedFilters.availability !== "Any time" ||
+    appliedFilters.language !== "all" ||
+    appliedFilters.sort !== "Recommended";
+
+  // Filtered list
+  const filteredDoctors = useMemo(() => {
+    return doctors.filter((doc) => {
+      // Specialty
+      if (
+        appliedFilters.specialty !== "all" &&
+        doc.specialty !== appliedFilters.specialty
+      ) {
+        return false;
+      }
+      // Availability
+      if (
+        appliedFilters.availability === "Available today" &&
+        !doc.availableToday
+      ) {
+        return false;
+      }
+      if (
+        appliedFilters.availability === "Available this week" &&
+        (!doc.availability || doc.availability.length === 0)
+      ) {
+        return false;
+      }
+      // Language
+      if (
+        appliedFilters.language !== "all" &&
+        !(doc.languages || []).includes(appliedFilters.language)
+      ) {
+        return false;
+      }
+      // Search
+      if (appliedFilters.search) {
+        const q = appliedFilters.search.toLowerCase();
+        const matchName = (doc.fullName || "").toLowerCase().includes(q);
+        const matchSpec = (doc.specialty || "").toLowerCase().includes(q);
+        const matchClinic = (doc.clinic || "").toLowerCase().includes(q);
+        return matchName || matchSpec || matchClinic;
+      }
+      return true;
+    });
+  }, [doctors, appliedFilters]);
+
+  // Sorted list
+  const sortedDoctors = useMemo(() => {
+    const list = [...filteredDoctors];
+    if (appliedFilters.sort === "Fee: Low to High") {
+      list.sort((a, b) => (a.fee || 0) - (b.fee || 0));
+    } else if (appliedFilters.sort === "Fee: High to Low") {
+      list.sort((a, b) => (b.fee || 0) - (a.fee || 0));
+    }
+    return list;
+  }, [filteredDoctors, appliedFilters.sort]);
+
+  const pageSize = 5;
+  const totalPages = Math.ceil(sortedDoctors.length / pageSize) || 1;
+  const paginatedDoctors = sortedDoctors.slice(
+    (page - 1) * pageSize,
+    page * pageSize,
+  );
 
   const startBooking = async (doctor) => {
     if (!authenticated) {
@@ -282,62 +386,6 @@ export default function FindDoctorsScreen({
     return slotTime === selectedTimeSlot;
   });
 
-  const specialties = [...new Set(doctors.map((doctor) => doctor.specialty).filter(Boolean))].sort();
-  const languages = [...new Set(doctors.flatMap((doctor) => doctor.languages || []).filter(Boolean))].sort();
-
-  const filteredDoctors = useMemo(() => {
-    return doctors.filter((doc) => {
-      if (
-        selectedSpecialties.length > 0 &&
-        !selectedSpecialties.includes(doc.specialty)
-      ) {
-        return false;
-      }
-      if (availabilityFilter === "Available today" && !doc.availableToday) {
-        return false;
-      }
-      if (
-        selectedLanguages.length > 0 &&
-        !(doc.languages || []).some((lang) => selectedLanguages.includes(lang))
-      ) {
-        return false;
-      }
-      if (
-        searchQuery.trim()
-      ) {
-        const q = searchQuery.toLowerCase();
-        const matchName = (doc.fullName || "").toLowerCase().includes(q);
-        const matchSpec = (doc.specialty || "").toLowerCase().includes(q);
-        const matchClinic = (doc.clinic || "").toLowerCase().includes(q);
-        return matchName || matchSpec || matchClinic;
-      }
-      return true;
-    });
-  }, [
-    doctors,
-    selectedSpecialties,
-    availabilityFilter,
-    selectedLanguages,
-    searchQuery,
-  ]);
-
-  const sortedDoctors = useMemo(() => {
-    const list = [...filteredDoctors];
-    if (sortOption === "Fee: Low to High") {
-      list.sort((a, b) => (a.fee || 0) - (b.fee || 0));
-    } else if (sortOption === "Fee: High to Low") {
-      list.sort((a, b) => (b.fee || 0) - (a.fee || 0));
-    }
-    return list;
-  }, [filteredDoctors, sortOption]);
-
-  const pageSize = 5;
-  const totalPages = Math.ceil(sortedDoctors.length / pageSize) || 1;
-  const paginatedDoctors = sortedDoctors.slice(
-    (page - 1) * pageSize,
-    page * pageSize,
-  );
-
   const handleConfirmBooking = async () => {
     if (!bookingDoctor || !selectedSlot || !bookingPricing) {
       setBookingError("Please select an available slot and an appointment type with valid pricing.");
@@ -347,7 +395,6 @@ export default function FindDoctorsScreen({
     setBookingError("");
 
     try {
-      // 1. Create Razorpay Order Server-Side (Recalculates amount on backend)
       const orderRes = await patientApi.createOrder({
         doctor_id: bookingDoctor.id,
         appointment_type: appointmentType,
@@ -357,14 +404,11 @@ export default function FindDoctorsScreen({
         doctor_notes: doctorNotes,
       });
 
-      // 2. Load Razorpay script
       const loaded = await loadRazorpayScript();
-
       if (!loaded || !window.Razorpay) {
         throw new Error("Payment checkout is unavailable. Please try again.");
       }
 
-      // 3. Launch Razorpay Standard Checkout
       const options = {
         key: orderRes.key_id,
         amount: orderRes.amount_paise,
@@ -423,226 +467,429 @@ export default function FindDoctorsScreen({
 
   return (
     <div className="space-y-6 font-sans text-[#162623]">
-      {/* Header Banner */}
-      <div className="care-card p-6 sm:p-8 bg-gradient-to-r from-[#25836F] to-[#162623] text-white">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Find Doctors &amp; Specialists
-        </h1>
-        <p className="text-xs sm:text-sm text-white/80 mt-1 max-w-2xl">
-          Search verified clinicians, check real-time schedule availability, and book teleconsultations.
-        </p>
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Left Filter Sidebar */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="care-card p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-[#577877]/15 pb-3">
-              <h2 className="text-sm font-bold text-[#162623]">Filters</h2>
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="text-xs font-semibold text-[#577877] hover:underline cursor-pointer"
-              >
-                Reset
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#162623]">Search</label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Doctor name, specialty, or clinic…"
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
-              />
-            </div>
-
-            {/* Specialty */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#162623]">Specialty</label>
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {specialties.map((spec) => (
-                  <label
-                    key={spec}
-                    className="flex items-center gap-2 text-xs text-[#162623] cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedSpecialties.includes(spec)}
-                      onChange={() => toggleSpecialty(spec)}
-                      className="rounded border-[#577877]/30 text-[#25836F]"
-                    />
-                    <span>{spec}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Availability */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#162623]">Availability</label>
-              <div className="space-y-1">
-                {AVAILABILITY_FILTERS.map((af) => (
-                  <label
-                    key={af}
-                    className="flex items-center gap-2 text-xs text-[#162623] cursor-pointer"
-                  >
-                    <input
-                      type="radio"
-                      name="availability"
-                      checked={availabilityFilter === af}
-                      onChange={() => setAvailabilityFilter(af)}
-                      className="text-[#25836F]"
-                    />
-                    <span>{af}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Languages */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#162623]">Languages</label>
-              <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                {languages.map((lang) => (
-                  <label
-                    key={lang}
-                    className="flex items-center gap-2 text-xs text-[#162623] cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedLanguages.includes(lang)}
-                      onChange={() => toggleLanguage(lang)}
-                      className="rounded border-[#577877]/30 text-[#25836F]"
-                    />
-                    <span>{lang}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+      {/* 1. Compact Heading Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Care Specialists &amp; Teleconsultation
           </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Find Doctors &amp; Specialists
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            Search verified clinicians, check real-time schedule availability, and book teleconsultations with confidence.
+          </p>
         </div>
 
-        {/* Right Doctor List */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="care-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="text-xs text-[#577877]">
-              Showing <span className="font-bold text-[#162623]">{sortedDoctors.length}</span> verified clinicians
+        <div className="hidden sm:flex items-center gap-2 text-xs bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20 shrink-0 self-start sm:self-center shadow-xs">
+          <span className="material-symbols-outlined !text-[#A3E2D4] text-lg">verified</span>
+          <span className="font-medium text-white/95">Board-Certified Doctors</span>
+        </div>
+      </div>
+
+      {/* 2. Compact Horizontal Filter Section */}
+      <div className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs space-y-4">
+        {/* Row 1: Full-width search bar + Mobile Filter Toggle button */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#577877] text-lg pointer-events-none">
+              search
+            </span>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleApplyFilters();
+              }}
+              placeholder="Doctor name, specialty, or clinic…"
+              className="w-full rounded-xl border border-[#577877]/25 pl-10 pr-4 py-2.5 text-xs text-[#162623] placeholder:text-[#577877]/70 bg-[#F0F5F7]/50 focus:bg-white focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                title="Clear search text"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Mobile Filter Toggle */}
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen((prev) => !prev)}
+            className="md:hidden inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs font-semibold text-[#162623] bg-[#F0F5F7] hover:bg-white transition cursor-pointer shrink-0"
+          >
+            <span className="material-symbols-outlined text-base text-[#25836F]">
+              tune
+            </span>
+            <span>Filters</span>
+            {hasActiveFilters && (
+              <span className="w-2 h-2 rounded-full bg-[#25836F]" />
+            )}
+          </button>
+        </div>
+
+        {/* Row 2: Dropdowns & Filter Actions (Desktop inline / Tablet 2-col / Mobile collapsible) */}
+        <div
+          className={`${
+            mobileFiltersOpen ? "block" : "hidden"
+          } md:block border-t border-[#577877]/10 pt-4 space-y-4`}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Specialty Dropdown */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs text-[#25836F]">medical_services</span>
+                Specialty
+              </label>
+              <select
+                value={selectedSpecialty}
+                onChange={(e) => setSelectedSpecialty(e.target.value)}
+                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+              >
+                <option value="all">All Specialties</option>
+                {specialties.map((spec) => (
+                  <option key={spec} value={spec}>
+                    {spec}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold text-[#577877]">Sort by:</span>
+            {/* Availability Dropdown */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs text-[#25836F]">event_available</span>
+                Availability
+              </label>
+              <select
+                value={availabilityFilter}
+                onChange={(e) => setAvailabilityFilter(e.target.value)}
+                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+              >
+                {AVAILABILITY_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Language Dropdown */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs text-[#25836F]">translate</span>
+                Language
+              </label>
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+              >
+                <option value="all">All Languages</option>
+                {languages.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort By Dropdown */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs text-[#25836F]">swap_vert</span>
+                Sort By
+              </label>
               <select
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value)}
-                className="rounded-xl border border-[#577877]/25 px-3 py-1.5 bg-white text-xs text-[#162623]"
+                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
               >
-                <option value="Recommended">Recommended</option>
-                <option value="Fee: Low to High">Fee: Low to High</option>
-                <option value="Fee: High to Low">Fee: High to Low</option>
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
-          {loading ? (
-            <div className="flex h-64 items-center justify-center text-[#577877]">
-              <span className="material-symbols-outlined animate-spin text-3xl">sync</span>
-            </div>
-          ) : loadError ? (
-            <div className="care-card p-8 text-center text-rose-600 text-xs font-medium">
-              {loadError}
-            </div>
-          ) : paginatedDoctors.length === 0 ? (
-            <div className="care-card p-12 text-center text-[#577877] space-y-2">
-              <span className="material-symbols-outlined text-4xl">search_off</span>
-              <h3 className="text-sm font-bold text-[#162623]">No Doctors Found</h3>
-              <p className="text-xs">Try relaxing your search or specialty filters.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {paginatedDoctors.map((doc) => (
-                <div key={doc.id} className="care-card p-6 transition hover:border-[#25836F]/40 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    <div className="flex gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-[#25836F] text-white flex items-center justify-center text-lg font-bold shadow-sm shrink-0">
-                        {doc.fullName
-                          .split(/\s+/)
-                          .map((n) => n[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase()}
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-bold text-[#162623]">{doc.fullName}</h3>
-                          <span className="material-symbols-outlined text-teal-600 text-base" title="Verified Clinician">
-                            verified
-                          </span>
-                        </div>
-                        <div className="text-xs font-semibold text-[#25836F]">{doc.specialty}</div>
-                        <div className="text-xs text-[#577877]">{doc.clinic}</div>
-                        <div className="text-[11px] text-[#577877]">
-                          Languages: {doc.languages.join(", ") || "Not provided"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right space-y-1 sm:self-center shrink-0">
-                      <div className="text-lg font-bold text-[#25836F]">{doc.feeDisplay}</div>
-                      <div className="text-[11px] text-[#577877]">Next available:</div>
-                      <div className="text-xs font-semibold text-[#162623]">{doc.nextSlotLabel}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-[#577877]/15 pt-3">
-                    <span className="text-xs text-[#577877]">
-                      {doc.availability.length} available slot(s)
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => startBooking(doc)}
-                      className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] cursor-pointer"
-                    >
-                      Book Appointment
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-[#577877]/15 pt-4 text-xs">
-                  <span className="text-[#577877]">
-                    Page {page} of {totalPages}
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      disabled={page === 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] disabled:opacity-40"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      disabled={page === totalPages}
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      className="rounded-lg border border-[#577877]/25 px-3 py-1.5 font-semibold text-[#25836F] disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
+          {/* Row 3: Action Buttons (Apply & Clear) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#577877]/10">
+            <div className="text-xs text-[#577877]">
+              {hasActiveFilters ? (
+                <span className="inline-flex items-center gap-1.5 text-[#25836F] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#25836F]" />
+                  Custom filters active
+                </span>
+              ) : (
+                <span>Showing standard directory recommendations</span>
               )}
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="px-4 py-2 rounded-xl border border-[#577877]/25 bg-white text-[#577877] hover:text-[#162623] hover:bg-[#F0F5F7] text-xs font-semibold transition cursor-pointer"
+              >
+                Clear Filters
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyFilters}
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#25836F] hover:bg-[#1f6f5e] text-white text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">filter_alt</span>
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Result Count & Meta Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+        <div className="text-xs text-[#577877]">
+          Showing{" "}
+          <span className="font-bold text-[#162623]">
+            {sortedDoctors.length}
+          </span>{" "}
+          verified clinician{sortedDoctors.length === 1 ? "" : "s"}
+          {appliedFilters.specialty !== "all" && (
+            <span className="ml-1 text-[#25836F] font-semibold">
+              in {appliedFilters.specialty}
+            </span>
+          )}
+        </div>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer self-start sm:self-auto"
+          >
+            Reset all filters
+          </button>
+        )}
+      </div>
+
+      {/* 4. Doctor Listing */}
+      {loading ? (
+        <div className="rounded-2xl bg-white border border-[#577877]/15 p-16 flex flex-col items-center justify-center gap-3 text-[#577877]">
+          <span className="material-symbols-outlined animate-spin text-4xl text-[#25836F]">
+            sync
+          </span>
+          <p className="text-xs font-medium">Loading clinical directory and schedules…</p>
+        </div>
+      ) : loadError ? (
+        <div className="rounded-2xl bg-white border border-rose-200 p-8 text-center text-rose-600 text-xs font-medium space-y-3">
+          <p>{loadError}</p>
+          <button
+            type="button"
+            onClick={loadDoctors}
+            className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 transition cursor-pointer"
+          >
+            Retry Loading
+          </button>
+        </div>
+      ) : paginatedDoctors.length === 0 ? (
+        /* 5. Helpful Empty State */
+        <div className="rounded-2xl bg-white border border-[#577877]/15 p-12 sm:p-16 text-center text-[#577877] space-y-4 max-w-xl mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-[#F0F5F7] text-[#25836F] mx-auto flex items-center justify-center">
+            <span className="material-symbols-outlined text-3xl">person_search</span>
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-[#162623]">
+              No Clinicians Match Your Criteria
+            </h3>
+            <p className="text-xs text-[#577877] max-w-md mx-auto leading-relaxed">
+              We couldn't find any doctors matching your search or filter combination. Try clearing your filters or selecting a different specialty.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#1f6f5e] transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">restart_alt</span>
+              Clear All Filters
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* 6. Redesigned Doctor Cards with Consistent Grid */
+        <div className="space-y-4">
+          {paginatedDoctors.map((doc) => {
+            const hasSlots = Array.isArray(doc.availability) && doc.availability.length > 0;
+            const initials = (doc.fullName || "MD")
+              .split(/\s+/)
+              .filter(Boolean)
+              .map((n) => n[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase();
+
+            return (
+              <div
+                key={doc.id}
+                className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs hover:shadow-md hover:border-[#25836F]/40 transition-all duration-200"
+              >
+                {/* Main Card Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+                  {/* Left Column: Avatar & Doctor Details (md: col-span-7 lg: col-span-8) */}
+                  <div className="md:col-span-7 lg:col-span-8 flex items-start gap-4 min-w-0">
+                    {/* Avatar */}
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#185A4D] text-white flex items-center justify-center text-lg sm:text-xl font-bold shadow-xs shrink-0 select-none">
+                      {initials}
+                    </div>
+
+                    {/* Details */}
+                    <div className="space-y-1.5 min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-bold text-[#162623] truncate">
+                          {doc.fullName}
+                        </h3>
+                        <span
+                          className="material-symbols-outlined text-[#25836F] text-base shrink-0"
+                          title="Verified Clinician"
+                        >
+                          verified
+                        </span>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#F0F5F7] text-[#185A4D]">
+                          {doc.specialty || "General Specialist"}
+                        </span>
+                      </div>
+
+                      {doc.clinic && (
+                        <p className="text-xs text-[#577877] flex items-center gap-1.5 truncate">
+                          <span className="material-symbols-outlined text-sm text-[#577877]/80 shrink-0">
+                            apartment
+                          </span>
+                          <span className="truncate">{doc.clinic}</span>
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#577877] pt-0.5">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="material-symbols-outlined text-xs text-[#25836F]">translate</span>
+                          Languages:{" "}
+                          <strong className="font-semibold text-[#162623]">
+                            {(doc.languages && doc.languages.length > 0)
+                              ? doc.languages.join(", ")
+                              : "English"}
+                          </strong>
+                        </span>
+
+                        {doc.timezone && (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs text-[#577877]">schedule</span>
+                            {doc.timezone}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Fee, Availability & Booking Action (md: col-span-5 lg: col-span-4) */}
+                  <div className="md:col-span-5 lg:col-span-4 flex flex-col md:items-end justify-between gap-3 border-t md:border-t-0 md:border-l border-[#577877]/15 pt-4 md:pt-0 md:pl-5">
+                    {/* Fee & Next Available */}
+                    <div className="md:text-right space-y-0.5">
+                      <div className="flex md:block items-baseline justify-between gap-2">
+                        <span className="text-[11px] text-[#577877] md:hidden">Consultation Fee</span>
+                        <div className="text-lg font-bold text-[#185A4D]">
+                          {doc.feeDisplay || "Fee calculated at booking"}
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-[#577877] pt-0.5">
+                        Next slot:{" "}
+                        <span
+                          className={`font-semibold ${
+                            hasSlots ? "text-[#162623]" : "text-amber-700"
+                          }`}
+                        >
+                          {doc.nextSlotLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Booking Action */}
+                    <div className="w-full md:w-auto flex flex-col sm:flex-row md:flex-col items-stretch md:items-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={!hasSlots}
+                        onClick={() => startBooking(doc)}
+                        className={`w-full md:w-auto px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 ${
+                          hasSlots
+                            ? "bg-[#25836F] hover:bg-[#1f6f5e] text-white hover:shadow-sm cursor-pointer"
+                            : "bg-[#E5EEF1] text-[#577877] cursor-not-allowed opacity-75"
+                        }`}
+                        title={
+                          hasSlots
+                            ? "Book an appointment with this doctor"
+                            : "No appointment slots are currently available for this doctor"
+                        }
+                      >
+                        <span className="material-symbols-outlined text-sm">
+                          {hasSlots ? "calendar_add_on" : "event_busy"}
+                        </span>
+                        <span>{hasSlots ? "Book Appointment" : "No Slots Available"}</span>
+                      </button>
+
+                      <div className="text-center md:text-right text-[11px] text-[#577877]">
+                        {hasSlots ? (
+                          <span className="inline-flex items-center gap-1 text-[#25836F] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#25836F]" />
+                            {doc.availability.length} slot{doc.availability.length === 1 ? "" : "s"} open
+                          </span>
+                        ) : (
+                          <span className="text-[#577877]">Check back later</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-[#577877]/15 pt-4 text-xs">
+              <span className="text-[#577877]">
+                Page <strong className="text-[#162623]">{page}</strong> of{" "}
+                <strong className="text-[#162623]">{totalPages}</strong>
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="rounded-xl border border-[#577877]/25 px-3.5 py-1.5 font-semibold text-[#25836F] bg-white hover:bg-[#F0F5F7] disabled:opacity-40 transition cursor-pointer"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="rounded-xl border border-[#577877]/25 px-3.5 py-1.5 font-semibold text-[#25836F] bg-white hover:bg-[#F0F5F7] disabled:opacity-40 transition cursor-pointer"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* Booking Modal */}
       {bookingDoctor && (
@@ -943,6 +1190,7 @@ export default function FindDoctorsScreen({
 
             <div className="pt-2 text-center">
               <button
+                type="button"
                 onClick={() => {
                   setPaymentConfirmationData(null);
                   onNavigate("appointments");
