@@ -86,7 +86,7 @@ export default function FindDoctorsScreen({
               qualificationsDisplay: qualList,
               experienceYears: doctor.experience_years ?? 5,
               registrationNumber: doctor.registration_number || doctor.registrationNo || "Verified Reg",
-              bio: doctor.bio || doctor.about || `Board-certified ${doctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`,
+              bio: doctor.bio || doctor.about || `Qualified ${doctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`,
               languages: doctor.supported_languages || doctor.languages || ["English"],
               fee: doctor.fee_paise == null ? null : doctor.fee_paise / 100,
               feeDisplay:
@@ -494,7 +494,7 @@ export default function FindDoctorsScreen({
 
         <div className="hidden sm:flex items-center gap-2 text-xs bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20 shrink-0 self-start sm:self-center shadow-xs">
           <span className="material-symbols-outlined !text-[#A3E2D4] text-lg">verified</span>
-          <span className="font-medium text-white/95">Board-Certified Doctors</span>
+          <span className="font-medium text-white/95">Qualified Healthcare Professionals</span>
         </div>
       </div>
 
@@ -1014,7 +1014,7 @@ export default function FindDoctorsScreen({
               </h3>
               <p className="text-xs text-[#162623] leading-relaxed bg-white p-3.5 rounded-xl border border-[#577877]/15">
                 {selectedProfileDoctor.bio ||
-                  `Board-certified ${selectedProfileDoctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`}
+                  `Qualified ${selectedProfileDoctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`}
               </p>
             </div>
 
