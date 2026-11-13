@@ -950,7 +950,7 @@ export default function LandingScreen({
             {[
               {
                 title: "General Consultation",
-                desc: "Comprehensive consultation for all your primary healthcare needs and acute medical questions.",
+                desc: "Connect with qualified doctors for general health concerns through online consultations.",
                 svg: (
                   <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
@@ -960,8 +960,8 @@ export default function LandingScreen({
                 ),
               },
               {
-                title: "Preventive Care",
-                desc: "Regular checkups, health screenings, and routine assessments to prevent chronic illnesses.",
+                title: "Preventive Health Guidance",
+                desc: "Receive preventive health advice, wellness recommendations, and follow-up guidance through online consultations.",
                 svg: (
                   <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -970,8 +970,8 @@ export default function LandingScreen({
                 ),
               },
               {
-                title: "Cardiac Care",
-                desc: "Expert clinical evaluation, ECG review, and specialized care plans for heart-related conditions.",
+                title: "Specialist Consultation",
+                desc: "Consult available medical specialists for expert advice and ongoing care.",
                 svg: (
                   <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
@@ -980,36 +980,28 @@ export default function LandingScreen({
                 ),
               },
               {
-                title: "Diagnostic Services",
-                desc: "Advanced diagnostic tests, pathology panel reviews, and fast imaging reports you can trust.",
+                title: "Online Video Consultation",
+                desc: "Attend scheduled, secure video consultations with your doctor from a supported device.",
                 svg: (
                   <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m10 2 4 4-4 4" />
-                    <path d="m14 14 4 4-4 4" />
-                    <path d="M4 14h16" />
-                    <path d="M4 10h16" />
-                    <path d="M14 2v20" />
-                    <path d="M10 2v20" />
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect width="15" height="14" x="1" y="5" rx="2" ry="2" />
                   </svg>
                 ),
               },
               {
-                title: "Vaccination & Immunization",
-                desc: "Safe and effective vaccines for adults and pediatric patients to maintain full protection.",
+                title: "Digital Prescriptions & Records",
+                desc: "Access doctor-issued prescriptions, consultation summaries, and available medical records.",
                 svg: (
                   <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m18 2 4 4" />
-                    <path d="m17 7 3-3" />
-                    <path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" />
-                    <path d="m9 11 4 4" />
-                    <path d="m5 19-3 3" />
-                    <path d="m14 4 6 6" />
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
                   </svg>
                 ),
               },
               {
                 title: "Follow-up & Support",
-                desc: "Continuous care guidance, digital prescription refills, and follow-up reviews for lasting wellness.",
+                desc: "Schedule follow-up appointments and receive continued consultation-related assistance.",
                 svg: (
                   <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
