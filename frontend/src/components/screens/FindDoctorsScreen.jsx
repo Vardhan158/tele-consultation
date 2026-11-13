@@ -468,10 +468,10 @@ export default function FindDoctorsScreen({
   return (
     <div className="space-y-6 font-sans text-[#162623]">
       {/* 1. Compact Heading Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#295255] via-[#214346] to-[#162623] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#295255]/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="rounded-2xl bg-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/80">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#25836F]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
             Care Specialists &amp; Teleconsultation
           </div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
@@ -482,8 +482,8 @@ export default function FindDoctorsScreen({
           </p>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 text-xs bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/10 shrink-0 self-start sm:self-center">
-          <span className="material-symbols-outlined !text-[#25836F] text-lg">verified</span>
+        <div className="hidden sm:flex items-center gap-2 text-xs bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/15 shrink-0 self-start sm:self-center">
+          <span className="material-symbols-outlined !text-[#F0F5F7] text-lg">verified</span>
           <span className="font-medium text-white/95">Board-Certified Doctors</span>
         </div>
       </div>
