@@ -270,8 +270,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   };
 
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="space-y-6 font-sans text-[#162623]">
         {/* Toast */}
         {toastMessage && (
           <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
@@ -664,7 +663,6 @@ export default function MedicalRecordsScreen({ onNavigate }) {
             </span>
           </div>
         </div>
-      </div>
 
       {/* Record Preview Modal */}
       {previewRecord && (

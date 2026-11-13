@@ -780,15 +780,12 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   // MAIN VIEW: APPOINTMENT LIST VIEW
   // ==========================================================
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 font-sans text-[#162623]">
+    <div className="space-y-6 font-sans text-[#162623]">
       {toastMessage && (
         <div className="fixed top-20 right-4 z-50 rounded-xl bg-[#25836F] text-white p-4 shadow-xl text-xs font-semibold">
           ℹ️ {toastMessage}
         </div>
       )}
-
-      {/* Main View: List of Appointments */}
-      <div className="mx-auto max-w-7xl space-y-6">
         {/* Compact Heading Banner matching Portal Brand System */}
         <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
@@ -955,7 +952,6 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
             )}
           </div>
         )}
-      </div>
     </div>
   );
 }

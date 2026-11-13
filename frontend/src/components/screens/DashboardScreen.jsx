@@ -179,37 +179,36 @@ export default function DashboardScreen({ onNavigate }) {
   });
 
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
-      <div className="mx-auto max-w-7xl space-y-8">
-        {/* Top Greeting & Date Banner matching Portal Brand System */}
-        <div
-          title={todayLabel}
-          className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
-        >
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
-              Personal Health Overview · Patient Dashboard
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-              {greeting}{firstName ? `, ${firstName}` : ""}
-            </h1>
-            <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
-              {todayLabel} · Your health plan is on schedule.
-            </p>
+    <div className="space-y-6 font-sans text-[#162623]">
+      {/* Top Greeting & Date Banner matching Portal Brand System */}
+      <div
+        title={todayLabel}
+        className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+      >
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Personal Health Overview · Patient Dashboard
           </div>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("find-doctors")}
-            className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0 self-start md:self-center"
-          >
-            <span className="material-symbols-outlined text-base !text-[#185A4D]">
-              add_circle
-            </span>
-            <span>Book New Visit</span>
-          </button>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            {greeting}{firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            {todayLabel} · Your health plan is on schedule.
+          </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => onNavigate("find-doctors")}
+          className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0 self-start sm:self-center"
+        >
+          <span className="material-symbols-outlined text-base !text-[#185A4D]">
+            add_circle
+          </span>
+          <span>Book New Visit</span>
+        </button>
+      </div>
 
         {/* Hero Upcoming Appointment Banner */}
         {nextVisit ? (
@@ -783,7 +782,6 @@ export default function DashboardScreen({ onNavigate }) {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Authorized Document Preview Modal */}
       {selectedRecord && (

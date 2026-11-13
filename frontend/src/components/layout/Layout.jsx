@@ -31,7 +31,7 @@ export default function Layout({
           onSignOut={onSignOut}
           patient={patient}
         />
-        <main className="flex-1 w-full bg-[#F0F5F7] p-6 space-y-6">
+        <main className="flex-1 w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           {children}
         </main>
       </div>
