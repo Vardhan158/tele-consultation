@@ -1076,8 +1076,8 @@ export default function LandingScreen({
               What Our Patients Say
             </h2>
             <p className="text-zinc-600 text-sm sm:text-base">
-              Real stories from patients who experienced compassionate,
-              high-quality clinical care at Kaizen Care.
+              Experiences from patients who used Kaizen Care for online doctor consultations,
+              video appointments, and follow-up care.
             </p>
           </div>
         </ScrollReveal>
@@ -1111,16 +1111,14 @@ export default function LandingScreen({
                 </div>
                 <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
                 <p className="text-zinc-700 text-sm leading-relaxed font-normal">
-                  "The doctor took the time to listen carefully and explained every
-                  step of my treatment. I felt comfortable and genuinely well
-                  cared for from start to finish."
+                  "The doctor took the time to listen carefully during our video consultation and explained my treatment plan clearly. I felt comfortable and well cared for from start to finish."
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-zinc-100">
                 <p className="font-semibold text-sm text-zinc-800">
                   Elena Rostova
                 </p>
-                <p className="text-xs text-zinc-500">General Consultation</p>
+                <p className="text-xs text-zinc-500">Online Video Consultation</p>
               </div>
             </div>
           </ScrollReveal>
@@ -1131,16 +1129,14 @@ export default function LandingScreen({
               <div>
                 <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
                 <p className="text-zinc-700 text-sm leading-relaxed">
-                  "Booking an appointment was simple, and the medical staff made the
-                  entire visit smooth and stress-free. Having my prescriptions
-                  instantly available on the portal is amazing."
+                  "Booking an online appointment was seamless, and the doctor was punctual and thorough. Accessing my doctor-issued prescription directly on the portal made the process effortless."
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-zinc-100">
                 <p className="font-semibold text-sm text-zinc-800">
                   Marcus Sterling
                 </p>
-                <p className="text-xs text-zinc-500">Preventive Care</p>
+                <p className="text-xs text-zinc-500">Online Appointment Booking</p>
               </div>
             </div>
           </ScrollReveal>
@@ -1151,16 +1147,14 @@ export default function LandingScreen({
               <div>
                 <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
                 <p className="text-zinc-700 text-sm leading-relaxed">
-                  "Professional doctors, friendly clinic staff, and exceptional
-                  service. The video consult worked seamlessly right in my
-                  browser without installing anything."
+                  "Professional doctors and exceptional online service. The video consultation worked seamlessly right in my browser without installing extra software."
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-zinc-100">
                 <p className="font-semibold text-sm text-zinc-800">
-                  Dr. Priya Sharma
+                  Priya Sharma
                 </p>
-                <p className="text-xs text-zinc-500">Cardiology Review</p>
+                <p className="text-xs text-zinc-500">Specialist Video Consultation</p>
               </div>
             </div>
           </ScrollReveal>
@@ -1171,16 +1165,14 @@ export default function LandingScreen({
               <div>
                 <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
                 <p className="text-zinc-700 text-sm leading-relaxed">
-                  "Every visit has been a great experience. The team is caring,
-                  attentive, and genuinely focused on patient well-being and
-                  long-term health."
+                  "Every online consultation has been a great experience. The doctors are attentive, thorough, and genuinely focused on patient well-being and follow-up care."
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-zinc-100">
                 <p className="font-semibold text-sm text-zinc-800">
                   Jonathan Vance
                 </p>
-                <p className="text-xs text-zinc-500">Diagnostic Checkup</p>
+                <p className="text-xs text-zinc-500">Follow-up & Support</p>
               </div>
             </div>
           </ScrollReveal>
@@ -1191,16 +1183,14 @@ export default function LandingScreen({
               <div>
                 <div className="flex text-[#F59E0B] text-sm mb-3">★★★★★</div>
                 <p className="text-zinc-700 text-sm leading-relaxed">
-                  "From consultation to follow-up, everything was handled with
-                  professionalism and compassion. I couldn't ask for better care
-                  for my family."
+                  "From booking the online appointment to receiving follow-up care, everything was handled with professionalism and clarity. Convenient digital healthcare for my family."
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-zinc-100">
                 <p className="font-semibold text-sm text-zinc-800">
                   Sarah Jenkins
                 </p>
-                <p className="text-xs text-zinc-500">Family Medicine</p>
+                <p className="text-xs text-zinc-500">Online Consultation</p>
               </div>
             </div>
           </ScrollReveal>
