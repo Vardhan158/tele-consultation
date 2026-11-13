@@ -681,12 +681,12 @@ export default function LandingScreen({
           {[...Array(2)].map((_, setIdx) => (
             <div key={setIdx} className="flex items-center shrink-0">
               {[
-                "100% Verified Clinicians",
+                "Qualified Healthcare Professionals",
                 "Secure Video Consultations",
-                "Instant Digital Prescriptions",
+                "Digital Prescriptions After Consultation",
                 "Seamless Slot Booking",
                 "Secure Medical Records",
-                "HIPAA Data Compliant",
+                "Patient Data Privacy & Security",
               ].map((text, idx) => (
                 <div key={idx} className="flex items-center">
                   <div className="flex items-center gap-2.5 px-6 sm:px-10">
