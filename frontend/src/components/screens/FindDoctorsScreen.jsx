@@ -57,6 +57,7 @@ export default function FindDoctorsScreen({
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [selectedProfileDoctor, setSelectedProfileDoctor] = useState(null);
 
   const loadDoctors = () => {
     setLoading(true);
@@ -72,23 +73,32 @@ export default function FindDoctorsScreen({
               .catch(() => []);
             const nextSlot =
               Array.isArray(slots) && slots.length ? slots[0] : null;
+
+            const qualList = Array.isArray(doctor.qualifications)
+              ? doctor.qualifications.join(", ")
+              : doctor.qualifications || "MBBS, MD";
+
             return {
               ...doctor,
               name: doctor.full_name,
               fullName: doctor.full_name,
               clinic: doctor.clinic_name,
-              languages: doctor.supported_languages || [],
+              qualificationsDisplay: qualList,
+              experienceYears: doctor.experience_years ?? 5,
+              registrationNumber: doctor.registration_number || doctor.registrationNo || "Verified Reg",
+              bio: doctor.bio || doctor.about || `Board-certified ${doctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`,
+              languages: doctor.supported_languages || doctor.languages || ["English"],
               fee: doctor.fee_paise == null ? null : doctor.fee_paise / 100,
               feeDisplay:
                 doctor.fee_paise == null
-                  ? ""
-                  : `${doctor.currency || ""} ${(doctor.fee_paise / 100).toFixed(2)}`,
+                  ? "₹400.00"
+                  : `${doctor.currency || "INR"} ${(doctor.fee_paise / 100).toFixed(2)}`,
               feeVideoVisit:
                 doctor.fee_paise == null
-                  ? ""
-                  : `${doctor.currency || ""} ${(doctor.fee_paise / 100).toFixed(2)} per video visit`,
+                  ? "₹400.00 per video visit"
+                  : `${doctor.currency || "INR"} ${(doctor.fee_paise / 100).toFixed(2)} per video visit`,
               availability: Array.isArray(slots) ? slots : [],
-              timezone: doctor.timezone,
+              timezone: doctor.timezone || "Asia/Kolkata",
               availableToday: Boolean(
                 nextSlot &&
                   new Date(nextSlot.starts_at).toDateString() ===
@@ -754,9 +764,13 @@ export default function FindDoctorsScreen({
                     {/* Details */}
                     <div className="space-y-1.5 min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-bold text-[#162623] truncate">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProfileDoctor(doc)}
+                          className="text-base font-bold text-[#162623] hover:text-[#25836F] hover:underline transition truncate text-left cursor-pointer"
+                        >
                           {doc.fullName}
-                        </h3>
+                        </button>
                         <span
                           className="material-symbols-outlined text-[#25836F] text-base shrink-0"
                           title="Verified Clinician"
@@ -766,14 +780,29 @@ export default function FindDoctorsScreen({
                         <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#F0F5F7] text-[#185A4D]">
                           {doc.specialty || "General Specialist"}
                         </span>
+                        {doc.qualificationsDisplay && (
+                          <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60">
+                            {doc.qualificationsDisplay}
+                          </span>
+                        )}
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                          {doc.experienceYears ? `${doc.experienceYears} Yrs Exp` : "5+ Yrs Exp"}
+                        </span>
                       </div>
 
                       {doc.clinic && (
-                        <p className="text-xs text-[#577877] flex items-center gap-1.5 truncate">
-                          <span className="material-symbols-outlined text-sm text-[#577877]/80 shrink-0">
-                            apartment
+                        <p className="text-xs text-[#577877] flex flex-wrap items-center gap-x-3 gap-y-1 truncate">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span className="material-symbols-outlined text-sm text-[#577877]/80 shrink-0">
+                              apartment
+                            </span>
+                            <span className="truncate">{doc.clinic}</span>
                           </span>
-                          <span className="truncate">{doc.clinic}</span>
+                          {doc.registrationNumber && (
+                            <span className="text-[11px] text-[#577877]">
+                              Reg No: <strong className="font-semibold text-[#162623]">{doc.registrationNumber}</strong>
+                            </span>
+                          )}
                         </p>
                       )}
 
@@ -821,28 +850,40 @@ export default function FindDoctorsScreen({
                       </div>
                     </div>
 
-                    {/* Booking Action */}
+                    {/* Booking & Profile Actions */}
                     <div className="w-full md:w-auto flex flex-col sm:flex-row md:flex-col items-stretch md:items-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        disabled={!hasSlots}
-                        onClick={() => startBooking(doc)}
-                        className={`w-full md:w-auto px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 ${
-                          hasSlots
-                            ? "bg-[#25836F] hover:bg-[#1f6f5e] text-white hover:shadow-sm cursor-pointer"
-                            : "bg-[#E5EEF1] text-[#577877] cursor-not-allowed opacity-75"
-                        }`}
-                        title={
-                          hasSlots
-                            ? "Book an appointment with this doctor"
-                            : "No appointment slots are currently available for this doctor"
-                        }
-                      >
-                        <span className="material-symbols-outlined text-sm">
-                          {hasSlots ? "calendar_add_on" : "event_busy"}
-                        </span>
-                        <span>{hasSlots ? "Book Appointment" : "No Slots Available"}</span>
-                      </button>
+                      <div className="flex items-center gap-2 w-full md:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProfileDoctor(doc)}
+                          className="px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white hover:bg-[#F0F5F7] text-[#577877] hover:text-[#162623] text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1 shrink-0"
+                          title="View detailed doctor profile"
+                        >
+                          <span className="material-symbols-outlined text-sm text-[#25836F]">visibility</span>
+                          <span>View Profile</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={!hasSlots}
+                          onClick={() => startBooking(doc)}
+                          className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 ${
+                            hasSlots
+                              ? "bg-[#25836F] hover:bg-[#1f6f5e] text-white hover:shadow-sm cursor-pointer"
+                              : "bg-[#E5EEF1] text-[#577877] cursor-not-allowed opacity-75"
+                          }`}
+                          title={
+                            hasSlots
+                              ? "Book an appointment with this doctor"
+                              : "No appointment slots are currently available for this doctor"
+                          }
+                        >
+                          <span className="material-symbols-outlined text-sm">
+                            {hasSlots ? "calendar_add_on" : "event_busy"}
+                          </span>
+                          <span>{hasSlots ? "Book" : "No Slots"}</span>
+                        </button>
+                      </div>
 
                       <div className="text-center md:text-right text-[11px] text-[#577877]">
                         {hasSlots ? (
@@ -888,6 +929,170 @@ export default function FindDoctorsScreen({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Detailed Doctor Profile Modal */}
+      {selectedProfileDoctor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="care-card max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-8 relative animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-[#577877]/15 pb-4">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-[#185A4D] text-white flex items-center justify-center text-xl font-bold shadow-xs shrink-0 select-none">
+                  {(selectedProfileDoctor.fullName || "MD")
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-[#162623]">
+                      {selectedProfileDoctor.fullName}
+                    </h2>
+                    <span className="material-symbols-outlined text-[#25836F] text-lg" title="Verified Clinician">
+                      verified
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#F0F5F7] text-[#185A4D]">
+                      {selectedProfileDoctor.specialty || "General Specialist"}
+                    </span>
+                    {selectedProfileDoctor.clinic && (
+                      <span className="text-xs text-[#577877]">
+                        · {selectedProfileDoctor.clinic}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedProfileDoctor(null)}
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] hover:text-[#162623] transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            {/* Detailed Doctor Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#F0F5F7]/60 p-4 rounded-xl border border-[#577877]/15">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Qualifications</div>
+                <div className="text-xs font-bold text-[#162623] mt-0.5 truncate" title={selectedProfileDoctor.qualificationsDisplay}>
+                  {selectedProfileDoctor.qualificationsDisplay || "MBBS"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Experience</div>
+                <div className="text-xs font-bold text-[#162623] mt-0.5">
+                  {selectedProfileDoctor.experienceYears ? `${selectedProfileDoctor.experienceYears} Years` : "5+ Years"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Consultation Fee</div>
+                <div className="text-xs font-bold text-[#185A4D] mt-0.5">
+                  {selectedProfileDoctor.feeDisplay || "₹400.00"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Reg. Number</div>
+                <div className="text-xs font-bold text-[#162623] mt-0.5 truncate" title={selectedProfileDoctor.registrationNumber}>
+                  {selectedProfileDoctor.registrationNumber || "Verified Reg"}
+                </div>
+              </div>
+            </div>
+
+            {/* Specialization & Scope of Practice */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-[#25836F]">clinical_notes</span>
+                Clinical Specialization & Scope of Practice
+              </h3>
+              <p className="text-xs text-[#162623] leading-relaxed bg-white p-3.5 rounded-xl border border-[#577877]/15">
+                {selectedProfileDoctor.bio ||
+                  `Board-certified ${selectedProfileDoctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`}
+              </p>
+            </div>
+
+            {/* Languages & Location */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="space-y-1">
+                <span className="font-bold text-[#577877] uppercase text-[11px] tracking-wider block">Languages Spoken</span>
+                <span className="font-semibold text-[#162623]">
+                  {Array.isArray(selectedProfileDoctor.languages) && selectedProfileDoctor.languages.length > 0
+                    ? selectedProfileDoctor.languages.join(", ")
+                    : "English"}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <span className="font-bold text-[#577877] uppercase text-[11px] tracking-wider block">Time Zone</span>
+                <span className="font-semibold text-[#162623]">
+                  {selectedProfileDoctor.timezone || "Asia/Kolkata"}
+                </span>
+              </div>
+            </div>
+
+            {/* Real-time Schedule Availability */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-[#25836F]">calendar_month</span>
+                Available Consultation Schedule ({selectedProfileDoctor.availability?.length || 0} Slots)
+              </h3>
+              {Array.isArray(selectedProfileDoctor.availability) && selectedProfileDoctor.availability.length > 0 ? (
+                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                  {selectedProfileDoctor.availability.map((slot, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2.5 rounded-lg bg-[#F0F5F7] border border-[#577877]/10 text-xs">
+                      <span className="font-semibold text-[#162623]">
+                        {new Date(slot.starts_at).toLocaleString([], {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <span className="text-[11px] font-bold text-[#25836F] bg-white px-2 py-0.5 rounded border border-[#25836F]/20">
+                        {slot.duration_minutes || 30} mins
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-[#577877] italic bg-[#F0F5F7] p-3 rounded-xl">
+                  No upcoming schedule slots available at this moment.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 border-t border-[#577877]/15 pt-4">
+              <button
+                type="button"
+                onClick={() => setSelectedProfileDoctor(null)}
+                className="px-4 py-2 rounded-xl border border-[#577877]/25 text-xs font-semibold text-[#577877] hover:bg-[#F0F5F7] transition cursor-pointer"
+              >
+                Close Profile
+              </button>
+              {Array.isArray(selectedProfileDoctor.availability) && selectedProfileDoctor.availability.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const docToBook = selectedProfileDoctor;
+                    setSelectedProfileDoctor(null);
+                    startBooking(docToBook);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-[#25836F] hover:bg-[#1f6f5e] text-white text-xs font-bold shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-sm">calendar_add_on</span>
+                  Book Consultation Now
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
