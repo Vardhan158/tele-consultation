@@ -78,14 +78,19 @@ export default function FindDoctorsScreen({
               ? doctor.qualifications.join(", ")
               : doctor.qualifications || "MBBS, MD";
 
+            const isVerified = Boolean(
+              doctor.approved_for_consultation || doctor.approval_status === "approved",
+            );
+
             return {
               ...doctor,
               name: doctor.full_name,
               fullName: doctor.full_name,
               clinic: doctor.clinic_name,
+              isVerified,
               qualificationsDisplay: qualList,
               experienceYears: doctor.experience_years ?? 5,
-              registrationNumber: doctor.registration_number || doctor.registrationNo || "Verified Reg",
+              registrationNumber: doctor.registration_number || doctor.registrationNo || "Registration on File",
               bio: doctor.bio || doctor.about || `Qualified ${doctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`,
               languages: doctor.supported_languages || doctor.languages || ["English"],
               fee: doctor.fee_paise == null ? null : doctor.fee_paise / 100,
@@ -488,12 +493,12 @@ export default function FindDoctorsScreen({
             Find Doctors &amp; Specialists
           </h1>
           <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
-            Search verified clinicians, check real-time schedule availability, and book teleconsultations with confidence.
+            Search available doctors, check real-time schedule availability, and book teleconsultations with confidence.
           </p>
         </div>
 
         <div className="hidden sm:flex items-center gap-2 text-xs bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20 shrink-0 self-start sm:self-center shadow-xs">
-          <span className="material-symbols-outlined !text-[#A3E2D4] text-lg">verified</span>
+          <span className="material-symbols-outlined !text-[#A3E2D4] text-lg">medical_services</span>
           <span className="font-medium text-white/95">Qualified Healthcare Professionals</span>
         </div>
       </div>
@@ -671,7 +676,7 @@ export default function FindDoctorsScreen({
           <span className="font-bold text-[#162623]">
             {sortedDoctors.length}
           </span>{" "}
-          verified clinician{sortedDoctors.length === 1 ? "" : "s"}
+          available doctor{sortedDoctors.length === 1 ? "" : "s"}
           {appliedFilters.specialty !== "all" && (
             <span className="ml-1 text-[#25836F] font-semibold">
               in {appliedFilters.specialty}
@@ -771,12 +776,14 @@ export default function FindDoctorsScreen({
                         >
                           {doc.fullName}
                         </button>
-                        <span
-                          className="material-symbols-outlined text-[#25836F] text-base shrink-0"
-                          title="Verified Clinician"
-                        >
-                          verified
-                        </span>
+                        {doc.isVerified && (
+                          <span
+                            className="material-symbols-outlined text-[#25836F] text-base shrink-0"
+                            title="Verified Credentials"
+                          >
+                            verified
+                          </span>
+                        )}
                         <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#F0F5F7] text-[#185A4D]">
                           {doc.specialty || "General Specialist"}
                         </span>
@@ -953,9 +960,11 @@ export default function FindDoctorsScreen({
                     <h2 className="text-xl font-bold text-[#162623]">
                       {selectedProfileDoctor.fullName}
                     </h2>
-                    <span className="material-symbols-outlined text-[#25836F] text-lg" title="Verified Clinician">
-                      verified
-                    </span>
+                    {selectedProfileDoctor.isVerified && (
+                      <span className="material-symbols-outlined text-[#25836F] text-lg" title="Verified Credentials">
+                        verified
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#F0F5F7] text-[#185A4D]">
@@ -1001,7 +1010,7 @@ export default function FindDoctorsScreen({
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Reg. Number</div>
                 <div className="text-xs font-bold text-[#162623] mt-0.5 truncate" title={selectedProfileDoctor.registrationNumber}>
-                  {selectedProfileDoctor.registrationNumber || "Verified Reg"}
+                  {selectedProfileDoctor.registrationNumber || "Reg. on File"}
                 </div>
               </div>
             </div>
