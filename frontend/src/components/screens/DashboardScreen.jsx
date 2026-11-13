@@ -199,28 +199,16 @@ export default function DashboardScreen({ onNavigate }) {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 self-start md:self-center">
-            <button
-              type="button"
-              onClick={() => onNavigate("find-doctors")}
-              className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-base !text-[#185A4D]">
-                add_circle
-              </span>
-              <span>Book New Visit</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate("medical-records")}
-              className="px-4 py-2.5 rounded-xl font-semibold text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 flex items-center gap-2 backdrop-blur-xs transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-base !text-white">
-                upload_file
-              </span>
-              <span>Upload Record</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate("find-doctors")}
+            className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0 self-start md:self-center"
+          >
+            <span className="material-symbols-outlined text-base !text-[#185A4D]">
+              add_circle
+            </span>
+            <span>Book New Visit</span>
+          </button>
         </div>
 
         {/* Hero Upcoming Appointment Banner */}
