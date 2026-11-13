@@ -181,48 +181,44 @@ export default function DashboardScreen({ onNavigate }) {
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
       <div className="mx-auto max-w-7xl space-y-8">
-        {/* Top Greeting & Date Banner */}
+        {/* Top Greeting & Date Banner matching Portal Brand System */}
         <div
           title={todayLabel}
-          className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-[#577877]/20"
+          className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
         >
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold tracking-wider uppercase text-[#577877]">
-                Personal Health Overview
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#577877]" />
-              <span className="text-xs text-[#577877]">Patient dashboard</span>
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+              Personal Health Overview · Patient Dashboard
             </div>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
-              {greeting}
-              {firstName ? `, ${firstName}` : ""}
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              {greeting}{firstName ? `, ${firstName}` : ""}
             </h1>
-            <p className="mt-1 text-sm text-[#577877]">
+            <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
               {todayLabel} · Your health plan is on schedule.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0 self-start md:self-center">
             <button
               type="button"
               onClick={() => onNavigate("find-doctors")}
-              className="btn-primary"
+              className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer"
             >
-              <span className="material-symbols-outlined !text-white text-lg">
+              <span className="material-symbols-outlined text-base !text-[#185A4D]">
                 add_circle
               </span>
-              Book New Visit
+              <span>Book New Visit</span>
             </button>
             <button
               type="button"
               onClick={() => onNavigate("medical-records")}
-              className="btn-secondary"
+              className="px-4 py-2.5 rounded-xl font-semibold text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 flex items-center gap-2 backdrop-blur-xs transition cursor-pointer"
             >
-              <span className="material-symbols-outlined !text-[#25836F] text-lg">
+              <span className="material-symbols-outlined text-base !text-white">
                 upload_file
               </span>
-              Upload Record
+              <span>Upload Record</span>
             </button>
           </div>
         </div>
