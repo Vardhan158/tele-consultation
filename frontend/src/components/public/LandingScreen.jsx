@@ -637,14 +637,14 @@ export default function LandingScreen({
 
             {/* Factual Messaging & Security Proof */}
             <div
-              className={`flex items-center gap-2.5 text-sm sm:text-base transform transition-all duration-300 ${
+              className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/85 backdrop-blur-md border border-white/60 shadow-xs text-sm transform transition-all duration-300 ${
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
               }`}
             >
-              <span className="material-symbols-outlined text-emerald-300 text-lg">
+              <span className="material-symbols-outlined text-[#145A4A] text-lg shrink-0">
                 verified_user
               </span>
-              <span className="text-[#D9EBE3] font-semibold text-xs sm:text-sm tracking-tight">
+              <span className="text-[#145A4A] font-semibold text-xs sm:text-sm tracking-tight">
                 Secure Video Consultations · Qualified Healthcare Professionals · Digital Prescriptions
               </span>
             </div>
