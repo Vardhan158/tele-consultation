@@ -1,253 +1,231 @@
-import { useState, useEffect } from "react";
-import { paymentApi, loadRazorpayScript } from "../../lib/api";
+import { useState, useEffect, useMemo } from "react";
+import { paymentApi, patientApi, loadRazorpayScript } from "../../lib/api";
 
-// eslint-disable-next-line no-unused-vars
-const defaultTransactionsList = [
-  {
-    receiptId: "KC-RC-1064",
-    date: "Nov 12, 2026",
-    doctor: "Dr. Sarah Chen",
-    specialty: "Internal medicine",
-    amount: "$85.00",
-    status: "Paid",
-    method: "Visa •••• 4242",
-    description: "Video follow-up · Dr. Sarah Chen",
-  },
-  {
-    receiptId: "KC-RC-1072",
-    date: "Nov 17, 2026",
-    doctor: "Dr. Avery Wilson",
-    specialty: "Dermatology",
-    amount: "$65.00",
-    status: "Refunded",
-    method: "Visa •••• 4242",
-    description: "Video Dermatology Consultation (30 mins)",
-  },
-  {
-    receiptId: "KC-RC-1038",
-    date: "Oct 29, 2026",
-    doctor: "Dr. Sarah Chen",
-    specialty: "Internal medicine",
-    amount: "$85.00",
-    status: "Paid",
-    method: "Visa •••• 4242",
-    description: "Hypertension Management Video Visit",
-  },
-  {
-    receiptId: "KC-RC-1011",
-    date: "Sep 24, 2026",
-    doctor: "Dr. Sarah Chen",
-    specialty: "Internal medicine",
-    amount: "$85.00",
-    status: "Paid",
-    method: "Visa •••• 4242",
-    description: "Prescription & Lab Review Visit",
-  },
-];
-
-const defaultCheckoutApt = {
-  id: "00000000-0000-0000-0000-000000001064",
-  receiptId: "KC-RC-1064",
-  doctor: {
-    name: "Dr. Sarah Chen",
-    fullName: "Dr. Sarah Chen, MD",
-    initials: "SC",
-    specialty: "Internal medicine",
-    experienceShort: "12 years of experience",
-    feeDisplay: "$85",
-  },
-  dateFormatted: "Thursday, November 12, 2026",
-  dateShort: "Nov 12, 2026",
-  datePaid: "November 4, 2026",
-  timeFormatted: "2:30–3:00 PM · Pacific Time",
-  timeRange: "2:30 PM PT",
-  timeAppointment: "2:30–3:00 PM PT",
-  patient: "Emma Mitchell",
-  billingAddress: "2148 Pine Street, Apt 3 · San Francisco, CA 94115",
-  visitFormatted: "Video · Follow-up consultation",
-  visitType: "Video · Follow-up · 30 minutes",
-  description: "Video follow-up · Dr. Sarah Chen",
-  fee: "$85.00",
-  feeNum: 85,
-  cardLast4: "4242",
-  transactionId: "TXN-861042",
-  status: "Paid in full",
-};
-
-export default function PaymentsScreen({ onNavigate, navParams }) {
-  // 'receipt' (Matches Screenshot 10) | 'checkout' (Matches Screenshot 9) | 'billing' (Matches Screenshot 8)
+export default function PaymentsScreen({ onNavigate, navParams, patient }) {
+  // Default view is "billing" overview. "receipt" or "checkout" are only active when explicitly requested.
   const [userView, setUserView] = useState(null);
-  const view = userView ?? (navParams?.view || "receipt");
+  const view = userView ?? (navParams?.view || "billing");
   const setView = (v) => setUserView(v);
 
   const [dbTransactions, setDbTransactions] = useState([]);
+  const [dbAppointments, setDbAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [paymentError, setPaymentError] = useState("");
   const [paymentSuccessData, setPaymentSuccessData] = useState(null);
+  const [toastMessage, setToastMessage] = useState("");
 
+  // Billing tab states
+  const [activeBillingTab, setActiveBillingTab] = useState("transactions");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const patientName = patient?.full_name || "Patient";
+  const patientEmail = patient?.email || "";
+  const billingAddress = patient?.address || "Address on record";
+
+  // Load real transactions and appointments
   useEffect(() => {
-    paymentApi
-      .list()
-      .then((items) => {
-        if (Array.isArray(items) && items.length > 0) {
-          const formatted = items.map((t) => ({
-            id: t.id,
-            receiptId: `KC-RC-${t.id.slice(0, 4).toUpperCase()}`,
-            date: t.created_at
+    setLoading(true);
+    Promise.all([
+      paymentApi.list().catch(() => []),
+      patientApi.appointments().catch(() => []),
+    ])
+      .then(([payments, appointments]) => {
+        const aptMap = new Map();
+        if (Array.isArray(appointments)) {
+          setDbAppointments(appointments);
+          appointments.forEach((a) => {
+            if (a.id) aptMap.set(a.id, a);
+          });
+        }
+
+        if (Array.isArray(payments) && payments.length > 0) {
+          const formatted = payments.map((t) => {
+            const apt = aptMap.get(t.appointment_id) || {};
+            const docName =
+              apt.doctor?.full_name ||
+              apt.doctor?.name ||
+              (apt.doctor_id ? "Consultation Specialist" : "Telehealth Specialist");
+            const specialty = apt.doctor?.specialty || "Telehealth Consultation";
+            const dateStr = t.created_at
               ? new Date(t.created_at).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
                   year: "numeric",
                 })
-              : "Nov 12, 2026",
-            doctor: "Dr. Sarah Chen",
-            specialty: "Internal medicine",
-            amount: `$${(t.amount_paise / 100).toFixed(2)}`,
-            status:
-              t.status === "success"
-                ? "Paid"
-                : t.status === "refunded"
-                  ? "Refunded"
-                  : t.status,
-            method: "Visa •••• 4242",
-            description: "Telehealth video consultation",
-          }));
+              : apt.starts_at
+                ? new Date(apt.starts_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "Recent";
+            const rawAmountPaise =
+              Number(t.amount_paise) ||
+              (apt.amount_paise ? Number(apt.amount_paise) : 0);
+            const amountFormatted = rawAmountPaise
+              ? `INR ${(rawAmountPaise / 100).toFixed(2)}`
+              : "INR 0.00";
+
+            return {
+              id: t.id,
+              appointmentId: t.appointment_id,
+              receiptId:
+                t.receipt ||
+                `KC-RC-${(t.id || "").replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+              date: dateStr,
+              doctor: docName,
+              specialty: specialty,
+              amount: amountFormatted,
+              rawAmountPaise,
+              status:
+                t.status === "success" || t.status === "paid"
+                  ? "Paid"
+                  : t.status === "refunded"
+                    ? "Refunded"
+                    : t.status === "pending"
+                      ? "Pending"
+                      : t.status || "Completed",
+              method:
+                t.provider === "razorpay"
+                  ? "Razorpay Online"
+                  : "Online Payment",
+              description: apt.type
+                ? `${apt.type} consultation`
+                : `Telehealth Consultation · ${docName}`,
+              transactionId: t.provider_transaction_id || t.id,
+            };
+          });
           setDbTransactions(formatted);
+        } else {
+          setDbTransactions([]);
         }
       })
-      .catch(() => {});
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
-  const activeTransactions = dbTransactions;
+  // Filtered transactions
+  const filteredTransactions = useMemo(() => {
+    return dbTransactions.filter((item) => {
+      if (statusFilter === "All") return true;
+      return item.status.toLowerCase() === statusFilter.toLowerCase();
+    });
+  }, [dbTransactions, statusFilter]);
 
-  // Active appointment for checkout/receipt flow
-  const rawApt = navParams?.appointment || defaultCheckoutApt;
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage) || 1;
+  const paginatedTransactions = useMemo(() => {
+    return filteredTransactions.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage,
+    );
+  }, [filteredTransactions, currentPage, itemsPerPage]);
+
+  // Derived financial metrics from real data
+  const totalPaidPaise = useMemo(() => {
+    return dbTransactions
+      .filter((t) => t.status === "Paid")
+      .reduce((sum, t) => sum + (t.rawAmountPaise || 0), 0);
+  }, [dbTransactions]);
+
+  const totalRefundedPaise = useMemo(() => {
+    return dbTransactions
+      .filter((t) => t.status === "Refunded")
+      .reduce((sum, t) => sum + (t.rawAmountPaise || 0), 0);
+  }, [dbTransactions]);
+
+  const paidCount = useMemo(() => {
+    return dbTransactions.filter((t) => t.status === "Paid").length;
+  }, [dbTransactions]);
+
+  const refundedCount = useMemo(() => {
+    return dbTransactions.filter((t) => t.status === "Refunded").length;
+  }, [dbTransactions]);
+
+  // Pending balance from uncompleted appointments
+  const pendingBalancePaise = useMemo(() => {
+    return dbAppointments
+      .filter((a) => a.payment_status === "pending" || a.status === "pending_payment")
+      .reduce((sum, a) => sum + (Number(a.amount_paise) || 0), 0);
+  }, [dbAppointments]);
+
+  // Active appointment / receipt data
+  const rawApt = navParams?.appointment || null;
+  const selectedTx = selectedReceipt || dbTransactions[0] || null;
+
   const checkoutApt = {
-    id: rawApt.id || defaultCheckoutApt.id,
+    id: rawApt?.id || selectedTx?.appointmentId || selectedTx?.id || "KC-ONLINE-PAYMENT",
     receiptId:
       paymentSuccessData?.receiptId ||
-      rawApt.receiptId ||
-      defaultCheckoutApt.receiptId,
-    doctor: rawApt.doctor || defaultCheckoutApt.doctor,
-    dateFormatted: rawApt.dateFormatted || defaultCheckoutApt.dateFormatted,
-    dateShort: rawApt.dateShort || defaultCheckoutApt.dateShort,
+      rawApt?.receiptId ||
+      selectedTx?.receiptId ||
+      "KC-RC-DIRECT",
+    doctor: {
+      name:
+        rawApt?.doctor?.name ||
+        rawApt?.doctor?.fullName ||
+        selectedTx?.doctor ||
+        "Telehealth Specialist",
+      specialty:
+        rawApt?.doctor?.specialty ||
+        selectedTx?.specialty ||
+        "Teleconsultation",
+      initials: (
+        rawApt?.doctor?.name ||
+        selectedTx?.doctor ||
+        "Dr"
+      )
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0])
+        .join("")
+        .toUpperCase(),
+    },
+    dateFormatted:
+      rawApt?.dateFull ||
+      rawApt?.dateFormatted ||
+      selectedTx?.date ||
+      new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+    dateShort: rawApt?.dateShort || selectedTx?.date || "Recent",
     datePaid:
       paymentSuccessData?.datePaid ||
-      rawApt.datePaid ||
-      defaultCheckoutApt.datePaid,
-    timeFormatted: rawApt.timeFormatted || defaultCheckoutApt.timeFormatted,
-    timeRange: rawApt.timeRange || defaultCheckoutApt.timeRange,
-    timeAppointment:
-      rawApt.timeAppointment || defaultCheckoutApt.timeAppointment,
-    patient: rawApt.patient || defaultCheckoutApt.patient,
-    billingAddress: rawApt.billingAddress || defaultCheckoutApt.billingAddress,
-    visitFormatted: rawApt.visitFormatted || defaultCheckoutApt.visitFormatted,
-    visitType: rawApt.visitType || defaultCheckoutApt.visitType,
-    description: rawApt.description || defaultCheckoutApt.description,
-    fee: paymentSuccessData?.amount || rawApt.fee || defaultCheckoutApt.fee,
-    cardLast4: rawApt.cardLast4 || defaultCheckoutApt.cardLast4,
+      selectedTx?.date ||
+      new Date().toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+    timeFormatted: rawApt?.timeFull || rawApt?.timeFormatted || "Scheduled Slot",
+    timeAppointment: rawApt?.timeRange || "Consultation Hour",
+    patient: patientName,
+    billingAddress: billingAddress,
+    visitFormatted: rawApt?.format || "Video Teleconsultation",
+    visitType: rawApt?.appointmentType || "Telehealth Consultation",
+    description:
+      rawApt?.reason ||
+      selectedTx?.description ||
+      `Video Consultation · ${rawApt?.doctor?.name || selectedTx?.doctor || "Specialist"}`,
+    fee:
+      paymentSuccessData?.amount ||
+      rawApt?.fee ||
+      selectedTx?.amount ||
+      "INR 0.00",
+    cardLast4: rawApt?.cardLast4 || "Online",
     transactionId:
       paymentSuccessData?.transactionId ||
-      rawApt.transactionId ||
-      defaultCheckoutApt.transactionId,
-    status: rawApt.status || defaultCheckoutApt.status,
-  };
-
-  // Checkout form states
-  const [useDifferentCard, setUseDifferentCard] = useState(false);
-  const [securityCode, setSecurityCode] = useState("424");
-  const [billingZip, setBillingZip] = useState("94115");
-  const [receiptEmail, setReceiptEmail] = useState("emma.mitchell@example.com");
-  const [saveForFuture, setSaveForFuture] = useState(true);
-  const [agreeCancellation, setAgreeCancellation] = useState(true);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-
-  // Billing tab states
-  const [activeBillingTab, setActiveBillingTab] = useState("transactions");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
-  const [selectedReceipt, setSelectedReceipt] = useState(null);
-  const [showManageCard, setShowManageCard] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-
-  const filteredTransactions = activeTransactions.filter((item) => {
-    if (statusFilter === "All") return true;
-    return item.status.toLowerCase() === statusFilter.toLowerCase();
-  });
-
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  const paginatedTransactions = filteredTransactions.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
-
-  const handleProcessPayment = async () => {
-    setIsProcessingPayment(true);
-    setPaymentError("");
-    try {
-      const initiated = await paymentApi.initiate(checkoutApt.id);
-      const isScriptLoaded = await loadRazorpayScript();
-
-      if (
-        isScriptLoaded &&
-        window.Razorpay &&
-        initiated.razorpay_key_id &&
-        !initiated.razorpay_key_id.includes("placeholder")
-      ) {
-        const rzp = new window.Razorpay({
-          key: initiated.razorpay_key_id,
-          amount: initiated.amount_paise,
-          currency: initiated.currency || "INR",
-          name: "Kaizen Care",
-          description: checkoutApt.visitType || "Doctor Consultation",
-          order_id: initiated.order_id,
-          prefill: {
-            name: checkoutApt.patient || "Emma Mitchell",
-            email: receiptEmail || "emma.mitchell@example.com",
-            contact: "+14155550142",
-          },
-          theme: { color: "#25836F" },
-          handler: async (resp) => {
-            try {
-              await paymentApi.verify(
-                initiated.id,
-                resp.razorpay_payment_id,
-                resp.razorpay_order_id,
-                resp.razorpay_signature,
-              );
-              setPaymentSuccessData({
-                receiptId: `KC-RC-${initiated.id.slice(0, 4).toUpperCase()}`,
-                transactionId: resp.razorpay_payment_id,
-                amount: `$${(initiated.amount_paise / 100).toFixed(2)}`,
-                datePaid: new Date().toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                }),
-              });
-              setView("receipt");
-            } catch (vErr) {
-              setPaymentError(vErr.message || "Payment verification failed");
-            } finally {
-              setIsProcessingPayment(false);
-            }
-          },
-          modal: {
-            ondismiss: () => {
-              setIsProcessingPayment(false);
-            },
-          },
-        });
-        rzp.open();
-      } else {
-        throw new Error(
-          "Razorpay checkout is unavailable. Configure Razorpay test credentials first.",
-        );
-      }
-    } catch (err) {
-      setPaymentError(err.message || "Payment processing failed");
-      setIsProcessingPayment(false);
-    }
+      rawApt?.transactionId ||
+      selectedTx?.transactionId ||
+      "RZP-TXN-VERIFIED",
+    status: selectedTx?.status === "Refunded" ? "Refunded" : "Paid in full",
   };
 
   const handleDownloadReceiptPdf = () => {
@@ -255,8 +233,14 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
   };
 
   const handleDownloadStatement = () => {
+    if (dbTransactions.length === 0) {
+      setToastMessage("No transaction statements to export yet.");
+      setTimeout(() => setToastMessage(""), 3500);
+      return;
+    }
+
     const csvContent = [
-      "Receipt,Appointment Date,Doctor,Specialty,Amount,Status,Payment Method",
+      "Receipt,Date,Doctor,Specialty,Amount,Status,Payment Method",
       ...dbTransactions.map(
         (t) =>
           `"${t.receiptId}","${t.date}","${t.doctor}","${t.specialty}","${t.amount}","${t.status}","${t.method}"`,
@@ -267,665 +251,50 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", "Kaizentrix-Annual-Statement-2026.csv");
+    link.setAttribute("download", `Kaizen-Care-Statement-${new Date().getFullYear()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    setToastMessage(
-      "Annual Financial Statement (2026) downloaded successfully.",
-    );
-    setTimeout(() => setToastMessage(""), 4000);
+    setToastMessage("Financial statement downloaded successfully.");
+    setTimeout(() => setToastMessage(""), 3500);
   };
 
   // ========================================================
-  // VIEW 1: PAYMENT RECEIPT VIEW (Matches User Screenshot 10)
+  // VIEW 1: PAYMENT RECEIPT VIEW
   // ========================================================
   if (view === "receipt") {
-    return (
-      <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-        <div className="mx-auto max-w-7xl space-y-6">
-          {/* Toast Notification */}
-          {toastMessage && (
-            <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
-              <span className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-base">
-                  check_circle
-                </span>
-                {toastMessage}
-              </span>
+    // If no receipt data exists at all, gently redirect to billing view
+    if (!rawApt && !paymentSuccessData && dbTransactions.length === 0) {
+      return (
+        <div className="space-y-6 font-sans text-[#162623]">
+          <div className="rounded-2xl bg-white border border-[#577877]/15 p-12 text-center space-y-3">
+            <span className="material-symbols-outlined text-4xl text-[#577877]/60">
+              receipt_long
+            </span>
+            <h2 className="text-lg font-bold text-[#162623]">
+              No Receipts Available
+            </h2>
+            <p className="text-xs text-[#577877] max-w-sm mx-auto">
+              You haven't completed any paid teleconsultations yet. Your invoices and receipts will appear here automatically.
+            </p>
+            <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setToastMessage("")}
-                className="text-[#577877] hover:text-[#162623]"
+                onClick={() => setView("billing")}
+                className="btn-primary !px-5 !py-2.5 rounded-xl font-semibold text-xs"
               >
-                <span className="material-symbols-outlined text-sm">close</span>
+                Back to Billing Overview
               </button>
             </div>
-          )}
-
-          {/* Header Row: Title & Download PDF Button matching Screenshot */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-                Payment received
-              </h1>
-              <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-                Your appointment is paid and confirmed. A copy of this receipt
-                is in your inbox.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleDownloadReceiptPdf}
-              className="btn-primary !px-5 !py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs shrink-0"
-            >
-              <span className="material-symbols-outlined !text-white text-base">
-                download
-              </span>
-              <span>Download PDF</span>
-            </button>
-          </div>
-
-          {/* Main 2-Column Content Area */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column (8 cols): Formal Printable Receipt Card */}
-            <div className="lg:col-span-8 care-card p-6 sm:p-9 space-y-7 border border-[#577877]/15 shadow-sm bg-white rounded-2xl">
-              {/* Receipt Header: Brand + Receipt ID */}
-              <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#25836F] flex items-center justify-center text-white shadow-2xs shrink-0">
-                    <span className="material-symbols-outlined text-2xl">
-                      vital_signs
-                    </span>
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-[#162623] tracking-tight">
-                      Kaizen Care
-                    </h2>
-                    <p className="text-[10px] font-semibold tracking-wider uppercase text-[#577877]">
-                      Patient Portal
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <h3 className="text-xl sm:text-2xl font-bold text-[#162623]">
-                    Receipt
-                  </h3>
-                  <p className="text-xs text-[#577877] font-medium mt-0.5">
-                    {checkoutApt.receiptId}
-                  </p>
-                </div>
-              </div>
-
-              {/* 3-Column Info Row: Billed to | Date paid | Status */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                <div>
-                  <span className="text-[#577877] block text-[11px]">
-                    Billed to
-                  </span>
-                  <span className="font-bold text-sm text-[#162623] mt-1 block">
-                    {checkoutApt.patient}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[#577877] block text-[11px]">
-                    Date paid
-                  </span>
-                  <span className="font-bold text-sm text-[#162623] mt-1 block">
-                    {checkoutApt.datePaid}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[#577877] block text-[11px]">
-                    Status
-                  </span>
-                  <span className="font-bold text-sm text-[#162623] mt-1 block">
-                    {checkoutApt.status}
-                  </span>
-                </div>
-              </div>
-
-              {/* Billing Address Row */}
-              <div className="text-xs">
-                <span className="text-[#577877] block text-[11px]">
-                  Billing address
-                </span>
-                <span className="font-bold text-sm text-[#162623] mt-1 block">
-                  {checkoutApt.billingAddress}
-                </span>
-              </div>
-
-              {/* Line Items Table with Shaded Header */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-[#F0F5F7] text-[#577877] font-medium rounded-xl">
-                      <th className="py-2.5 px-4 rounded-l-xl">Description</th>
-                      <th className="py-2.5 px-4 text-center">Quantity</th>
-                      <th className="py-2.5 px-4 text-right rounded-r-xl">
-                        Amount
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-[#577877]/15">
-                      <td className="py-4 px-4 font-semibold text-[#162623]">
-                        {checkoutApt.description}
-                      </td>
-                      <td className="py-4 px-4 text-center font-medium text-[#162623]">
-                        1
-                      </td>
-                      <td className="py-4 px-4 text-right font-semibold text-[#162623]">
-                        {checkoutApt.fee}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Appointment Reference Row */}
-              <div className="text-xs space-y-1">
-                <span className="text-[#577877] block text-[11px]">
-                  Appointment
-                </span>
-                <p className="font-bold text-[#162623]">
-                  {checkoutApt.dateShort} · {checkoutApt.timeAppointment} ·{" "}
-                  {checkoutApt.id}
-                </p>
-              </div>
-
-              {/* Paid With & Total Paid Block */}
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-3 border-t border-[#577877]/15">
-                <div className="text-xs space-y-0.5">
-                  <span className="text-[#577877] block text-[11px]">
-                    Paid with
-                  </span>
-                  <p className="font-semibold text-sm text-[#162623]">
-                    Visa ending {checkoutApt.cardLast4}
-                  </p>
-                  <p className="text-[11px] text-[#577877]">
-                    Transaction · {checkoutApt.transactionId}
-                  </p>
-                </div>
-
-                <div className="text-left sm:text-right space-y-1">
-                  <span className="text-[11px] text-[#577877] block">
-                    Total paid · USD
-                  </span>
-                  <p className="text-3xl font-bold text-[#162623] tracking-tight">
-                    {checkoutApt.fee}
-                  </p>
-                  <div>
-                    <span className="inline-flex items-center text-[11px] font-semibold px-3 py-1 rounded-full bg-[#E6F4EA] text-[#1E7E34]">
-                      Payment successful
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer Note */}
-              <div className="pt-4 border-t border-[#577877]/15 text-[11px] text-[#577877] leading-relaxed">
-                Thank you for choosing Kaizen Care. This receipt confirms
-                payment and is not a statement of insurance benefits. Keep it
-                for your records.
-              </div>
-            </div>
-
-            {/* Right Column (4 cols): What happens next & Billing Support */}
-            <div className="lg:col-span-4 space-y-4">
-              {/* Card 1: What happens next? */}
-              <div className="care-card p-6 sm:p-7 space-y-4">
-                <h3 className="text-base font-bold text-[#162623]">
-                  What happens next?
-                </h3>
-                <p className="text-xs text-[#577877] leading-relaxed">
-                  You're booked with {checkoutApt.doctor.name}. Visit details
-                  and preparation tips are ready in My appointments.
-                </p>
-
-                <div className="space-y-2.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onNavigate("appointments", {
-                        view: "confirmation",
-                        appointment: {
-                          id: checkoutApt.id,
-                          doctor: checkoutApt.doctor,
-                          dateFormatted: checkoutApt.dateFormatted,
-                          timeFormatted: checkoutApt.timeFormatted,
-                          patient: checkoutApt.patient,
-                          visitFormatted: checkoutApt.visitFormatted,
-                          fee: checkoutApt.fee,
-                          cardLast4: checkoutApt.cardLast4,
-                        },
-                      })
-                    }
-                    className="btn-primary w-full !py-2.5 rounded-xl font-semibold text-xs shadow-2xs"
-                  >
-                    View appointment
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setView("billing")}
-                    className="btn-secondary w-full !py-2.5 rounded-xl font-semibold text-xs text-[#162623] shadow-2xs"
-                  >
-                    Back to payments
-                  </button>
-                </div>
-              </div>
-
-              {/* Card 2: Need a billing correction? */}
-              <div className="p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3">
-                <span className="material-symbols-outlined !text-[#25836F] text-lg shrink-0 mt-0.5">
-                  info
-                </span>
-                <div className="text-xs space-y-1">
-                  <h4 className="font-bold text-[#162623]">
-                    Need a billing correction?
-                  </h4>
-                  <p className="text-[#577877] leading-relaxed">
-                    <span
-                      onClick={() => onNavigate("support")}
-                      className="text-[#25836F] font-semibold hover:underline cursor-pointer"
-                    >
-                      Contact billing support
-                    </span>{" "}
-                    and include receipt {checkoutApt.receiptId}. Never send full
-                    card details.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Global Footer */}
-          <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-            <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
-            <div className="flex items-center gap-4">
-              <span className="hover:text-[#162623] cursor-pointer">
-                Privacy
-              </span>
-              <span>·</span>
-              <span className="hover:text-[#162623] cursor-pointer">Terms</span>
-              <span>·</span>
-              <span
-                className="hover:text-[#162623] cursor-pointer"
-                onClick={() => onNavigate("support")}
-              >
-                Need help?
-              </span>
-            </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  // ========================================================
-  // VIEW 2: PAYMENT CHECKOUT VIEW (Matches Screenshot 9)
-  // ========================================================
-  if (view === "checkout") {
     return (
-      <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-        <div className="mx-auto max-w-7xl space-y-6">
-          {/* Top affordance row */}
-          <div className="flex items-center justify-between pb-1">
-            <button
-              type="button"
-              onClick={() => onNavigate("find-doctors")}
-              className="btn-secondary !px-3.5 !py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs"
-            >
-              <span className="material-symbols-outlined !text-[#25836F] text-sm">
-                arrow_back
-              </span>
-              <span>Back to appointment booking</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setView("billing")}
-              className="text-xs font-semibold text-[#25836F] hover:underline"
-            >
-              View past statements &amp; billing history →
-            </button>
-          </div>
-
-          {/* Heading & Subtitle matching Screenshot */}
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-              Review &amp; pay
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              One final step. Confirm your payment to reserve your appointment.
-            </p>
-          </div>
-
-          {/* Two-Column Grid matching Screenshot */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column (8 cols): Payment method + Billing contact + Policy */}
-            <div className="lg:col-span-8 space-y-5">
-              {/* Card 1: Payment method matching Screenshot */}
-              <div className="care-card p-6 sm:p-7 space-y-4">
-                <h2 className="text-base font-bold text-[#162623]">
-                  Payment method
-                </h2>
-
-                {/* Selected Default Card Container */}
-                <div className="rounded-2xl border-2 border-[#2563EB] bg-[#F4F8FD] p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3.5">
-                    {/* Selected Radio Indicator */}
-                    <div className="w-4 h-4 rounded-full border-2 border-[#2563EB] flex items-center justify-center shrink-0">
-                      <div className="w-2 h-2 rounded-full bg-[#2563EB]" />
-                    </div>
-
-                    <span className="px-2 py-0.5 rounded bg-white font-bold text-xs text-[#2563EB] border border-[#2563EB]/20 tracking-wider">
-                      VISA
-                    </span>
-
-                    <div>
-                      <p className="text-xs font-semibold text-[#162623]">
-                        Visa ending in 4242
-                      </p>
-                      <p className="text-[11px] text-[#577877]">
-                        Emma Mitchell · Expires 08/2028
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="text-xs font-semibold text-[#2563EB]">
-                    Default
-                  </span>
-                </div>
-
-                {/* Use a different card toggle */}
-                <label className="flex items-center gap-2.5 pt-1 text-xs text-[#162623] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={useDifferentCard}
-                    onChange={(e) => setUseDifferentCard(e.target.checked)}
-                    className="w-4 h-4 rounded border-[#577877]/40 text-[#25836F] focus:ring-[#25836F] accent-[#25836F]"
-                  />
-                  <span>Use a different card</span>
-                </label>
-
-                {/* Security Code & Billing ZIP Code Inputs matching Screenshot */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#162623] mb-1.5">
-                      Security code
-                    </label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined !text-[#577877] text-base absolute left-3 top-1/2 -translate-y-1/2">
-                        lock
-                      </span>
-                      <input
-                        type="password"
-                        maxLength={4}
-                        value={securityCode}
-                        onChange={(e) => setSecurityCode(e.target.value)}
-                        placeholder="•••"
-                        className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] tracking-widest focus:outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-                    <span className="text-[11px] text-[#577877] block mt-1">
-                      3 digits on the back of your card
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#162623] mb-1.5">
-                      Billing ZIP code
-                    </label>
-                    <input
-                      type="text"
-                      value={billingZip}
-                      onChange={(e) => setBillingZip(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#2563EB]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: Billing contact matching Screenshot */}
-              <div className="care-card p-6 sm:p-7 space-y-4">
-                <h2 className="text-base font-bold text-[#162623]">
-                  Billing contact
-                </h2>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#162623] mb-1.5">
-                    Receipt email
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined !text-[#577877] text-base absolute left-3 top-1/2 -translate-y-1/2">
-                      mail
-                    </span>
-                    <input
-                      type="email"
-                      value={receiptEmail}
-                      onChange={(e) => setReceiptEmail(e.target.value)}
-                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#2563EB]"
-                    />
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-2.5 pt-1 text-xs text-[#162623] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={saveForFuture}
-                    onChange={(e) => setSaveForFuture(e.target.checked)}
-                    className="w-4 h-4 rounded border-[#577877]/40 text-[#25836F] focus:ring-[#25836F] accent-[#25836F]"
-                  />
-                  <span className="font-semibold">
-                    Save this payment method for future appointments
-                  </span>
-                </label>
-
-                <p className="text-[11px] text-[#577877] pt-1 leading-relaxed">
-                  Your card details are handled by our payment provider. We do
-                  not display your full card number.
-                </p>
-              </div>
-
-              {/* Card 3: No surprise charges callout matching Screenshot */}
-              <div className="p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3">
-                <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5">
-                  credit_card
-                </span>
-                <div className="text-xs space-y-1">
-                  <h3 className="font-bold text-[#162623]">
-                    No surprise charges
-                  </h3>
-                  <p className="text-[#577877] leading-relaxed">
-                    You'll only be charged the amount shown. This payment is for
-                    the consultation, not prescriptions or tests.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column (4 cols): Appointment summary Card */}
-            <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-24">
-              {/* Card 4: Appointment summary matching Screenshot */}
-              <div className="care-card p-6 sm:p-7 space-y-4">
-                <h3 className="text-base font-bold text-[#162623]">
-                  Appointment summary
-                </h3>
-
-                {/* Doctor Row */}
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-full bg-[#E0F0EC] text-[#25836F] font-bold text-sm flex items-center justify-center shrink-0">
-                    {checkoutApt.doctor.initials || "SC"}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-[#162623]">
-                      {checkoutApt.doctor.name}
-                    </h4>
-                    <p className="text-xs font-semibold text-[#25836F]">
-                      {checkoutApt.doctor.specialty}
-                    </p>
-                    <p className="text-[11px] text-[#577877]">
-                      {checkoutApt.doctor.experienceShort ||
-                        "12 years of experience"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="border-t border-[#577877]/15 my-3" />
-
-                {/* Metadata List */}
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <span className="text-[#577877] block text-[11px]">
-                      Patient
-                    </span>
-                    <span className="font-semibold text-xs text-[#162623]">
-                      {checkoutApt.patient}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[#577877] block text-[11px]">
-                      When
-                    </span>
-                    <span className="font-semibold text-xs text-[#162623]">
-                      {checkoutApt.dateShort} · {checkoutApt.timeRange}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[#577877] block text-[11px]">
-                      Visit type
-                    </span>
-                    <span className="font-semibold text-xs text-[#162623]">
-                      {checkoutApt.visitType}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="border-t border-[#577877]/15 my-3" />
-
-                {/* Line Item Fees */}
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#577877]">Consultation fee</span>
-                    <span className="font-semibold text-[#162623]">
-                      {checkoutApt.fee}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#577877]">Platform fee</span>
-                    <span className="font-semibold text-[#162623]">$0.00</span>
-                  </div>
-                </div>
-
-                <div className="border-t border-[#577877]/15 my-3" />
-
-                {/* Total due today */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-[#162623]">
-                    Total due today
-                  </span>
-                  <span className="text-2xl font-bold text-[#162623]">
-                    {checkoutApt.fee}
-                  </span>
-                </div>
-
-                {/* Cancellation Policy Checkbox */}
-                <div className="pt-2">
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={agreeCancellation}
-                      onChange={(e) => setAgreeCancellation(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-[#577877]/40 text-[#25836F] focus:ring-[#25836F] accent-[#25836F]"
-                    />
-                    <div className="text-xs">
-                      <span className="font-semibold text-[#162623]">
-                        I agree to the cancellation policy.
-                      </span>
-                      <span className="text-[11px] text-[#577877] block mt-0.5 leading-normal">
-                        Full refund if cancelled at least 24 hours before the
-                        visit.
-                      </span>
-                    </div>
-                  </label>
-                </div>
-
-                {paymentError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">
-                      error
-                    </span>
-                    <span>{paymentError}</span>
-                  </div>
-                )}
-
-                {/* Pay Button matching Screenshot */}
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    disabled={!agreeCancellation || isProcessingPayment}
-                    onClick={handleProcessPayment}
-                    className={`btn-primary w-full !py-3 rounded-xl font-semibold text-xs shadow-sm flex items-center justify-center gap-2 ${
-                      !agreeCancellation ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-sm">
-                      lock
-                    </span>
-                    <span>
-                      {isProcessingPayment
-                        ? "Processing..."
-                        : `Pay ${checkoutApt.fee} & confirm`}
-                    </span>
-                  </button>
-
-                  <p className="text-[11px] text-[#577877] text-center mt-2.5">
-                    USD · Your payment is submitted once.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Global Footer matching Screenshot */}
-          <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-            <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
-            <div className="flex items-center gap-4">
-              <span className="hover:text-[#162623] cursor-pointer">
-                Privacy
-              </span>
-              <span>·</span>
-              <span className="hover:text-[#162623] cursor-pointer">Terms</span>
-              <span>·</span>
-              <span
-                className="hover:text-[#162623] cursor-pointer"
-                onClick={() => onNavigate("support")}
-              >
-                Need help?
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ========================================================
-  // VIEW 3: PAYMENTS & BILLING OVERVIEW (Matches Screenshot 8)
-  // ========================================================
-  return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="space-y-6 font-sans text-[#162623]">
         {/* Toast Notification */}
         {toastMessage && (
           <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
@@ -945,166 +314,487 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           </div>
         )}
 
-        {/* Page Heading & Top Action Row matching Screenshot */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-              Payments &amp; billing
+        {/* Compact Heading Banner matching Portal Brand System */}
+        <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+              Official Clinical Consultation Invoice
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              Payment Received
             </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              Simple, transparent payments. Your receipts are always here when
-              you need them.
+            <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+              Your consultation fee has been verified. A copy of this receipt is preserved in your portal records.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
             <button
               type="button"
-              onClick={() => setView("receipt")}
-              className="btn-primary !px-4 !py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs"
+              onClick={() => setView("billing")}
+              className="px-4 py-2.5 rounded-xl font-semibold text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 flex items-center gap-2 backdrop-blur-xs transition cursor-pointer"
             >
-              <span className="material-symbols-outlined !text-white text-base">
-                receipt_long
+              <span className="material-symbols-outlined text-base !text-white">
+                arrow_back
               </span>
-              <span>Latest receipt</span>
+              <span>All Payments</span>
             </button>
-
             <button
               type="button"
-              onClick={handleDownloadStatement}
-              className="btn-secondary !px-4 !py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs shrink-0"
+              onClick={handleDownloadReceiptPdf}
+              className="px-4 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer"
             >
-              <span className="material-symbols-outlined !text-[#25836F] text-base">
+              <span className="material-symbols-outlined text-base !text-[#185A4D]">
                 download
               </span>
-              <span>Download statement</span>
+              <span>Download PDF</span>
             </button>
           </div>
         </div>
 
-        {/* 3 Metric Stat Cards matching Screenshot 8 */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {/* Card 1: Outstanding balance */}
-          <div className="care-card p-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[#577877] font-medium">
-                Outstanding balance
-              </span>
-              <span className="material-symbols-outlined !text-[#25836F] text-lg">
-                check_circle
-              </span>
-            </div>
-            <p className="text-3xl font-bold text-[#162623] tracking-tight">
-              $0.00
-            </p>
-            <p className="text-xs text-[#577877]">You're all up to date</p>
-          </div>
-
-          {/* Card 2: Paid this year */}
-          <div className="care-card p-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[#577877] font-medium">
-                Paid this year
-              </span>
-              <span className="material-symbols-outlined !text-[#25836F] text-lg">
-                account_balance_wallet
-              </span>
-            </div>
-            <p className="text-3xl font-bold text-[#162623] tracking-tight">
-              $630.00
-            </p>
-            <p className="text-xs text-[#577877]">8 consultations in 2026</p>
-          </div>
-
-          {/* Card 3: Refunds in progress */}
-          <div className="care-card p-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[#577877] font-medium">
-                Refunds in progress
-              </span>
-              <span className="material-symbols-outlined !text-[#25836F] text-lg">
-                sync
-              </span>
-            </div>
-            <p className="text-3xl font-bold text-[#162623] tracking-tight">
-              $0.00
-            </p>
-            <p className="text-xs text-[#577877]">No pending refunds</p>
-          </div>
-        </div>
-
-        {/* Main Card: Tabs + Table matching Screenshot 8 */}
-        <div className="care-card p-6 sm:p-7 space-y-5">
-          {/* Tabs: Transactions | Payment methods | Billing details */}
-          <div className="flex items-center gap-8 border-b border-[#577877]/20 pt-1 text-sm font-medium">
-            {[
-              { id: "transactions", label: "Transactions" },
-              { id: "methods", label: "Payment methods" },
-              { id: "details", label: "Billing details" },
-            ].map((tab) => {
-              const isActive = activeBillingTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveBillingTab(tab.id)}
-                  className={`pb-3 font-semibold transition-all relative ${
-                    isActive
-                      ? "text-[#25836F]"
-                      : "text-[#577877] hover:text-[#162623]"
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  {isActive && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#25836F] rounded-full" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* TAB 1: Transactions Table */}
-          {activeBillingTab === "transactions" && (
-            <div className="space-y-4">
-              {/* Subheader: All transactions · 2026 + Filter pill */}
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[#577877]">All transactions · 2026</span>
-                <div className="relative">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => {
-                      setStatusFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="appearance-none bg-[#F0F5F7] text-[#577877] hover:text-[#162623] font-medium px-3.5 py-1.5 rounded-full text-xs focus:outline-none cursor-pointer pr-7"
-                  >
-                    <option value="All">All statuses</option>
-                    <option value="Paid">Paid</option>
-                    <option value="Refunded">Refunded</option>
-                  </select>
-                  <span className="material-symbols-outlined !text-[#577877] text-xs absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                    expand_more
+        {/* Main 2-Column Content Area */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column (8 cols): Formal Printable Receipt Card */}
+          <div className="lg:col-span-8 care-card p-6 sm:p-9 space-y-7 border border-[#577877]/15 shadow-sm bg-white rounded-2xl">
+            {/* Receipt Header: Brand + Receipt ID */}
+            <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#25836F] flex items-center justify-center text-white shadow-2xs shrink-0">
+                  <span className="material-symbols-outlined text-2xl">
+                    vital_signs
                   </span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-[#162623] tracking-tight">
+                    Kaizen Care
+                  </h2>
+                  <p className="text-[10px] font-semibold tracking-wider uppercase text-[#577877]">
+                    Patient Portal
+                  </p>
                 </div>
               </div>
 
-              {/* Transactions Table matching Screenshot */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-[#F0F5F7]/80 text-[#577877] font-semibold uppercase text-[11px] tracking-wider border-y border-[#577877]/15">
-                      <th className="py-3 px-4">Receipt</th>
-                      <th className="py-3 px-4">Appointment</th>
-                      <th className="py-3 px-4">Doctor</th>
-                      <th className="py-3 px-4">Amount</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Action</th>
+              <div className="text-right">
+                <h3 className="text-xl sm:text-2xl font-bold text-[#162623]">
+                  Receipt
+                </h3>
+                <p className="text-xs text-[#577877] font-medium mt-0.5">
+                  {checkoutApt.receiptId}
+                </p>
+              </div>
+            </div>
+
+            {/* 3-Column Info Row: Billed to | Date paid | Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div>
+                <span className="text-[#577877] block text-[11px]">
+                  Billed to
+                </span>
+                <span className="font-bold text-sm text-[#162623] mt-1 block">
+                  {checkoutApt.patient}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[#577877] block text-[11px]">
+                  Date paid
+                </span>
+                <span className="font-bold text-sm text-[#162623] mt-1 block">
+                  {checkoutApt.datePaid}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[#577877] block text-[11px]">
+                  Status
+                </span>
+                <span className="font-bold text-sm text-[#162623] mt-1 block">
+                  {checkoutApt.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Billing Address Row */}
+            <div className="text-xs">
+              <span className="text-[#577877] block text-[11px]">
+                Billing contact &amp; address
+              </span>
+              <span className="font-bold text-sm text-[#162623] mt-1 block">
+                {checkoutApt.billingAddress}
+              </span>
+              {patientEmail && (
+                <span className="text-xs text-[#577877] mt-0.5 block">
+                  {patientEmail}
+                </span>
+              )}
+            </div>
+
+            {/* Line Items Table with Shaded Header */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-[#F0F5F7] text-[#577877] font-medium rounded-xl">
+                    <th className="py-2.5 px-4 rounded-l-xl">Description</th>
+                    <th className="py-2.5 px-4 text-center">Quantity</th>
+                    <th className="py-2.5 px-4 text-right rounded-r-xl">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-[#577877]/15">
+                    <td className="py-4 px-4 font-semibold text-[#162623]">
+                      {checkoutApt.description}
+                    </td>
+                    <td className="py-4 px-4 text-center font-medium text-[#162623]">
+                      1
+                    </td>
+                    <td className="py-4 px-4 text-right font-semibold text-[#162623]">
+                      {checkoutApt.fee}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Appointment Reference Row */}
+            <div className="text-xs space-y-1">
+              <span className="text-[#577877] block text-[11px]">
+                Appointment Details
+              </span>
+              <p className="font-bold text-[#162623]">
+                {checkoutApt.dateShort} · {checkoutApt.timeAppointment} · Ref: {checkoutApt.id}
+              </p>
+            </div>
+
+            {/* Paid With & Total Paid Block */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-3 border-t border-[#577877]/15">
+              <div className="text-xs space-y-0.5">
+                <span className="text-[#577877] block text-[11px]">
+                  Payment Method
+                </span>
+                <p className="font-semibold text-sm text-[#162623]">
+                  Razorpay Secure Gateway
+                </p>
+                <p className="text-[11px] text-[#577877]">
+                  Transaction Ref · {checkoutApt.transactionId}
+                </p>
+              </div>
+
+              <div className="text-left sm:text-right space-y-1">
+                <span className="text-[11px] text-[#577877] block">
+                  Total Paid · INR
+                </span>
+                <p className="text-3xl font-bold text-[#162623] tracking-tight">
+                  {checkoutApt.fee}
+                </p>
+                <div>
+                  <span className="inline-flex items-center text-[11px] font-semibold px-3 py-1 rounded-full bg-[#E6F4EA] text-[#1E7E34]">
+                    Payment verified
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Note */}
+            <div className="pt-4 border-t border-[#577877]/15 text-[11px] text-[#577877] leading-relaxed">
+              Thank you for choosing Kaizen Care. This receipt confirms verified clinical payment. Keep it for your medical records and insurance claims.
+            </div>
+          </div>
+
+          {/* Right Column (4 cols): What happens next & Billing Support */}
+          <div className="lg:col-span-4 space-y-4">
+            {/* Card 1: What happens next? */}
+            <div className="care-card p-6 sm:p-7 space-y-4">
+              <h3 className="text-base font-bold text-[#162623]">
+                What happens next?
+              </h3>
+              <p className="text-xs text-[#577877] leading-relaxed">
+                Your consultation with {checkoutApt.doctor.name} is on schedule. Review your appointment instructions and access the waiting room from Appointments.
+              </p>
+
+              <div className="space-y-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => onNavigate("appointments")}
+                  className="btn-primary w-full !py-2.5 rounded-xl font-semibold text-xs shadow-2xs"
+                >
+                  View in My Appointments
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setView("billing")}
+                  className="btn-secondary w-full !py-2.5 rounded-xl font-semibold text-xs text-[#162623] shadow-2xs"
+                >
+                  Back to Payments
+                </button>
+              </div>
+            </div>
+
+            {/* Card 2: Need a billing correction? */}
+            <div className="p-5 rounded-2xl bg-white border border-[#577877]/15 flex items-start gap-3 shadow-xs">
+              <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5">
+                info
+              </span>
+              <div className="text-xs space-y-1">
+                <h4 className="font-bold text-[#162623]">
+                  Need a billing correction?
+                </h4>
+                <p className="text-[#577877] leading-relaxed">
+                  <span
+                    className="text-[#25836F] font-semibold hover:underline cursor-pointer"
+                    onClick={() => onNavigate("support")}
+                  >
+                    Contact billing support
+                  </span>{" "}
+                  with receipt {checkoutApt.receiptId} for refunds or fee adjustments.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ========================================================
+  // VIEW 2: PAYMENTS & BILLING OVERVIEW (Default View)
+  // ========================================================
+  return (
+    <div className="space-y-6 font-sans text-[#162623]">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
+          <span className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">
+              check_circle
+            </span>
+            {toastMessage}
+          </span>
+          <button
+            type="button"
+            onClick={() => setToastMessage("")}
+            className="text-[#577877] hover:text-[#162623]"
+          >
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+      )}
+
+      {/* Compact Heading Banner matching Portal Brand System */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Secure Billing &amp; Transaction History
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Payments &amp; Billing
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            Transparent consultation fees, downloadable invoices, and verified digital receipts.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
+          {dbTransactions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setView("receipt")}
+              className="px-4 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base !text-[#185A4D]">
+                receipt_long
+              </span>
+              <span>Latest Receipt</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleDownloadStatement}
+            className="px-4 py-2.5 rounded-xl font-semibold text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 flex items-center gap-2 backdrop-blur-xs transition cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base !text-white">
+              download
+            </span>
+            <span>Download Statement</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 3 Metric Stat Cards dynamically derived from backend records */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        {/* Card 1: Outstanding balance */}
+        <div className="care-card p-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[#577877] font-medium">
+              Outstanding Balance
+            </span>
+            <span className="material-symbols-outlined !text-[#25836F] text-lg">
+              check_circle
+            </span>
+          </div>
+          <p className="text-3xl font-bold text-[#162623] tracking-tight">
+            {pendingBalancePaise > 0
+              ? `INR ${(pendingBalancePaise / 100).toFixed(2)}`
+              : "INR 0.00"}
+          </p>
+          <p className="text-xs text-[#577877]">
+            {pendingBalancePaise > 0
+              ? "Payment pending for upcoming visit"
+              : "You're all up to date"}
+          </p>
+        </div>
+
+        {/* Card 2: Paid this year */}
+        <div className="care-card p-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[#577877] font-medium">
+              Paid to Date
+            </span>
+            <span className="material-symbols-outlined !text-[#25836F] text-lg">
+              account_balance_wallet
+            </span>
+          </div>
+          <p className="text-3xl font-bold text-[#162623] tracking-tight">
+            {totalPaidPaise > 0
+              ? `INR ${(totalPaidPaise / 100).toFixed(2)}`
+              : "INR 0.00"}
+          </p>
+          <p className="text-xs text-[#577877]">
+            {paidCount} consultation{paidCount !== 1 ? "s" : ""} completed
+          </p>
+        </div>
+
+        {/* Card 3: Refunds in progress */}
+        <div className="care-card p-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[#577877] font-medium">
+              Refunds Processed
+            </span>
+            <span className="material-symbols-outlined !text-[#25836F] text-lg">
+              sync
+            </span>
+          </div>
+          <p className="text-3xl font-bold text-[#162623] tracking-tight">
+            {totalRefundedPaise > 0
+              ? `INR ${(totalRefundedPaise / 100).toFixed(2)}`
+              : "INR 0.00"}
+          </p>
+          <p className="text-xs text-[#577877]">
+            {refundedCount > 0
+              ? `${refundedCount} refund${refundedCount !== 1 ? "s" : ""} recorded`
+              : "No pending refunds"}
+          </p>
+        </div>
+      </div>
+
+      {/* Main Card: Tabs + Content */}
+      <div className="care-card p-6 sm:p-7 space-y-5">
+        {/* Tabs: Transactions | Payment methods | Billing details */}
+        <div className="flex items-center gap-8 border-b border-[#577877]/20 pt-1 text-sm font-medium">
+          {[
+            { id: "transactions", label: "Transactions" },
+            { id: "methods", label: "Payment Methods" },
+            { id: "details", label: "Billing Profile" },
+          ].map((tab) => {
+            const isActive = activeBillingTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveBillingTab(tab.id)}
+                className={`pb-3 font-semibold transition-all relative cursor-pointer ${
+                  isActive
+                    ? "text-[#25836F]"
+                    : "text-[#577877] hover:text-[#162623]"
+                }`}
+              >
+                <span>{tab.label}</span>
+                {isActive && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#25836F] rounded-full" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* TAB 1: Transactions Table */}
+        {activeBillingTab === "transactions" && (
+          <div className="space-y-4">
+            {/* Subheader: Filter row */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[#577877]">
+                {loading
+                  ? "Loading records…"
+                  : `Showing ${filteredTransactions.length} transaction${filteredTransactions.length !== 1 ? "s" : ""}`}
+              </span>
+              <div className="relative">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="appearance-none bg-[#F0F5F7] text-[#577877] hover:text-[#162623] font-medium px-3.5 py-1.5 rounded-full text-xs focus:outline-none cursor-pointer pr-7"
+                >
+                  <option value="All">All statuses</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Refunded">Refunded</option>
+                  <option value="Pending">Pending</option>
+                </select>
+                <span className="material-symbols-outlined !text-[#577877] text-xs absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                  expand_more
+                </span>
+              </div>
+            </div>
+
+            {/* Transactions Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-[#F0F5F7]/80 text-[#577877] font-semibold uppercase text-[11px] tracking-wider border-y border-[#577877]/15">
+                    <th className="py-3 px-4">Receipt</th>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Provider</th>
+                    <th className="py-3 px-4">Amount</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#577877]/15">
+                  {filteredTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-[#577877]">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <span className="material-symbols-outlined text-4xl text-[#577877]/60">
+                            receipt_long
+                          </span>
+                          <p className="font-semibold text-sm text-[#162623]">
+                            No payment transactions found
+                          </p>
+                          <p className="text-xs max-w-sm text-[#577877]">
+                            Invoices, consultation receipts, and payment statements will be recorded here automatically once an appointment is scheduled.
+                          </p>
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={() => onNavigate("find-doctors")}
+                              className="btn-primary !px-4 !py-2 text-xs font-semibold rounded-xl"
+                            >
+                              Book a Consultation
+                            </button>
+                          </div>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#577877]/15">
-                    {paginatedTransactions.map((item) => (
+                  ) : (
+                    paginatedTransactions.map((item) => (
                       <tr
-                        key={item.receiptId}
+                        key={item.receiptId || item.id}
                         className="hover:bg-[#F0F5F7]/40 transition"
                       >
                         <td className="py-4 px-4 font-medium text-[#162623]">
@@ -1120,11 +810,19 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                           {item.amount}
                         </td>
                         <td className="py-4 px-4">
-                          <span className="font-semibold text-[#1E7E34]">
+                          <span
+                            className={`font-semibold text-[11px] px-2.5 py-0.5 rounded-full ${
+                              item.status === "Paid"
+                                ? "bg-emerald-50 text-[#1E7E34]"
+                                : item.status === "Refunded"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : "bg-blue-50 text-[#25836F]"
+                            }`}
+                          >
                             {item.status}
                           </span>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4 text-right">
                           <button
                             type="button"
                             onClick={() => {
@@ -1139,12 +837,14 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                           </button>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-              {/* Pagination Row matching Screenshot */}
+            {/* Pagination Row */}
+            {filteredTransactions.length > itemsPerPage && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#577877]/15 text-xs text-[#577877]">
                 <span>
                   Showing {(currentPage - 1) * itemsPerPage + 1}–
@@ -1185,167 +885,83 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* TAB 2: Payment Methods */}
-          {activeBillingTab === "methods" && (
-            <div className="space-y-4 pt-2">
-              <h3 className="text-sm font-bold text-[#162623]">
-                Cards on File
-              </h3>
-              <div className="p-4 rounded-xl border border-[#577877]/20 bg-[#F0F5F7]/30 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="px-2.5 py-1 rounded bg-[#EBF5F5] text-[#25836F] font-bold text-xs tracking-wider border border-[#25836F]/20">
-                    VISA
-                  </span>
-                  <div>
-                    <p className="text-xs font-semibold text-[#162623]">
-                      •••• 4242 (Default)
-                    </p>
-                    <p className="text-[11px] text-[#577877]">
-                      Expires 08/2028 · Emma Mitchell
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowManageCard(true)}
-                  className="btn-secondary !px-3.5 !py-1 text-xs font-semibold rounded-xl"
-                >
-                  Edit
-                </button>
+        {/* TAB 2: Payment Methods & Gateway */}
+        {activeBillingTab === "methods" && (
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[#162623]">
+                  Payment Gateway Integration
+                </h3>
+                <p className="text-xs text-[#577877] mt-0.5">
+                  Telehealth consultations and slot reservations are securely processed via Razorpay.
+                </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowManageCard(true)}
-                className="btn-secondary !px-4 !py-2 text-xs font-semibold rounded-xl flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined !text-[#25836F] text-base">
-                  add
-                </span>
-                <span>Add payment method</span>
-              </button>
-            </div>
-          )}
-
-          {/* TAB 3: Billing Details */}
-          {activeBillingTab === "details" && (
-            <div className="space-y-4 pt-2 text-xs">
-              <h3 className="text-sm font-bold text-[#162623]">
-                Patient Billing Profile
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
-                  <span className="text-[#577877] block text-[11px]">
-                    Legal Name
-                  </span>
-                  <p className="font-semibold text-[#162623]">Emma Mitchell</p>
-                </div>
-                <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
-                  <span className="text-[#577877] block text-[11px]">
-                    Billing Address
-                  </span>
-                  <p className="font-semibold text-[#162623]">
-                    2148 Pine Street, Apt 3, San Francisco, CA 94115
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
-                  <span className="text-[#577877] block text-[11px]">
-                    HSA / FSA Eligibility
-                  </span>
-                  <p className="font-semibold text-[#1E7E34]">
-                    Eligible for Medical Reimbursement
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
-                  <span className="text-[#577877] block text-[11px]">
-                    Currency
-                  </span>
-                  <p className="font-semibold text-[#162623]">
-                    USD ($) · Self-pay
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom 2-Column Row matching Screenshot 8 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-          {/* Left Card: Your preferred payment method */}
-          <div className="care-card p-6 sm:p-7 flex flex-col justify-between space-y-4">
-            <div>
-              <h3 className="text-base font-bold text-[#162623]">
-                Your preferred payment method
-              </h3>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Razorpay Active
+              </span>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center">
-                <span className="px-2.5 py-1 rounded bg-[#EBF5F5] text-[#25836F] font-bold text-xs tracking-wider border border-[#25836F]/20">
-                  VISA
-                </span>
-                <span className="text-xs font-medium text-[#162623] ml-3">
-                  •••• 4242 · Expires 08/2028
+            <div className="p-5 rounded-2xl border border-[#577877]/20 bg-[#F0F5F7]/30 flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[#25836F] text-white flex items-center justify-center shrink-0 shadow-xs">
+                <span className="material-symbols-outlined text-2xl">
+                  security
                 </span>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowManageCard(true)}
-                className="btn-secondary !px-4 !py-1.5 rounded-xl text-xs font-semibold shadow-2xs"
-              >
-                Manage
-              </button>
+              <div className="space-y-1 text-xs">
+                <p className="font-bold text-[#162623]">
+                  Zero Card Data Stored On-Device
+                </p>
+                <p className="text-[#577877] leading-relaxed">
+                  UPI, Debit/Credit Cards, and NetBanking payments are directly tokenized through Razorpay with end-to-end 256-bit encryption. Payment details are not permanently cached on our servers.
+                </p>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Right Card: A question about a charge? */}
-          <div className="care-card p-6 sm:p-7 flex flex-col justify-between space-y-3">
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-[#162623]">
-                A question about a charge?
-              </h3>
-              <p className="text-xs text-[#577877] leading-relaxed">
-                Our billing team can help with receipts, refunds, and payment
-                questions.
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => onNavigate("support")}
-                className="text-xs font-semibold text-[#25836F] hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <span>Contact billing support</span>
-                <span>→</span>
-              </button>
+        {/* TAB 3: Billing Profile */}
+        {activeBillingTab === "details" && (
+          <div className="space-y-4 pt-2 text-xs">
+            <h3 className="text-sm font-bold text-[#162623]">
+              Patient Billing Information
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
+                <span className="text-[#577877] block text-[11px]">
+                  Account Name
+                </span>
+                <p className="font-semibold text-[#162623]">{patientName}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
+                <span className="text-[#577877] block text-[11px]">
+                  Registered Billing Email
+                </span>
+                <p className="font-semibold text-[#162623]">{patientEmail || "Not provided"}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
+                <span className="text-[#577877] block text-[11px]">
+                  Billing Address
+                </span>
+                <p className="font-semibold text-[#162623]">{billingAddress}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-1">
+                <span className="text-[#577877] block text-[11px]">
+                  Currency
+                </span>
+                <p className="font-semibold text-[#162623]">INR (₹) · Indian Rupee</p>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Global Footer matching Screenshot */}
-        <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
-          <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
-          <div className="flex items-center gap-4">
-            <span className="hover:text-[#162623] cursor-pointer">Privacy</span>
-            <span>·</span>
-            <span className="hover:text-[#162623] cursor-pointer">Terms</span>
-            <span>·</span>
-            <span
-              className="hover:text-[#162623] cursor-pointer"
-              onClick={() => onNavigate("support")}
-            >
-              Need help?
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* View Receipt Modal */}
+      {/* Selected Receipt Detail Modal */}
       {selectedReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
@@ -1361,7 +977,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               <button
                 type="button"
                 onClick={() => setSelectedReceipt(null)}
-                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7]"
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
@@ -1406,100 +1022,13 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               </div>
             </div>
 
-            <p className="text-[11px] text-[#577877]">
-              Healthcare Teleconsultation services are exempt from sales tax.
-              Suitable for HSA/FSA claims.
-            </p>
-
             <div className="pt-2 flex justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => setSelectedReceipt(null)}
-                className="btn-secondary !py-2 !px-4 text-xs"
+                className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
               >
                 Close
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="btn-primary !py-2 !px-4 text-xs flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-sm">print</span>
-                <span>Print Receipt</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Manage Payment Card Modal */}
-      {showManageCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined !text-[#25836F] text-xl">
-                  credit_card
-                </span>
-                <h3 className="text-base font-bold text-[#162623]">
-                  Payment Method
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowManageCard(false)}
-                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7]"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3.5 rounded-xl border-2 border-[#25836F] bg-[#E8F3F3] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="px-2 py-0.5 rounded bg-white text-[#25836F] font-bold text-xs tracking-wider">
-                    VISA
-                  </span>
-                  <div>
-                    <p className="font-bold text-[#162623]">•••• 4242</p>
-                    <p className="text-[11px] text-[#577877]">
-                      Expires 08/2028 · Default method
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[#25836F] font-bold">✓</span>
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <label className="font-semibold text-[#162623] block">
-                  Billing ZIP Code
-                </label>
-                <input
-                  type="text"
-                  defaultValue="94115"
-                  className="w-full px-3 py-2 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setShowManageCard(false)}
-                className="btn-secondary !py-2 !px-4 text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowManageCard(false);
-                  setToastMessage("Payment preferences saved.");
-                  setTimeout(() => setToastMessage(""), 3500);
-                }}
-                className="btn-primary !py-2 !px-4 text-xs"
-              >
-                Save Changes
               </button>
             </div>
           </div>

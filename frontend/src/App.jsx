@@ -286,7 +286,11 @@ export default function App() {
         return <FollowUpCareScreen onNavigate={handleNavigate} />;
       case "payments":
         return (
-          <PaymentsScreen onNavigate={handleNavigate} navParams={navParams} />
+          <PaymentsScreen
+            onNavigate={handleNavigate}
+            navParams={navParams}
+            patient={patient}
+          />
         );
       case "notifications":
         return <NotificationsScreen onNavigate={handleNavigate} />;
