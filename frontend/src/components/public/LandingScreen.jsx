@@ -573,7 +573,7 @@ export default function LandingScreen({
                 <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
                 <path d="m9 12 2 2 4-4" />
               </svg>
-              <span>Verified Telehealth Platform</span>
+              <span>Online Healthcare Platform</span>
             </div>
 
             {/* Display Heading */}
@@ -592,7 +592,7 @@ export default function LandingScreen({
               }`}
             >
               Connect with verified specialists through seamless online doctor consultations,
-              easy appointment booking, and encrypted HD video consultations from the comfort of your home.
+              easy appointment booking, and secure video consultations from the comfort of your home.
             </p>
 
             {/* Action Buttons */}
@@ -645,7 +645,7 @@ export default function LandingScreen({
                 verified_user
               </span>
               <span className="text-[#D9EBE3] font-semibold text-xs sm:text-sm tracking-tight">
-                Encrypted Video Calls · Verified Specialists · Digital Prescriptions
+                Secure Video Consultations · Verified Specialists · Digital Prescriptions
               </span>
             </div>
           </div>
@@ -682,7 +682,7 @@ export default function LandingScreen({
             <div key={setIdx} className="flex items-center shrink-0">
               {[
                 "100% Verified Clinicians",
-                "Encrypted HD Video Calls",
+                "Secure Video Consultations",
                 "Instant Digital Prescriptions",
                 "Seamless Slot Booking",
                 "Secure Medical Records",
@@ -756,7 +756,7 @@ export default function LandingScreen({
             {
               step: "03",
               title: "Consult Online",
-              desc: "Join high-definition, encrypted WebRTC video sessions with your doctor from any device.",
+              desc: "Join high-definition, secure video consultations with your doctor from any device.",
               icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="23 7 16 12 23 17 23 7" />
