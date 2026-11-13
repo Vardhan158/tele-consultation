@@ -1357,9 +1357,8 @@ export default function LandingScreen({
                 </span>
               </div>
               <p className="text-sm text-zinc-400 leading-relaxed">
-                Providing compassionate healthcare through experienced
-                professionals, modern treatments and patient-first care for every
-                visit.
+                Providing accessible teleconsultation healthcare through qualified
+                healthcare professionals, secure video consultations, and patient-first digital care.
               </p>
             </div>
 
@@ -1426,9 +1425,10 @@ export default function LandingScreen({
               </p>
               <div className="flex flex-col gap-2.5 text-sm text-zinc-400">
                 <span>General Consultation</span>
-                <span>Preventive Care</span>
-                <span>Cardiac Care</span>
-                <span>Diagnostic Services</span>
+                <span>Preventive Health Guidance</span>
+                <span>Specialist Consultation</span>
+                <span>Online Video Consultation</span>
+                <span>Digital Prescriptions & Records</span>
                 <span>Follow-up & Support</span>
               </div>
             </div>
