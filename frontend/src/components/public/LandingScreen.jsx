@@ -938,9 +938,8 @@ export default function LandingScreen({
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
                 Healthcare Services Designed for You
               </h2>
-              <p className="text-zinc-600 text-sm sm:text-base">
-                Explore comprehensive medical care tailored to your family's needs
-                with modern treatments and caring doctors.
+              <p className="text-zinc-600 text-sm sm:text-base max-w-xl">
+                Connect with qualified healthcare professionals through online consultations, appointment booking, digital health records, and follow-up care.
               </p>
             </div>
           </ScrollReveal>
