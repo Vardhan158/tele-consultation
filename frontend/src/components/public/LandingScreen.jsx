@@ -830,15 +830,15 @@ export default function LandingScreen({
               </div>
 
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight tracking-tight mb-4 max-w-lg">
-                Personalized Care, Trusted Results
+                Personalized Care, Wherever You Are
               </h2>
 
+              <p className="text-zinc-600 text-sm sm:text-base leading-relaxed mb-4 max-w-xl">
+                Kaizen Care is an online teleconsultation platform connecting patients with qualified healthcare professionals. Patients can discover doctors, book appointments, attend secure video consultations, and access their consultation records through one convenient digital platform.
+              </p>
+
               <p className="text-zinc-600 text-sm sm:text-base leading-relaxed mb-8 max-w-xl">
-                We believe exceptional healthcare starts with listening. Our
-                clinic provides personalized consultations, preventive care, and
-                modern treatments in a comfortable and welcoming environment.
-                Whether you need routine care or specialized consultations, our
-                board-certified clinical team is here for you.
+                Our goal is to make healthcare more accessible by simplifying the entire patient journey, from appointment booking to consultation completion and follow-up care.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full mb-8">
@@ -862,10 +862,10 @@ export default function LandingScreen({
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-zinc-800">
-                      Experienced Doctors
+                      Qualified Healthcare Professionals
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Qualified healthcare professionals across major clinical specialties.
+                      Connect with doctors across available medical specialties.
                     </p>
                   </div>
                 </div>
@@ -884,20 +884,16 @@ export default function LandingScreen({
                       strokeLinejoin="round"
                       className="text-[#1A7D67]"
                     >
-                      <path d="m10 2 4 4-4 4" />
-                      <path d="m14 14 4 4-4 4" />
-                      <path d="M4 14h16" />
-                      <path d="M4 10h16" />
-                      <path d="M14 2v20" />
-                      <path d="M10 2v20" />
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                      <polyline points="14 2 14 8 20 8" />
                     </svg>
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-zinc-800">
-                      Modern Diagnostics
+                      Digital Health Records
                     </h4>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      Fast turnaround digital lab reports and imaging traces.
+                      Access consultation summaries, doctor-issued prescriptions, and available medical records securely.
                     </p>
                   </div>
                 </div>
