@@ -1214,8 +1214,7 @@ export default function LandingScreen({
               Frequently Asked Questions
             </h2>
             <p className="text-zinc-600 text-sm sm:text-base">
-              Everything you need to know about booking, medical care, and portal
-              features.
+              Everything you need to know about online doctor consultations, appointment booking, and portal features.
             </p>
           </div>
         </ScrollReveal>
@@ -1223,24 +1222,28 @@ export default function LandingScreen({
         <div className="space-y-4">
           {[
             {
-              q: "How do I book an appointment?",
-              a: "You can book an appointment online through our website by clicking the 'Book Appointment' button or by calling our clinic directly. We will help you select a convenient time slot with your doctor.",
+              q: "How do I book an online doctor consultation?",
+              a: "Browse available medical specialists by specialty or availability, select your preferred date and time slot, and confirm your booking through the patient portal.",
             },
             {
-              q: "Do you accept walk-in patients?",
-              a: "Yes, we accept walk-in patients. However, booking an appointment in advance is highly recommended to secure your preferred doctor and minimize your waiting time.",
+              q: "How do I pay for an appointment?",
+              a: "You can complete your appointment payment securely online using integrated payment gateways during the booking flow.",
             },
             {
-              q: "What services does your clinic provide?",
-              a: "Our clinic provides general consultations, preventive care, cardiac care, diagnostic tests, vaccinations, and continuous follow-up support tailored to your healthcare needs.",
+              q: "How do I join my video consultation?",
+              a: "Log into your patient portal account, navigate to Appointments or Video Consultation, and click 'Join Video Room' when your scheduled time arrives.",
             },
             {
-              q: "Can I reschedule my appointment?",
-              a: "Yes, you can easily reschedule or cancel your appointment. Please contact our support team or use the online portal at least 24 hours prior to your scheduled time.",
+              q: "Can I reschedule or cancel my appointment?",
+              a: "Yes, you can easily reschedule or cancel an upcoming consultation directly from your Appointments tab up to 24 hours prior to the scheduled start time.",
             },
             {
-              q: "Do you offer online consultations?",
-              a: "Yes, we offer secure online video consultations powered by Daily SDK, allowing you to connect with our specialists directly from your browser at home.",
+              q: "Where can I access my prescriptions and consultation records?",
+              a: "After your consultation is completed, doctor-issued prescriptions, consultation summaries, and available medical records are securely stored under your portal account.",
+            },
+            {
+              q: "What happens if my video connection is interrupted?",
+              a: "If your connection drops, simply refresh your browser page or click 'Rejoin Video Room' to reconnect to your ongoing secure consultation.",
             },
           ].map((faq, idx) => (
             <ScrollReveal key={idx} animation="fade-up" delay={idx * 80}>
