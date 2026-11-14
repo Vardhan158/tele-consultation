@@ -203,7 +203,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           )}
 
           {/* Header Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
                 {isPaid ? "Payment received" : "Pending Payment Record"}
@@ -256,7 +256,10 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
             /* Main 2-Column Content Area */
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Left Column (8 cols): Formal Printable Receipt / Statement Card */}
-              <div className="lg:col-span-8 care-card p-6 sm:p-9 space-y-7 border border-[#577877]/15 shadow-sm bg-white rounded-2xl">
+              <div
+                id="printable-receipt"
+                className="lg:col-span-8 care-card p-6 sm:p-9 space-y-7 border border-[#577877]/15 shadow-sm bg-white rounded-2xl print:m-0 print:p-0 print:border-none print:shadow-none"
+              >
                 {/* Receipt Header: Brand + Receipt ID */}
                 <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
                   <div className="flex items-center gap-3">
@@ -399,7 +402,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               </div>
 
               {/* Right Column (4 cols) */}
-              <div className="lg:col-span-4 space-y-4">
+              <div className="lg:col-span-4 space-y-4 no-print">
                 <div className="care-card p-6 sm:p-7 space-y-4 bg-white rounded-2xl border border-[#577877]/15">
                   <h3 className="text-base font-bold text-[#162623]">
                     {isPaid ? "What happens next?" : "Action Required"}
