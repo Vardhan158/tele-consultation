@@ -18,3 +18,4 @@ class NotificationResponse(BaseModel):
     appointment_id: str | None = None
     patient_display_name: str | None = None
     notification_type: str | None = None
+    appointment_starts_at: datetime | str | None = None

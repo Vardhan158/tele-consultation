@@ -28,6 +28,7 @@ async def ensure_doctor_appointment_notification(*, tenant_id: str, doctor_id: s
         {"$setOnInsert": {
             "id": str(uuid4()), "tenant_id": str(tenant_id), "recipient_id": str(doctor_id),
             "doctor_id": str(doctor_id), "appointment_id": str(appointment.get("id")),
+            "appointment_starts_at": appointment.get("starts_at"),
             "patient_display_name": patient_display_name, "notification_type": "APPOINTMENT_CONFIRMED",
             "event_type": "appointment_confirmed", "channel": "in_app", "subject": "Appointment confirmed",
             "body": f"{patient_display_name} booked an appointment for {appointment.get('starts_at', 'the scheduled time')}.",
