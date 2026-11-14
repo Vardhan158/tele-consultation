@@ -102,7 +102,7 @@ export default function NotificationsScreen({ onNavigate }) {
         if (Array.isArray(items) && items.length > 0) {
           setNotifications(
             items.map((n) => {
-              const isUnread = n.status !== "read";
+              const isUnread = !n.read_at && n.status !== "read";
               const cat = n.event_type?.includes("appointment")
                 ? "appointments"
                 : n.event_type?.includes("payment")

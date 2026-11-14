@@ -34,8 +34,10 @@ export default function Header({
     notificationApi
       .list()
       .then((items) => {
-        if (Array.isArray(items))
-          setUnreadCount(items.filter((n) => n.status !== "read").length);
+        if (Array.isArray(items)) {
+          const unread = items.filter((n) => !n.read_at && n.status !== "read");
+          setUnreadCount(unread.length);
+        }
       })
       .catch(() => {});
   }, [activeTab, patient, isAdmin, isDoctor]);
@@ -164,9 +166,15 @@ export default function Header({
             <span className="material-symbols-outlined !text-[#577877] text-xl">
               notifications
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-[#E5EEF1] text-[#185A4D] font-bold text-[11px]">
-              {unreadCount} new
-            </span>
+            {unreadCount > 0 ? (
+              <span className="px-2 py-0.5 rounded-full bg-[#25836F] text-white font-bold text-[11px]">
+                {unreadCount} new
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded-full bg-[#E5EEF1] text-[#577877] font-medium text-[11px]">
+                0 new
+              </span>
+            )}
           </button>
         )}
 
