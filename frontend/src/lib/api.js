@@ -250,6 +250,8 @@ export const notificationApi = {
   list: () => apiRequest("/patient/notifications"),
   markRead: (id) =>
     apiRequest(`/patient/notifications/${id}/read`, { method: "POST" }),
+  markAllRead: () =>
+    apiRequest("/patient/notifications/read-all", { method: "POST" }),
   retry: (id) =>
     apiRequest(`/patient/notifications/${id}/retry`, { method: "POST" }),
 };

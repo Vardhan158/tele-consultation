@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -30,6 +31,7 @@ def queue_patient_notification(
     session.add(notification)
     return notification
 
+
 async def ensure_patient_notification(
     *,
     tenant_id: str,
@@ -48,13 +50,20 @@ async def ensure_patient_notification(
     p_id_str = str(patient_id)
     now_dt = datetime.now(UTC)
 
-    query = {
+    # Idempotency check: query if notification already exists for tenant & event/appointment
+    query: dict[str, Any] = {
         "tenant_id": t_id_str,
-        "recipient_id": p_id_str,
         "event_type": event_type,
     }
     if appointment_id:
         query["appointment_id"] = str(appointment_id)
+    else:
+        query["recipient_id"] = p_id_str
+        query["subject"] = subject
+
+    existing = await database["notifications"].find_one(query)
+    if existing:
+        return  # Notification already exists (read or unread). Do NOT recreate!
 
     notification_id = str(uuid4())
     doc = {
@@ -73,22 +82,7 @@ async def ensure_patient_notification(
     if appointment_id:
         doc["appointment_id"] = str(appointment_id)
 
-    if appointment_id:
-        await database["notifications"].update_one(
-            query,
-            {"$setOnInsert": doc},
-            upsert=True,
-        )
-    else:
-        recent = await database["notifications"].find_one({
-            "tenant_id": t_id_str,
-            "recipient_id": p_id_str,
-            "event_type": event_type,
-            "subject": subject,
-            "body": body,
-        })
-        if not recent:
-            await database["notifications"].insert_one(dict(doc))
+    await database["notifications"].insert_one(dict(doc))
 
 
 async def ensure_doctor_appointment_notification(*, tenant_id: str, doctor_id: str, appointment: dict, patient_display_name: str) -> None:
