@@ -392,10 +392,6 @@ export default function LandingScreen({
       >
         <ScrollReveal animation="fade-up">
           <div className="flex flex-col items-center text-center max-w-2xl mx-auto space-y-3 mb-16">
-            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
-              <span className="size-2 rounded-full bg-[#1A7D67]"></span>
-              Simple 4-Step Process
-            </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
               How Kaizen Care Works
             </h2>
