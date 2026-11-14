@@ -154,8 +154,8 @@ export default function Navbar() {
           className="flex shrink-0 items-center gap-3 rounded-xl focus:outline-none"
         >
           <div
-            className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-xs transition-colors duration-300 ${
-              useSolidWhiteHeader ? "bg-[#1A7D67] text-white" : "bg-white text-[#1A7D67]"
+            className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-300 ${
+              useSolidWhiteHeader ? "bg-[#1A7D67] text-white shadow-xs" : "bg-transparent text-white"
             }`}
           >
             <svg
