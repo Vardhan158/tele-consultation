@@ -131,7 +131,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const fetchRecords = async () => {
     try {
       const items = await recordsApi.list();
-      if (Array.isArray(items) && items.length > 0) {
+      if (Array.isArray(items)) {
         setDbRecords(
           items.map((doc) => ({
             id: doc.id,
@@ -194,10 +194,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           : "other";
       if (!selectedFileObj) throw new Error("Choose a file before uploading.");
       await recordsApi.upload(selectedFileObj, cat);
-      setToastMessage(
-        `"${rawName}" uploaded securely to your medical records.`,
-      );
-      fetchRecords();
+      setToastMessage("Medical record uploaded successfully.");
+      await fetchRecords();
       setSelectedFileName("");
       setSelectedFileObj(null);
     } catch (err) {
@@ -229,6 +227,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+        setSelectedFileObj(null);
+        setSelectedFileName("");
+        setToastMessage("Invalid file type. Upload a PDF, JPG, or PNG.");
+        return;
+      }
       setSelectedFileObj(file);
       const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
       const nameWithMB = `${file.name} · ${sizeMB} MB`;

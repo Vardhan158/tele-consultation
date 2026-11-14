@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -17,7 +18,7 @@ from teleconsult.modules.records.patient_schemas import DocumentResponse
 
 router = APIRouter(prefix="/patient/documents", tags=["medical-records"])
 ALLOWED_TYPES = {"application/pdf", "image/jpeg", "image/png"}
-MAX_BYTES = 25_000_000
+MAX_BYTES = 10_000_000
 PRIVATE_ROOT = Path(__file__).resolve().parents[4] / "private_storage" / "records"
 
 
@@ -66,24 +67,32 @@ async def list_documents(
 async def upload_document(
     file: UploadFile = File(...),
     category: str = Form(...),
-    session: AsyncSession = Depends(tenant_session),
+    session: AsyncSession | None = Depends(records_session),
     principal: Principal = Depends(require("records:upload")),
 ) -> PatientDocument:
     content_type = file.content_type or "application/octet-stream"
     if content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=415, detail="File type is not supported")
-    await require_active_consent(session, UUID(principal.tenant_id), UUID(principal.user_id), {"medical_record_sharing", "share_records", "treatment"})
+    if session is not None:
+        await require_active_consent(session, UUID(principal.tenant_id), UUID(principal.user_id), {"medical_record_sharing", "share_records", "treatment"})
     safe_name = Path(file.filename or "record").name
     if Path(safe_name).suffix.lower() not in {".pdf", ".jpg", ".jpeg", ".png"}:
         raise HTTPException(status_code=415, detail="File extension is not supported")
     data = await file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
-        raise HTTPException(status_code=413, detail="File exceeds the 25 MB limit")
+        raise HTTPException(status_code=413, detail="File exceeds the 10 MB limit")
     document_id = uuid4()
     storage_key = f"{UUID(principal.tenant_id)}/{document_id}{Path(safe_name).suffix.lower()}"
     storage_path = PRIVATE_ROOT / storage_key
     storage_path.parent.mkdir(parents=True, exist_ok=True)
     storage_path.write_bytes(data)
+    if get_settings().mongodb_enabled:
+        now = datetime.now(UTC)
+        document = {"id": str(document_id), "tenant_id": principal.tenant_id, "patient_id": principal.user_id, "private_storage_key": storage_key, "status": "available", "released_to_patient": True, "category": category, "file_name": safe_name, "content_type": content_type, "size_bytes": len(data), "created_at": now, "released_at": now}
+        await mongo_database.database()["medical_records"].insert_one(document)
+        return DocumentResponse.model_validate(document)
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
     document = PatientDocument(
         id=document_id,
         tenant_id=UUID(principal.tenant_id),
@@ -104,7 +113,14 @@ async def upload_document(
 
 
 @router.get("/{document_id}/download")
-async def download_document(document_id: UUID, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("records:read"))):
+async def download_document(document_id: UUID, session: AsyncSession | None = Depends(records_session), principal: Principal = Depends(require("records:read"))):
+    if get_settings().mongodb_enabled:
+        document = await mongo_database.database()["medical_records"].find_one({"id": str(document_id), "tenant_id": principal.tenant_id, "patient_id": principal.user_id, "released_to_patient": True, "status": "available"})
+        if document is None: raise HTTPException(status_code=404, detail="Document not found")
+        path = (PRIVATE_ROOT / document["private_storage_key"]).resolve()
+        if PRIVATE_ROOT.resolve() not in path.parents or not path.is_file(): raise HTTPException(status_code=404, detail="Document content is unavailable")
+        return FileResponse(path, media_type=document["content_type"], filename=document["file_name"], content_disposition_type="inline")
+    if session is None: raise HTTPException(status_code=503, detail="No application database is configured")
     document = await session.scalar(select(PatientDocument).where(
         PatientDocument.id == document_id, PatientDocument.tenant_id == UUID(principal.tenant_id),
         PatientDocument.patient_id == UUID(principal.user_id), PatientDocument.released_to_patient.is_(True),
@@ -118,7 +134,15 @@ async def download_document(document_id: UUID, session: AsyncSession = Depends(t
 
 
 @router.delete("/{document_id}", status_code=204)
-async def delete_document(document_id: UUID, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("records:upload"))):
+async def delete_document(document_id: UUID, session: AsyncSession | None = Depends(records_session), principal: Principal = Depends(require("records:upload"))):
+    if get_settings().mongodb_enabled:
+        document = await mongo_database.database()["medical_records"].find_one({"id": str(document_id), "tenant_id": principal.tenant_id, "patient_id": principal.user_id})
+        if document is None: raise HTTPException(status_code=404, detail="Document not found")
+        path = PRIVATE_ROOT / document["private_storage_key"]
+        if path.is_file(): path.unlink()
+        await mongo_database.database()["medical_records"].delete_one({"id": str(document_id), "tenant_id": principal.tenant_id, "patient_id": principal.user_id})
+        return None
+    if session is None: raise HTTPException(status_code=503, detail="No application database is configured")
     document = await session.scalar(select(PatientDocument).where(
         PatientDocument.id == document_id, PatientDocument.tenant_id == UUID(principal.tenant_id),
         PatientDocument.patient_id == UUID(principal.user_id)))
