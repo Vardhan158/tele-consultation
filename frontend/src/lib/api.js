@@ -350,6 +350,17 @@ export const adminApi = {
   pendingDoctors: () => apiRequest("/doctor/pending"),
   approveDoctor: (id) => apiRequest(`/doctor/${id}/approve`, { method: "POST" }),
   rejectDoctor: (id) => apiRequest(`/doctor/${id}/reject`, { method: "POST" }),
+  downloadDoctorCredential: async (id, inline = false) => {
+    const response = await fetch(
+      `${API_BASE_URL}/doctor/${id}/credentials${inline ? "?inline=true" : ""}`,
+      { credentials: "include" },
+    );
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Credential document content is unavailable.");
+    }
+    return response.blob();
+  },
   uploadDoctorCredential: (id, file) => {
     const form = new FormData();
     form.append("credential_document", file);

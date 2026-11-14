@@ -288,8 +288,42 @@ export default function DoctorManagementTab() {
                     <div><strong>Filename:</strong> {selectedDoctor.credential_document.file_name}</div>
                     <div><strong>Uploaded:</strong> {selectedDoctor.credential_document.uploaded_at ? new Date(selectedDoctor.credential_document.uploaded_at).toLocaleString() : "Unknown"}</div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => window.open(`${API_BASE_URL}/doctor/${selectedDoctor.id}/credentials`, "_blank", "noopener,noreferrer")} className="rounded-lg bg-[#25836F] px-3 py-1.5 font-semibold text-white">Preview</button>
-                      <a href={`${API_BASE_URL}/doctor/${selectedDoctor.id}/credentials`} target="_blank" rel="noreferrer" className="rounded-lg border border-[#25836F]/30 bg-white px-3 py-1.5 font-semibold text-[#25836F]">Download</a>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const blob = await adminApi.downloadDoctorCredential(selectedDoctor.id, true);
+                            const url = URL.createObjectURL(blob);
+                            window.open(url, "_blank");
+                          } catch (err) {
+                            showToast(err.message || "Credential content is unavailable. Please re-upload.", "error");
+                          }
+                        }}
+                        className="rounded-lg bg-[#25836F] px-3 py-1.5 font-semibold text-white cursor-pointer"
+                      >
+                        Preview
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const blob = await adminApi.downloadDoctorCredential(selectedDoctor.id, false);
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement("a");
+                            link.href = url;
+                            link.download = selectedDoctor.credential_document?.file_name || "credential_document.pdf";
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          } catch (err) {
+                            showToast(err.message || "Credential content is unavailable. Please re-upload.", "error");
+                          }
+                        }}
+                        className="rounded-lg border border-[#25836F]/30 bg-white px-3 py-1.5 font-semibold text-[#25836F] cursor-pointer"
+                      >
+                        Download
+                      </button>
                     </div>
                   </div>
                 ) : <div className="text-[11px] text-[#577877]">Credential document not uploaded</div>}

@@ -169,6 +169,7 @@ async def register_doctor(
             credential_path = PRIVATE_CREDENTIAL_ROOT / tenant_id / f"{user_id}{CREDENTIAL_TYPES[content_type]}"
             credential_path.parent.mkdir(parents=True, exist_ok=True)
             credential_path.write_bytes(data)
+            file_b64 = base64.b64encode(data).decode('utf-8')
             credential_meta = {
                 "doctor_id": user_id,
                 "tenant_id": tenant_id,
@@ -177,6 +178,7 @@ async def register_doctor(
                 "file_name": filename,
                 "content_type": content_type,
                 "size_bytes": len(data),
+                "file_data_base64": file_b64,
                 "status": "pending_verification",
                 "created_at": now,
                 "uploaded_at": now,
@@ -367,16 +369,49 @@ async def get_doctor_credentials(doctor_id: str, request: Request):
     settings = get_settings()
     if not settings.mongodb_enabled:
         raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
-    document = await mongo_database.database()["doctor_credentials"].find_one({
+
+    db = mongo_database.database()
+    doctor = await db["doctors"].find_one({
         "tenant_id": settings.default_tenant_id,
-        "doctor_id": str(doctor_id),
+        "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+    })
+    doc_target_id = str(doctor.get("id") or doctor.get("user_id") or doctor_id) if doctor else str(doctor_id)
+
+    document = await db["doctor_credentials"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [{"doctor_id": doc_target_id}, {"doctor_id": str(doctor_id)}],
     })
     if not document:
         raise HTTPException(status_code=404, detail="Credential document not found")
-    path = (PRIVATE_CREDENTIAL_ROOT / document["storage_key"]).resolve()
-    if PRIVATE_CREDENTIAL_ROOT.resolve() not in path.parents or not path.is_file():
-        raise HTTPException(status_code=404, detail="Credential content is unavailable")
-    return FileResponse(path, media_type=document["content_type"], filename=document["file_name"], content_disposition_type="attachment")
+
+    file_bytes = None
+    path = (PRIVATE_CREDENTIAL_ROOT / document.get("storage_key", "")).resolve()
+    if PRIVATE_CREDENTIAL_ROOT.resolve() in path.parents and path.is_file():
+        file_bytes = path.read_bytes()
+    elif document.get("file_data_base64"):
+        try:
+            file_bytes = base64.b64decode(document["file_data_base64"])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(file_bytes)
+        except Exception:
+            pass
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=404,
+            detail="Credential content is unavailable. Please re-upload the clinician's credential document.",
+        )
+
+    is_inline = request.query_params.get("inline") == "true"
+    disposition = "inline" if is_inline else "attachment"
+    safe_filename = document.get("file_name", "credential_document.pdf")
+    content_type = document.get("content_type", "application/pdf")
+
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={"Content-Disposition": f'{disposition}; filename="{safe_filename}"'},
+    )
 
 
 @router.post("/{doctor_id}/credentials")
@@ -409,9 +444,23 @@ async def upload_doctor_credentials(doctor_id: str, request: Request):
     path = PRIVATE_CREDENTIAL_ROOT / settings.default_tenant_id / f"{doctor.get('id') or doctor.get('user_id')}{CREDENTIAL_TYPES[content_type]}"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
+    file_b64 = base64.b64encode(data).decode('utf-8')
+
     await db["doctor_credentials"].update_one(
-        {"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor.get("id") or doctor.get("user_id"))},
-        {"$set": {"registration_number": doctor.get("registration_number"), "storage_key": str(path.relative_to(PRIVATE_CREDENTIAL_ROOT)), "file_name": raw_name.name, "content_type": content_type, "size_bytes": len(data), "status": "pending_verification", "created_at": now, "uploaded_at": now, "uploaded_by": str(principal.user_id)}},
+        {"tenant_id": settings.default_tenant_id, "$or": [{"doctor_id": str(doctor.get("id"))}, {"doctor_id": str(doctor.get("user_id"))}, {"doctor_id": str(doctor_id)}]},
+        {"$set": {
+            "doctor_id": str(doctor.get("id") or doctor.get("user_id")),
+            "registration_number": doctor.get("registration_number"),
+            "storage_key": str(path.relative_to(PRIVATE_CREDENTIAL_ROOT)),
+            "file_name": raw_name.name,
+            "content_type": content_type,
+            "size_bytes": len(data),
+            "file_data_base64": file_b64,
+            "status": "pending_verification",
+            "created_at": now,
+            "uploaded_at": now,
+            "uploaded_by": str(principal.user_id),
+        }},
         upsert=True,
     )
     return {"status": "stored", "doctor_id": str(doctor.get("id") or doctor.get("user_id")), "file_name": raw_name.name, "uploaded_at": now, "approval_status": doctor.get("approval_status", "pending")}
