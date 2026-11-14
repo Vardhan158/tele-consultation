@@ -10,7 +10,6 @@ interface NavItem {
 const PUBLIC_NAV_LINKS: NavItem[] = [
   { label: "Home", path: "/" },
   { label: "Find Doctors", path: "/find-doctors" },
-  { label: "How It Works", path: "/how-it-works" },
   { label: "Services", path: "/#services", sectionId: "services" },
   { label: "About", path: "/#about", sectionId: "about" },
   { label: "FAQs", path: "/#faqs", sectionId: "faqs" },

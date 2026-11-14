@@ -19,7 +19,6 @@ import AuthScreen from "./components/auth/AuthScreen";
 import { authApi } from "./lib/api";
 import ServicesScreen from "./components/public/ServicesScreen";
 import LandingScreen from "./components/public/LandingScreen";
-import HowItWorksScreen from "./components/public/HowItWorksScreen";
 import AboutUsScreen from "./components/public/AboutUsScreen";
 import FaqsScreen from "./components/public/FaqsScreen";
 import ContactScreen from "./components/public/ContactScreen";
@@ -37,7 +36,6 @@ import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
 const PATH_TO_TAB = {
   "/dashboard": "dashboard",
   "/find-doctors": "find-doctors",
-  "/how-it-works": "how-it-works",
   "/about-us": "about-us",
   "/contact": "contact",
   "/appointments": "appointments",
@@ -142,7 +140,6 @@ export default function App() {
   if (authChecking) return null;
 
   if (location.pathname === "/services") return <ServicesScreen />;
-  if (location.pathname === "/how-it-works") return <HowItWorksScreen />;
   if (location.pathname === "/about" || location.pathname === "/about-us") return <AboutUsScreen />;
   if (location.pathname === "/faqs") return <FaqsScreen />;
   if (location.pathname === "/contact") return <ContactScreen />;

@@ -299,13 +299,16 @@ export default function LandingScreen({
                   <path d="m12 5 7 7-7 7"></path>
                 </svg>
               </button>
-              <button
-                type="button"
-                onClick={() => navigate("/how-it-works")}
+              <a
+                href="#how-it-works"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection("how-it-works");
+                }}
                 className="inline-flex items-center justify-center rounded-lg bg-white hover:bg-white/95 text-[#165849] text-sm sm:text-base font-medium px-6 py-3.5 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
               >
                 How It Works
-              </button>
+              </a>
             </div>
 
             {/* Factual Messaging & Security Proof */}
@@ -472,17 +475,6 @@ export default function LandingScreen({
               </div>
             </ScrollReveal>
           ))}
-        </div>
-
-        <div className="mt-12 text-center">
-          <button
-            type="button"
-            onClick={() => navigate("/how-it-works")}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#1A7D67]/30 bg-[#EEF6F3] px-5 py-2.5 text-sm font-bold text-[#1A7D67] hover:bg-[#1A7D67] hover:text-white transition duration-300 cursor-pointer shadow-xs"
-          >
-            <span>Explore Complete Care Journey Guide</span>
-            <span className="material-symbols-outlined text-lg">arrow_forward</span>
-          </button>
         </div>
       </section>
 
