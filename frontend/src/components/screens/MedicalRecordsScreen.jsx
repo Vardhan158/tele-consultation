@@ -120,6 +120,9 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const [dbRecords, setDbRecords] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
 
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -127,6 +130,46 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const [selectedFileObj, setSelectedFileObj] = useState(null);
   const [isTooLarge, setIsTooLarge] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Fetch actual document blob and manage object URL lifecycle for preview
+  useEffect(() => {
+    if (!previewRecord) {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      setPreviewError("");
+      setPreviewLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setPreviewLoading(true);
+    setPreviewError("");
+
+    recordsApi
+      .download(previewRecord.id)
+      .then((blob) => {
+        if (!isMounted) return;
+        const objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setPreviewError(err.message || "Failed to load document preview.");
+      })
+      .finally(() => {
+        if (isMounted) setPreviewLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+    };
+  }, [previewRecord?.id]);
 
   const fetchRecords = async () => {
     try {
@@ -136,6 +179,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           items.map((doc) => ({
             id: doc.id,
             name: doc.file_name || doc.title || "Document.pdf",
+            contentType: doc.content_type || "",
+            status: doc.status || "available",
             date: doc.created_at
               ? new Date(doc.created_at).toLocaleDateString("en-US", {
                   month: "short",
@@ -671,98 +716,145 @@ export default function MedicalRecordsScreen({ onNavigate }) {
       </div>
 
       {/* Record Preview Modal */}
-      {previewRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
-                  description
-                </span>
-                <h3 className="text-base font-bold text-[#162623]">
-                  {previewRecord.name}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewRecord(null)}
-                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7]"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
+      {previewRecord && (() => {
+        const isImage =
+          previewRecord.contentType?.startsWith("image/") ||
+          /\.(jpg|jpeg|png|gif|webp)$/i.test(previewRecord.name || "");
+        const isPdf =
+          previewRecord.contentType === "application/pdf" ||
+          /\.pdf$/i.test(previewRecord.name || "");
 
-            <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Date Uploaded:</span>
-                <span className="font-semibold text-[#162623]">
-                  {previewRecord.date}
-                </span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="material-symbols-outlined !text-[#25836F] text-2xl shrink-0">
+                    {isImage ? "image" : isPdf ? "picture_as_pdf" : "description"}
+                  </span>
+                  <h3 className="text-base font-bold text-[#162623] truncate" title={previewRecord.name}>
+                    {previewRecord.name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewRecord(null)}
+                  className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer shrink-0"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Added by:</span>
-                <span className="font-semibold text-[#162623]">
-                  {previewRecord.addedBy}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Category:</span>
-                <span className="font-semibold text-[#25836F]">
-                  {previewRecord.categoryDisplay}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">File Size:</span>
-                <span className="font-semibold text-[#162623]">
-                  {previewRecord.size}
-                </span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-[#577877]/15">
-                <span className="text-[#577877]">Encryption:</span>
-                <span className="font-semibold text-emerald-700">
-                  AES-256 Verified at rest
-                </span>
-              </div>
-            </div>
 
-            <div className="p-6 rounded-xl border border-dashed border-[#577877]/30 text-center space-y-2 bg-[#F8FAFB]">
-              <span className="material-symbols-outlined !text-[#25836F] text-4xl">
-                picture_as_pdf
-              </span>
-              <p className="text-xs font-semibold text-[#162623]">
-                Decrypted In-Memory Stream Active
-              </p>
-              <p className="text-[11px] text-[#577877]">
-                Encrypted with your patient vault key for clinical
-                teleconsultation review.
-              </p>
-            </div>
+              {/* Metadata Card */}
+              <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">Date Uploaded:</span>
+                  <span className="font-semibold text-[#162623]">
+                    {previewRecord.date}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">Added by:</span>
+                  <span className="font-semibold text-[#162623]">
+                    {previewRecord.addedBy}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">Category:</span>
+                  <span className="font-semibold text-[#25836F]">
+                    {previewRecord.categoryDisplay}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">File Size:</span>
+                  <span className="font-semibold text-[#162623]">
+                    {previewRecord.size}
+                  </span>
+                </div>
+                {(previewRecord.status === "available" || previewRecord.status === "released") && (
+                  <div className="flex justify-between pt-1 border-t border-[#577877]/15">
+                    <span className="text-[#577877]">Encryption:</span>
+                    <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">verified_user</span>
+                      <span>AES-256 Verified at rest</span>
+                    </span>
+                  </div>
+                )}
+              </div>
 
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setPreviewRecord(null)}
-                className="btn-secondary !py-2 !px-4 text-xs font-semibold"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleDownloadRecord(previewRecord);
-                  setPreviewRecord(null);
-                }}
-                className="btn-primary !py-2 !px-4 text-xs font-semibold flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-sm">
-                  download
-                </span>
-                <span>Download PDF</span>
-              </button>
+              {/* Document / Image / PDF Preview Area */}
+              {previewLoading ? (
+                <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-[#F8FAFB] border border-[#577877]/20 text-[#577877] space-y-2">
+                  <span className="material-symbols-outlined animate-spin text-3xl text-[#25836F]">
+                    sync
+                  </span>
+                  <p className="text-xs font-semibold text-[#162623]">
+                    Decrypting &amp; loading document preview…
+                  </p>
+                </div>
+              ) : previewError ? (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base text-rose-600">error</span>
+                  <span>{previewError || "Unable to display preview. Use Download Original to view the file."}</span>
+                </div>
+              ) : previewUrl && isImage ? (
+                <div className="rounded-xl overflow-hidden border border-[#577877]/20 bg-black/5 flex items-center justify-center p-2 max-h-72 sm:max-h-80">
+                  <img
+                    src={previewUrl}
+                    alt={previewRecord.name}
+                    className="max-h-68 sm:max-h-76 w-auto object-contain rounded-lg shadow-xs"
+                  />
+                </div>
+              ) : previewUrl && isPdf ? (
+                <div className="rounded-xl overflow-hidden border border-[#577877]/20 bg-white">
+                  <iframe
+                    src={previewUrl}
+                    title={previewRecord.name}
+                    className="w-full h-72 sm:h-80 border-0 rounded-xl"
+                  />
+                </div>
+              ) : (
+                <div className="p-6 rounded-xl border border-dashed border-[#577877]/30 text-center space-y-2 bg-[#F8FAFB]">
+                  <span className="material-symbols-outlined !text-[#25836F] text-4xl">
+                    description
+                  </span>
+                  <p className="text-xs font-semibold text-[#162623]">
+                    Decrypted File Stream Ready
+                  </p>
+                  <p className="text-[11px] text-[#577877]">
+                    Use Download Original to inspect this health record.
+                  </p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewRecord(null)}
+                  className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadRecord(previewRecord);
+                    setPreviewRecord(null);
+                  }}
+                  className="btn-primary !py-2 !px-4 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">
+                    download
+                  </span>
+                  <span>Download Original</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
