@@ -144,12 +144,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                 })
               : "Nov 4, 2026",
             addedBy:
-              doc.category === "imaging"
-                ? "Bayview Radiology"
-                : doc.file_name?.toLowerCase().includes("log") ||
-                    doc.file_name?.toLowerCase().includes("history")
-                  ? "You"
-                  : "Dr. Sarah Chen",
+              doc.uploaded_by ||
+              (doc.uploaded_by_role === "doctor"
+                ? "Dr. Sarah Chen"
+                : doc.category === "imaging"
+                  ? "Bayview Radiology"
+                  : "You"),
             category: doc.category?.toLowerCase().includes("lab")
               ? "Lab reports"
               : doc.category?.toLowerCase().includes("imaging")

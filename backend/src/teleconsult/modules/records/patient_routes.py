@@ -111,6 +111,8 @@ async def list_documents(
                     content_type=str(document.get("content_type", "application/octet-stream")),
                     size_bytes=int(document.get("size_bytes", 0)),
                     status=str(document.get("status", "available")),
+                    uploaded_by=str(document.get("uploaded_by") or "You"),
+                    uploaded_by_role=str(document.get("uploaded_by_role") or "patient"),
                     created_at=created_at_dt,
                     released_at=released_at_dt,
                 ))
@@ -166,6 +168,12 @@ async def upload_document(
     if get_settings().mongodb_enabled:
         now = datetime.now(UTC)
         now_iso = now.isoformat()
+        db = mongo_database.database()
+        user_doc = await db["users"].find_one({
+            "tenant_id": tenant_str,
+            "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}],
+        })
+        uploader_name = (user_doc or {}).get("full_name") or "You"
         document = {
             "id": str(document_id),
             "tenant_id": tenant_str,
@@ -177,10 +185,12 @@ async def upload_document(
             "file_name": safe_name,
             "content_type": content_type,
             "size_bytes": len(data),
+            "uploaded_by": uploader_name,
+            "uploaded_by_role": "patient",
             "created_at": now_iso,
             "released_at": now_iso,
         }
-        await mongo_database.database()["medical_records"].insert_one(dict(document))
+        await db["medical_records"].insert_one(dict(document))
         return DocumentResponse(
             id=document_id,
             category=category,
@@ -188,6 +198,8 @@ async def upload_document(
             content_type=content_type,
             size_bytes=len(data),
             status="available",
+            uploaded_by=uploader_name,
+            uploaded_by_role="patient",
             created_at=now,
             released_at=now,
         )
