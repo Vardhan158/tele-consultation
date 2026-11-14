@@ -11,9 +11,9 @@ const PUBLIC_NAV_LINKS: NavItem[] = [
   { label: "Home", path: "/" },
   { label: "Find Doctors", path: "/find-doctors" },
   { label: "How It Works", path: "/how-it-works" },
-  { label: "Services", path: "/services" },
-  { label: "About", path: "/about" },
-  { label: "FAQs", path: "/faqs" },
+  { label: "Services", path: "/#services", sectionId: "services" },
+  { label: "About", path: "/#about", sectionId: "about" },
+  { label: "FAQs", path: "/#faqs", sectionId: "faqs" },
 ];
 
 export default function Navbar() {
@@ -53,8 +53,6 @@ export default function Navbar() {
   }, [location.pathname, location.hash]);
 
   const handleLinkClick = (item: NavItem, e: React.MouseEvent) => {
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault();
     setOpen(false);
     if (item.sectionId) {
       if (location.pathname === "/") {
@@ -73,6 +71,9 @@ export default function Navbar() {
     }
   };
 
+  const isLightPage = ["/find-doctors", "/faqs", "/services"].includes(location.pathname);
+  const useSolidWhiteHeader = isScrolled || isLightPage;
+
   const getLinkClass = (item: NavItem) => {
     let isActive = false;
     if (item.path === "/" && location.pathname === "/" && !location.hash) {
@@ -83,7 +84,7 @@ export default function Navbar() {
       isActive = true;
     }
 
-    if (isScrolled) {
+    if (useSolidWhiteHeader) {
       return `rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
         isActive
           ? "bg-[#EEF6F3] text-[#1A7D67] font-bold"
@@ -106,9 +107,9 @@ export default function Navbar() {
   return (
     <header
       className={`fixed top-0 left-0 right-0 w-full z-50 select-none transition-all duration-300 ${
-        isScrolled
+        useSolidWhiteHeader
           ? "bg-white/95 backdrop-blur-md border-b border-[#577877]/15 shadow-xs"
-          : "bg-[#1A7D67] border-b border-white/10 shadow-none"
+          : "bg-transparent border-b border-transparent shadow-none"
       }`}
     >
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-6 py-3.5 lg:px-10">
@@ -120,7 +121,7 @@ export default function Navbar() {
         >
           <div
             className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-xs transition-colors duration-300 ${
-              isScrolled ? "bg-[#1A7D67] text-white" : "bg-white text-[#1A7D67]"
+              useSolidWhiteHeader ? "bg-[#1A7D67] text-white" : "bg-white text-[#1A7D67]"
             }`}
           >
             <svg
@@ -148,14 +149,14 @@ export default function Navbar() {
           <div>
             <p
               className={`text-lg font-bold leading-none tracking-tight transition-colors duration-300 ${
-                isScrolled ? "text-[#162623]" : "text-white"
+                useSolidWhiteHeader ? "text-[#162623]" : "text-white"
               }`}
             >
               Kaizen Care
             </p>
             <p
               className={`mt-0.5 text-[10px] font-semibold uppercase tracking-widest transition-colors duration-300 ${
-                isScrolled ? "text-[#577877]" : "text-white/80"
+                useSolidWhiteHeader ? "text-[#577877]" : "text-white/80"
               }`}
             >
               Telehealth Platform
@@ -170,7 +171,6 @@ export default function Navbar() {
               key={item.label}
               href={item.path}
               onClick={(e) => handleLinkClick(item, e)}
-              aria-current={!item.sectionId && location.pathname === item.path ? "page" : undefined}
               className={getLinkClass(item)}
             >
               {item.label}
@@ -184,7 +184,7 @@ export default function Navbar() {
             type="button"
             onClick={() => go("/doctor/register")}
             className={`rounded-lg px-2.5 py-2 text-xs font-semibold transition cursor-pointer ${
-              isScrolled
+              useSolidWhiteHeader
                 ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
                 : "text-white/90 hover:bg-white/10 hover:text-white"
             }`}
@@ -195,7 +195,7 @@ export default function Navbar() {
             type="button"
             onClick={() => go("/login")}
             className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold transition cursor-pointer ${
-              isScrolled
+              useSolidWhiteHeader
                 ? "border border-[#577877]/30 bg-white text-[#162623] hover:bg-[#F0F5F7]"
                 : "border border-white/40 bg-white/10 text-white hover:bg-white/20 backdrop-blur-xs"
             }`}
@@ -206,7 +206,7 @@ export default function Navbar() {
             type="button"
             onClick={() => go("/find-doctors")}
             className={`inline-flex items-center justify-center rounded-xl px-4.5 py-2 text-xs font-bold transition cursor-pointer shadow-xs ${
-              isScrolled
+              useSolidWhiteHeader
                 ? "bg-[#1A7D67] hover:bg-[#156654] text-white"
                 : "bg-white hover:bg-white/90 text-[#1A7D67]"
             }`}
@@ -222,8 +222,8 @@ export default function Navbar() {
           aria-expanded={open}
           aria-controls="public-mobile-navigation"
           onClick={() => setOpen((prev) => !prev)}
-          className={`rounded-lg p-2 transition xl:hidden cursor-pointer ${
-            isScrolled
+          className={`rounded-lg p-2 transition lg:hidden cursor-pointer ${
+            useSolidWhiteHeader
               ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
               : "text-white hover:bg-white/10"
           }`}
@@ -238,8 +238,8 @@ export default function Navbar() {
       {open && (
         <div
           id="public-mobile-navigation"
-          className={`border-t px-6 py-4 xl:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
-            isScrolled
+          className={`border-t px-6 py-4 lg:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+            useSolidWhiteHeader
               ? "border-[#577877]/15 bg-white text-[#162623]"
               : "border-white/10 bg-[#1A7D67] text-white"
           }`}
@@ -250,8 +250,7 @@ export default function Navbar() {
                 key={item.label}
                 href={item.path}
                 onClick={(e) => handleLinkClick(item, e)}
-                aria-current={!item.sectionId && location.pathname === item.path ? "page" : undefined}
-              className={getLinkClass(item)}
+                className={getLinkClass(item)}
               >
                 {item.label}
               </a>
@@ -260,7 +259,7 @@ export default function Navbar() {
               type="button"
               onClick={() => go("/doctor/register")}
               className={`rounded-lg px-3 py-2 text-left text-sm font-semibold cursor-pointer ${
-                isScrolled
+                useSolidWhiteHeader
                   ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
                   : "text-white/90 hover:bg-white/10"
               }`}
@@ -269,14 +268,14 @@ export default function Navbar() {
             </button>
             <div
               className={`mt-3 flex gap-2 border-t pt-4 ${
-                isScrolled ? "border-[#577877]/15" : "border-white/10"
+                useSolidWhiteHeader ? "border-[#577877]/15" : "border-white/10"
               }`}
             >
               <button
                 type="button"
                 onClick={() => go("/login")}
                 className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold cursor-pointer ${
-                  isScrolled
+                  useSolidWhiteHeader
                     ? "border border-[#577877]/30 bg-white text-[#162623]"
                     : "border border-white/40 bg-white/10 text-white"
                 }`}
@@ -287,7 +286,7 @@ export default function Navbar() {
                 type="button"
                 onClick={() => go("/find-doctors")}
                 className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold cursor-pointer ${
-                  isScrolled
+                  useSolidWhiteHeader
                     ? "bg-[#1A7D67] text-white"
                     : "bg-white text-[#1A7D67]"
                 }`}
