@@ -61,7 +61,9 @@ async def expire_pending_payment(database: Any, *, tenant_id: str, appointment_i
         "payment_status": {"$in": ["pending", "pending_payment", "failed"]},
         "$or": [
             {"payment_deadline_at": {"$lte": now.isoformat()}},
-            {"payment_deadline_at": {"$exists": False}, "ends_at": {"$lte": now.isoformat()}},
+            # Legacy bookings did not persist a deadline or end time; once their
+            # scheduled start has passed they are no longer payable.
+            {"payment_deadline_at": {"$exists": False}, "starts_at": {"$lte": now.isoformat()}},
         ],
     }
     if appointment_id is not None:
