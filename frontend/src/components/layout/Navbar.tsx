@@ -87,8 +87,8 @@ export default function Navbar() {
     if (useSolidWhiteHeader) {
       return `rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
         isActive
-          ? "bg-[#EEF6F3] text-[#1A7D67] font-bold"
-          : "text-[#577877] hover:bg-[#F0F5F7] hover:text-[#162623]"
+          ? "bg-[#EEF6F3]/90 text-[#1A7D67] font-bold"
+          : "text-[#577877] hover:bg-[#F0F5F7]/80 hover:text-[#162623]"
       }`;
     }
 
@@ -108,7 +108,7 @@ export default function Navbar() {
     <header
       className={`fixed top-0 left-0 right-0 w-full z-50 select-none transition-all duration-300 ${
         useSolidWhiteHeader
-          ? "bg-white/95 backdrop-blur-md border-b border-[#577877]/15 shadow-xs"
+          ? "bg-white/80 backdrop-blur-xl backdrop-saturate-150 border-b border-white/60 shadow-[0_4px_25px_rgba(22,38,35,0.08)]"
           : "bg-transparent border-b border-transparent shadow-none"
       }`}
     >
@@ -196,7 +196,7 @@ export default function Navbar() {
             onClick={() => go("/login")}
             className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold transition cursor-pointer ${
               useSolidWhiteHeader
-                ? "border border-[#577877]/30 bg-white text-[#162623] hover:bg-[#F0F5F7]"
+                ? "border border-[#577877]/30 bg-white/90 hover:bg-white text-[#162623]"
                 : "border border-white/40 bg-white/10 text-white hover:bg-white/20 backdrop-blur-xs"
             }`}
           >
@@ -240,8 +240,8 @@ export default function Navbar() {
           id="public-mobile-navigation"
           className={`border-t px-6 py-4 lg:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
             useSolidWhiteHeader
-              ? "border-[#577877]/15 bg-white text-[#162623]"
-              : "border-white/10 bg-[#1A7D67] text-white"
+              ? "border-white/40 bg-white/90 backdrop-blur-xl text-[#162623]"
+              : "border-white/10 bg-[#1A7D67]/95 backdrop-blur-xl text-white"
           }`}
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1.5">
