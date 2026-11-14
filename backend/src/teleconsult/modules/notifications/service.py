@@ -30,6 +30,66 @@ def queue_patient_notification(
     session.add(notification)
     return notification
 
+async def ensure_patient_notification(
+    *,
+    tenant_id: str,
+    patient_id: str,
+    event_type: str,
+    subject: str,
+    body: str,
+    appointment_id: str | None = None,
+    channel: str = "in_app",
+) -> None:
+    """Persist an in-app notification document for a patient in MongoDB idempotently."""
+    if not mongo_database.enabled:
+        return
+    database = mongo_database.database()
+    t_id_str = str(tenant_id)
+    p_id_str = str(patient_id)
+    now_dt = datetime.now(UTC)
+
+    query = {
+        "tenant_id": t_id_str,
+        "recipient_id": p_id_str,
+        "event_type": event_type,
+    }
+    if appointment_id:
+        query["appointment_id"] = str(appointment_id)
+
+    notification_id = str(uuid4())
+    doc = {
+        "id": notification_id,
+        "tenant_id": t_id_str,
+        "recipient_id": p_id_str,
+        "patient_id": p_id_str,
+        "event_type": event_type,
+        "subject": subject,
+        "body": body,
+        "channel": channel,
+        "status": "queued",
+        "read_at": None,
+        "created_at": now_dt.isoformat(),
+    }
+    if appointment_id:
+        doc["appointment_id"] = str(appointment_id)
+
+    if appointment_id:
+        await database["notifications"].update_one(
+            query,
+            {"$setOnInsert": doc},
+            upsert=True,
+        )
+    else:
+        recent = await database["notifications"].find_one({
+            "tenant_id": t_id_str,
+            "recipient_id": p_id_str,
+            "event_type": event_type,
+            "subject": subject,
+            "body": body,
+        })
+        if not recent:
+            await database["notifications"].insert_one(dict(doc))
+
 
 async def ensure_doctor_appointment_notification(*, tenant_id: str, doctor_id: str, appointment: dict, patient_display_name: str) -> None:
     """Persist exactly one doctor notification for a confirmed appointment."""

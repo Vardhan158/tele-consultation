@@ -18,7 +18,7 @@ from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.notifications.service import ensure_doctor_appointment_notification, queue_patient_notification
+from teleconsult.modules.notifications.service import ensure_doctor_appointment_notification, ensure_patient_notification, queue_patient_notification
 from teleconsult.modules.patient_portal.models import Appointment, Doctor
 from teleconsult.modules.patient_portal.appointment_access import expire_pending_payment
 from teleconsult.modules.payments.models import PaymentTransaction
@@ -585,6 +585,39 @@ async def verify_razorpay_payment(
     patient = await db["patients"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": appointment.get("patient_id")} , {"user_id": appointment.get("patient_id")}]}) if appointment else None
     if appointment and doctor:
         await ensure_doctor_appointment_notification(tenant_id=principal.tenant_id, doctor_id=str(doctor.get("user_account_id") or doctor.get("user_id") or doctor.get("id")), appointment=appointment, patient_display_name=str((patient or {}).get("full_name") or "Patient"))
+
+        # Queue patient in-app notifications idempotently
+        doc_name = doctor.get("full_name") or "your clinician"
+        fee_paise = payment.get("amount_paise") or payment.get("amount") or 0
+        fee_str = f"₹{(fee_paise / 100.0):.2f}" if fee_paise else "payment"
+
+        raw_start = appointment.get("starts_at")
+        time_str = "the scheduled time"
+        if raw_start:
+            try:
+                start_dt = raw_start if isinstance(raw_start, datetime) else datetime.fromisoformat(str(raw_start).replace("Z", "+00:00"))
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=UTC)
+                time_str = start_dt.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%b %d, %Y at %I:%M %p IST")
+            except (ValueError, TypeError):
+                time_str = str(raw_start)
+
+        await ensure_patient_notification(
+            tenant_id=principal.tenant_id,
+            patient_id=principal.user_id,
+            event_type="appointment_confirmed",
+            subject="Appointment Booking Confirmed",
+            body=f"Your appointment with {doc_name} for {time_str} is booked and confirmed.",
+            appointment_id=str(appointment.get("id")),
+        )
+        await ensure_patient_notification(
+            tenant_id=principal.tenant_id,
+            patient_id=principal.user_id,
+            event_type="payment_success",
+            subject="Payment Verified",
+            body=f"Your payment of {fee_str} for appointment {appointment.get('id')} was successfully verified.",
+            appointment_id=str(appointment.get("id")),
+        )
 
     # Mark Doctor Availability Slot Booked
     doctor_id = payment.get("doctor_id")
