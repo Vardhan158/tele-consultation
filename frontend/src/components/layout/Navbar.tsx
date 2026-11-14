@@ -120,7 +120,7 @@ export default function Navbar() {
         key={item.label}
         href={item.path}
         onClick={(e) => handleLinkClick(item, e)}
-        className={`group relative rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-300 cursor-pointer ${baseText}`}
+        className={`group relative rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors duration-300 cursor-pointer ${baseText}`}
       >
         <span>{item.label}</span>
         {/* Cinematic Animated Underline */}
@@ -146,7 +146,7 @@ export default function Navbar() {
           : "bg-transparent border-b border-transparent shadow-none"
       }`}
     >
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-6 py-3.5 lg:px-10">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-6 sm:px-8 py-4.5 lg:px-12">
         {/* Brand Logo */}
         <NavLink
           to="/"
