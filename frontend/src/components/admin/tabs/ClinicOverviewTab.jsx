@@ -87,9 +87,9 @@ export default function ClinicOverviewTab({ onSelectTab }) {
       </div>
 
       {/* System Alerts & Recent Activity Feed */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 items-start">
         {/* Alerts & System Status */}
-        <div className="care-card p-6 space-y-4 min-w-0 flex flex-col">
+        <div className="care-card p-6 space-y-4 min-w-0">
           <div className="flex items-center justify-between border-b border-[#577877]/15 pb-3">
             <h2 className="text-base font-bold text-[#162623] flex items-center gap-2">
               <span className="material-symbols-outlined text-amber-500">warning</span>
@@ -97,7 +97,7 @@ export default function ClinicOverviewTab({ onSelectTab }) {
             </h2>
             <span className="text-xs text-[#577877]">Live feed</span>
           </div>
-          <div className="space-y-3 flex-1">
+          <div className="space-y-3">
             {alerts.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[#577877]/20 bg-[#F0F5F7] p-3 text-xs text-[#577877] text-center font-medium">
                 No active operational alerts. System functioning normally.
