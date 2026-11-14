@@ -730,6 +730,15 @@ async def book_appointment(
     )
 
 
+def _to_int(val: Any) -> int | None:
+    if val is None:
+        return None
+    try:
+        return int(float(val))
+    except (ValueError, TypeError):
+        return None
+
+
 def _to_uuid(val: Any) -> UUID:
     if isinstance(val, UUID):
         return val
@@ -762,85 +771,92 @@ async def list_appointments(
 ) -> list[AppointmentResponse]:
     if get_settings().mongodb_enabled:
         database = mongo_database.database()
-        clinic_settings = await database["clinic_settings"].find_one({"tenant_id": principal.tenant_id})
+        clinic_settings = await database["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
         clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
 
         cursor = database["appointments"].find({
-            "tenant_id": principal.tenant_id,
+            "tenant_id": str(principal.tenant_id),
             "$or": [
-                {"patient_id": principal.user_id},
                 {"patient_id": str(principal.user_id)},
+                {"patient_id": principal.user_id},
             ],
         }).sort("starts_at", -1)
 
         documents = await cursor.to_list(500)
         results = []
         for appointment in documents:
-            doctor_id_raw = appointment.get("doctor_id")
-            doctor = None
-            if doctor_id_raw:
-                doctor = await database["doctors"].find_one({
-                    "tenant_id": principal.tenant_id,
-                    "$or": [{"id": str(doctor_id_raw)}, {"user_id": str(doctor_id_raw)}],
-                })
+            try:
+                doctor_id_raw = appointment.get("doctor_id")
+                doctor = None
+                if doctor_id_raw:
+                    doctor = await database["doctors"].find_one({
+                        "tenant_id": str(principal.tenant_id),
+                        "$or": [{"id": str(doctor_id_raw)}, {"user_id": str(doctor_id_raw)}, {"user_account_id": str(doctor_id_raw)}],
+                    })
 
-            doctor_response = None
-            if doctor:
-                doc_fee = doctor.get("fee_paise")
-                doctor_response = DoctorResponse(
-                    id=_to_uuid(doctor.get("id") or doctor.get("user_id")),
-                    full_name=doctor.get("full_name", ""),
-                    specialty=doctor.get("specialty", ""),
-                    clinic_name=doctor.get("clinic_name", ""),
-                    fee_paise=int(doc_fee) if doc_fee is not None else None,
-                    timezone=doctor.get("timezone") or clinic_timezone,
-                    supported_languages=doctor.get("supported_languages") or [],
-                    registration_number=doctor.get("registration_number"),
+                doctor_response = None
+                if doctor:
+                    doc_fee = _to_int(doctor.get("fee_paise"))
+                    doctor_response = DoctorResponse(
+                        id=_to_uuid(doctor.get("id") or doctor.get("user_id") or doctor_id_raw),
+                        full_name=str(doctor.get("full_name") or "Doctor"),
+                        specialty=str(doctor.get("specialty") or "General Specialist"),
+                        clinic_name=str(doctor.get("clinic_name") or "Kaizen Care Telehealth Center"),
+                        fee_paise=doc_fee,
+                        timezone=str(doctor.get("timezone") or clinic_timezone),
+                        supported_languages=doctor.get("supported_languages") if isinstance(doctor.get("supported_languages"), list) else ["English"],
+                        registration_number=doctor.get("registration_number"),
+                    )
+
+                starts_at_dt = _parse_datetime(appointment.get("starts_at"))
+                ends_at_val = appointment.get("ends_at")
+                if ends_at_val:
+                    ends_at_dt = _parse_datetime(ends_at_val)
+                else:
+                    dur = _to_int(appointment.get("duration_minutes")) or 30
+                    ends_at_dt = starts_at_dt + timedelta(minutes=dur)
+
+                fee_paise = _to_int(appointment.get("fee_paise"))
+                base_fee_paise = _to_int(appointment.get("base_fee_paise"))
+                platform_fee_paise = _to_int(appointment.get("platform_fee_paise"))
+
+                apt_id_str = str(appointment.get("id") or appointment.get("_id") or "")
+                payment_cursor = database["payments"].find({
+                    "tenant_id": str(principal.tenant_id),
+                    "appointment_id": apt_id_str,
+                }).sort("created_at", -1).limit(1)
+                payments = await payment_cursor.to_list(1)
+                payment = payments[0] if payments else None
+
+                if payment:
+                    fee_paise = fee_paise or _to_int(payment.get("amount_paise") or payment.get("amount"))
+                    base_fee_paise = base_fee_paise if base_fee_paise is not None else _to_int(payment.get("base_fee_paise"))
+                    platform_fee_paise = platform_fee_paise if platform_fee_paise is not None else _to_int(payment.get("platform_fee_paise"))
+
+                total_payable_paise = fee_paise or (
+                    (base_fee_paise or 0) + (platform_fee_paise or 0) if base_fee_paise is not None else None
                 )
+                payment_status = str(payment.get("status") if payment else appointment.get("payment_status", "pending"))
 
-            starts_at_dt = _parse_datetime(appointment.get("starts_at"))
-            ends_at_val = appointment.get("ends_at")
-            if ends_at_val:
-                ends_at_dt = _parse_datetime(ends_at_val)
-            else:
-                dur = int(appointment.get("duration_minutes", 30))
-                ends_at_dt = starts_at_dt + timedelta(minutes=dur)
+                results.append(AppointmentResponse(
+                    id=_to_uuid(apt_id_str or str(uuid4())),
+                    doctor_id=_to_uuid(doctor_id_raw or principal.user_id),
+                    patient_id=_to_uuid(appointment.get("patient_id") or principal.user_id),
+                    starts_at=starts_at_dt,
+                    ends_at=ends_at_dt,
+                    status=str(appointment.get("status", "confirmed")),
+                    payment_status=payment_status,
+                    base_fee_paise=base_fee_paise,
+                    platform_fee_paise=platform_fee_paise,
+                    total_payable_paise=total_payable_paise,
+                    currency=str(appointment.get("currency") or (payment.get("currency") if payment else "INR")),
+                    doctor=doctor_response,
+                ))
+            except Exception as exc:
+                import logging
+                logging.getLogger("teleconsult.portal").exception(f"Error parsing appointment item: {exc}")
+                continue
 
-            fee_paise = appointment.get("fee_paise")
-            base_fee_paise = appointment.get("base_fee_paise")
-            platform_fee_paise = appointment.get("platform_fee_paise")
-
-            payment_cursor = database["payments"].find({
-                "tenant_id": principal.tenant_id,
-                "appointment_id": appointment.get("id"),
-            }).sort("created_at", -1).limit(1)
-            payments = await payment_cursor.to_list(1)
-            payment = payments[0] if payments else None
-
-            if payment:
-                fee_paise = fee_paise or payment.get("amount_paise")
-                base_fee_paise = base_fee_paise if base_fee_paise is not None else payment.get("base_fee_paise")
-                platform_fee_paise = platform_fee_paise if platform_fee_paise is not None else payment.get("platform_fee_paise")
-
-            total_payable_paise = fee_paise or (
-                (base_fee_paise or 0) + (platform_fee_paise or 0) if base_fee_paise is not None else None
-            )
-            payment_status = payment.get("status") if payment else appointment.get("payment_status", "pending")
-
-            results.append(AppointmentResponse(
-                id=_to_uuid(appointment.get("id")),
-                doctor_id=_to_uuid(doctor_id_raw) if doctor_id_raw else _to_uuid(principal.user_id),
-                patient_id=_to_uuid(appointment.get("patient_id")),
-                starts_at=starts_at_dt,
-                ends_at=ends_at_dt,
-                status=appointment.get("status", "confirmed"),
-                payment_status=payment_status,
-                base_fee_paise=base_fee_paise,
-                platform_fee_paise=platform_fee_paise,
-                total_payable_paise=total_payable_paise,
-                currency=appointment.get("currency") or (payment.get("currency") if payment else "INR"),
-                doctor=doctor_response,
-            ))
         return results
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
