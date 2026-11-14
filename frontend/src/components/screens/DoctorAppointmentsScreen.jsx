@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { doctorApi } from "../../lib/api";
+import { CLINICAL_NOTE_FIELDS, emptyClinicalNote, parseClinicalNote, serializeClinicalNote } from "../../lib/clinicalNotes";
 
 function formatPaymentLabel(raw) {
   const p = (raw || "").toLowerCase();
@@ -30,7 +31,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
   const [items, setItems] = useState(null);
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState(null);
-  const [noteText, setNoteText] = useState("");
+  const [noteFields, setNoteFields] = useState(emptyClinicalNote);
   const [amendments, setAmendments] = useState([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -60,8 +61,8 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
   const saveDraft = async () => {
     try {
       const result = selected.note_id
-        ? await doctorApi.updateNote(selected.note_id, noteText)
-        : await doctorApi.saveNote(selected.id, noteText);
+        ? await doctorApi.updateNote(selected.note_id, serializeClinicalNote(noteFields))
+        : await doctorApi.saveNote(selected.id, serializeClinicalNote(noteFields));
       setSelected({ ...selected, note_id: result.id, note_status: "draft" });
       setMessage("Draft saved successfully.");
     } catch (err) {
@@ -81,7 +82,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
 
   const amend = async () => {
     try {
-      await doctorApi.amendNote(selected.note_id, noteText);
+      await doctorApi.amendNote(selected.note_id, serializeClinicalNote(noteFields));
       const history = await doctorApi.amendments(selected.note_id);
       setAmendments(history);
       setMessage("Amendment recorded.");
@@ -95,7 +96,7 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
       const notes = await doctorApi.notes(item.id);
       const note = Array.isArray(notes) ? notes[0] : null;
       setSelected({ ...item, note_id: note?.id, note_status: note?.status });
-      setNoteText(note?.content_reference || "");
+      setNoteFields(parseClinicalNote(note?.content_reference || ""));
       setAmendments(
         note?.status === "finalized" ? await doctorApi.amendments(note.id) : [],
       );
@@ -249,18 +250,26 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
             </button>
           </div>
 
-          <textarea
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            className="w-full min-h-32 rounded-xl border border-[#577877]/25 p-3 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
-            placeholder="Document consultation findings, diagnosis, and prescription details..."
-          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {CLINICAL_NOTE_FIELDS.map(([key, label]) => (
+              <label key={key} className="text-xs font-semibold text-[#162623]">
+                {label}
+                <textarea
+                  value={noteFields[key]}
+                  onChange={(e) => setNoteFields({ ...noteFields, [key]: e.target.value })}
+                  rows={key === "findings" || key === "treatmentPlan" || key === "prescription" ? 4 : 3}
+                  className="mt-1.5 w-full rounded-xl border border-[#577877]/25 p-3 text-xs font-normal text-[#162623] focus:border-[#25836F] focus:outline-none"
+                  placeholder={`Enter ${label.toLowerCase()}...`}
+                />
+              </label>
+            ))}
+          </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {selected.note_status !== "finalized" && (
               <button
                 type="button"
-                disabled={!noteText.trim()}
+                disabled={!Object.values(noteFields).some((value) => value.trim())}
                 onClick={saveDraft}
                 className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
               >
