@@ -39,8 +39,27 @@ const basePermissionsList = [
   },
 ];
 
+const formatConsentTitle = (consentType) => {
+  if (!consentType) return "Consent Directive";
+  const typeLower = String(consentType).toLowerCase();
+  if (typeLower === "registration_terms") return "Registration Terms & Portal Policies";
+  if (typeLower === "treatment" || typeLower === "telehealth") return "Telehealth Care Consent";
+  if (typeLower === "medical_record_sharing" || typeLower === "share_records") return "Share Records with Care Team";
+  if (typeLower === "reminders") return "Appointment & Follow-up Reminders";
+  if (typeLower === "communication_preferences" || typeLower === "news") return "Communication Preferences & Updates";
+  if (typeLower === "research") return "Optional Health Research";
+  return consentType.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+};
+
 export default function ConsentScreen({ onNavigate }) {
-  const [permissions, setPermissions] = useState([]);
+  const [permissions, setPermissions] = useState(() =>
+    basePermissionsList.map((perm) => ({
+      ...perm,
+      dbId: null,
+      granted: perm.required || perm.id === "medical_record_sharing" || perm.id === "reminders",
+      statusText: perm.required || perm.id === "medical_record_sharing" || perm.id === "reminders" ? "Granted" : "Not granted",
+    }))
+  );
   const [activity, setActivity] = useState([]);
   const [lastSaved, setLastSaved] = useState("Checking saved directives...");
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -95,11 +114,11 @@ export default function ConsentScreen({ onNavigate }) {
           setLastSaved("Default Preferences");
         }
 
-        // Map Audit History Table
+        // Map Audit History Table with formatted titles
         const auditItems = items.map((c, idx) => {
           const dt = new Date(c.granted_at || Date.now());
           const matchPerm = basePermissionsList.find(p => p.id === c.consent_type || (p.id === "telehealth" && c.consent_type === "treatment"));
-          const title = matchPerm ? matchPerm.title : c.consent_type;
+          const title = matchPerm ? matchPerm.title : formatConsentTitle(c.consent_type);
           return {
             id: c.id || `act-${idx}`,
             permission: title,
