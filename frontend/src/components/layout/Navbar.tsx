@@ -87,15 +87,15 @@ export default function Navbar() {
     if (useSolidWhiteHeader) {
       return `rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
         isActive
-          ? "bg-[#EEF6F3]/90 text-[#1A7D67] font-bold"
-          : "text-[#577877] hover:bg-[#F0F5F7]/80 hover:text-[#162623]"
+          ? "bg-[#EEF6F3]/90 text-[#1A7D67] font-bold underline underline-offset-4 decoration-2 decoration-[#1A7D67]"
+          : "text-[#577877] hover:text-[#162623] hover:underline underline-offset-4 decoration-2 decoration-[#1A7D67] hover:bg-[#F0F5F7]/80"
       }`;
     }
 
     return `rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
       isActive
-        ? "bg-white/20 text-white font-bold backdrop-blur-xs"
-        : "text-white/85 hover:bg-white/10 hover:text-white"
+        ? "bg-white/20 text-white font-bold backdrop-blur-xs underline underline-offset-4 decoration-2 decoration-white"
+        : "text-white/85 hover:text-white hover:underline underline-offset-4 decoration-2 decoration-white hover:bg-white/10"
     }`;
   };
 
@@ -185,8 +185,8 @@ export default function Navbar() {
             onClick={() => go("/doctor/register")}
             className={`rounded-lg px-2.5 py-2 text-xs font-semibold transition cursor-pointer ${
               useSolidWhiteHeader
-                ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
-                : "text-white/90 hover:bg-white/10 hover:text-white"
+                ? "text-[#1A7D67] hover:underline underline-offset-4 decoration-2 decoration-[#1A7D67] hover:bg-[#EEF6F3]"
+                : "text-white/90 hover:text-white hover:underline underline-offset-4 decoration-2 decoration-white hover:bg-white/10"
             }`}
           >
             Clinician Registration
