@@ -442,12 +442,57 @@ async def save_note(appointment_id: UUID, payload: NotePayload, session: AsyncSe
 
 
 @router.get("/appointments/{appointment_id}/notes")
-async def appointment_notes(appointment_id: UUID, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinical:read"))):
+async def appointment_notes(appointment_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:read"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doctor = await db["doctors"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [
+                {"id": str(principal.user_id)},
+                {"user_id": str(principal.user_id)},
+                {"user_account_id": str(principal.user_id)},
+            ],
+        })
+        if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+
+        appointment = await db["appointments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": str(doctor.get("id")),
+            "id": str(appointment_id),
+        })
+        if appointment is None:
+            raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
+
+        notes = await db["clinical_notes"].find({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": str(doctor.get("id")),
+            "$or": [
+                {"consultation_id": str(appointment_id)},
+                {"appointment_id": str(appointment_id)},
+            ],
+        }).sort("created_at", -1).to_list(100)
+        return [
+            {
+                "id": item.get("id") or str(item.get("_id")),
+                "status": item.get("status", "draft"),
+                "content_reference": item.get("content_reference") or item.get("content", ""),
+                "created_at": item.get("created_at"),
+            }
+            for item in notes
+        ]
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
+    try:
+        appointment_uuid = UUID(appointment_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Authorized clinical encounter not found") from exc
     doctor = await _doctor(session, principal)
-    appointment = await session.scalar(select(Appointment).where(Appointment.id == appointment_id, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id))
+    appointment = await session.scalar(select(Appointment).where(Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id))
     if appointment is None:
         raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
-    notes = await session.scalars(select(ClinicalNote).where(ClinicalNote.consultation_id == appointment_id, ClinicalNote.doctor_id == doctor.id).order_by(ClinicalNote.created_at.desc()))
+    notes = await session.scalars(select(ClinicalNote).where(ClinicalNote.consultation_id == appointment_uuid, ClinicalNote.doctor_id == doctor.id).order_by(ClinicalNote.created_at.desc()))
     return [{"id": note.id, "status": note.status, "content_reference": note.content_reference, "created_at": note.created_at} for note in notes]
 
 @router.patch("/notes/{note_id}")

@@ -120,6 +120,28 @@ async def test_payment_information_agrees_between_portals(portal):
     assert patient.payment_status == doctor["raw_payment_status"] == "refunded"
 
 
+async def test_mongodb_doctor_notes_support_legacy_appointment_id(portal, monkeypatch):
+    from teleconsult.modules.consultation import doctor_routes
+
+    rows, _ = portal
+    rows["clinical_notes"] = [{
+        "id": "note-1",
+        "tenant_id": "1",
+        "doctor_id": DOCTOR,
+        "appointment_id": "apt-45bde4b19136",
+        "status": "draft",
+        "content_reference": "Follow up",
+        "created_at": "2026-11-16T04:30:00Z",
+    }]
+    db = {key: Collection(value) for key, value in rows.items()}
+    monkeypatch.setattr(doctor_routes.mongo_database, "database", lambda: db)
+    monkeypatch.setattr(doctor_routes, "get_settings", lambda: SimpleNamespace(mongodb_enabled=True))
+    principal = Principal(DOCTOR, "1", frozenset({"doctor"}), frozenset({"clinical:read"}))
+    assert await doctor_routes.appointment_notes("apt-45bde4b19136", None, principal) == [{
+        "id": "note-1", "status": "draft", "content_reference": "Follow up", "created_at": "2026-11-16T04:30:00Z",
+    }]
+
+
 @pytest.mark.parametrize("change", [{"id": "missing"}, {"patient_id": "other"}, {"tenant_id": "2"}])
 async def test_join_not_found_never_creates_appointment(portal, change):
     rows, principal = portal
