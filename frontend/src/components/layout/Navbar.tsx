@@ -154,13 +154,6 @@ export default function Navbar() {
             >
               Kaizen Care
             </p>
-            <p
-              className={`mt-0.5 text-[10px] font-semibold uppercase tracking-widest transition-colors duration-300 ${
-                useSolidWhiteHeader ? "text-[#577877]" : "text-white/80"
-              }`}
-            >
-              Telehealth Platform
-            </p>
           </div>
         </NavLink>
 
