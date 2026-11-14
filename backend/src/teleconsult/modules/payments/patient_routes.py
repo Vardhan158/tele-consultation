@@ -391,13 +391,21 @@ async def create_payment_order(
     else:
         appointment_id = f"apt-{secrets.token_hex(6)}"
         idempotency_key = f"idemp-{appointment_id}"
+        dur_mins = int(pricing.get("duration_minutes", 30))
+        try:
+            start_dt = datetime.fromisoformat(payload.starts_at.replace("Z", "+00:00"))
+            ends_at_str = (start_dt + timedelta(minutes=dur_mins)).isoformat()
+        except (ValueError, TypeError):
+            ends_at_str = payload.starts_at
+
         apt_doc = {
             "id": appointment_id,
             "tenant_id": principal.tenant_id,
             "patient_id": principal.user_id,
             "doctor_id": payload.doctor_id,
             "starts_at": payload.starts_at,
-            "duration_minutes": pricing.get("duration_minutes", 30),
+            "ends_at": ends_at_str,
+            "duration_minutes": dur_mins,
             "status": "pending_payment",
             "payment_status": "pending_payment",
             "type": payload.appointment_type,

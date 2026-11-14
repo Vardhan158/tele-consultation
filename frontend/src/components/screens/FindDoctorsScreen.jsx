@@ -1302,6 +1302,9 @@ export default function FindDoctorsScreen({
                         ? "Audio"
                         : visitFormat}{" "}
                       · {appointmentType || "Not selected"}
+                      {bookingPricing?.duration_minutes
+                        ? ` · ${bookingPricing.duration_minutes} mins`
+                        : " · 30 mins"}
                     </span>
                   </div>
                 </div>
