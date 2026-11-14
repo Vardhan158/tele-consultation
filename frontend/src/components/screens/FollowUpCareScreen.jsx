@@ -1,129 +1,116 @@
 import { useState, useEffect } from "react";
 import { supportApi } from "../../lib/api";
 
-// Legacy visual fixture retained for backwards-compatible layout only; API data is authoritative.
-// eslint-disable-next-line no-unused-vars
-const initialTasks = [
-  {
-    id: "task-bp",
-    title: "Log your blood pressure",
-    subtitle: "Morning and evening readings · Due Nov 6",
-    dueBadge: "Due Nov 6",
-    completed: false,
-    completedNote: "",
-  },
-  {
-    id: "task-panel",
-    title: "Complete metabolic panel",
-    subtitle: "Lab order in Medical records · Due Nov 10",
-    dueBadge: "Due Nov 10",
-    completed: false,
-    completedNote: "",
-  },
-  {
-    id: "task-appt",
-    title: "Confirm your follow-up appointment",
-    subtitle: "Completed Nov 4 · Nov 12, 2:30 PM PT",
-    dueBadge: null,
-    completed: true,
-    completedNote: "Completed Nov 4 · Nov 12, 2:30 PM PT",
-  },
-];
-
-const initialReadings = [
-  {
-    date: "Oct 28",
-    systolic: 142,
-    diastolic: 88,
-    pulse: 74,
-    time: "8:30 AM",
-    notes: "Baseline",
-  },
-  {
-    date: "Oct 29",
-    systolic: 138,
-    diastolic: 86,
-    pulse: 72,
-    time: "8:15 AM",
-    notes: "Post-consult",
-  },
-  {
-    date: "Oct 30",
-    systolic: 136,
-    diastolic: 85,
-    pulse: 71,
-    time: "8:30 AM",
-    notes: "Morning",
-  },
-  {
-    date: "Oct 31",
-    systolic: 130,
-    diastolic: 82,
-    pulse: 70,
-    time: "8:45 AM",
-    notes: "Weekend morning",
-  },
-  {
-    date: "Nov 1",
-    systolic: 134,
-    diastolic: 84,
-    pulse: 73,
-    time: "8:20 AM",
-    notes: "Morning",
-  },
-  {
-    date: "Nov 3",
-    systolic: 132,
-    diastolic: 82,
-    pulse: 72,
-    time: "8:30 AM",
-    notes: "Morning, before breakfast",
-  },
-];
+const getDefaultLocalDateTime = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
 
 export default function FollowUpCareScreen({ onNavigate }) {
   const [tasks, setTasks] = useState([]);
-  const [readings, setReadings] = useState(initialReadings);
-
-  useEffect(() => {
-    supportApi
-      .followUp()
-      .then((data) => {
-        const apiTasks = Array.isArray(data) ? data : data?.tasks;
-        if (Array.isArray(apiTasks) && apiTasks.length > 0) {
-          setTasks(
-            apiTasks.map((t) => ({
-              id: t.id,
-              title: t.title || t.advice || "Follow-up task",
-              subtitle:
-                t.subtitle ||
-                t.advice ||
-                (t.due_date
-                  ? `Due ${new Date(t.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-                  : ""),
-              dueBadge: t.due_date
-                ? `Due ${new Date(t.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-                : null,
-              completed: t.completed ?? t.status === "completed",
-              completedNote:
-                (t.completed ?? t.status === "completed") ? "Completed" : "",
-            })),
-          );
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const [followUpPlan, setFollowUpPlan] = useState(null);
+  const [readings, setReadings] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Form State
-  const [dateTime, setDateTime] = useState("Nov 4, 2026 · 8:30 AM");
-  const [systolic, setSystolic] = useState("132");
-  const [diastolic, setDiastolic] = useState("82");
+  const [dateTime, setDateTime] = useState(getDefaultLocalDateTime());
+  const [systolic, setSystolic] = useState("120");
+  const [diastolic, setDiastolic] = useState("80");
   const [pulse, setPulse] = useState("72");
-  const [notes, setNotes] = useState("Morning, before breakfast");
+  const [notes, setNotes] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
-  // Toggle tasks
-  const handleToggleTask = () => {};
+  const loadFollowUpData = async () => {
+    try {
+      const data = await supportApi.followUp().catch(() => []);
+      if (Array.isArray(data) && data.length > 0) {
+        setFollowUpPlan(data[0]);
+        setTasks(
+          data.map((t) => ({
+            id: t.id,
+            title: t.advice || "Follow-up care task",
+            subtitle: t.created_at
+              ? `Assigned ${new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+              : "Assigned by clinician",
+            dueBadge: null,
+            completed: t.status === "completed",
+            completedNote: t.status === "completed" ? "Completed" : "",
+          })),
+        );
+      } else {
+        setFollowUpPlan(null);
+        setTasks([]);
+      }
+    } catch {
+      // Handled
+    }
+  };
+
+  const loadBpReadings = async () => {
+    try {
+      const items = await supportApi.bpReadings().catch(() => []);
+      if (Array.isArray(items)) {
+        setReadings(
+          items.map((r) => {
+            const dt = r.reading_at ? new Date(r.reading_at) : new Date();
+            return {
+              id: r.id,
+              date: dt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+              time: dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+              systolic: r.systolic,
+              diastolic: r.diastolic,
+              pulse: r.pulse,
+              notes: r.notes || "",
+              rawDate: dt,
+            };
+          }),
+        );
+      }
+    } catch {
+      // Handled
+    }
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([loadFollowUpData(), loadBpReadings()]).finally(() =>
+      setLoading(false),
+    );
+  }, []);
+
+  const handleSaveReading = async (e) => {
+    e.preventDefault();
+    if (!systolic || !diastolic || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const readingDate = dateTime ? new Date(dateTime) : new Date();
+      await supportApi.saveBpReading({
+        systolic: parseInt(systolic, 10),
+        diastolic: parseInt(diastolic, 10),
+        pulse: pulse ? parseInt(pulse, 10) : null,
+        reading_at: readingDate.toISOString(),
+        notes: notes.trim(),
+      });
+
+      setSaveSuccess(true);
+      setNotes("");
+      setDateTime(getDefaultLocalDateTime());
+      await loadBpReadings();
+    } catch (err) {
+      setToastMessage(err.message || "Failed to log blood pressure reading.");
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveSuccess(false), 3500);
+    }
+  };
 
   const completedCount = tasks.filter((t) => t.completed).length;
   const remainingCount = tasks.length - completedCount;
@@ -131,106 +118,119 @@ export default function FollowUpCareScreen({ onNavigate }) {
     ? Math.round((completedCount / tasks.length) * 100)
     : 0;
 
-  // Handle save reading
-  const handleSaveReading = (e) => {
-    e.preventDefault();
-    if (!systolic || !diastolic) return;
+  const latestReading = readings.length > 0 ? readings[readings.length - 1] : null;
 
-    const newReading = {
-      date: "Nov 4",
-      systolic: parseInt(systolic, 10) || 132,
-      diastolic: parseInt(diastolic, 10) || 82,
-      pulse: parseInt(pulse, 10) || 72,
-      time: dateTime,
-      notes,
-    };
+  // Chart SVG coordinates computation for readings
+  const getChartPoints = () => {
+    if (readings.length < 2) return "";
+    const minSys = 90;
+    const maxSys = 180;
+    const width = 500;
+    const height = 120;
 
-    setReadings((prev) => [...prev, newReading]);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3500);
+    return readings
+      .map((r, idx) => {
+        const x = (idx / (readings.length - 1)) * (width - 20) + 10;
+        const normalized = (r.systolic - minSys) / (maxSys - minSys);
+        const y = height - Math.max(0, Math.min(1, normalized)) * (height - 20) - 10;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" L ");
   };
 
-  const latestReading =
-    readings[readings.length - 1] ||
-    initialReadings[initialReadings.length - 1];
-
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
+    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
       <div className="mx-auto max-w-6xl space-y-6">
-        {/* Header matching Screenshot 1:1 */}
+        {/* Toast */}
+        {toastMessage && (
+          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">info</span>
+              {toastMessage}
+            </span>
+            <button
+              type="button"
+              onClick={() => setToastMessage("")}
+              className="text-[#577877] hover:text-[#162623]"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+        )}
+
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
               Small steps. Steadier care.
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              Your follow-up plan from Dr. Sarah Chen · Updated Oct 29, 2026
+              {followUpPlan
+                ? `Your follow-up plan from ${followUpPlan.doctor_name || "your clinician"}`
+                : "Your personalized care log and vitals history."}
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onNavigate && onNavigate("summaries")}
-            className="self-start sm:self-auto border border-[#577877]/30 bg-white hover:bg-[#F0F5F7] text-[#162623] px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-2xs transition cursor-pointer"
-          >
-            View consultation summary
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate && onNavigate("find-doctors")}
-            className="self-start sm:self-auto btn-primary text-xs sm:text-sm"
-          >
-            Book follow-up appointment
-          </button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate("summaries")}
+              className="border border-[#577877]/30 bg-white hover:bg-[#F0F5F7] text-[#162623] px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-2xs transition cursor-pointer"
+            >
+              View consultation summary
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate("find-doctors")}
+              className="btn-primary text-xs sm:text-sm cursor-pointer"
+            >
+              Book follow-up appointment
+            </button>
+          </div>
         </div>
 
-        {/* Cyan Announcement Banner matching Screenshot */}
-        {tasks.length > 0 && (
+        {/* Doctor's Follow-up Plan Banner - Displayed ONLY when a genuine plan exists */}
+        {followUpPlan && followUpPlan.advice && (
           <div className="rounded-2xl p-4 sm:p-5 bg-[#E8F3F3] border border-[#25836F]/20 flex items-start gap-3.5 shadow-2xs">
             <div className="w-8 h-8 rounded-full bg-[#25836F]/10 flex items-center justify-center shrink-0 mt-0.5">
-              <svg
-                className="w-5 h-5 text-[#25836F]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
+              <span className="material-symbols-outlined text-[#25836F] text-lg">
+                health_and_safety
+              </span>
             </div>
             <div>
               <h3 className="text-sm font-bold text-[#162623]">
-                Your next review is November 12
+                Doctor's Follow-up Advice
               </h3>
               <p className="text-xs text-[#577877] mt-0.5 leading-relaxed">
-                Bring your blood pressure log to your video appointment. Your
-                care team will review progress with you.
+                {followUpPlan.advice}
               </p>
             </div>
           </div>
         )}
 
-        {/* Main 2-Column Grid matching Screenshot */}
+        {/* Main 2-Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column (7 cols): Next steps & BP log */}
           <div className="lg:col-span-7 space-y-6">
-            {/* CARD 1: Your next steps matching Screenshot */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-5">
+            {/* CARD 1: Your next steps */}
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-5">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-[#162623]">
                     Your next steps
                   </h2>
                   <p className="text-xs text-[#577877] mt-0.5">
-                    {completedCount} of {tasks.length} tasks complete
+                    {tasks.length === 0
+                      ? "No follow-up tasks assigned yet"
+                      : `${completedCount} of ${tasks.length} tasks complete`}
                   </p>
                 </div>
 
-                {remainingCount > 0 ? (
+                {tasks.length === 0 ? (
+                  <span className="bg-[#F0F5F7] text-[#577877] font-medium text-xs px-3 py-1 rounded-full">
+                    No follow-up tasks assigned yet
+                  </span>
+                ) : remainingCount > 0 ? (
                   <span className="bg-[#FEF3C7] text-[#92400E] font-medium text-xs px-3 py-1 rounded-full">
                     {remainingCount} tasks remaining
                   </span>
@@ -241,7 +241,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
                 )}
               </div>
 
-              {/* Progress bar matching Screenshot */}
+              {/* Progress bar */}
               <div className="w-full h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#25836F] rounded-full transition-all duration-300"
@@ -250,170 +250,183 @@ export default function FollowUpCareScreen({ onNavigate }) {
               </div>
 
               {/* Tasks List */}
-              <div className="divide-y divide-[#577877]/10 pt-1">
-                {tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3 group"
-                  >
+              {tasks.length === 0 ? (
+                <div className="py-8 text-center text-[#577877] text-xs font-medium">
+                  No follow-up tasks assigned yet.
+                </div>
+              ) : (
+                <div className="divide-y divide-[#577877]/10 pt-1">
+                  {tasks.map((task) => (
                     <div
-                      onClick={() => handleToggleTask(task.id)}
-                      className="flex items-start gap-3.5 cursor-pointer flex-1"
+                      key={task.id}
+                      className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3"
                     >
-                      <button
-                        type="button"
-                        aria-label={`Toggle ${task.title}`}
-                        className={`w-5 h-5 rounded mt-0.5 flex items-center justify-center transition shrink-0 ${
-                          task.completed
-                            ? "bg-[#25836F] text-white"
-                            : "border border-[#577877]/40 bg-white hover:border-[#25836F]"
-                        }`}
-                      >
-                        {task.completed && (
-                          <span className="material-symbols-outlined text-sm font-bold">
-                            check
-                          </span>
-                        )}
-                      </button>
-
-                      <div>
-                        <h4
-                          className={`text-xs sm:text-sm font-bold text-[#162623] ${
-                            task.completed ? "line-through text-[#577877]" : ""
+                      <div className="flex items-start gap-3.5 flex-1">
+                        <span
+                          className={`w-5 h-5 rounded mt-0.5 flex items-center justify-center shrink-0 ${
+                            task.completed
+                              ? "bg-[#25836F] text-white"
+                              : "border border-[#577877]/40 bg-white"
                           }`}
                         >
-                          {task.title}
-                        </h4>
-                        <p className="text-[11px] sm:text-xs text-[#577877] mt-0.5">
-                          {task.subtitle}
-                        </p>
+                          {task.completed && (
+                            <span className="material-symbols-outlined text-sm font-bold">
+                              check
+                            </span>
+                          )}
+                        </span>
+
+                        <div>
+                          <h4
+                            className={`text-xs sm:text-sm font-bold text-[#162623] ${
+                              task.completed ? "line-through text-[#577877]" : ""
+                            }`}
+                          >
+                            {task.title}
+                          </h4>
+                          <p className="text-[11px] sm:text-xs text-[#577877] mt-0.5">
+                            {task.subtitle}
+                          </p>
+                        </div>
                       </div>
                     </div>
-
-                    {task.dueBadge && !task.completed && (
-                      <span className="bg-[#FEF3C7] text-[#92400E] text-xs font-medium px-3 py-1 rounded-full shrink-0">
-                        {task.dueBadge}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* CARD 2: Blood pressure log & Trend chart matching Screenshot */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-6">
+            {/* CARD 2: Blood pressure log & Trend chart */}
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-6">
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-[#162623]">
                   Blood pressure log
                 </h2>
               </div>
 
-              {/* 2-column stats strip */}
+              {/* Stats strip */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-[11px] text-[#577877] block">
-                    Latest reading · {latestReading.date}
+                    Latest reading {latestReading ? `· ${latestReading.date}` : ""}
                   </span>
                   <span className="text-base sm:text-lg font-bold text-[#162623] mt-0.5 block">
-                    {latestReading.systolic} / {latestReading.diastolic} mmHg
+                    {latestReading
+                      ? `${latestReading.systolic} / ${latestReading.diastolic} mmHg`
+                      : "-- / -- mmHg"}
                   </span>
                 </div>
 
                 <div>
                   <span className="text-[11px] text-[#577877] block">
-                    Last 7 days
+                    Recorded history
                   </span>
                   <span className="text-base sm:text-lg font-bold text-[#162623] mt-0.5 block">
-                    {readings.length} readings recorded
+                    {readings.length} {readings.length === 1 ? "reading" : "readings"} recorded
                   </span>
                 </div>
               </div>
 
-              {/* Trend Chart Area matching Screenshot */}
+              {/* Trend Chart Area */}
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-[#25836F]">
-                    Systolic · mmHg
+                    Systolic Trend · mmHg
                   </span>
                   <span className="text-[#577877]">
-                    142 → {latestReading.systolic}
+                    {readings.length > 0
+                      ? `${readings[0].systolic} → ${latestReading.systolic}`
+                      : "No readings recorded"}
                   </span>
                 </div>
 
-                {/* SVG Line Graph */}
-                <div className="w-full pt-4 pb-2">
-                  <svg
-                    viewBox="0 0 500 120"
-                    className="w-full h-28 sm:h-32 overflow-visible"
-                    preserveAspectRatio="none"
-                  >
-                    {/* Horizontal guide lines */}
-                    <line
-                      x1="0"
-                      y1="20"
-                      x2="500"
-                      y2="20"
-                      stroke="#577877"
-                      strokeOpacity="0.1"
-                      strokeDasharray="4 4"
-                    />
-                    <line
-                      x1="0"
-                      y1="60"
-                      x2="500"
-                      y2="60"
-                      stroke="#577877"
-                      strokeOpacity="0.1"
-                      strokeDasharray="4 4"
-                    />
-                    <line
-                      x1="0"
-                      y1="100"
-                      x2="500"
-                      y2="100"
-                      stroke="#577877"
-                      strokeOpacity="0.1"
-                      strokeDasharray="4 4"
-                    />
-
-                    {/* Trend line representing 142 -> 138 -> 136 -> 130 -> 134 -> 132 */}
-                    <path
-                      d="M 10 20 L 100 45 L 200 55 L 290 85 L 390 70 L 490 100"
-                      fill="none"
-                      stroke="#25836F"
-                      strokeWidth="2.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-
-                    {/* Data Points */}
-                    <circle cx="10" cy="20" r="3.5" fill="#25836F" />
-                    <circle cx="100" cy="45" r="3.5" fill="#25836F" />
-                    <circle cx="200" cy="55" r="3.5" fill="#25836F" />
-                    <circle cx="290" cy="85" r="3.5" fill="#25836F" />
-                    <circle cx="390" cy="70" r="3.5" fill="#25836F" />
-                    <circle cx="490" cy="100" r="3.5" fill="#25836F" />
-                  </svg>
-
-                  {/* Dates underneath graph matching Screenshot */}
-                  <div className="flex items-center justify-between text-xs text-[#577877] mt-2">
-                    <span>Oct 28</span>
-                    <span>Nov 3</span>
+                {readings.length === 0 ? (
+                  <div className="p-8 text-center text-[#577877] text-xs font-medium bg-[#F8FAFB] rounded-xl border border-dashed border-[#577877]/20">
+                    No blood pressure readings recorded yet. Log your first reading below.
                   </div>
-                </div>
+                ) : readings.length === 1 ? (
+                  <div className="p-6 text-center text-[#162623] text-xs font-semibold bg-[#F0F5F7] rounded-xl">
+                    1 reading recorded ({readings[0].systolic}/{readings[0].diastolic} mmHg on {readings[0].date} at {readings[0].time}). Log additional readings to generate trend graphs.
+                  </div>
+                ) : (
+                  <div className="w-full pt-4 pb-2">
+                    <svg
+                      viewBox="0 0 500 120"
+                      className="w-full h-28 sm:h-32 overflow-visible"
+                      preserveAspectRatio="none"
+                    >
+                      <line
+                        x1="0"
+                        y1="20"
+                        x2="500"
+                        y2="20"
+                        stroke="#577877"
+                        strokeOpacity="0.1"
+                        strokeDasharray="4 4"
+                      />
+                      <line
+                        x1="0"
+                        y1="60"
+                        x2="500"
+                        y2="60"
+                        stroke="#577877"
+                        strokeOpacity="0.1"
+                        strokeDasharray="4 4"
+                      />
+                      <line
+                        x1="0"
+                        y1="100"
+                        x2="500"
+                        y2="100"
+                        stroke="#577877"
+                        strokeOpacity="0.1"
+                        strokeDasharray="4 4"
+                      />
+
+                      <path
+                        d={`M ${getChartPoints()}`}
+                        fill="none"
+                        stroke="#25836F"
+                        strokeWidth="2.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {readings.map((r, idx) => {
+                        const x = (idx / (readings.length - 1)) * 480 + 10;
+                        const minSys = 90;
+                        const maxSys = 180;
+                        const normalized = (r.systolic - minSys) / (maxSys - minSys);
+                        const y = 120 - Math.max(0, Math.min(1, normalized)) * 100 - 10;
+                        return (
+                          <circle
+                            key={r.id || idx}
+                            cx={x.toFixed(1)}
+                            cy={y.toFixed(1)}
+                            r="3.5"
+                            fill="#25836F"
+                          />
+                        );
+                      })}
+                    </svg>
+
+                    <div className="flex items-center justify-between text-xs text-[#577877] mt-2">
+                      <span>{readings[0].date}</span>
+                      <span>{latestReading.date}</span>
+                    </div>
+                  </div>
+                )}
 
                 <p className="text-[11px] text-[#577877] pt-2">
-                  Trend from your entered readings. This is not a diagnosis or
-                  an automated medical assessment.
+                  Trend calculated from your entered database records. This is not an automated medical diagnosis.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Right Column (5 cols): Add BP reading & Urgent feeling unwell alert */}
+          {/* Right Column (5 cols): Add BP reading */}
           <div className="lg:col-span-5 space-y-6">
-            {/* CARD 1: Add a blood pressure reading form matching Screenshot */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-4">
+            {/* CARD 1: Add a blood pressure reading form */}
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-4">
               <h2 className="text-base sm:text-lg font-bold text-[#162623]">
                 Add a blood pressure reading
               </h2>
@@ -423,25 +436,26 @@ export default function FollowUpCareScreen({ onNavigate }) {
                   <span className="material-symbols-outlined text-sm">
                     check_circle
                   </span>
-                  <span>Reading logged successfully!</span>
+                  <span>Reading saved to database &amp; updated!</span>
                 </div>
               )}
 
               <form onSubmit={handleSaveReading} className="space-y-4">
-                {/* Date & time */}
+                {/* Date & time - Defaulted to local date/time */}
                 <div>
                   <label className="text-xs font-semibold text-[#162623] block mb-1.5">
-                    Date & time
+                    Date &amp; time
                   </label>
                   <input
-                    type="text"
+                    type="datetime-local"
                     value={dateTime}
                     onChange={(e) => setDateTime(e.target.value)}
+                    max={getDefaultLocalDateTime()}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
                   />
                 </div>
 
-                {/* Systolic & Diastolic 2 columns */}
+                {/* Systolic & Diastolic */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-[#162623] block mb-1.5">
@@ -449,6 +463,9 @@ export default function FollowUpCareScreen({ onNavigate }) {
                     </label>
                     <input
                       type="number"
+                      required
+                      min="40"
+                      max="260"
                       value={systolic}
                       onChange={(e) => setSystolic(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
@@ -461,6 +478,9 @@ export default function FollowUpCareScreen({ onNavigate }) {
                     </label>
                     <input
                       type="number"
+                      required
+                      min="20"
+                      max="180"
                       value={diastolic}
                       onChange={(e) => setDiastolic(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
@@ -468,51 +488,54 @@ export default function FollowUpCareScreen({ onNavigate }) {
                   </div>
                 </div>
 
-                {/* Pulse bpm optional */}
+                {/* Pulse bpm */}
                 <div>
                   <label className="text-xs font-semibold text-[#162623] block mb-1.5">
                     Pulse · bpm (optional)
                   </label>
                   <input
                     type="number"
+                    min="30"
+                    max="220"
                     value={pulse}
                     onChange={(e) => setPulse(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
                   />
                 </div>
 
-                {/* Notes optional */}
+                {/* Notes */}
                 <div>
                   <label className="text-xs font-semibold text-[#162623] block mb-1.5">
                     Notes (optional)
                   </label>
                   <input
                     type="text"
+                    placeholder="e.g. Morning, before breakfast"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F] bg-white transition"
                   />
                 </div>
 
-                {/* Blue Save reading button */}
+                {/* Save reading button */}
                 <button
                   type="submit"
-                  className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium py-3 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition text-xs sm:text-sm cursor-pointer mt-2"
+                  disabled={isSaving}
+                  className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium py-3 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition text-xs sm:text-sm cursor-pointer mt-2 disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-base">
                     add
                   </span>
-                  <span>Save reading</span>
+                  <span>{isSaving ? "Saving..." : "Save reading"}</span>
                 </button>
               </form>
 
               <p className="text-[11px] text-[#577877] leading-relaxed pt-1">
-                Entries are not monitored in real time. Follow the guidance
-                given by your clinician.
+                Entries are recorded in your patient health record and not monitored in real time.
               </p>
             </div>
 
-            {/* CARD 2: Feeling unwell? amber card matching Screenshot */}
+            {/* Feeling unwell card */}
             <div className="bg-[#FEF3C7]/40 border border-[#FDE68A] rounded-2xl p-4 sm:p-5 flex items-start gap-3">
               <span className="material-symbols-outlined !text-[#92400E] text-lg shrink-0 mt-0.5">
                 info

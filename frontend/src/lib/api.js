@@ -308,6 +308,12 @@ export const clinicalApi = {
 
 export const supportApi = {
   followUp: () => apiRequest("/patient/follow-up"),
+  bpReadings: () => apiRequest("/patient/vitals/blood-pressure"),
+  saveBpReading: (payload) =>
+    apiRequest("/patient/vitals/blood-pressure", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   tickets: () => apiRequest("/patient/support/tickets"),
   createTicket: (payload) =>
     apiRequest("/patient/support/tickets", {

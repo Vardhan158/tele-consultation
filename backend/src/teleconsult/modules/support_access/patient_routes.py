@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
-from datetime import datetime
-from uuid import UUID
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
@@ -28,51 +28,176 @@ async def followup_session() -> AsyncIterator[AsyncSession | None]:
 
 class SupportTicketCreate(BaseModel):
     category: str = Field(min_length=2, max_length=40)
+    subject: str = Field(default="Support Request", max_length=120)
     description: str = Field(min_length=2, max_length=2000)
 
 
 class SupportTicketResponse(SupportTicketCreate):
     id: UUID
     status: str
+    created_at: datetime
 
 
 class FollowUpResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    appointment_id: UUID
+    id: UUID | str
+    appointment_id: UUID | str
     advice: str
     status: str
-    next_appointment_id: UUID | None
+    next_appointment_id: UUID | str | None = None
     created_at: datetime
 
 
-@router.get("/follow-up", response_model=list[FollowUpResponse])
-async def follow_up(session: AsyncSession | None = Depends(followup_session), principal: Principal = Depends(require("followup:read"))) -> list[FollowUpAction]:
+class BloodPressureReadingCreate(BaseModel):
+    systolic: int = Field(ge=40, le=260)
+    diastolic: int = Field(ge=20, le=180)
+    pulse: int | None = Field(default=None, ge=30, le=220)
+    reading_at: datetime | str | None = None
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class BloodPressureReadingResponse(BaseModel):
+    id: str
+    systolic: int
+    diastolic: int
+    pulse: int | None = None
+    reading_at: datetime
+    notes: str | None = None
+
+
+@router.get("/vitals/blood-pressure", response_model=list[BloodPressureReadingResponse])
+async def list_bp_readings(
+    session: AsyncSession | None = Depends(followup_session),
+    principal: Principal = Depends(require("followup:read")),
+):
     if get_settings().mongodb_enabled:
-        documents = mongo_database.database()["follow_up_plans"].find({
-            "tenant_id": principal.tenant_id, "patient_id": principal.user_id,
+        db = mongo_database.database()
+        patient_ids = [str(principal.user_id)]
+        patient_doc = await db["patients"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [
+                {"id": str(principal.user_id)},
+                {"user_id": str(principal.user_id)},
+                {"user_account_id": str(principal.user_id)},
+            ],
+        })
+        if patient_doc:
+            for k in ("id", "user_id", "user_account_id"):
+                val = patient_doc.get(k)
+                if val and str(val) not in patient_ids:
+                    patient_ids.append(str(val))
+
+        all_ids = []
+        for pid in patient_ids:
+            all_ids.extend([pid, pid.lower(), pid.upper()])
+        all_ids = list(set(all_ids))
+
+        cursor = db["vitals_blood_pressure"].find({
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": {"$in": all_ids},
+        }).sort("reading_at", 1)
+
+        documents = await cursor.to_list(500)
+        results = []
+        for doc in documents:
+            dt_val = doc.get("reading_at")
+            if isinstance(dt_val, str):
+                try:
+                    dt = datetime.fromisoformat(dt_val.replace("Z", "+00:00"))
+                except ValueError:
+                    dt = datetime.now(UTC)
+            elif isinstance(dt_val, datetime):
+                dt = dt_val
+            else:
+                dt = datetime.now(UTC)
+
+            results.append(BloodPressureReadingResponse(
+                id=str(doc.get("id") or doc.get("_id") or uuid4()),
+                systolic=int(doc.get("systolic", 120)),
+                diastolic=int(doc.get("diastolic", 80)),
+                pulse=int(doc["pulse"]) if doc.get("pulse") is not None else None,
+                reading_at=dt,
+                notes=doc.get("notes"),
+            ))
+        return results
+    return []
+
+
+@router.post("/vitals/blood-pressure", response_model=BloodPressureReadingResponse, status_code=201)
+async def create_bp_reading(
+    payload: BloodPressureReadingCreate,
+    session: AsyncSession | None = Depends(followup_session),
+    principal: Principal = Depends(require("followup:read")),
+):
+    reading_id = str(uuid4())
+    if isinstance(payload.reading_at, datetime):
+        reading_dt = payload.reading_at
+    elif isinstance(payload.reading_at, str) and payload.reading_at:
+        try:
+            reading_dt = datetime.fromisoformat(payload.reading_at.replace("Z", "+00:00"))
+        except ValueError:
+            reading_dt = datetime.now(UTC)
+    else:
+        reading_dt = datetime.now(UTC)
+
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doc = {
+            "id": reading_id,
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": str(principal.user_id),
+            "systolic": payload.systolic,
+            "diastolic": payload.diastolic,
+            "pulse": payload.pulse,
+            "reading_at": reading_dt.isoformat(),
+            "notes": payload.notes or "",
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        await db["vitals_blood_pressure"].insert_one(dict(doc))
+        return BloodPressureReadingResponse(
+            id=reading_id,
+            systolic=payload.systolic,
+            diastolic=payload.diastolic,
+            pulse=payload.pulse,
+            reading_at=reading_dt,
+            notes=payload.notes,
+        )
+
+    return BloodPressureReadingResponse(
+        id=reading_id,
+        systolic=payload.systolic,
+        diastolic=payload.diastolic,
+        pulse=payload.pulse,
+        reading_at=reading_dt,
+        notes=payload.notes,
+    )
+
+
+@router.get("/follow-up", response_model=list[FollowUpResponse])
+async def follow_up(session: AsyncSession | None = Depends(followup_session), principal: Principal = Depends(require("followup:read"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        documents = db["follow_up_plans"].find({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [{"patient_id": str(principal.user_id)}, {"patient_id": principal.user_id}],
         }).sort("created_at", -1)
-        return [FollowUpResponse(
-            id=UUID(document["id"]), appointment_id=UUID(document["appointment_id"]),
-            advice=document.get("advice", ""), status=document.get("status", "pending"),
-            next_appointment_id=UUID(document["next_appointment_id"]) if document.get("next_appointment_id") else None,
-            created_at=document["created_at"],
-        ) async for document in documents]
+        results = []
+        async for document in documents:
+            dt_val = document.get("created_at")
+            dt = datetime.fromisoformat(dt_val.replace("Z", "+00:00")) if isinstance(dt_val, str) else (dt_val or datetime.now(UTC))
+            results.append(FollowUpResponse(
+                id=str(document.get("id") or document.get("_id") or uuid4()),
+                appointment_id=str(document.get("appointment_id") or uuid4()),
+                advice=str(document.get("advice") or ""),
+                status=str(document.get("status") or "pending"),
+                next_appointment_id=document.get("next_appointment_id"),
+                created_at=dt,
+            ))
+        return results
     if session is None:
         raise RuntimeError("No application database is configured")
     result = await session.scalars(select(FollowUpAction).where(FollowUpAction.tenant_id == UUID(principal.tenant_id), FollowUpAction.patient_id == UUID(principal.user_id)).order_by(FollowUpAction.created_at.desc()))
-    actions = list(result)
-    for action in actions:
-        if action.status not in {"completed", "cancelled"}:
-            existing = await session.scalar(select(Notification).where(
-                Notification.tenant_id == action.tenant_id, Notification.patient_id == action.patient_id,
-                Notification.event_type == "follow_up_reminder", Notification.body.contains(str(action.id))))
-            if existing is None:
-                session.add(Notification(
-                    tenant_id=action.tenant_id, patient_id=action.patient_id,
-                    event_type="follow_up_reminder", channel="in_app", status="queued",
-                    subject="Follow-up care reminder", body=f"Follow-up activity {action.id}: {action.advice}"))
-    return actions
+    return list(result)
 
 
 @router.post("/support/tickets", response_model=SupportTicketResponse, status_code=201)
