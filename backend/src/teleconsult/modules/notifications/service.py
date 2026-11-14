@@ -8,6 +8,18 @@ from teleconsult.modules.notifications.models import Notification
 from teleconsult.kernel.mongodb.client import mongo_database
 
 
+def format_appointment_message(body: str, patient_display_name: str, starts_at) -> str:
+    try:
+        start = starts_at if isinstance(starts_at, datetime) else datetime.fromisoformat(str(starts_at).replace("Z", "+00:00"))
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=UTC)
+        local = start.astimezone(ZoneInfo("Asia/Kolkata"))
+        formatted = f"{local.day:02d} {local.strftime('%b %Y at %I:%M %p')} IST".replace(" at 0", " at ")
+        return f"{patient_display_name} booked an appointment for {formatted}."
+    except (TypeError, ValueError):
+        return body
+
+
 def queue_patient_notification(
     session: AsyncSession, *, tenant_id: UUID, patient_id: UUID, event_type: str,
     subject: str, body: str, channel: str = "in_app",

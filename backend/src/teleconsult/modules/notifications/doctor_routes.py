@@ -9,6 +9,7 @@ from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.notifications.schemas import NotificationResponse
+from teleconsult.modules.notifications.service import format_appointment_message
 
 router = APIRouter(prefix="/doctor/notifications", tags=["notifications"])
 
@@ -30,7 +31,15 @@ async def list_doctor_notifications(
         cursor = mongo_database.database()["notifications"].find(
             {"tenant_id": principal.tenant_id, "recipient_id": principal.user_id}
         ).sort("created_at", -1).limit(100)
-        return [NotificationResponse.model_validate(document) async for document in cursor]
+        results = []
+        async for document in cursor:
+            if document.get("notification_type") == "APPOINTMENT_CONFIRMED" and document.get("appointment_starts_at"):
+                document = dict(document)
+                document["body"] = format_appointment_message(
+                    document.get("body", ""), document.get("patient_display_name") or "Patient", document["appointment_starts_at"]
+                )
+            results.append(NotificationResponse.model_validate(document))
+        return results
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
     # SQL notifications predate doctor recipients; never broaden this query to another user.
