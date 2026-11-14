@@ -142,6 +142,25 @@ async def create_bp_reading(
 
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
+        iso_reading = reading_dt.isoformat()
+        # Deduplication check: prevent duplicate submissions with identical values and timestamp
+        recent = await db["vitals_blood_pressure"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": str(principal.user_id),
+            "systolic": payload.systolic,
+            "diastolic": payload.diastolic,
+            "reading_at": iso_reading,
+        })
+        if recent:
+            return BloodPressureReadingResponse(
+                id=str(recent.get("id") or recent.get("_id")),
+                systolic=int(recent["systolic"]),
+                diastolic=int(recent["diastolic"]),
+                pulse=int(recent["pulse"]) if recent.get("pulse") is not None else None,
+                reading_at=reading_dt,
+                notes=recent.get("notes"),
+            )
+
         doc = {
             "id": reading_id,
             "tenant_id": str(principal.tenant_id),
@@ -149,7 +168,7 @@ async def create_bp_reading(
             "systolic": payload.systolic,
             "diastolic": payload.diastolic,
             "pulse": payload.pulse,
-            "reading_at": reading_dt.isoformat(),
+            "reading_at": iso_reading,
             "notes": payload.notes or "",
             "created_at": datetime.now(UTC).isoformat(),
         }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supportApi } from "../../lib/api";
 
 const getDefaultLocalDateTime = () => {
@@ -85,10 +85,13 @@ export default function FollowUpCareScreen({ onNavigate }) {
     );
   }, []);
 
+  const isSavingRef = useRef(false);
+
   const handleSaveReading = async (e) => {
     e.preventDefault();
-    if (!systolic || !diastolic || isSaving) return;
+    if (!systolic || !diastolic || isSavingRef.current) return;
 
+    isSavingRef.current = true;
     setIsSaving(true);
     try {
       const readingDate = dateTime ? new Date(dateTime) : new Date();
@@ -107,6 +110,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
     } catch (err) {
       setToastMessage(err.message || "Failed to log blood pressure reading.");
     } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
       setTimeout(() => setSaveSuccess(false), 3500);
     }
