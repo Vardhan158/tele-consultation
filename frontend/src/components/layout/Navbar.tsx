@@ -74,7 +74,7 @@ export default function Navbar() {
   const isLightPage = ["/find-doctors", "/faqs", "/services"].includes(location.pathname);
   const useSolidWhiteHeader = isScrolled || isLightPage;
 
-  const getLinkClass = (item: NavItem) => {
+  const renderNavLink = (item: NavItem, isMobile = false) => {
     let isActive = false;
     if (item.path === "/" && location.pathname === "/" && !location.hash) {
       isActive = true;
@@ -84,19 +84,55 @@ export default function Navbar() {
       isActive = true;
     }
 
-    if (useSolidWhiteHeader) {
-      return `rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
-        isActive
-          ? "bg-[#EEF6F3]/90 text-[#1A7D67] font-bold underline underline-offset-4 decoration-2 decoration-[#1A7D67]"
-          : "text-[#577877] hover:text-[#162623] hover:underline underline-offset-4 decoration-2 decoration-[#1A7D67] hover:bg-[#F0F5F7]/80"
-      }`;
+    if (isMobile) {
+      return (
+        <a
+          key={item.label}
+          href={item.path}
+          onClick={(e) => handleLinkClick(item, e)}
+          className={`rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
+            useSolidWhiteHeader
+              ? isActive
+                ? "bg-[#EEF6F3]/90 text-[#1A7D67] font-bold"
+                : "text-[#577877] hover:bg-[#F0F5F7]/80 hover:text-[#162623]"
+              : isActive
+              ? "bg-white/20 text-white font-bold"
+              : "text-white/85 hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          {item.label}
+        </a>
+      );
     }
 
-    return `rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
-      isActive
-        ? "bg-white/20 text-white font-bold backdrop-blur-xs underline underline-offset-4 decoration-2 decoration-white"
-        : "text-white/85 hover:text-white hover:underline underline-offset-4 decoration-2 decoration-white hover:bg-white/10"
-    }`;
+    const baseText = useSolidWhiteHeader
+      ? isActive
+        ? "text-[#1A7D67] font-bold"
+        : "text-[#577877] hover:text-[#162623]"
+      : isActive
+      ? "text-white font-bold"
+      : "text-white/85 hover:text-white";
+
+    const underlineGradient = useSolidWhiteHeader
+      ? "bg-gradient-to-r from-[#1A7D67] via-[#25836F] to-[#1A7D67] shadow-[0_0_8px_rgba(26,125,103,0.5)]"
+      : "bg-gradient-to-r from-white/70 via-white to-white/70 shadow-[0_0_8px_rgba(255,255,255,0.8)]";
+
+    return (
+      <a
+        key={item.label}
+        href={item.path}
+        onClick={(e) => handleLinkClick(item, e)}
+        className={`group relative rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-300 cursor-pointer ${baseText}`}
+      >
+        <span>{item.label}</span>
+        {/* Cinematic Animated Underline */}
+        <span
+          className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-[2px] rounded-full transition-all duration-300 ease-out pointer-events-none ${
+            isActive ? "w-4/5" : "w-0 group-hover:w-4/5"
+          } ${underlineGradient}`}
+        />
+      </a>
+    );
   };
 
   const go = (path: string) => {
@@ -159,16 +195,7 @@ export default function Navbar() {
 
         {/* Desktop Navigation Links */}
         <nav aria-label="Primary navigation" className="hidden items-center gap-1 xl:flex">
-          {PUBLIC_NAV_LINKS.map((item) => (
-            <a
-              key={item.label}
-              href={item.path}
-              onClick={(e) => handleLinkClick(item, e)}
-              className={getLinkClass(item)}
-            >
-              {item.label}
-            </a>
-          ))}
+          {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, false))}
         </nav>
 
         {/* Right Desktop Actions */}
@@ -176,13 +203,18 @@ export default function Navbar() {
           <button
             type="button"
             onClick={() => go("/doctor/register")}
-            className={`rounded-lg px-2.5 py-2 text-xs font-semibold transition cursor-pointer ${
-              useSolidWhiteHeader
-                ? "text-[#1A7D67] hover:underline underline-offset-4 decoration-2 decoration-[#1A7D67] hover:bg-[#EEF6F3]"
-                : "text-white/90 hover:text-white hover:underline underline-offset-4 decoration-2 decoration-white hover:bg-white/10"
+            className={`group relative rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors duration-300 cursor-pointer ${
+              useSolidWhiteHeader ? "text-[#1A7D67] hover:text-[#162623]" : "text-white/90 hover:text-white"
             }`}
           >
-            Clinician Registration
+            <span>Clinician Registration</span>
+            <span
+              className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-[2px] w-0 group-hover:w-4/5 rounded-full transition-all duration-300 ease-out pointer-events-none ${
+                useSolidWhiteHeader
+                  ? "bg-gradient-to-r from-[#1A7D67] via-[#25836F] to-[#1A7D67] shadow-[0_0_8px_rgba(26,125,103,0.5)]"
+                  : "bg-gradient-to-r from-white/70 via-white to-white/70 shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+              }`}
+            />
           </button>
           <button
             type="button"
@@ -238,16 +270,7 @@ export default function Navbar() {
           }`}
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1.5">
-            {PUBLIC_NAV_LINKS.map((item) => (
-              <a
-                key={item.label}
-                href={item.path}
-                onClick={(e) => handleLinkClick(item, e)}
-                className={getLinkClass(item)}
-              >
-                {item.label}
-              </a>
-            ))}
+            {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, true))}
             <button
               type="button"
               onClick={() => go("/doctor/register")}
