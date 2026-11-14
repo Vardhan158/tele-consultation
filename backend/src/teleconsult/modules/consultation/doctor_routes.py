@@ -258,6 +258,8 @@ async def doctor_availability(
         doctor_id = str(doctor_doc.get("id"))
         clinic_settings = await db["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
         clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
+        now_utc = datetime.now(UTC)
+        active_appointments = await db["appointments"].find({"tenant_id": str(principal.tenant_id), "doctor_id": doctor_id, "status": {"$in": ["requested", "pending_payment", "confirmed", "checked_in", "in_progress", "rescheduled"]}}).to_list(500)
 
         cursor = db["doctor_availability"].find({
             "tenant_id": str(principal.tenant_id),
@@ -267,12 +269,16 @@ async def doctor_availability(
 
         slots = []
         async for doc in cursor:
+            starts_at = datetime.fromisoformat(str(doc.get("starts_at")).replace("Z", "+00:00"))
+            ends_at = datetime.fromisoformat(str(doc.get("ends_at")).replace("Z", "+00:00"))
+            occupied = bool(doc.get("booked")) or any(datetime.fromisoformat(str(item.get("starts_at")).replace("Z", "+00:00")) < ends_at and datetime.fromisoformat(str(item.get("ends_at")).replace("Z", "+00:00")) > starts_at for item in active_appointments)
+            status_value = "expired" if ends_at <= now_utc else "booked" if occupied or doc.get("status") in {"reserved", "booked"} else "available"
             slots.append({
                 "id": str(doc.get("id", doc.get("_id"))),
                 "doctor_id": doc.get("doctor_id"),
                 "starts_at": doc.get("starts_at"),
                 "ends_at": doc.get("ends_at"),
-                "status": doc.get("status", "available"),
+                "status": status_value,
                 "timezone": clinic_timezone,
             })
         return slots
@@ -289,7 +295,9 @@ async def doctor_availability(
         )
         .order_by(DoctorAvailability.starts_at)
     )
-    return list(result)
+    now_utc = datetime.now(UTC)
+    appointments = list(await session.scalars(select(Appointment).where(Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id, Appointment.status.in_(["requested", "pending_payment", "confirmed", "checked_in", "in_progress", "rescheduled"]))))
+    return [{**slot.__dict__, "status": "expired" if slot.ends_at <= now_utc else "booked" if any(item.starts_at < slot.ends_at and item.ends_at > slot.starts_at for item in appointments) or slot.status in {"reserved", "booked"} else "available"} for slot in result]
 
 
 @router.post("/availability", status_code=201)

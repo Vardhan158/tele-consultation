@@ -50,6 +50,17 @@ from teleconsult.modules.patient_portal.schemas import (
 router = APIRouter(prefix="/patient", tags=["patient-journey"])
 public_router = APIRouter(prefix="/patient", tags=["public-directory"])
 
+ACTIVE_BOOKING_STATUSES = {"requested", "pending_payment", "confirmed", "checked_in", "in_progress", "rescheduled"}
+
+
+def _slot_status(starts_at: Any, ends_at: Any, booked: bool = False, now: datetime | None = None) -> str:
+    now_utc = now or datetime.now(UTC)
+    start = _parse_datetime(starts_at)
+    end = _parse_datetime(ends_at)
+    if end <= now_utc or start <= now_utc and booked:
+        return "expired" if end <= now_utc else "booked"
+    return "booked" if booked else "available"
+
 
 @public_router.get("/booking-options")
 async def booking_options() -> dict[str, list[str]]:
@@ -310,13 +321,19 @@ async def public_doctor_availability(
             "status": "available",
         }).sort("starts_at", 1)
         clinic_timezone = timezone_name
-        return [AvailabilityResponse(
-            id=str(document["id"]),
-            doctor_id=UUID(document["doctor_id"]),
-            starts_at=document["starts_at"],
-            ends_at=document["ends_at"],
-            timezone=clinic_timezone,
-        ) async for document in documents]
+        now_utc = datetime.now(UTC)
+        active_appointments = await db["appointments"].find({
+            "tenant_id": str(tenant_id), "doctor_id": str(doctor_id), "status": {"$in": list(ACTIVE_BOOKING_STATUSES)},
+        }).to_list(500)
+        result = []
+        async for document in documents:
+            start = _parse_datetime(document["starts_at"])
+            end = _parse_datetime(document["ends_at"])
+            occupied = any(_parse_datetime(item.get("starts_at")) < end and _parse_datetime(item.get("ends_at")) > start for item in active_appointments)
+            if end <= now_utc or occupied:
+                continue
+            result.append(AvailabilityResponse(id=str(document["id"]), doctor_id=UUID(document["doctor_id"]), starts_at=start, ends_at=end, timezone=clinic_timezone))
+        return result
     if session is None:
         raise HTTPException(status_code=503, detail="Public directory is unavailable")
     doctor = await session.scalar(select(Doctor).where(
@@ -605,20 +622,31 @@ async def doctor_availability(
     principal: Principal = Depends(require("directory:read")),
 ) -> list[DoctorAvailability]:
     if get_settings().mongodb_enabled:
-        documents = mongo_database.database()["doctor_availability"].find({
+        db = mongo_database.database()
+        documents = db["doctor_availability"].find({
             "tenant_id": principal.tenant_id, "doctor_id": str(doctor_id), "status": "available",
         }).sort("starts_at", 1)
-        return [AvailabilityResponse(
-            id=str(document["id"]), doctor_id=UUID(document["doctor_id"]),
-            starts_at=document["starts_at"], ends_at=document["ends_at"],
-        ) async for document in documents]
+        active_appointments = await db["appointments"].find({"tenant_id": principal.tenant_id, "doctor_id": str(doctor_id), "status": {"$in": list(ACTIVE_BOOKING_STATUSES)}}).to_list(500)
+        now_utc = datetime.now(UTC)
+        result = []
+        async for document in documents:
+            start, end = _parse_datetime(document["starts_at"]), _parse_datetime(document["ends_at"])
+            occupied = any(_parse_datetime(item.get("starts_at")) < end and _parse_datetime(item.get("ends_at")) > start for item in active_appointments)
+            if end <= now_utc or occupied:
+                continue
+            result.append(AvailabilityResponse(id=str(document["id"]), doctor_id=UUID(document["doctor_id"]), starts_at=start, ends_at=end))
+        return result
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
     result = await session.scalars(select(DoctorAvailability).where(
         DoctorAvailability.tenant_id == UUID(principal.tenant_id), DoctorAvailability.doctor_id == doctor_id,
         DoctorAvailability.status == "available"
     ).order_by(DoctorAvailability.starts_at))
-    return list(result)
+    now_utc = datetime.now(UTC)
+    appointments = list(await session.scalars(select(Appointment).where(
+        Appointment.tenant_id == UUID(principal.tenant_id), Appointment.doctor_id == doctor_id,
+        Appointment.status.in_(ACTIVE_BOOKING_STATUSES))))
+    return [slot for slot in result if slot.ends_at > now_utc and not any(item.starts_at < slot.ends_at and item.ends_at > slot.starts_at for item in appointments)]
 
 
 @router.post("/appointments", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
@@ -655,7 +683,7 @@ async def book_appointment(
         platform_fee_paise = int(service.get("platform_fee", 0)) * 100
         total_payable_paise = base_fee_paise + platform_fee_paise
         currency = service.get("currency", "INR")
-        timezone_name = (clinic_settings or {}).get("timezone", "America/New_York")
+        timezone_name = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
         try:
             clinic_zone = ZoneInfo(timezone_name)
         except ZoneInfoNotFoundError as exc:
@@ -664,8 +692,21 @@ async def book_appointment(
         blocked = await db["blocked_dates"].find_one({"tenant_id": principal.tenant_id, "date": local_date.isoformat()})
         if blocked:
             raise HTTPException(status_code=409, detail="Appointments are unavailable on this blocked clinic date")
+        now_utc = datetime.now(UTC)
+        slot_end = payload.starts_at + timedelta(minutes=payload.duration_minutes)
+        if payload.starts_at <= now_utc or slot_end <= now_utc:
+            raise HTTPException(status_code=409, detail="Selected appointment slot has expired")
+        occupied = await db["appointments"].find_one({
+            "tenant_id": principal.tenant_id,
+            "doctor_id": str(payload.doctor_id),
+            "status": {"$in": list(ACTIVE_BOOKING_STATUSES)},
+            "starts_at": {"$lt": slot_end.isoformat()},
+            "ends_at": {"$gt": payload.starts_at.isoformat()},
+        })
+        if occupied:
+            raise HTTPException(status_code=409, detail="Doctor is not available for this time")
         slot = await db["doctor_availability"].find_one_and_update(
-            {"tenant_id": principal.tenant_id, "doctor_id": str(payload.doctor_id), "starts_at": payload.starts_at.isoformat(), "status": "available", "booked": {"$ne": True}},
+            {"tenant_id": principal.tenant_id, "doctor_id": str(payload.doctor_id), "starts_at": payload.starts_at.isoformat(), "ends_at": {"$gt": now_utc.isoformat()}, "status": "available", "booked": {"$ne": True}},
             {"$set": {"status": "reserved", "booked": True}},
         )
         if slot is None:
@@ -688,9 +729,12 @@ async def book_appointment(
     doctor = await session.scalar(select(Doctor).where(Doctor.id == payload.doctor_id, Doctor.tenant_id == tenant_id, Doctor.active.is_(True)))
     if doctor is None:
         raise HTTPException(status_code=404, detail="Doctor not found")
+    now_utc = datetime.now(UTC)
+    if payload.starts_at <= now_utc:
+        raise HTTPException(status_code=409, detail="Selected appointment slot has expired")
     slot = await session.scalar(select(DoctorAvailability).where(
         DoctorAvailability.tenant_id == tenant_id, DoctorAvailability.doctor_id == payload.doctor_id,
-        DoctorAvailability.starts_at == payload.starts_at, DoctorAvailability.status == "available"
+        DoctorAvailability.starts_at == payload.starts_at, DoctorAvailability.ends_at > now_utc, DoctorAvailability.status == "available"
     ).with_for_update())
     if slot is None:
         raise HTTPException(status_code=409, detail="Selected appointment slot is no longer available")

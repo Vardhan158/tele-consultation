@@ -173,7 +173,9 @@ export default function DoctorAvailabilityScreen() {
             {items.map((item) => {
               const startObj = new Date(item.starts_at);
               const endObj = new Date(item.ends_at);
-              const isAvailable = item.status === "available";
+              const normalizedStatus = String(item.status || "available").toLowerCase();
+              const isAvailable = normalizedStatus === "available";
+              const isExpired = normalizedStatus === "expired";
 
               return (
                 <div
@@ -181,9 +183,9 @@ export default function DoctorAvailabilityScreen() {
                   className="rounded-xl bg-white p-4 border border-[#577877]/15 shadow-2xs hover:shadow-xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isAvailable ? "bg-[#EEF6F3] text-[#185A4D]" : "bg-amber-50 text-amber-800"}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isAvailable ? "bg-[#EEF6F3] text-[#185A4D]" : isExpired ? "bg-rose-50 text-rose-800" : "bg-amber-50 text-amber-800"}`}>
                       <span className="material-symbols-outlined text-xl">
-                        {isAvailable ? "event_available" : "event_seat"}
+                        {isAvailable ? "event_available" : isExpired ? "event_busy" : "event_seat"}
                       </span>
                     </div>
                     <div>
@@ -198,8 +200,8 @@ export default function DoctorAvailabilityScreen() {
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-2 sm:pt-0 border-[#577877]/10">
-                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isAvailable ? "bg-emerald-50 text-emerald-800 border border-emerald-200/60" : "bg-amber-50 text-amber-800 border border-amber-200/60"}`}>
-                      {item.status}
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isAvailable ? "bg-emerald-50 text-emerald-800 border border-emerald-200/60" : isExpired ? "bg-rose-50 text-rose-800 border border-rose-200/60" : "bg-amber-50 text-amber-800 border border-amber-200/60"}`}>
+                      {normalizedStatus.toUpperCase()}
                     </span>
 
                     {isAvailable && (
