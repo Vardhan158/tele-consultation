@@ -740,22 +740,7 @@ export default function FindDoctorsScreen({
             </div>
 
             {/* Doctor Cards Listing / States */}
-          )}
-        </div>
-
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer self-start sm:self-auto"
-          >
-            Reset all filters
-          </button>
-        )}
-      </div>
-
-      {/* 4. Doctor Listing */}
-      {loading ? (
+            {loading ? (
         <div className="rounded-2xl bg-white border border-[#577877]/15 p-16 flex flex-col items-center justify-center gap-3 text-[#577877]">
           <span className="material-symbols-outlined animate-spin text-4xl text-[#25836F]">
             sync
