@@ -80,9 +80,12 @@ function formatDbAppointment(apt) {
   const isPaid = apt.payment_status === "captured" || apt.payment_status === "success";
   const isExplicitlyFree = apt.payment_status === "not_required" || apt.payment_status === "no_payment_required";
   const isPendingPayment = totalPaise != null && (apt.status === "pending_payment" || apt.payment_status === "pending" || apt.payment_status === "pending_payment");
+  const isExpiredPendingPayment = isPendingPayment && endDate.getTime() < Date.now();
 
   const statusLabel =
-    apt.status === "confirmed"
+    isExpiredPendingPayment
+      ? "Booking Expired"
+      : apt.status === "confirmed"
       ? "Confirmed"
       : apt.status === "completed"
         ? "Completed"
@@ -92,7 +95,9 @@ function formatDbAppointment(apt) {
             ? "Pending Payment"
             : apt.status ? apt.status.charAt(0).toUpperCase() + apt.status.slice(1) : "Confirmed";
 
-  const paymentStatusLabel = isPaid
+  const paymentStatusLabel = isExpiredPendingPayment
+    ? "Payment Expired"
+    : isPaid
     ? "Paid"
     : isExplicitlyFree
       ? "No Payment Required"
@@ -138,6 +143,7 @@ function formatDbAppointment(apt) {
     rawPaymentStatus: apt.payment_status,
     isPaid,
     isPendingPayment,
+    isExpiredPendingPayment,
     join_window_minutes: apt.join_window_minutes,
     fee: feeFull,
     feePaise: totalPaise,
