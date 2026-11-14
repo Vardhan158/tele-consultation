@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
-from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.identity.auth_routes import (
     auth_database_session,
@@ -445,7 +444,18 @@ async def reject_doctor(
 
 
 @router.post("/mfa/enroll")
-async def enroll_mfa(session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("doctor:profile:write"))):
+async def enroll_mfa(session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
+        if user is None:
+            raise HTTPException(status_code=404, detail="Doctor account not found")
+        secret = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
+        recovery_codes = [secrets.token_urlsafe(8) for _ in range(8)]
+        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$set": {"mfa_secret": secret, "mfa_recovery_codes": recovery_codes, "mfa_enabled": False}})
+        return {"secret": secret, "recovery_codes": recovery_codes}
+    if session is None:
+        raise HTTPException(status_code=503, detail="Application database is unavailable")
     user = await session.get(UserAccount, UUID(principal.user_id))
     if user is None:
         raise HTTPException(status_code=404, detail="Doctor account not found")
@@ -455,7 +465,17 @@ async def enroll_mfa(session: AsyncSession = Depends(tenant_session), principal:
 
 
 @router.post("/mfa/verify")
-async def verify_mfa(payload: MfaCode, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("doctor:profile:write"))):
+async def verify_mfa(payload: MfaCode, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
+        secret = user.get("mfa_secret") if user else None
+        if user is None or not secret or not any(hmac.compare_digest(_totp(secret, int(time.time() // 30) + offset), payload.code) for offset in (-1, 0, 1)):
+            raise HTTPException(status_code=400, detail="Invalid MFA code")
+        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$set": {"mfa_enabled": True}})
+        return {"status": "enabled"}
+    if session is None:
+        raise HTTPException(status_code=503, detail="Application database is unavailable")
     user = await session.get(UserAccount, UUID(principal.user_id))
     if user is None or not user.mfa_secret or not any(hmac.compare_digest(_totp(user.mfa_secret, int(time.time() // 30) + offset), payload.code) for offset in (-1, 0, 1)):
         raise HTTPException(status_code=400, detail="Invalid MFA code")
