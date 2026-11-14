@@ -216,6 +216,23 @@ async def test_finalized_note_is_locked_and_amendment_is_separate(portal, monkey
     assert "Corrected coding" in db["clinical_note_amendments"].rows[0]["content_reference"]
 
 
+async def test_patient_detail_retrieves_notes_by_authorized_appointment(portal, monkeypatch):
+    from teleconsult.modules.consultation import doctor_routes
+
+    rows, _ = portal
+    rows["appointments"][0]["status"] = "completed"
+    rows["clinical_notes"] = [{"id": "note-patient", "tenant_id": "1", "appointment_id": "apt-45bde4b19136", "consultation_id": "apt-45bde4b19136", "doctor_id": DOCTOR, "author_id": DOCTOR, "status": "finalized", "content_reference": "Diagnosis:\nViral URI"}]
+    rows["clinical_note_amendments"] = []
+    db = {key: Collection(value) for key, value in rows.items()}
+    monkeypatch.setattr(doctor_routes.mongo_database, "database", lambda: db)
+    monkeypatch.setattr(doctor_routes, "get_settings", lambda: SimpleNamespace(mongodb_enabled=True))
+    principal = Principal(DOCTOR, "1", frozenset({"doctor"}), frozenset({"clinical:read"}))
+    result = await doctor_routes.doctor_patient_detail(PATIENT, None, principal)
+    assert len(result["notes"]) == 1
+    assert result["notes"][0]["appointment_id"] == "apt-45bde4b19136"
+    assert result["notes"][0]["status"] == "finalized"
+
+
 @pytest.mark.parametrize("change", [{"id": "missing"}, {"patient_id": "other"}, {"tenant_id": "2"}])
 async def test_join_not_found_never_creates_appointment(portal, change):
     rows, principal = portal

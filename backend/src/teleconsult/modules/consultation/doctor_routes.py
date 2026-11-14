@@ -650,11 +650,16 @@ async def doctor_patient_detail(patient_id: str, session: AsyncSession | None = 
         })
         p_name = patient.get("full_name") if patient else "Emma Mitchell"
 
+        appointment_ids = [str(item.get("id") or item.get("_id")) for item in appointments]
         notes = await db["clinical_notes"].find({
-            "tenant_id": principal.tenant_id,
-            "doctor_id": doctor.get("id"),
-            "patient_id": str(patient_id),
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": str(doctor.get("id")),
+            "$or": [
+                {"appointment_id": {"$in": appointment_ids}},
+                {"consultation_id": {"$in": appointment_ids}},
+            ],
         }).sort("created_at", -1).to_list(100)
+        appointment_map = {str(item.get("id") or item.get("_id")): item for item in appointments}
 
         return {
             "patient": {
@@ -676,10 +681,16 @@ async def doctor_patient_detail(patient_id: str, session: AsyncSession | None = 
             "notes": [
                 {
                     "id": item.get("id") or str(item.get("_id")),
-                    "appointment_id": item.get("appointment_id") or item.get("consultation_id"),
+                    "appointment_id": str(item.get("appointment_id") or item.get("consultation_id")),
+                    "appointment_date": (appointment_map.get(str(item.get("appointment_id") or item.get("consultation_id"))) or {}).get("starts_at"),
+                    "appointment_status": (appointment_map.get(str(item.get("appointment_id") or item.get("consultation_id"))) or {}).get("status"),
                     "status": item.get("status", "draft"),
                     "content_reference": item.get("content_reference") or item.get("content", ""),
                     "created_at": item.get("created_at"),
+                    "amendments": [
+                        {"id": amendment.get("id") or str(amendment.get("_id")), "version": amendment.get("version", 1), "content_reference": amendment.get("content_reference", ""), "created_at": amendment.get("created_at")}
+                        for amendment in await db["clinical_note_amendments"].find({"tenant_id": str(principal.tenant_id), "note_id": str(item.get("id") or item.get("_id"))}).sort("version", 1).to_list(100)
+                    ],
                 }
                 for item in notes
             ],
@@ -702,7 +713,7 @@ async def doctor_patient_detail(patient_id: str, session: AsyncSession | None = 
     return {
         "patient": {"id": patient.id, "full_name": patient.full_name, "preferred_language": patient.preferred_language},
         "appointments": [{"id": item.id, "starts_at": item.starts_at, "ends_at": item.ends_at, "status": item.status, "reason": item.reason} for item in appointments],
-        "notes": [{"id": item.id, "appointment_id": item.consultation_id, "status": item.status, "content_reference": item.content_reference, "created_at": item.created_at} for item in notes],
+        "notes": [{"id": item.id, "appointment_id": item.consultation_id, "appointment_date": next((appointment.starts_at for appointment in appointments if appointment.id == item.consultation_id), None), "appointment_status": next((appointment.status for appointment in appointments if appointment.id == item.consultation_id), None), "status": item.status, "content_reference": item.content_reference, "created_at": item.created_at, "amendments": []} for item in notes],
     }
 
 
