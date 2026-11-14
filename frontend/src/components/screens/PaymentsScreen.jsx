@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { paymentApi, patientApi, loadRazorpayScript } from "../../lib/api";
+import { paymentApi, patientApi } from "../../lib/api";
 
 export default function PaymentsScreen({ onNavigate, navParams }) {
   const [userView, setUserView] = useState(null);
@@ -9,20 +9,13 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
   const [patientProfile, setPatientProfile] = useState(null);
   const [dbTransactions, setDbTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [paymentError, setPaymentError] = useState("");
-  const [paymentSuccessData, setPaymentSuccessData] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
 
   // Billing tab states
-  const [activeBillingTab, setActiveBillingTab] = useState("transactions");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
   const [toastMessage, setToastMessage] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-
-  const [useDifferentCard, setUseDifferentCard] = useState(false);
-  const [agreeCancellation, setAgreeCancellation] = useState(true);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const fetchPaymentsData = async () => {
     setLoading(true);
@@ -42,6 +35,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
           return {
             id: t.id,
+            appointmentId: t.appointment_id,
             receiptId: t.receipt || `KC-RC-${strVal(t.id).slice(-6).toUpperCase()}`,
             date: t.created_at || t.appointment_date
               ? new Date(t.created_at || t.appointment_date).toLocaleDateString("en-US", {
@@ -63,6 +57,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
             amountPaise: t.amount_paise || 0,
             status: statusText,
             rawStatus,
+            isPaid,
             method: "Razorpay Online Payment",
             description: `${t.appointment_type || "Video Consultation"} · ${t.doctor_name || "Clinician"}`,
             transactionId: t.provider_transaction_id || `TXN-${strVal(t.id).slice(-8).toUpperCase()}`,
@@ -86,11 +81,11 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
   }, []);
 
   const activeTransactions = dbTransactions;
-
-  // Compute active checkout/receipt targets
   const activeTx = selectedReceipt || activeTransactions[0] || null;
 
-  const currentReceiptData = paymentSuccessData || (activeTx ? {
+  const currentReceiptData = activeTx ? {
+    id: activeTx.id,
+    appointmentId: activeTx.appointmentId,
     receiptId: activeTx.receiptId,
     transactionId: activeTx.transactionId,
     amount: activeTx.amount,
@@ -99,7 +94,8 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
     specialty: activeTx.specialty,
     description: activeTx.description,
     status: activeTx.status,
-  } : null);
+    isPaid: activeTx.isPaid,
+  } : null;
 
   const filteredTransactions = activeTransactions.filter((item) => {
     if (statusFilter === "All") return true;
@@ -166,15 +162,24 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
     setTimeout(() => setToastMessage(""), 3500);
   };
 
-  const totalPaidNum = dbTransactions
-    .filter((t) => t.status === "Paid")
-    .reduce((acc, t) => acc + (t.amountPaise || 0), 0);
+  // Paid consultations calculation
+  const paidTransactions = dbTransactions.filter((t) => t.isPaid);
+  const paidCount = paidTransactions.length;
+  const totalPaidNum = paidTransactions.reduce((acc, t) => acc + (t.amountPaise || 0), 0);
   const totalPaidFormatted = totalPaidNum > 0 ? `₹${(totalPaidNum / 100).toFixed(2)}` : "₹0.00";
 
+  // Pending payments calculation
+  const pendingTransactions = dbTransactions.filter((t) => !t.isPaid && t.status !== "Refunded");
+  const pendingCount = pendingTransactions.length;
+  const pendingAmountNum = pendingTransactions.reduce((acc, t) => acc + (t.amountPaise || 0), 0);
+  const pendingAmountFormatted = pendingAmountNum > 0 ? `₹${(pendingAmountNum / 100).toFixed(2)}` : "₹0.00";
+
   // ========================================================
-  // VIEW 1: PAYMENT RECEIPT VIEW
+  // VIEW 1: PAYMENT RECEIPT / PENDING STATEMENT VIEW
   // ========================================================
   if (view === "receipt") {
+    const isPaid = currentReceiptData?.isPaid;
+
     return (
       <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
         <div className="mx-auto max-w-7xl space-y-6">
@@ -201,10 +206,12 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-                Payment received
+                {isPaid ? "Payment received" : "Pending Payment Record"}
               </h1>
               <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-                Your appointment is paid and confirmed.
+                {isPaid
+                  ? "Your appointment is paid and confirmed."
+                  : "Payment is required to confirm this appointment. Complete payment via Razorpay to finalize your booking."}
               </p>
             </div>
 
@@ -225,7 +232,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                   <span className="material-symbols-outlined !text-white text-base">
                     download
                   </span>
-                  <span>Download PDF</span>
+                  <span>{isPaid ? "Download PDF" : "Download Statement"}</span>
                 </button>
               )}
             </div>
@@ -248,7 +255,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           ) : (
             /* Main 2-Column Content Area */
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Left Column (8 cols): Formal Printable Receipt Card */}
+              {/* Left Column (8 cols): Formal Printable Receipt / Statement Card */}
               <div className="lg:col-span-8 care-card p-6 sm:p-9 space-y-7 border border-[#577877]/15 shadow-sm bg-white rounded-2xl">
                 {/* Receipt Header: Brand + Receipt ID */}
                 <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
@@ -270,7 +277,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
                   <div className="text-right">
                     <h3 className="text-xl sm:text-2xl font-bold text-[#162623]">
-                      Receipt
+                      {isPaid ? "Receipt" : "Payment Record"}
                     </h3>
                     <p className="text-xs text-[#577877] font-medium mt-0.5">
                       {currentReceiptData.receiptId}
@@ -291,7 +298,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
                   <div>
                     <span className="text-[#577877] block text-[11px]">
-                      Date paid
+                      {isPaid ? "Date paid" : "Record date"}
                     </span>
                     <span className="font-bold text-sm text-[#162623] mt-1 block">
                       {currentReceiptData.datePaid}
@@ -303,7 +310,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                       Status
                     </span>
                     <span className="font-bold text-sm text-[#162623] mt-1 block">
-                      {currentReceiptData.status || "Paid"}
+                      {isPaid ? "Paid" : "Pending Payment"}
                     </span>
                   </div>
                 </div>
@@ -348,11 +355,11 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                   </table>
                 </div>
 
-                {/* Paid With & Total Paid Block */}
+                {/* Paid With / Payment Method Block */}
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-3 border-t border-[#577877]/15">
                   <div className="text-xs space-y-0.5">
                     <span className="text-[#577877] block text-[11px]">
-                      Paid with
+                      Payment method
                     </span>
                     <p className="font-semibold text-sm text-[#162623]">
                       Razorpay Online Payment
@@ -364,24 +371,30 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
                   <div className="text-left sm:text-right space-y-1">
                     <span className="text-[11px] text-[#577877] block">
-                      Total paid
+                      {isPaid ? "Total paid" : "Total due"}
                     </span>
                     <p className="text-3xl font-bold text-[#162623] tracking-tight">
                       {currentReceiptData.amount}
                     </p>
                     <div>
-                      <span className="inline-flex items-center text-[11px] font-semibold px-3 py-1 rounded-full bg-[#E6F4EA] text-[#1E7E34]">
-                        Payment successful
-                      </span>
+                      {isPaid ? (
+                        <span className="inline-flex items-center text-[11px] font-semibold px-3 py-1 rounded-full bg-[#E6F4EA] text-[#1E7E34]">
+                          Payment successful
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-[11px] font-semibold px-3 py-1 rounded-full bg-amber-100 text-amber-900">
+                          Payment Pending
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Footer Note */}
                 <div className="pt-4 border-t border-[#577877]/15 text-[11px] text-[#577877] leading-relaxed">
-                  Thank you for choosing Kaizen Care. This receipt confirms
-                  payment and is not a statement of insurance benefits. Keep it
-                  for your records.
+                  {isPaid
+                    ? "Thank you for choosing Kaizen Care. This receipt confirms payment and is not a statement of insurance benefits. Keep it for your records."
+                    : "This statement reflects an unverified or pending payment item. Complete payment through the patient portal to receive your verified paid receipt."}
                 </div>
               </div>
 
@@ -389,20 +402,32 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               <div className="lg:col-span-4 space-y-4">
                 <div className="care-card p-6 sm:p-7 space-y-4 bg-white rounded-2xl border border-[#577877]/15">
                   <h3 className="text-base font-bold text-[#162623]">
-                    What happens next?
+                    {isPaid ? "What happens next?" : "Action Required"}
                   </h3>
                   <p className="text-xs text-[#577877] leading-relaxed">
-                    You're booked with {currentReceiptData.doctor || "your clinician"}. Visit details and preparation tips are ready in My appointments.
+                    {isPaid
+                      ? `You're booked with ${currentReceiptData.doctor || "your clinician"}. Visit details and preparation tips are ready in My appointments.`
+                      : `Payment of ${currentReceiptData.amount} is pending for your appointment with ${currentReceiptData.doctor || "your clinician"}.`}
                   </p>
 
                   <div className="space-y-2.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => onNavigate && onNavigate("appointments")}
-                      className="btn-primary w-full !py-2.5 rounded-xl font-semibold text-xs shadow-2xs cursor-pointer"
-                    >
-                      View appointments
-                    </button>
+                    {!isPaid ? (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate && onNavigate("appointments")}
+                        className="btn-primary w-full !py-2.5 rounded-xl font-semibold text-xs shadow-2xs cursor-pointer"
+                      >
+                        Complete Payment in Appointments
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate && onNavigate("appointments")}
+                        className="btn-primary w-full !py-2.5 rounded-xl font-semibold text-xs shadow-2xs cursor-pointer"
+                      >
+                        View appointments
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -429,7 +454,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                       >
                         Contact billing support
                       </span>{" "}
-                      and include receipt {currentReceiptData.receiptId}. Never send full card details.
+                      and include record {currentReceiptData.receiptId}. Never send full card details.
                     </p>
                   </div>
                 </div>
@@ -501,7 +526,11 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
             {dbTransactions.length > 0 && (
               <button
                 type="button"
-                onClick={() => setView("receipt")}
+                onClick={() => {
+                  const paid = dbTransactions.find((t) => t.isPaid) || dbTransactions[0];
+                  setSelectedReceipt(paid);
+                  setView("receipt");
+                }}
                 className="btn-primary !px-4 !py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs cursor-pointer"
               >
                 <span className="material-symbols-outlined !text-white text-base">
@@ -526,20 +555,28 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
         {/* 3 Metric Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {/* Card 1: Outstanding balance */}
+          {/* Card 1: Pending / Outstanding balance */}
           <div className="care-card p-6 space-y-3 bg-white rounded-2xl border border-[#577877]/15">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[#577877] font-medium">
                 Outstanding balance
               </span>
-              <span className="material-symbols-outlined !text-[#25836F] text-lg">
-                check_circle
+              <span
+                className={`material-symbols-outlined text-lg ${
+                  pendingCount > 0 ? "text-amber-600" : "!text-[#25836F]"
+                }`}
+              >
+                {pendingCount > 0 ? "pending" : "check_circle"}
               </span>
             </div>
             <p className="text-3xl font-bold text-[#162623] tracking-tight">
-              ₹0.00
+              {pendingAmountFormatted}
             </p>
-            <p className="text-xs text-[#577877]">You're all up to date</p>
+            <p className="text-xs text-[#577877]">
+              {pendingCount > 0
+                ? `${pendingCount} pending payment`
+                : "You're all up to date"}
+            </p>
           </div>
 
           {/* Card 2: Total Paid */}
@@ -556,7 +593,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
               {totalPaidFormatted}
             </p>
             <p className="text-xs text-[#577877]">
-              {dbTransactions.length} {dbTransactions.length === 1 ? "transaction" : "transactions"}
+              {paidCount} paid {paidCount === 1 ? "consultation" : "consultations"}
             </p>
           </div>
 
@@ -591,7 +628,9 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[#577877]">All transactions</span>
+              <span className="text-[#577877]">
+                All transactions ({filteredTransactions.length})
+              </span>
               <div className="relative">
                 <select
                   value={statusFilter}
@@ -603,6 +642,7 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                 >
                   <option value="All">All statuses</option>
                   <option value="Paid">Paid</option>
+                  <option value="Pending">Pending</option>
                   <option value="Refunded">Refunded</option>
                 </select>
                 <span className="material-symbols-outlined !text-[#577877] text-xs absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -624,61 +664,90 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-[#F0F5F7]/80 text-[#577877] font-semibold uppercase text-[11px] tracking-wider border-y border-[#577877]/15">
-                      <th className="py-3 px-4">Receipt</th>
-                      <th className="py-3 px-4">Appointment</th>
-                      <th className="py-3 px-4">Doctor</th>
-                      <th className="py-3 px-4">Amount</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#577877]/10">
-                    {paginatedTransactions.map((item) => (
-                      <tr key={item.id} className="hover:bg-[#F8FAFB] transition">
-                        <td className="py-3.5 px-4 font-mono font-semibold text-[#162623]">
-                          {item.receiptId}
-                        </td>
-                        <td className="py-3.5 px-4 text-[#577877]">
-                          {item.date}
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-[#162623]">
-                          {item.doctor}
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-[#162623]">
-                          {item.amount}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase ${
-                              item.status === "Paid"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-amber-100 text-amber-900"
-                            }`}
-                          >
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedReceipt(item);
-                              setView("receipt");
-                            }}
-                            className="text-[#25836F] font-bold hover:underline cursor-pointer"
-                          >
-                            View receipt
-                          </button>
-                        </td>
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-[#F0F5F7]/80 text-[#577877] font-semibold uppercase text-[11px] tracking-wider border-y border-[#577877]/15">
+                        <th className="py-3 px-4">Receipt</th>
+                        <th className="py-3 px-4">Appointment</th>
+                        <th className="py-3 px-4">Doctor</th>
+                        <th className="py-3 px-4">Amount</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-[#577877]/10">
+                      {paginatedTransactions.map((item) => (
+                        <tr key={item.id} className="hover:bg-[#F8FAFB] transition">
+                          <td className="py-3.5 px-4 font-mono font-semibold text-[#162623]">
+                            {item.receiptId}
+                          </td>
+                          <td className="py-3.5 px-4 text-[#577877]">
+                            {item.date}
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-[#162623]">
+                            {item.doctor}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-[#162623]">
+                            {item.amount}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase ${
+                                item.isPaid
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-amber-100 text-amber-900"
+                              }`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedReceipt(item);
+                                setView("receipt");
+                              }}
+                              className="text-[#25836F] font-bold hover:underline cursor-pointer"
+                            >
+                              {item.isPaid ? "View receipt" : "View record"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-3 text-xs text-[#577877]">
+                    <span>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        className="px-3 py-1.5 rounded-lg border border-[#577877]/25 font-semibold hover:bg-[#F0F5F7] disabled:opacity-40 cursor-pointer"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        className="px-3 py-1.5 rounded-lg border border-[#577877]/25 font-semibold hover:bg-[#F0F5F7] disabled:opacity-40 cursor-pointer"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
