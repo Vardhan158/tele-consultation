@@ -90,6 +90,9 @@ export default function Header({
         return "Dashboard";
       case "find-doctors":
         return "Find doctors";
+      case "doctor-availability":
+      case "availability":
+        return "Availability";
       case "appointments":
       case "doctor-appointments":
         return "Appointments";

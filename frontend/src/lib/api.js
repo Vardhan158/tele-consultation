@@ -114,6 +114,10 @@ export const doctorApi = {
       method: "POST",
       body: JSON.stringify(slot),
     }),
+  deleteAvailability: (slotId) =>
+    apiRequest(`/doctor/availability/${slotId}`, {
+      method: "DELETE",
+    }),
   saveNote: (appointmentId, content_reference) =>
     apiRequest(`/doctor/appointments/${appointmentId}/notes`, {
       method: "POST",

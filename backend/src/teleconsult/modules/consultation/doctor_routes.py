@@ -1,7 +1,7 @@
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -235,28 +235,192 @@ async def doctor_appointments(session: AsyncSession | None = Depends(auth_databa
 
 
 @router.get("/availability")
-async def doctor_availability(session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("doctor:availability:read"))):
+async def doctor_availability(
+    session: AsyncSession | None = Depends(auth_database_session),
+    principal: Principal = Depends(require("doctor:availability:read")),
+):
+    if get_settings().mongodb_enabled and mongo_database.enabled:
+        db = mongo_database.database()
+        doctor_doc = await db["doctors"].find_one({
+            "tenant_id": principal.tenant_id,
+            "$or": [
+                {"id": principal.user_id},
+                {"user_id": principal.user_id},
+                {"user_account_id": principal.user_id},
+            ],
+        })
+        if doctor_doc is None or doctor_doc.get("approval_status") != "approved" or not doctor_doc.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+
+        doctor_id = str(doctor_doc.get("id"))
+        clinic_settings = await db["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
+        clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
+
+        cursor = db["doctor_availability"].find({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": doctor_id,
+            "status": {"$ne": "deleted"},
+        }).sort("starts_at", 1)
+
+        slots = []
+        async for doc in cursor:
+            slots.append({
+                "id": str(doc.get("id", doc.get("_id"))),
+                "doctor_id": doc.get("doctor_id"),
+                "starts_at": doc.get("starts_at"),
+                "ends_at": doc.get("ends_at"),
+                "status": doc.get("status", "available"),
+                "timezone": clinic_timezone,
+            })
+        return slots
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="Runtime database is unavailable")
+
     doctor = await _doctor(session, principal)
-    result = await session.scalars(select(DoctorAvailability).where(
-        DoctorAvailability.tenant_id == doctor.tenant_id, DoctorAvailability.doctor_id == doctor.id).order_by(DoctorAvailability.starts_at))
+    result = await session.scalars(
+        select(DoctorAvailability)
+        .where(
+            DoctorAvailability.tenant_id == doctor.tenant_id,
+            DoctorAvailability.doctor_id == doctor.id,
+        )
+        .order_by(DoctorAvailability.starts_at)
+    )
     return list(result)
 
 
 @router.post("/availability", status_code=201)
-async def create_availability(payload: DoctorSlot, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("doctor:availability:write"))):
-    doctor = await _doctor(session, principal)
+async def create_availability(
+    payload: DoctorSlot,
+    session: AsyncSession | None = Depends(auth_database_session),
+    principal: Principal = Depends(require("doctor:availability:write")),
+):
     if payload.ends_at <= payload.starts_at:
         raise HTTPException(status_code=422, detail="Slot end must be after slot start")
-    conflict = await session.scalar(select(DoctorAvailability.id).where(
-        DoctorAvailability.tenant_id == doctor.tenant_id, DoctorAvailability.doctor_id == doctor.id,
-        DoctorAvailability.starts_at < payload.ends_at, DoctorAvailability.ends_at > payload.starts_at,
-        DoctorAvailability.status == "available"))
+
+    if get_settings().mongodb_enabled and mongo_database.enabled:
+        db = mongo_database.database()
+        doctor_doc = await db["doctors"].find_one({
+            "tenant_id": principal.tenant_id,
+            "$or": [
+                {"id": principal.user_id},
+                {"user_id": principal.user_id},
+                {"user_account_id": principal.user_id},
+            ],
+        })
+        if doctor_doc is None or doctor_doc.get("approval_status") != "approved" or not doctor_doc.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+
+        doctor_id = str(doctor_doc.get("id"))
+        starts_iso = payload.starts_at.astimezone(UTC).isoformat() if payload.starts_at.tzinfo else payload.starts_at.isoformat()
+        ends_iso = payload.ends_at.astimezone(UTC).isoformat() if payload.ends_at.tzinfo else payload.ends_at.isoformat()
+
+        # Check for overlapping or duplicate slots in MongoDB
+        conflict = await db["doctor_availability"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": doctor_id,
+            "status": {"$in": ["available", "reserved", "booked"]},
+            "starts_at": {"$lt": ends_iso},
+            "ends_at": {"$gt": starts_iso},
+        })
+        if conflict:
+            raise HTTPException(status_code=409, detail="Availability overlaps an existing slot")
+
+        slot_id = str(uuid4())
+        slot_doc = {
+            "id": slot_id,
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": doctor_id,
+            "starts_at": starts_iso,
+            "ends_at": ends_iso,
+            "status": "available",
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        await db["doctor_availability"].insert_one(slot_doc)
+
+        clinic_settings = await db["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
+        clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
+
+        return {
+            "id": slot_id,
+            "doctor_id": doctor_id,
+            "starts_at": starts_iso,
+            "ends_at": ends_iso,
+            "status": "available",
+            "timezone": clinic_timezone,
+        }
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="Runtime database is unavailable")
+
+    doctor = await _doctor(session, principal)
+    conflict = await session.scalar(
+        select(DoctorAvailability.id).where(
+            DoctorAvailability.tenant_id == doctor.tenant_id,
+            DoctorAvailability.doctor_id == doctor.id,
+            DoctorAvailability.starts_at < payload.ends_at,
+            DoctorAvailability.ends_at > payload.starts_at,
+            DoctorAvailability.status.in_(["available", "reserved", "booked"]),
+        )
+    )
     if conflict:
         raise HTTPException(status_code=409, detail="Availability overlaps an existing slot")
-    slot = DoctorAvailability(tenant_id=doctor.tenant_id, doctor_id=doctor.id, status="available", **payload.model_dump())
+
+    slot = DoctorAvailability(
+        tenant_id=doctor.tenant_id,
+        doctor_id=doctor.id,
+        status="available",
+        **payload.model_dump(),
+    )
     session.add(slot)
     await session.flush()
     return slot
+
+
+@router.delete("/availability/{slot_id}")
+async def delete_availability(
+    slot_id: str,
+    session: AsyncSession | None = Depends(auth_database_session),
+    principal: Principal = Depends(require("doctor:availability:write")),
+):
+    if get_settings().mongodb_enabled and mongo_database.enabled:
+        db = mongo_database.database()
+        doctor_doc = await db["doctors"].find_one({
+            "tenant_id": principal.tenant_id,
+            "$or": [
+                {"id": principal.user_id},
+                {"user_id": principal.user_id},
+                {"user_account_id": principal.user_id},
+            ],
+        })
+        if doctor_doc is None or doctor_doc.get("approval_status") != "approved" or not doctor_doc.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+
+        doctor_id = str(doctor_doc.get("id"))
+        result = await db["doctor_availability"].delete_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": doctor_id,
+            "id": slot_id,
+        })
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Availability slot not found")
+        return {"status": "deleted", "slot_id": slot_id}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="Runtime database is unavailable")
+
+    doctor = await _doctor(session, principal)
+    slot = await session.scalar(
+        select(DoctorAvailability).where(
+            DoctorAvailability.id == UUID(slot_id),
+            DoctorAvailability.tenant_id == doctor.tenant_id,
+            DoctorAvailability.doctor_id == doctor.id,
+        )
+    )
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Availability slot not found")
+    await session.delete(slot)
+    return {"status": "deleted", "slot_id": slot_id}
 
 
 @router.post("/appointments/{appointment_id}/notes", status_code=201)
