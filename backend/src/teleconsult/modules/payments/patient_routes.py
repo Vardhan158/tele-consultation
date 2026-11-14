@@ -122,34 +122,19 @@ async def create_payment_order(
 
     db = mongo_database.database()
 
-    # 1. Recalculate Service Pricing Server-side
-    apt_clean = payload.appointment_type.strip(" .,;:")
-    escaped_apt = re.escape(apt_clean)
-    services = await db["services"].find({
-        "tenant_id": principal.tenant_id,
-        "active": True,
-        "assigned_doctors": payload.doctor_id,
-        "appointment_types": {"$regex": f"^{escaped_apt}[\\s\\.]*$", "$options": "i"},
-    }).to_list(5)
+    # 1. Recalculate Service Pricing Server-side authoritatively
+    from teleconsult.modules.patient_portal.routes import compute_doctor_pricing
 
-    if not services:
-        services = await db["services"].find({
-            "tenant_id": principal.tenant_id,
-            "active": True,
-            "assigned_doctors": payload.doctor_id,
-        }).to_list(5)
-
-    if not services:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="No matching service fee mapping exists for this doctor and appointment type",
-        )
-
-    service = services[0]
-    base_fee_paise = int(service.get("base_fee", 0)) * 100
-    platform_fee_paise = int(service.get("platform_fee", 0)) * 100
-    total_payable_paise = base_fee_paise + platform_fee_paise
-    currency = service.get("currency", "INR")
+    pricing = await compute_doctor_pricing(
+        db=db,
+        tenant_id=principal.tenant_id,
+        doctor_id=payload.doctor_id,
+        appointment_type=payload.appointment_type,
+    )
+    base_fee_paise = pricing["base_fee_paise"]
+    platform_fee_paise = pricing["platform_fee_paise"]
+    total_payable_paise = pricing["total_payable_paise"]
+    currency = pricing["currency"]
 
     # 2. Check if doctor availability slot exists and is available
     slot = await db["doctor_availability"].find_one({

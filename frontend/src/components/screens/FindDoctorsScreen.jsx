@@ -109,15 +109,15 @@ export default function FindDoctorsScreen({
               registrationNumber: doctor.registration_number || doctor.registrationNo || "Registration on File",
               bio: doctor.bio || doctor.about || `Qualified ${doctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`,
               languages: doctor.supported_languages || doctor.languages || ["English"],
-              fee: doctor.fee_paise == null ? null : doctor.fee_paise / 100,
+              fee: (doctor.total_payable_paise ?? doctor.fee_paise) == null ? null : (doctor.total_payable_paise ?? doctor.fee_paise) / 100,
               feeDisplay:
-                doctor.fee_paise == null
-                  ? "₹400.00"
-                  : `${doctor.currency || "INR"} ${(doctor.fee_paise / 100).toFixed(2)}`,
+                (doctor.total_payable_paise ?? doctor.fee_paise) == null
+                  ? "Fee calculated at booking"
+                  : `${doctor.currency === "USD" ? "$" : doctor.currency === "INR" ? "₹" : (doctor.currency || "INR") + " "} ${((doctor.total_payable_paise ?? doctor.fee_paise) / 100).toFixed(2)}`,
               feeVideoVisit:
-                doctor.fee_paise == null
-                  ? "₹400.00 per video visit"
-                  : `${doctor.currency || "INR"} ${(doctor.fee_paise / 100).toFixed(2)} per video visit`,
+                (doctor.total_payable_paise ?? doctor.fee_paise) == null
+                  ? "Fee calculated at booking"
+                  : `${doctor.currency === "USD" ? "$" : doctor.currency === "INR" ? "₹" : (doctor.currency || "INR") + " "} ${((doctor.total_payable_paise ?? doctor.fee_paise) / 100).toFixed(2)} per video visit`,
               availability: futureSlots,
               timezone: doctor.timezone || "Asia/Kolkata",
               availableToday: Boolean(
@@ -1048,9 +1048,9 @@ export default function FindDoctorsScreen({
                 </div>
               </div>
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Consultation Fee</div>
-                <div className="text-xs font-bold text-[#185A4D] mt-0.5">
-                  {selectedProfileDoctor.feeDisplay || "₹400.00"}
+                <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Consultation Fee</div>
+                <div className="text-xs font-bold text-[#1A7D67] mt-0.5">
+                  {selectedProfileDoctor.feeDisplay || "Fee calculated at booking"}
                 </div>
               </div>
               <div>

@@ -60,76 +60,99 @@ async def booking_options() -> dict[str, list[str]]:
     return {"appointment_types": appointment_types, "visit_formats": visit_formats}
 
 
+async def compute_doctor_pricing(
+    db: Any,
+    tenant_id: str,
+    doctor_id: Any,
+    appointment_type: str | None = None,
+) -> dict[str, Any]:
+    """Compute the single authoritative consultation fee for a doctor and appointment type."""
+    doc_id_str = str(doctor_id)
+    t_id_str = str(tenant_id)
+    apt_clean = (appointment_type or "").strip(" .,;:")
+    escaped_apt = re.escape(apt_clean) if apt_clean else ""
+
+    services = []
+    if escaped_apt:
+        # 1. Active service matching assigned doctor & appointment_type
+        services = await db["services"].find({
+            "tenant_id": t_id_str,
+            "active": True,
+            "assigned_doctors": doc_id_str,
+            "appointment_types": {"$regex": f"^{escaped_apt}[\\s\\.]*$", "$options": "i"},
+        }).to_list(5)
+
+        # 2. Active service matching appointment_type for clinic
+        if not services:
+            services = await db["services"].find({
+                "tenant_id": t_id_str,
+                "active": True,
+                "appointment_types": {"$regex": f"^{escaped_apt}[\\s\\.]*$", "$options": "i"},
+            }).to_list(5)
+
+    # 3. Any active service assigned to doctor
+    if not services:
+        services = await db["services"].find({
+            "tenant_id": t_id_str,
+            "active": True,
+            "assigned_doctors": doc_id_str,
+        }).to_list(5)
+
+    # 4. Any active service in clinic
+    if not services:
+        services = await db["services"].find({
+            "tenant_id": t_id_str,
+            "active": True,
+        }).to_list(5)
+
+    if services:
+        service = services[0]
+        base_fee = int(service.get("base_fee_paise", int(service.get("base_fee", 0)) * 100))
+        platform_fee = int(service.get("platform_fee_paise", int(service.get("platform_fee", 0)) * 100))
+        currency = service.get("currency", "INR")
+        return {
+            "service_id": str(service.get("id", service.get("_id"))),
+            "base_fee_paise": base_fee,
+            "platform_fee_paise": platform_fee,
+            "total_payable_paise": base_fee + platform_fee,
+            "currency": currency,
+        }
+
+    # 5. Doctor document fee_paise
+    doctor_doc = await db["doctors"].find_one({
+        "tenant_id": t_id_str,
+        "$or": [{"id": doc_id_str}, {"user_id": doc_id_str}, {"user_account_id": doc_id_str}],
+    })
+
+    if doctor_doc and doctor_doc.get("fee_paise") is not None and int(doctor_doc.get("fee_paise", 0)) > 0:
+        base_fee = int(doctor_doc.get("fee_paise"))
+        platform_fee = int(doctor_doc.get("platform_fee_paise", 0))
+        currency = doctor_doc.get("currency", "INR")
+        return {
+            "service_id": f"doctor_fee_{doc_id_str}",
+            "base_fee_paise": base_fee,
+            "platform_fee_paise": platform_fee,
+            "total_payable_paise": base_fee + platform_fee,
+            "currency": currency,
+        }
+
+    # Standard fallback if fee is unconfigured
+    return {
+        "service_id": f"default_fee_{doc_id_str}",
+        "base_fee_paise": 40000,
+        "platform_fee_paise": 0,
+        "total_payable_paise": 40000,
+        "currency": "INR",
+    }
+
+
 @public_router.get("/doctors/{doctor_id}/pricing")
 async def doctor_pricing(doctor_id: UUID, appointment_type: str = Query(min_length=1)) -> dict:
     settings = get_settings()
     if not settings.mongodb_enabled:
         raise HTTPException(status_code=503, detail="Service pricing is unavailable")
     db = mongo_database.database()
-    doc_id_str = str(doctor_id)
-    apt_clean = appointment_type.strip(" .,;:")
-    escaped_apt = re.escape(apt_clean)
-
-    # 1. Primary lookup: active service matching appointment_type and assigned to this doctor
-    services = await db["services"].find({
-        "tenant_id": str(public_tenant_id()),
-        "active": True,
-        "assigned_doctors": doc_id_str,
-        "appointment_types": {"$regex": f"^{escaped_apt}[\\s\\.]*$", "$options": "i"},
-    }).to_list(5)
-
-    # 2. Fallback lookup: active service matching appointment_type for clinic
-    if not services:
-        services = await db["services"].find({
-            "tenant_id": str(public_tenant_id()),
-            "active": True,
-            "appointment_types": {"$regex": f"^{escaped_apt}[\\s\\.]*$", "$options": "i"},
-        }).to_list(5)
-
-    # 3. Fallback lookup: any active service assigned to doctor
-    if not services:
-        services = await db["services"].find({
-            "tenant_id": str(public_tenant_id()),
-            "active": True,
-            "assigned_doctors": doc_id_str,
-        }).to_list(5)
-
-    # 4. Fallback lookup: any active service in clinic
-    if not services:
-        services = await db["services"].find({
-            "tenant_id": str(public_tenant_id()),
-            "active": True,
-        }).to_list(5)
-
-    if not services:
-        doctor_doc = await db["doctors"].find_one({
-            "$or": [{"id": doc_id_str}, {"user_id": doc_id_str}, {"user_account_id": doc_id_str}],
-        })
-        base_fee = 50000
-        currency = "INR"
-        if doctor_doc:
-            if doctor_doc.get("fee_paise") is not None:
-                base_fee = int(doctor_doc.get("fee_paise"))
-            currency = doctor_doc.get("currency", "INR")
-        return {
-            "service_id": f"doctor_default_{doc_id_str}",
-            "base_fee_paise": base_fee,
-            "platform_fee_paise": 0,
-            "total_payable_paise": base_fee,
-            "currency": currency,
-        }
-
-    service = services[0]
-    base = int(service.get("base_fee_paise", int(service.get("base_fee", 0)) * 100))
-    platform = int(service.get("platform_fee_paise", int(service.get("platform_fee", 0)) * 100))
-    currency = service.get("currency", "INR")
-    return {
-        "service_id": str(service.get("id", service.get("_id"))),
-        "base_fee_paise": base,
-        "platform_fee_paise": platform,
-        "total_payable_paise": base + platform,
-        "currency": currency,
-    }
+    return await compute_doctor_pricing(db, public_tenant_id(), doctor_id, appointment_type)
 
 
 async def _clinic_blocked_dates() -> set[str]:
@@ -185,33 +208,19 @@ async def public_list_doctors(
         if language:
             query["supported_languages"] = {"$elemMatch": {"$regex": f"^{language[:32]}$", "$options": "i"}}
         documents = mongo_database.database()["doctors"].find(query).sort("full_name", 1)
-        services = await mongo_database.database()["services"].find({
-            "tenant_id": str(tenant_id), "active": True,
-        }).to_list(500)
         responses = []
         async for document in documents:
             doctor_id = str(document.get("id", document["user_id"]))
-            matches = [service for service in services
-                       if doctor_id in service.get("assigned_doctors", [])]
-            doc_fee = document.get("fee_paise")
-            if (doc_fee is None or doc_fee == 0) and len(matches) >= 1:
-                service = matches[0]
-                base_fee_paise = int(service.get("base_fee", 0)) * 100
-                platform_fee_paise = int(service.get("platform_fee", 0)) * 100
-                total_payable_paise = base_fee_paise + platform_fee_paise
-                currency = service.get("currency", "INR")
-            elif doc_fee and doc_fee > 0:
-                base_fee_paise = doc_fee
-                platform_fee_paise = 0
-                total_payable_paise = doc_fee
-                currency = document.get("currency", "INR")
-            else:
-                base_fee_paise = platform_fee_paise = total_payable_paise = None
-                currency = document.get("currency", "INR")
+            pricing = await compute_doctor_pricing(mongo_database.database(), tenant_id, doctor_id)
+            base_fee_paise = pricing["base_fee_paise"]
+            platform_fee_paise = pricing["platform_fee_paise"]
+            total_payable_paise = pricing["total_payable_paise"]
+            currency = pricing["currency"]
+
             responses.append(DoctorResponse(
                 id=UUID(doctor_id), full_name=document.get("full_name", ""),
                 specialty=document.get("specialty", ""), clinic_name=document.get("clinic_name", ""),
-                fee_paise=base_fee_paise, currency=currency,
+                fee_paise=total_payable_paise, currency=currency,
                 base_fee_paise=base_fee_paise, platform_fee_paise=platform_fee_paise,
                 total_payable_paise=total_payable_paise,
                 timezone=document.get("timezone") or clinic_timezone,
