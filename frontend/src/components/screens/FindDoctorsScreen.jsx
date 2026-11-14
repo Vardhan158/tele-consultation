@@ -519,185 +519,227 @@ export default function FindDoctorsScreen({
   return (
     <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623]">
       {!authenticated && <PublicNavbar />}
-      <div className="space-y-6 max-w-7xl mx-auto px-5 py-6 lg:px-10">
-        {/* 2. Compact Horizontal Filter Section */}
-      <div className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs space-y-4">
-        {/* Row 1: Full-width search bar + Mobile Filter Toggle button */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#577877] text-lg pointer-events-none">
-              search
-            </span>
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleApplyFilters();
-              }}
-              placeholder="Doctor name, specialty, or clinic…"
-              className="w-full rounded-xl border border-[#577877]/25 pl-10 pr-4 py-2.5 text-xs text-[#162623] placeholder:text-[#577877]/70 bg-[#F0F5F7]/50 focus:bg-white focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => setSearchInput("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
-                title="Clear search text"
-              >
-                <span className="material-symbols-outlined text-base">close</span>
-              </button>
+
+      <div className={`max-w-7xl mx-auto px-5 py-6 lg:px-10 space-y-6 ${!authenticated ? "pt-20 sm:pt-24" : ""}`}>
+
+        {/* Mobile Filter Toggle Header (Visible only on < lg screens) */}
+        <div className="lg:hidden flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#577877]/15 shadow-xs">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#162623]">
+            <span className="material-symbols-outlined text-[#25836F] text-xl">tune</span>
+            <span>Filter Clinicians</span>
+            {hasActiveFilters && (
+              <span className="px-2 py-0.5 rounded-full bg-[#EEF6F3] text-[#25836F] text-[10px] font-bold">
+                Active Filters
+              </span>
             )}
           </div>
-
-          {/* Mobile Filter Toggle */}
           <button
             type="button"
             onClick={() => setMobileFiltersOpen((prev) => !prev)}
-            className="md:hidden inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs font-semibold text-[#162623] bg-[#F0F5F7] hover:bg-white transition cursor-pointer shrink-0"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#25836F] text-white text-xs font-bold shadow-xs hover:bg-[#1f6f5e] transition cursor-pointer"
           >
-            <span className="material-symbols-outlined text-base text-[#25836F]">
-              tune
+            <span className="material-symbols-outlined text-sm">
+              {mobileFiltersOpen ? "close" : "tune"}
             </span>
-            <span>Filters</span>
-            {hasActiveFilters && (
-              <span className="w-2 h-2 rounded-full bg-[#25836F]" />
-            )}
+            <span>{mobileFiltersOpen ? "Hide Filters" : "Filters"}</span>
           </button>
         </div>
 
-        {/* Row 2: Dropdowns & Filter Actions (Desktop inline / Tablet 2-col / Mobile collapsible) */}
-        <div
-          className={`${
-            mobileFiltersOpen ? "block" : "hidden"
-          } md:block border-t border-[#577877]/10 pt-4 space-y-4`}
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Specialty Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-[#25836F]">medical_services</span>
-                Specialty
-              </label>
-              <select
-                value={selectedSpecialty}
-                onChange={(e) => setSelectedSpecialty(e.target.value)}
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
-              >
-                <option value="all">All Specialties</option>
-                {specialties.map((spec) => (
-                  <option key={spec} value={spec}>
-                    {spec}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {/* Main 2-Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
 
-            {/* Availability Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-[#25836F]">event_available</span>
-                Availability
-              </label>
-              <select
-                value={availabilityFilter}
-                onChange={(e) => setAvailabilityFilter(e.target.value)}
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
-              >
-                {AVAILABILITY_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* ========================================================= */}
+          {/* LEFT SIDEBAR FILTER PANEL                                 */}
+          {/* ========================================================= */}
+          <aside
+            className={`${
+              mobileFiltersOpen ? "block" : "hidden"
+            } lg:block lg:col-span-4 xl:col-span-3 space-y-5 lg:sticky lg:top-24 z-10`}
+          >
+            <div className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs space-y-5">
+              {/* Filter Panel Header */}
+              <div className="flex items-center justify-between border-b border-[#577877]/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#25836F] text-xl">tune</span>
+                  <h2 className="text-base font-bold text-[#162623]">Filters</h2>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer"
+                  >
+                    Reset All
+                  </button>
+                )}
+              </div>
 
-            {/* Language Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-[#25836F]">translate</span>
-                Language
-              </label>
-              <select
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
-              >
-                <option value="all">All Languages</option>
-                {languages.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {/* Search Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#25836F]">search</span>
+                  Search Doctor
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleApplyFilters();
+                    }}
+                    placeholder="Name, specialty, or clinic…"
+                    className="w-full rounded-xl border border-[#577877]/25 pl-3.5 pr-8 py-2.5 text-xs text-[#162623] placeholder:text-[#577877]/70 bg-[#F0F5F7]/50 focus:bg-white focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition"
+                  />
+                  {searchInput && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchInput("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                      title="Clear search"
+                    >
+                      <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                  )}
+                </div>
+              </div>
 
-            {/* Sort By Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-[#25836F]">swap_vert</span>
-                Sort By
-              </label>
-              <select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value)}
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
-              >
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+              {/* Specialty Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#25836F]">medical_services</span>
+                  Specialty
+                </label>
+                <select
+                  value={selectedSpecialty}
+                  onChange={(e) => setSelectedSpecialty(e.target.value)}
+                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="all">All Specialties</option>
+                  {specialties.map((spec) => (
+                    <option key={spec} value={spec}>
+                      {spec}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {/* Row 3: Action Buttons (Apply & Clear) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#577877]/10">
-            <div className="text-xs text-[#577877]">
-              {hasActiveFilters ? (
-                <span className="inline-flex items-center gap-1.5 text-[#25836F] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#25836F]" />
-                  Custom filters active
-                </span>
-              ) : (
-                <span>Showing standard directory recommendations</span>
+              {/* Availability Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#25836F]">event_available</span>
+                  Availability
+                </label>
+                <select
+                  value={availabilityFilter}
+                  onChange={(e) => setAvailabilityFilter(e.target.value)}
+                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+                >
+                  {AVAILABILITY_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Language Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#25836F]">translate</span>
+                  Language
+                </label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="all">All Languages</option>
+                  {languages.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort By Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#25836F]">swap_vert</span>
+                  Sort By
+                </label>
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value)}
+                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter Actions */}
+              <div className="pt-3 border-t border-[#577877]/10 space-y-2">
+                <button
+                  type="button"
+                  onClick={handleApplyFilters}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#25836F] hover:bg-[#1f6f5e] text-white text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">filter_alt</span>
+                  Apply Filters
+                </button>
+
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="w-full px-4 py-2 rounded-xl border border-[#577877]/25 bg-white text-[#577877] hover:text-[#162623] hover:bg-[#F0F5F7] text-xs font-semibold transition cursor-pointer"
+                  >
+                    Clear All Filters
+                  </button>
+                )}
+              </div>
+            </div>
+          </aside>
+
+          {/* ========================================================= */}
+          {/* RIGHT MAIN CONTENT SECTION                                */}
+          {/* ========================================================= */}
+          <main className="lg:col-span-8 xl:col-span-9 space-y-5">
+            {/* Results Count & Active Filter Pills Bar */}
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-4 sm:px-5 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="text-[#577877]">
+                Showing{" "}
+                <span className="font-bold text-[#162623]">
+                  {sortedDoctors.length}
+                </span>{" "}
+                available doctor{sortedDoctors.length === 1 ? "" : "s"}
+                {appliedFilters.specialty !== "all" && (
+                  <span className="ml-1 text-[#25836F] font-semibold">
+                    in {appliedFilters.specialty}
+                  </span>
+                )}
+              </div>
+
+              {hasActiveFilters && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[#577877]">Active filters applied</span>
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                className="px-4 py-2 rounded-xl border border-[#577877]/25 bg-white text-[#577877] hover:text-[#162623] hover:bg-[#F0F5F7] text-xs font-semibold transition cursor-pointer"
-              >
-                Clear Filters
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyFilters}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#25836F] hover:bg-[#1f6f5e] text-white text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-sm">filter_alt</span>
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Result Count & Meta Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
-        <div className="text-xs text-[#577877]">
-          Showing{" "}
-          <span className="font-bold text-[#162623]">
-            {sortedDoctors.length}
-          </span>{" "}
-          available doctor{sortedDoctors.length === 1 ? "" : "s"}
-          {appliedFilters.specialty !== "all" && (
-            <span className="ml-1 text-[#25836F] font-semibold">
-              in {appliedFilters.specialty}
-            </span>
+            {/* Doctor Cards Listing / States */}
           )}
         </div>
 
@@ -955,6 +997,8 @@ export default function FindDoctorsScreen({
           )}
         </div>
       )}
+          </main>
+        </div>
 
       {/* Detailed Doctor Profile Modal */}
       {selectedProfileDoctor && (

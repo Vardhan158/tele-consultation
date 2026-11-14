@@ -17,7 +17,7 @@ export default function FaqsScreen() {
   return (
     <div className="min-h-screen bg-white font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white overflow-x-hidden">
       <PublicNavbar />
-      <main>
+      <main className="pt-20 sm:pt-24">
         <section id="faqs" className="scroll-mt-16 w-full max-w-4xl mx-auto px-6 sm:px-10 py-16 md:py-24">
           <div className="flex flex-col items-center text-center space-y-3 mb-12">
             <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold"><span className="size-2 rounded-full bg-[#1A7D67]"></span>Common Questions</div>
