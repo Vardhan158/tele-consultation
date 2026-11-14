@@ -265,6 +265,8 @@ async def get_doctors(
             d.get("user_account_id") or d.get("user_id") or d.get("id") for d in docs
         ]
         users = await db["users"].find({"id": {"$in": user_ids}}).to_list(200)
+        credentials = await db["doctor_credentials"].find({"tenant_id": settings.default_tenant_id, "doctor_id": {"$in": user_ids}}).to_list(200)
+        credentials_by_doctor = {item.get("doctor_id"): item for item in credentials}
         for u in users:
             users_by_id[u["id"]] = u
 
@@ -290,6 +292,11 @@ async def get_doctors(
                 "approved_for_consultation": d.get("approved_for_consultation", False),
                 "email_verified": bool(u_info.get("verified_at")),
                 "created_at": d.get("created_at"),
+                "credential_document": ({
+                    "file_name": credentials_by_doctor[u_id].get("file_name"),
+                    "uploaded_at": credentials_by_doctor[u_id].get("created_at"),
+                    "status": credentials_by_doctor[u_id].get("status", "pending_verification"),
+                } if u_id in credentials_by_doctor else None),
             })
         return result
 

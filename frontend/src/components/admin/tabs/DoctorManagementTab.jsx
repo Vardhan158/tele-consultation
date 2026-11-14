@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { adminApi } from "../../../lib/api";
+import { API_BASE_URL, adminApi } from "../../../lib/api";
 import { useToast } from "../../common/Toast";
 
 const ITEMS_PER_PAGE = 5;
@@ -282,6 +282,21 @@ export default function DoctorManagementTab() {
               </div>
 
               <div className="border-t border-[#577877]/15 pt-2">
+                <div className="font-semibold text-[#162623] mb-1">Credential Document</div>
+                {selectedDoctor.credential_document ? (
+                  <div className="rounded-xl bg-[#EEF6F3] p-3 text-[11px] text-[#577877] space-y-2">
+                    <div><strong>Filename:</strong> {selectedDoctor.credential_document.file_name}</div>
+                    <div><strong>Uploaded:</strong> {selectedDoctor.credential_document.uploaded_at ? new Date(selectedDoctor.credential_document.uploaded_at).toLocaleString() : "Unknown"}</div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => window.open(`${API_BASE_URL}/doctor/${selectedDoctor.id}/credentials`, "_blank", "noopener,noreferrer")} className="rounded-lg bg-[#25836F] px-3 py-1.5 font-semibold text-white">Preview</button>
+                      <a href={`${API_BASE_URL}/doctor/${selectedDoctor.id}/credentials`} target="_blank" rel="noreferrer" className="rounded-lg border border-[#25836F]/30 bg-white px-3 py-1.5 font-semibold text-[#25836F]">Download</a>
+                    </div>
+                  </div>
+                ) : <div className="text-[11px] text-[#577877]">Credential document not uploaded</div>}
+                <label className="inline-flex cursor-pointer rounded-lg border border-[#25836F]/30 bg-white px-3 py-1.5 text-[11px] font-semibold text-[#25836F]">
+                  Upload credential
+                  <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const result = await adminApi.uploadDoctorCredential(selectedDoctor.id, file); setSelectedDoctor((current) => ({ ...current, credential_document: { file_name: result.file_name, uploaded_at: result.uploaded_at, status: "pending_verification" } })); showToast("Credential document uploaded for review.", "success"); } catch (error) { showToast(error.message || "Credential upload failed.", "error"); } event.target.value = ""; }} />
+                </label>
                 <div className="font-semibold text-[#162623] mb-1">Audit History</div>
                 <div className="text-[11px] text-[#577877]">
                   Account registered on {selectedDoctor.created_at ? new Date(selectedDoctor.created_at).toLocaleString() : "System Record"}

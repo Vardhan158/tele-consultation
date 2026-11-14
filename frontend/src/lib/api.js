@@ -324,6 +324,11 @@ export const adminApi = {
   pendingDoctors: () => apiRequest("/doctor/pending"),
   approveDoctor: (id) => apiRequest(`/doctor/${id}/approve`, { method: "POST" }),
   rejectDoctor: (id) => apiRequest(`/doctor/${id}/reject`, { method: "POST" }),
+  uploadDoctorCredential: (id, file) => {
+    const form = new FormData();
+    form.append("credential_document", file);
+    return apiRequest(`/doctor/${id}/credentials`, { method: "POST", body: form });
+  },
   toggleDoctorStatus: (id, active, reason = "") =>
     apiRequest(`/admin/doctors/${id}/status`, {
       method: "PATCH",
