@@ -213,6 +213,9 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
                   ? "Your appointment is paid and confirmed."
                   : "Payment is required to confirm this appointment. Complete payment via Razorpay to finalize your booking."}
               </p>
+              <p className="text-[10px] text-[#577877]/80 mt-0.5 no-print">
+                Tip: In the print dialog, uncheck "Headers and footers" to remove browser page titles and URLs.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
