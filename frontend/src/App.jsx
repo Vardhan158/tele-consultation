@@ -246,7 +246,7 @@ export default function App() {
         case "doctor-dashboard":
           return <DoctorDashboardScreen onNavigate={handleNavigate} />;
         case "notifications":
-          return <DoctorNotificationsScreen />;
+          return <DoctorNotificationsScreen onNavigate={handleNavigate} />;
         case "doctor-appointments":
           return <DoctorAppointmentsScreen onNavigate={handleNavigate} />;
         case "doctor-patients":

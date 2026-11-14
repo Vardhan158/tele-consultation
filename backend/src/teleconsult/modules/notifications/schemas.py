@@ -14,3 +14,7 @@ class NotificationResponse(BaseModel):
     status: str
     read_at: datetime | None
     created_at: datetime
+    doctor_id: str | None = None
+    appointment_id: str | None = None
+    patient_display_name: str | None = None
+    notification_type: str | None = None

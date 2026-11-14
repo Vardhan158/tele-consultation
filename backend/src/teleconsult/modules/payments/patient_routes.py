@@ -18,7 +18,7 @@ from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.notifications.service import queue_patient_notification
+from teleconsult.modules.notifications.service import ensure_doctor_appointment_notification, queue_patient_notification
 from teleconsult.modules.patient_portal.models import Appointment, Doctor
 from teleconsult.modules.patient_portal.appointment_access import expire_pending_payment
 from teleconsult.modules.payments.models import PaymentTransaction
@@ -298,6 +298,11 @@ async def verify_razorpay_payment(
 
     # Idempotency check: If already captured/success, return verified state immediately!
     if payment.get("status") in {"captured", "success"}:
+        apt = await db["appointments"].find_one({"id": payment.get("appointment_id"), "tenant_id": principal.tenant_id})
+        doctor = await db["doctors"].find_one({"tenant_id": principal.tenant_id, "id": payment.get("doctor_id")}) if payment.get("doctor_id") else None
+        patient = await db["patients"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": apt.get("patient_id")} , {"user_id": apt.get("patient_id")}]}) if apt else None
+        if apt and doctor:
+            await ensure_doctor_appointment_notification(tenant_id=principal.tenant_id, doctor_id=str(doctor.get("user_account_id") or doctor.get("user_id") or doctor.get("id")), appointment=apt, patient_display_name=str((patient or {}).get("full_name") or "Patient"))
         return {
             "status": "success",
             "payment_id": payment.get("id"),
@@ -371,6 +376,11 @@ async def verify_razorpay_payment(
             }
         },
     )
+    appointment = await db["appointments"].find_one({"id": apt_id, "tenant_id": principal.tenant_id})
+    doctor = await db["doctors"].find_one({"tenant_id": principal.tenant_id, "id": payment.get("doctor_id")})
+    patient = await db["patients"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": appointment.get("patient_id")} , {"user_id": appointment.get("patient_id")}]}) if appointment else None
+    if appointment and doctor:
+        await ensure_doctor_appointment_notification(tenant_id=principal.tenant_id, doctor_id=str(doctor.get("user_account_id") or doctor.get("user_id") or doctor.get("id")), appointment=appointment, patient_display_name=str((patient or {}).get("full_name") or "Patient"))
 
     # Mark Doctor Availability Slot Booked
     doctor_id = payment.get("doctor_id")
@@ -617,7 +627,14 @@ async def razorpay_webhook(
 
         if event_type in {"payment.captured", "order.paid"}:
             if payment.get("status") == "captured":
-                return  # Duplicate webhook ignored safely!
+                # Duplicate callbacks never create duplicates, but repair a
+                # transiently missed doctor notification if necessary.
+                appointment = await db["appointments"].find_one({"id": payment.get("appointment_id")})
+                doctor = await db["doctors"].find_one({"tenant_id": payment.get("tenant_id"), "id": payment.get("doctor_id")})
+                patient = await db["patients"].find_one({"tenant_id": payment.get("tenant_id"), "$or": [{"id": appointment.get("patient_id")} , {"user_id": appointment.get("patient_id")}]}) if appointment else None
+                if appointment and doctor:
+                    await ensure_doctor_appointment_notification(tenant_id=str(payment.get("tenant_id")), doctor_id=str(doctor.get("user_account_id") or doctor.get("user_id") or doctor.get("id")), appointment=appointment, patient_display_name=str((patient or {}).get("full_name") or "Patient"))
+                return
 
             await db["payments"].update_one(
                 {"id": payment["id"]},
@@ -640,6 +657,11 @@ async def razorpay_webhook(
                     }
                 },
             )
+            appointment = await db["appointments"].find_one({"id": payment.get("appointment_id")})
+            doctor = await db["doctors"].find_one({"tenant_id": payment.get("tenant_id"), "id": payment.get("doctor_id")})
+            patient = await db["patients"].find_one({"tenant_id": payment.get("tenant_id"), "$or": [{"id": appointment.get("patient_id")} , {"user_id": appointment.get("patient_id")}]}) if appointment else None
+            if appointment and doctor:
+                await ensure_doctor_appointment_notification(tenant_id=str(payment.get("tenant_id")), doctor_id=str(doctor.get("user_account_id") or doctor.get("user_id") or doctor.get("id")), appointment=appointment, patient_display_name=str((patient or {}).get("full_name") or "Patient"))
         elif event_type in {"payment.failed", "order.payment_failed"}:
             await db["payments"].update_one(
                 {"id": payment["id"]},
