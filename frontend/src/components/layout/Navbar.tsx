@@ -76,9 +76,7 @@ export default function Navbar() {
 
   const renderNavLink = (item: NavItem, isMobile = false) => {
     let isActive = false;
-    if (item.path === "/" && location.pathname === "/" && !location.hash) {
-      isActive = true;
-    } else if (item.path !== "/" && !item.sectionId && item.path === location.pathname) {
+    if (item.path !== "/" && !item.sectionId && item.path === location.pathname) {
       isActive = true;
     } else if (item.sectionId && location.pathname === "/" && activeHash === `#${item.sectionId}`) {
       isActive = true;
