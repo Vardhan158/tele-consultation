@@ -5,9 +5,13 @@ export default function DoctorSettingsScreen() {
   const [enrollment, setEnrollment] = useState(null);
   const [code, setCode] = useState("");
   const [message, setMessage] = useState("");
+  const [showSetupKey, setShowSetupKey] = useState(false);
+  const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
   const enroll = async () => {
     try {
       setEnrollment(await doctorApi.enrollMfa());
+      setShowSetupKey(false);
+      setShowRecoveryCodes(false);
       setMessage(
         "Scan or enter the secret in an authenticator app, then verify a code.",
       );
@@ -41,7 +45,8 @@ export default function DoctorSettingsScreen() {
           <>
             <div className="space-y-2 text-sm">
               <p>Open Google Authenticator or Microsoft Authenticator, choose <strong>Set up key manually</strong>, and enter this key:</p>
-              <p className="font-mono break-all">{enrollment.secret}</p>
+              <p className="font-mono break-all">{showSetupKey ? enrollment.secret : "••••••••••••••••••••"}</p>
+              <button type="button" className="text-xs font-semibold text-[#25836F] hover:underline" onClick={() => setShowSetupKey((value) => !value)}>{showSetupKey ? "Hide setup key" : "Reveal setup key"}</button>
               <p className="text-xs text-[#577877] break-all">Issuer: Kaizentrix Care · Account: your doctor login</p>
               <p className="text-xs text-amber-700">This setup expires in {enrollment.expires_in_minutes || 10} minutes. The secret is shown only during enrollment.</p>
             </div>
@@ -64,7 +69,7 @@ export default function DoctorSettingsScreen() {
               </button>
               <button type="button" className="rounded-lg border px-3" onClick={() => { setEnrollment(null); setCode(""); setMessage("Enrollment cancelled."); }}>Cancel</button>
             </form>
-            {enrollment.recovery_codes?.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-xs"><p className="font-semibold">Save these recovery codes now. Each works once.</p><p className="font-mono break-all mt-1">{enrollment.recovery_codes.join(" · ")}</p></div>}
+            {enrollment.recovery_codes?.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-xs"><p className="font-semibold">Recovery codes are hidden by default. Each code works once.</p><button type="button" className="mt-1 font-semibold text-[#25836F] hover:underline" onClick={() => setShowRecoveryCodes((value) => !value)}>{showRecoveryCodes ? "Hide recovery codes" : "Reveal recovery codes"}</button>{showRecoveryCodes && <p className="font-mono break-all mt-1">{enrollment.recovery_codes.join(" · ")}</p>}</div>}
           </>
         )}
         {message && <p className="text-sm text-[#25836F]">{message}</p>}
