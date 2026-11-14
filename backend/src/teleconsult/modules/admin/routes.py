@@ -65,6 +65,19 @@ async def _audit_log(
         await db["audit_logs"].insert_one(dict(item))
 
 
+def _format_activity_timestamp(dt_val: Any) -> str:
+    if not dt_val:
+        return "Recent"
+    try:
+        dt = dt_val if isinstance(dt_val, datetime) else datetime.fromisoformat(str(dt_val).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        ist_dt = dt.astimezone(ZoneInfo("Asia/Kolkata"))
+        return ist_dt.strftime("%d %b %Y, %I:%M %p IST")
+    except (ValueError, TypeError):
+        return str(dt_val or "Recent")
+
+
 # --- 01. Clinic Overview ---
 @router.get("/overview")
 async def get_overview(
@@ -80,6 +93,7 @@ async def get_overview(
         now = datetime.now(UTC)
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
+
         total_doctors = await db["doctors"].count_documents({"tenant_id": t_id})
         pending_approvals = await db["doctors"].count_documents({
             "tenant_id": t_id,
@@ -101,58 +115,80 @@ async def get_overview(
         })
         today_appointments = await db["appointments"].count_documents({
             "tenant_id": t_id,
-            "starts_at": {"$gte": day_start, "$lt": day_end},
+            "starts_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()},
         })
-        payments = await db["payments"].find({
-            "tenant_id": t_id,
-            "status": "captured",
-        }).to_list(1000)
-        total_revenue = sum(p.get("amount", 0) for p in payments) / 100.0
 
+        # Calculate Net Revenue = Captured/Paid - Refunded
+        captured_payments = await db["payments"].find({
+            "tenant_id": t_id,
+            "status": {"$in": ["captured", "success", "paid"]},
+        }).to_list(1000)
+
+        refunded_payments = await db["payments"].find({
+            "tenant_id": t_id,
+            "status": "refunded",
+        }).to_list(1000)
+
+        total_captured_paise = sum(int(p.get("amount_paise") or p.get("amount") or 0) for p in captured_payments)
+        total_refunded_paise = sum(int(p.get("amount_paise") or p.get("amount") or 0) for p in refunded_payments)
+        net_revenue = (total_captured_paise - total_refunded_paise) / 100.0
+
+        # Generate Operational Alerts from Real Conditions
         alerts = []
         if pending_approvals > 0:
             alerts.append({
                 "id": "alert-pending-docs",
                 "type": "warning",
-                "message": (
-                    f"{pending_approvals} doctor credential application(s) "
-                    f"awaiting verification."
-                ),
+                "message": f"{pending_approvals} clinician application(s) awaiting verification and approval.",
             })
-        alerts.append({
-            "id": "alert-sys-normal",
-            "type": "info",
-            "message": "System running normally. WebRTC signaling & MongoDB Atlas connected.",
+
+        open_tickets = await db["support_tickets"].count_documents({"tenant_id": t_id, "status": "open"})
+        if open_tickets > 0:
+            alerts.append({
+                "id": "alert-open-tickets",
+                "type": "warning",
+                "message": f"{open_tickets} open patient support / refill request ticket(s) require care team review.",
+            })
+
+        pending_payments_count = await db["appointments"].count_documents({"tenant_id": t_id, "status": "pending_payment"})
+        if pending_payments_count > 0:
+            alerts.append({
+                "id": "alert-pending-payments",
+                "type": "warning",
+                "message": f"{pending_payments_count} appointment booking(s) awaiting payment verification.",
+            })
+
+        today_slots = await db["doctor_availability"].count_documents({
+            "tenant_id": t_id,
+            "starts_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()},
         })
+        if today_slots == 0:
+            alerts.append({
+                "id": "alert-no-slots",
+                "type": "info",
+                "message": "No clinician availability slots currently scheduled for today.",
+            })
 
-        recent_activity = [
-            {
-                "id": "act-1",
-                "timestamp": "10 mins ago",
-                "text": "New clinician application received from Dr. Vance",
-            },
-            {
-                "id": "act-2",
-                "timestamp": "30 mins ago",
-                "text": "Patient consultation completed by Dr. Chen",
-            },
-            {
-                "id": "act-3",
-                "timestamp": "1 hour ago",
-                "text": "Payment verified via Razorpay for appointment #apt-402",
-            },
-        ]
-
-        alerts = [alert for alert in alerts if alert.get("id") != "alert-sys-normal"]
+        # Recent Activity Log with Readable Date/Time & Context
         recent_activity = []
         audit_documents = db["audit_logs"].find({"tenant_id": t_id}).sort("occurred_at", -1).limit(10)
         async for event in audit_documents:
             occurred_at = event.get("occurred_at") or event.get("created_at")
+            formatted_ts = _format_activity_timestamp(occurred_at)
+
+            action_raw = str(event.get("action", "Clinic Event")).replace(".", " ").replace("_", " ").strip().title()
+            actor_id = str(event.get("actor_id") or "System")
+            resource_type = str(event.get("resource_type") or "Resource").replace("_", " ").title()
+
+            actor_doc = await db["users"].find_one({"tenant_id": t_id, "$or": [{"id": actor_id}, {"user_id": actor_id}]})
+            actor_label = actor_doc.get("full_name") if actor_doc else ("Clinic Admin" if "admin" in action_raw.lower() else "Authorized Actor")
+
             recent_activity.append({
                 "id": str(event.get("id", event.get("_id"))),
-                "timestamp": occurred_at.isoformat() if hasattr(occurred_at, "isoformat") else str(occurred_at or ""),
-                "text": event.get("action", "Clinic activity recorded").replace(".", " ").replace("_", " ").strip().title(),
+                "timestamp": formatted_ts,
+                "text": f"{action_raw} by {actor_label} · {resource_type}",
             })
+
         return {
             "kpis": {
                 "total_doctors": total_doctors,
@@ -162,7 +198,7 @@ async def get_overview(
                 "confirmed_appointments": confirmed_appointments,
                 "completed_consultations": completed_consultations,
                 "today_appointments": today_appointments,
-                "total_revenue": total_revenue,
+                "total_revenue": net_revenue,
             },
             "alerts": alerts,
             "recent_activity": recent_activity,
