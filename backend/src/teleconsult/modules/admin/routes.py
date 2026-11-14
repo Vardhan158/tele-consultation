@@ -1451,16 +1451,16 @@ class ClinicSettingsPayload(BaseModel):
 
 
 DEFAULT_CLINIC_SETTINGS = {
-    "clinic_name": "Kaizentrix Care Telehealth Center",
-    "address": "742 Medical Center Blvd, San Francisco, CA 94107",
-    "contact_email": "support@kaizentrixcare.local",
-    "contact_phone": "+1 (800) 555-KAIZEN",
-    "timezone": "America/New_York",
+    "clinic_name": "Kaizen Care Telehealth Center",
+    "address": "Kaizen Care Health Tower, MG Road, Bengaluru, Karnataka 560001, India",
+    "contact_email": "support@kaizencare.in",
+    "contact_phone": "+91 80 4567 8900",
+    "timezone": "Asia/Kolkata",
     "cancellation_deadline_hours": 24,
     "intake_policy": "clinic_configured",
     "prescriptions_enabled": True,
-    "operating_hours": "Mon - Sat: 08:00 AM - 08:00 PM EST",
-    "authorized_administrators": ["clinic-admin@teleconsult.local"],
+    "operating_hours": "Mon - Sat: 08:00 AM - 08:00 PM IST",
+    "authorized_administrators": ["admin@kaizencare.in"],
     "email_alerts_new_doctor": True,
     "email_alerts_daily_summary": True,
     "email_alerts_payment_failures": True,
