@@ -121,7 +121,7 @@ export default function LandingScreen({
   onFindDoctor,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [heroMounted, setHeroMounted] = useState(true);
+  const [heroMounted, setHeroMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -226,7 +226,8 @@ export default function LandingScreen({
           <div className="flex-1 max-w-2xl self-center lg:self-center pb-12 lg:pb-24 pt-4 lg:pt-0 z-10">
             {/* Pill Tag */}
             <div
-              className={`inline-flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full border border-white/40 bg-white/10 backdrop-blur-sm text-xs sm:text-sm font-medium text-white mb-6 shadow-sm transform transition-all duration-300 ${
+              style={{ transitionDelay: "100ms" }}
+              className={`inline-flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full border border-white/40 bg-white/10 backdrop-blur-sm text-xs sm:text-sm font-medium text-white mb-6 shadow-sm transform transition-all duration-700 ease-out ${
                 heroMounted ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"
               }`}
             >
@@ -250,7 +251,8 @@ export default function LandingScreen({
 
             {/* Display Heading */}
             <h1
-              className={`text-4xl sm:text-5xl lg:text-[62px] xl:text-[68px] font-bold text-white tracking-tight leading-[1.12] mb-5 transform transition-all duration-300 ${
+              style={{ transitionDelay: "250ms" }}
+              className={`text-4xl sm:text-5xl lg:text-[62px] xl:text-[68px] font-bold text-white tracking-tight leading-[1.12] mb-5 transform transition-all duration-700 ease-out ${
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
               }`}
             >
@@ -259,7 +261,8 @@ export default function LandingScreen({
 
             {/* Description */}
             <p
-              className={`text-sm sm:text-base lg:text-[17px] text-white/90 max-w-xl leading-relaxed mb-10 font-normal transform transition-all duration-300 ${
+              style={{ transitionDelay: "400ms" }}
+              className={`text-sm sm:text-base lg:text-[17px] text-white/90 max-w-xl leading-relaxed mb-10 font-normal transform transition-all duration-700 ease-out ${
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
               }`}
             >
@@ -269,7 +272,8 @@ export default function LandingScreen({
 
             {/* Action Buttons */}
             <div
-              className={`flex flex-wrap items-center gap-4 mb-10 transform transition-all duration-300 ${
+              style={{ transitionDelay: "550ms" }}
+              className={`flex flex-wrap items-center gap-4 mb-10 transform transition-all duration-700 ease-out ${
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
               }`}
             >
@@ -306,7 +310,8 @@ export default function LandingScreen({
 
             {/* Factual Messaging & Security Proof */}
             <div
-              className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/85 backdrop-blur-md border border-white/60 shadow-xs text-sm transform transition-all duration-300 ${
+              style={{ transitionDelay: "700ms" }}
+              className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/85 backdrop-blur-md border border-white/60 shadow-xs text-sm transform transition-all duration-700 ease-out ${
                 heroMounted ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
               }`}
             >
@@ -321,7 +326,8 @@ export default function LandingScreen({
 
           {/* Right Column Physician Image */}
           <div
-            className={`flex-1 w-full flex justify-center lg:justify-end items-end self-end z-10 mt-6 lg:mt-0 transform transition-all duration-300 ${
+            style={{ transitionDelay: "300ms" }}
+            className={`flex-1 w-full flex justify-center lg:justify-end items-end self-end z-10 mt-6 lg:mt-0 transform transition-all duration-1000 ease-out ${
               heroMounted ? "translate-y-0 opacity-100 scale-100" : "translate-y-12 opacity-0 scale-98"
             }`}
           >
