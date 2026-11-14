@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import hmac
 import secrets
@@ -63,6 +64,27 @@ def _totp(secret: str, counter: int | None = None) -> str:
     digest = hmac.new(key, raw, hashlib.sha1).digest()
     offset = digest[-1] & 15
     return str((struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7fffffff) % 1_000_000).zfill(6)
+
+
+def _mfa_expired(value) -> bool:
+    if not value:
+        return False
+    try:
+        expiry = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=UTC)
+        return expiry <= datetime.now(UTC)
+    except (TypeError, ValueError, OverflowError):
+        return True
+
+
+def _valid_mfa_code(secret: str | None, code: str) -> bool:
+    if not secret:
+        return False
+    try:
+        return any(hmac.compare_digest(_totp(secret, int(time.time() // 30) + offset), code) for offset in (-1, 0, 1))
+    except (ValueError, TypeError, binascii.Error):
+        return False
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -470,7 +492,7 @@ async def verify_mfa(payload: MfaCode, session: AsyncSession | None = Depends(au
         db = mongo_database.database()
         user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
         secret = user.get("mfa_secret") if user else None
-        if user is None or not secret or user.get("mfa_enrollment_expires_at") and user["mfa_enrollment_expires_at"] < datetime.now(UTC) or user.get("mfa_failed_attempts", 0) >= 5 or not any(hmac.compare_digest(_totp(secret, int(time.time() // 30) + offset), payload.code) for offset in (-1, 0, 1)):
+        if user is None or _mfa_expired(user.get("mfa_enrollment_expires_at")) or user.get("mfa_failed_attempts", 0) >= 5 or not _valid_mfa_code(secret, payload.code):
             if user:
                 await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$inc": {"mfa_failed_attempts": 1}})
             raise HTTPException(status_code=400, detail="Invalid MFA code")
@@ -479,7 +501,7 @@ async def verify_mfa(payload: MfaCode, session: AsyncSession | None = Depends(au
     if session is None:
         raise HTTPException(status_code=503, detail="Application database is unavailable")
     user = await session.get(UserAccount, UUID(principal.user_id))
-    if user is None or not user.mfa_secret or not any(hmac.compare_digest(_totp(user.mfa_secret, int(time.time() // 30) + offset), payload.code) for offset in (-1, 0, 1)):
+    if user is None or not _valid_mfa_code(user.mfa_secret if user else None, payload.code):
         raise HTTPException(status_code=400, detail="Invalid MFA code")
     user.mfa_enabled = True
     return {"status": "enabled"}
