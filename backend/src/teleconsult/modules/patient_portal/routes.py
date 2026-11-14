@@ -110,12 +110,14 @@ async def compute_doctor_pricing(
         base_fee = int(service.get("base_fee_paise", int(service.get("base_fee", 0)) * 100))
         platform_fee = int(service.get("platform_fee_paise", int(service.get("platform_fee", 0)) * 100))
         currency = service.get("currency", "INR")
+        duration = int(service.get("duration_minutes", 30))
         return {
             "service_id": str(service.get("id", service.get("_id"))),
             "base_fee_paise": base_fee,
             "platform_fee_paise": platform_fee,
             "total_payable_paise": base_fee + platform_fee,
             "currency": currency,
+            "duration_minutes": duration,
         }
 
     # 5. Doctor document fee_paise
@@ -134,6 +136,7 @@ async def compute_doctor_pricing(
             "platform_fee_paise": platform_fee,
             "total_payable_paise": base_fee + platform_fee,
             "currency": currency,
+            "duration_minutes": 30,
         }
 
     # Standard fallback if fee is unconfigured
@@ -143,6 +146,7 @@ async def compute_doctor_pricing(
         "platform_fee_paise": 0,
         "total_payable_paise": 40000,
         "currency": "INR",
+        "duration_minutes": 30,
     }
 
 

@@ -186,7 +186,7 @@ async def create_payment_order(
             "patient_id": principal.user_id,
             "doctor_id": payload.doctor_id,
             "starts_at": payload.starts_at,
-            "duration_minutes": service.get("duration_minutes", 30),
+            "duration_minutes": pricing.get("duration_minutes", 30),
             "status": "pending_payment",
             "payment_status": "pending_payment",
             "type": payload.appointment_type,
