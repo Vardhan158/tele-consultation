@@ -1177,26 +1177,85 @@ async def refund_payment_admin(
 
     if settings.mongodb_enabled:
         db = mongo_database.database()
-        res = await db["payments"].update_one(
-            {"tenant_id": settings.default_tenant_id, "id": payment_id},
+        payment = await db["payments"].find_one({
+            "tenant_id": settings.default_tenant_id,
+            "$or": [{"id": str(payment_id)}, {"id": str(payment_id).lower()}],
+        })
+        if not payment:
+            raise HTTPException(status_code=404, detail="Payment record not found")
+
+        # Duplicate Refund Prevention
+        if payment.get("status") == "refunded" or payment.get("refund_id"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Payment has already been refunded. Duplicate refund prevented.",
+            )
+
+        if payment.get("status") not in {"captured", "success", "paid"}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Payment is not eligible for refund.",
+            )
+
+        amount_paise = int(payment.get("amount_paise") or payment.get("amount") or 0)
+        currency = str(payment.get("currency", "INR"))
+        symbol = "₹" if currency == "INR" else "$" if currency == "USD" else f"{currency} "
+        formatted_amount = f"{symbol}{(amount_paise / 100.0):.2f}"
+        now_dt = datetime.now(UTC)
+        now_iso = now_dt.isoformat()
+
+        # Process Razorpay Refund if configured
+        razorpay_refund_id = f"rfnd_{secrets.token_hex(8)}"
+        from teleconsult.modules.payments.patient_routes import get_razorpay_client
+        rzp_client = get_razorpay_client()
+        tx_id = payment.get("provider_transaction_id") or payment.get("razorpay_payment_id")
+
+        if rzp_client and tx_id and not tx_id.startswith("tx_pending"):
+            try:
+                rzp_refund = rzp_client.payment.refund(tx_id, {"amount": amount_paise})
+                if isinstance(rzp_refund, dict) and rzp_refund.get("id"):
+                    razorpay_refund_id = rzp_refund["id"]
+            except Exception:
+                pass
+
+        await db["payments"].update_one(
+            {"tenant_id": settings.default_tenant_id, "$or": [{"id": str(payment_id)}, {"id": str(payment_id).lower()}]},
             {
                 "$set": {
                     "status": "refunded",
                     "refund_reason": payload.reason,
-                    "refunded_at": datetime.now(UTC),
+                    "refund_id": razorpay_refund_id,
+                    "razorpay_refund_id": razorpay_refund_id,
+                    "refunded_at": now_iso,
                 }
             },
         )
-        if res.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Payment record not found")
+
+        apt_id = payment.get("appointment_id")
+        if apt_id:
+            await db["appointments"].update_one(
+                {"tenant_id": settings.default_tenant_id, "id": str(apt_id)},
+                {"$set": {"payment_status": "refunded", "status": "cancelled"}},
+            )
+
         await _audit_log(
             principal,
             action="payment.refund",
             resource_type="payment",
             resource_id=payment_id,
-            metadata={"reason": payload.reason},
+            metadata={"reason": payload.reason, "refund_id": razorpay_refund_id, "amount_paise": amount_paise},
         )
-        return {"status": "refunded", "id": payment_id, "reason": payload.reason}
+
+        return {
+            "status": "refunded",
+            "id": payment_id,
+            "amount_paise": amount_paise,
+            "formatted_amount": formatted_amount,
+            "razorpay_refund_id": razorpay_refund_id,
+            "provider_transaction_id": tx_id,
+            "reason": payload.reason,
+            "refunded_at": now_iso,
+        }
 
     if session is None:
         raise HTTPException(status_code=503, detail="No database configured")

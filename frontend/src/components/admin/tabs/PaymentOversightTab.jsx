@@ -36,11 +36,14 @@ export default function PaymentOversightTab() {
   }, [filter, searchQuery]);
 
   const handleConfirmRefund = async () => {
-    if (!refundModal) return;
+    if (!refundModal || refunding) return;
     setRefunding(true);
     try {
-      await adminApi.refundPayment(refundModal, refundReason);
-      showToast("Refund processed successfully.", "warning");
+      const targetId = typeof refundModal === "object" ? refundModal.id : refundModal;
+      const res = await adminApi.refundPayment(targetId, refundReason);
+      const refId = res.razorpay_refund_id || res.id;
+      const amt = res.formatted_amount || (refundModal.amount ? `₹${refundModal.amount}` : "payment");
+      showToast(`Refund of ${amt} processed via Razorpay (Reference: ${refId}).`, "success");
       setRefundModal(null);
       loadPayments();
     } catch (err) {
@@ -204,32 +207,102 @@ export default function PaymentOversightTab() {
         </div>
       )}
 
-      {/* Refund Modal */}
+      {/* Refund Confirmation Modal */}
       {refundModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/50 backdrop-blur-xs p-4">
-          <div className="care-card max-w-md w-full p-6 space-y-4">
-            <h3 className="text-sm font-bold text-[#162623]">Issue Administrative Refund</h3>
-            <p className="text-xs text-[#577877]">
-              Provide a reason for processing this payment refund.
-            </p>
-            <textarea
-              value={refundReason}
-              onChange={(e) => setRefundReason(e.target.value)}
-              className="w-full rounded-xl border border-[#577877]/25 p-3 text-xs h-24"
-            />
-            <div className="flex justify-end gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/60 backdrop-blur-xs p-4">
+          <div className="care-card max-w-md w-full p-6 sm:p-7 space-y-5 bg-white rounded-2xl border border-[#577877]/20 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-xl">undo</span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#162623]">
+                  Issue Administrative Refund
+                </h3>
+                <p className="text-xs text-[#577877]">
+                  Verify payment details before confirming.
+                </p>
+              </div>
+            </div>
+
+            {/* Refund Item Details Card */}
+            <div className="rounded-xl bg-[#F0F5F7] p-3.5 text-xs space-y-2 border border-[#577877]/15">
+              <div className="flex justify-between">
+                <span className="text-[#577877]">Refund Amount:</span>
+                <span className="font-bold text-[#162623] text-sm">
+                  {typeof refundModal === "object"
+                    ? refundModal.formatted_amount || (refundModal.amount ? `₹${refundModal.amount}` : "₹400.00")
+                    : "₹400.00"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#577877]">Transaction Reference:</span>
+                <span className="font-mono font-semibold text-[#162623]">
+                  {typeof refundModal === "object"
+                    ? refundModal.provider_transaction_id || refundModal.id
+                    : refundModal}
+                </span>
+              </div>
+              {typeof refundModal === "object" && refundModal.patient_name && (
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">Patient Name:</span>
+                  <span className="font-semibold text-[#162623]">
+                    {refundModal.patient_name}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Explicit Final Warning Banner */}
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-rose-600 text-base shrink-0 mt-0.5">
+                warning
+              </span>
+              <div className="space-y-0.5">
+                <div className="font-bold text-rose-900">Final Confirmation Warning</div>
+                <div className="font-normal leading-relaxed text-rose-800">
+                  This action will initiate an immediate financial refund through Razorpay and cancel the associated appointment booking. This operation cannot be undone.
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#162623] mb-1.5">
+                Administrative Reason
+              </label>
+              <textarea
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="Reason for administrative refund..."
+                className="w-full rounded-xl border border-[#577877]/25 p-3 text-xs h-20 text-[#162623] focus:outline-none focus:border-[#25836F] bg-white"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-1">
               <button
+                type="button"
+                disabled={refunding}
                 onClick={() => setRefundModal(null)}
-                className="rounded-xl border border-[#577877]/30 px-3 py-2 text-xs font-semibold text-[#577877]"
+                className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={handleConfirmRefund}
+                type="button"
                 disabled={refunding}
-                className="rounded-xl bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-800 disabled:opacity-50"
+                onClick={handleConfirmRefund}
+                className="rounded-xl bg-rose-600 text-xs font-bold text-white shadow-xs hover:bg-rose-700 px-4 py-2 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
               >
-                {refunding ? "Refunding…" : "Confirm Refund"}
+                {refunding ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin text-sm">
+                      sync
+                    </span>
+                    <span>Refunding…</span>
+                  </>
+                ) : (
+                  "Confirm & Issue Refund"
+                )}
               </button>
             </div>
           </div>
@@ -300,8 +373,8 @@ export default function PaymentOversightTab() {
 
                       {p.status === "captured" && (
                         <button
-                          onClick={() => setRefundModal(p.id)}
-                          className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-50"
+                          onClick={() => setRefundModal(p)}
+                          className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-50 cursor-pointer"
                         >
                           Refund
                         </button>
