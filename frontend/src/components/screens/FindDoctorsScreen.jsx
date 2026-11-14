@@ -517,18 +517,18 @@ export default function FindDoctorsScreen({
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623]">
+    <div className="min-h-screen bg-[#F9FBFA] font-sans text-zinc-800 antialiased selection:bg-[#1A7D67] selection:text-white">
       {!authenticated && <PublicNavbar />}
 
-      <div className={`max-w-7xl mx-auto px-5 py-6 lg:px-10 space-y-6 ${!authenticated ? "pt-20 sm:pt-24" : ""}`}>
+      <div className={`max-w-7xl mx-auto px-5 py-6 lg:px-10 space-y-6 ${!authenticated ? "pt-24 sm:pt-28" : ""}`}>
 
         {/* Mobile Filter Toggle Header (Visible only on < lg screens) */}
-        <div className="lg:hidden flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#577877]/15 shadow-xs">
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#162623]">
-            <span className="material-symbols-outlined text-[#25836F] text-xl">tune</span>
+        <div className="lg:hidden flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs">
+          <div className="flex items-center gap-2 text-xs font-semibold text-zinc-800">
+            <span className="material-symbols-outlined text-[#1A7D67] text-xl">tune</span>
             <span>Filter Clinicians</span>
             {hasActiveFilters && (
-              <span className="px-2 py-0.5 rounded-full bg-[#EEF6F3] text-[#25836F] text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-[#EEF6F3] text-[#1A7D67] text-[10px] font-bold">
                 Active Filters
               </span>
             )}
@@ -536,7 +536,7 @@ export default function FindDoctorsScreen({
           <button
             type="button"
             onClick={() => setMobileFiltersOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#25836F] text-white text-xs font-bold shadow-xs hover:bg-[#1f6f5e] transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1A7D67] text-white text-xs font-bold shadow-xs hover:bg-[#156654] transition cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">
               {mobileFiltersOpen ? "close" : "tune"}
@@ -556,18 +556,18 @@ export default function FindDoctorsScreen({
               mobileFiltersOpen ? "block" : "hidden"
             } lg:block lg:col-span-4 xl:col-span-3 space-y-5 lg:sticky lg:top-24 z-10`}
           >
-            <div className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs space-y-5">
+            <div className="rounded-2xl bg-white border border-zinc-200 p-5 sm:p-6 shadow-xs space-y-5">
               {/* Filter Panel Header */}
-              <div className="flex items-center justify-between border-b border-[#577877]/10 pb-3">
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#25836F] text-xl">tune</span>
-                  <h2 className="text-base font-bold text-[#162623]">Filters</h2>
+                  <span className="material-symbols-outlined text-[#1A7D67] text-xl">tune</span>
+                  <h2 className="text-base font-bold text-zinc-800">Filters</h2>
                 </div>
                 {hasActiveFilters && (
                   <button
                     type="button"
                     onClick={handleClearFilters}
-                    className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer"
+                    className="text-xs font-semibold text-[#1A7D67] hover:underline cursor-pointer"
                   >
                     Reset All
                   </button>
@@ -576,8 +576,8 @@ export default function FindDoctorsScreen({
 
               {/* Search Filter */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs text-[#25836F]">search</span>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">search</span>
                   Search Doctor
                 </label>
                 <div className="relative">
@@ -589,13 +589,13 @@ export default function FindDoctorsScreen({
                       if (e.key === "Enter") handleApplyFilters();
                     }}
                     placeholder="Name, specialty, or clinic…"
-                    className="w-full rounded-xl border border-[#577877]/25 pl-3.5 pr-8 py-2.5 text-xs text-[#162623] placeholder:text-[#577877]/70 bg-[#F0F5F7]/50 focus:bg-white focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition"
+                    className="w-full rounded-xl border border-zinc-300 pl-3.5 pr-8 py-2.5 text-xs text-zinc-800 placeholder:text-zinc-400 bg-[#F9FBFA] focus:bg-white focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition"
                   />
                   {searchInput && (
                     <button
                       type="button"
                       onClick={() => setSearchInput("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 cursor-pointer"
                       title="Clear search"
                     >
                       <span className="material-symbols-outlined text-base">close</span>
@@ -606,14 +606,14 @@ export default function FindDoctorsScreen({
 
               {/* Specialty Filter */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs text-[#25836F]">medical_services</span>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">medical_services</span>
                   Specialty
                 </label>
                 <select
                   value={selectedSpecialty}
                   onChange={(e) => setSelectedSpecialty(e.target.value)}
-                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-xs bg-white text-zinc-800 focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition cursor-pointer"
                 >
                   <option value="all">All Specialties</option>
                   {specialties.map((spec) => (
@@ -626,14 +626,14 @@ export default function FindDoctorsScreen({
 
               {/* Availability Filter */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs text-[#25836F]">event_available</span>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">event_available</span>
                   Availability
                 </label>
                 <select
                   value={availabilityFilter}
                   onChange={(e) => setAvailabilityFilter(e.target.value)}
-                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-xs bg-white text-zinc-800 focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition cursor-pointer"
                 >
                   {AVAILABILITY_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -645,14 +645,14 @@ export default function FindDoctorsScreen({
 
               {/* Language Filter */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs text-[#25836F]">translate</span>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">translate</span>
                   Language
                 </label>
                 <select
                   value={selectedLanguage}
                   onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-xs bg-white text-zinc-800 focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition cursor-pointer"
                 >
                   <option value="all">All Languages</option>
                   {languages.map((lang) => (
@@ -665,14 +665,14 @@ export default function FindDoctorsScreen({
 
               {/* Sort By Filter */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs text-[#25836F]">swap_vert</span>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">swap_vert</span>
                   Sort By
                 </label>
                 <select
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value)}
-                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2.5 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-xs bg-white text-zinc-800 focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition cursor-pointer"
                 >
                   {SORT_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -683,11 +683,11 @@ export default function FindDoctorsScreen({
               </div>
 
               {/* Filter Actions */}
-              <div className="pt-3 border-t border-[#577877]/10 space-y-2">
+              <div className="pt-3 border-t border-zinc-100 space-y-2">
                 <button
                   type="button"
                   onClick={handleApplyFilters}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#25836F] hover:bg-[#1f6f5e] text-white text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1A7D67] hover:bg-[#156654] text-white text-xs font-bold shadow-xs hover:shadow-md transition duration-300 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-sm">filter_alt</span>
                   Apply Filters
@@ -697,7 +697,7 @@ export default function FindDoctorsScreen({
                   <button
                     type="button"
                     onClick={handleClearFilters}
-                    className="w-full px-4 py-2 rounded-xl border border-[#577877]/25 bg-white text-[#577877] hover:text-[#162623] hover:bg-[#F0F5F7] text-xs font-semibold transition cursor-pointer"
+                    className="w-full px-4 py-2 rounded-xl border border-zinc-300 bg-white text-zinc-600 hover:text-zinc-800 hover:bg-[#F9FBFA] text-xs font-semibold transition cursor-pointer"
                   >
                     Clear All Filters
                   </button>
@@ -711,15 +711,15 @@ export default function FindDoctorsScreen({
           {/* ========================================================= */}
           <main className="lg:col-span-8 xl:col-span-9 space-y-5">
             {/* Results Count & Active Filter Pills Bar */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-4 sm:px-5 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="text-[#577877]">
+            <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:px-5 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="text-zinc-500">
                 Showing{" "}
-                <span className="font-bold text-[#162623]">
+                <span className="font-bold text-zinc-800">
                   {sortedDoctors.length}
                 </span>{" "}
                 available doctor{sortedDoctors.length === 1 ? "" : "s"}
                 {appliedFilters.specialty !== "all" && (
-                  <span className="ml-1 text-[#25836F] font-semibold">
+                  <span className="ml-1 text-[#1A7D67] font-semibold">
                     in {appliedFilters.specialty}
                   </span>
                 )}
@@ -727,11 +727,11 @@ export default function FindDoctorsScreen({
 
               {hasActiveFilters && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[#577877]">Active filters applied</span>
+                  <span className="text-zinc-500">Active filters applied</span>
                   <button
                     type="button"
                     onClick={handleClearFilters}
-                    className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer"
+                    className="text-xs font-semibold text-[#1A7D67] hover:underline cursor-pointer"
                   >
                     Reset
                   </button>
@@ -741,8 +741,8 @@ export default function FindDoctorsScreen({
 
             {/* Doctor Cards Listing / States */}
             {loading ? (
-        <div className="rounded-2xl bg-white border border-[#577877]/15 p-16 flex flex-col items-center justify-center gap-3 text-[#577877]">
-          <span className="material-symbols-outlined animate-spin text-4xl text-[#25836F]">
+        <div className="rounded-2xl bg-white border border-zinc-200 p-16 flex flex-col items-center justify-center gap-3 text-zinc-500">
+          <span className="material-symbols-outlined animate-spin text-4xl text-[#1A7D67]">
             sync
           </span>
           <p className="text-xs font-medium">Loading clinical directory and schedules…</p>
@@ -759,16 +759,16 @@ export default function FindDoctorsScreen({
           </button>
         </div>
       ) : paginatedDoctors.length === 0 ? (
-        /* 5. Helpful Empty State */
-        <div className="rounded-2xl bg-white border border-[#577877]/15 p-12 sm:p-16 text-center text-[#577877] space-y-4 max-w-xl mx-auto shadow-xs">
-          <div className="w-16 h-16 rounded-2xl bg-[#F0F5F7] text-[#25836F] mx-auto flex items-center justify-center">
+        /* Helpful Empty State */
+        <div className="rounded-2xl bg-white border border-zinc-200 p-12 sm:p-16 text-center text-zinc-500 space-y-4 max-w-xl mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-full bg-[#EEF6F3] text-[#1A7D67] mx-auto flex items-center justify-center">
             <span className="material-symbols-outlined text-3xl">person_search</span>
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-bold text-[#162623]">
+            <h3 className="text-base font-bold text-zinc-800">
               No Clinicians Match Your Criteria
             </h3>
-            <p className="text-xs text-[#577877] max-w-md mx-auto leading-relaxed">
+            <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
               We couldn't find any doctors matching your search or filter combination. Try clearing your filters or selecting a different specialty.
             </p>
           </div>
@@ -776,7 +776,7 @@ export default function FindDoctorsScreen({
             <button
               type="button"
               onClick={handleClearFilters}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#1f6f5e] transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1A7D67] px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#156654] transition cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm">restart_alt</span>
               Clear All Filters
@@ -784,7 +784,7 @@ export default function FindDoctorsScreen({
           </div>
         </div>
       ) : (
-        /* 6. Redesigned Doctor Cards with Consistent Grid */
+        /* Redesigned Doctor Cards matching Landing Page & Our Services Cards */
         <div className="space-y-4">
           {paginatedDoctors.map((doc) => {
             const hasSlots = Array.isArray(doc.availability) && doc.availability.length > 0;
@@ -799,14 +799,14 @@ export default function FindDoctorsScreen({
             return (
               <div
                 key={doc.id}
-                className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs hover:shadow-md hover:border-[#25836F]/40 transition-all duration-200"
+                className="rounded-2xl bg-white hover:bg-[#EEF6F3]/40 border border-zinc-200 hover:border-[#1A7D67]/40 p-5 sm:p-6 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
               >
                 {/* Main Card Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
                   {/* Left Column: Avatar & Doctor Details (md: col-span-7 lg: col-span-8) */}
                   <div className="md:col-span-7 lg:col-span-8 flex items-start gap-4 min-w-0">
-                    {/* Avatar */}
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#185A4D] text-white flex items-center justify-center text-lg sm:text-xl font-bold shadow-xs shrink-0 select-none">
+                    {/* Avatar Pill Circle */}
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center text-lg sm:text-xl font-bold transition-colors duration-300 shadow-xs shrink-0 select-none">
                       {initials}
                     </div>
 
@@ -816,19 +816,19 @@ export default function FindDoctorsScreen({
                         <button
                           type="button"
                           onClick={() => setSelectedProfileDoctor(doc)}
-                          className="text-base font-bold text-[#162623] hover:text-[#25836F] hover:underline transition truncate text-left cursor-pointer"
+                          className="text-base sm:text-lg font-bold text-zinc-800 group-hover:text-[#1A7D67] transition-colors truncate text-left cursor-pointer"
                         >
                           {doc.fullName}
                         </button>
                         {doc.isVerified && (
                           <span
-                            className="material-symbols-outlined text-[#25836F] text-base shrink-0"
+                            className="material-symbols-outlined text-[#1A7D67] text-base shrink-0"
                             title="Verified Credentials"
                           >
                             verified
                           </span>
                         )}
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#F0F5F7] text-[#185A4D]">
+                        <span className="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#EEF6F3] text-[#1A7D67]">
                           {doc.specialty || "General Specialist"}
                         </span>
                         {doc.qualificationsDisplay && (
@@ -842,26 +842,26 @@ export default function FindDoctorsScreen({
                       </div>
 
                       {doc.clinic && (
-                        <p className="text-xs text-[#577877] flex flex-wrap items-center gap-x-3 gap-y-1 truncate">
+                        <p className="text-xs text-zinc-500 flex flex-wrap items-center gap-x-3 gap-y-1 truncate">
                           <span className="flex items-center gap-1.5 truncate">
-                            <span className="material-symbols-outlined text-sm text-[#577877]/80 shrink-0">
+                            <span className="material-symbols-outlined text-sm text-zinc-400 shrink-0">
                               apartment
                             </span>
                             <span className="truncate">{doc.clinic}</span>
                           </span>
                           {doc.registrationNumber && (
-                            <span className="text-[11px] text-[#577877]">
-                              Reg No: <strong className="font-semibold text-[#162623]">{doc.registrationNumber}</strong>
+                            <span className="text-[11px] text-zinc-500">
+                              Reg No: <strong className="font-semibold text-zinc-700">{doc.registrationNumber}</strong>
                             </span>
                           )}
                         </p>
                       )}
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#577877] pt-0.5">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500 pt-0.5">
                         <span className="inline-flex items-center gap-1">
-                          <span className="material-symbols-outlined text-xs text-[#25836F]">translate</span>
+                          <span className="material-symbols-outlined text-xs text-[#1A7D67]">translate</span>
                           Languages:{" "}
-                          <strong className="font-semibold text-[#162623]">
+                          <strong className="font-semibold text-zinc-700">
                             {(doc.languages && doc.languages.length > 0)
                               ? doc.languages.join(", ")
                               : "English"}
@@ -870,7 +870,7 @@ export default function FindDoctorsScreen({
 
                         {doc.timezone && (
                           <span className="inline-flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs text-[#577877]">schedule</span>
+                            <span className="material-symbols-outlined text-xs text-zinc-400">schedule</span>
                             {doc.timezone}
                           </span>
                         )}
@@ -879,21 +879,21 @@ export default function FindDoctorsScreen({
                   </div>
 
                   {/* Right Column: Fee, Availability & Booking Action (md: col-span-5 lg: col-span-4) */}
-                  <div className="md:col-span-5 lg:col-span-4 flex flex-col md:items-end justify-between gap-3 border-t md:border-t-0 md:border-l border-[#577877]/15 pt-4 md:pt-0 md:pl-5">
+                  <div className="md:col-span-5 lg:col-span-4 flex flex-col md:items-end justify-between gap-3 border-t md:border-t-0 md:border-l border-zinc-100 pt-4 md:pt-0 md:pl-5">
                     {/* Fee & Next Available */}
                     <div className="md:text-right space-y-0.5">
                       <div className="flex md:block items-baseline justify-between gap-2">
-                        <span className="text-[11px] text-[#577877] md:hidden">Consultation Fee</span>
-                        <div className="text-lg font-bold text-[#185A4D]">
+                        <span className="text-[11px] text-zinc-500 md:hidden">Consultation Fee</span>
+                        <div className="text-lg font-bold text-[#1A7D67]">
                           {doc.feeDisplay || "Fee calculated at booking"}
                         </div>
                       </div>
 
-                      <div className="text-[11px] text-[#577877] pt-0.5">
+                      <div className="text-[11px] text-zinc-500 pt-0.5">
                         Next slot:{" "}
                         <span
                           className={`font-semibold ${
-                            hasSlots ? "text-[#162623]" : "text-amber-700"
+                            hasSlots ? "text-zinc-800" : "text-amber-700"
                           }`}
                         >
                           {doc.nextSlotLabel}
@@ -907,10 +907,10 @@ export default function FindDoctorsScreen({
                         <button
                           type="button"
                           onClick={() => setSelectedProfileDoctor(doc)}
-                          className="px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white hover:bg-[#F0F5F7] text-[#577877] hover:text-[#162623] text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1 shrink-0"
+                          className="px-3.5 py-2.5 rounded-xl border border-zinc-300 bg-white hover:bg-white/95 text-zinc-700 hover:text-[#1A7D67] hover:border-[#1A7D67]/30 text-xs font-semibold transition-all duration-300 shadow-2xs cursor-pointer flex items-center justify-center gap-1 shrink-0"
                           title="View detailed doctor profile"
                         >
-                          <span className="material-symbols-outlined text-sm text-[#25836F]">visibility</span>
+                          <span className="material-symbols-outlined text-sm text-[#1A7D67]">visibility</span>
                           <span>View Profile</span>
                         </button>
 
@@ -918,10 +918,10 @@ export default function FindDoctorsScreen({
                           type="button"
                           disabled={!hasSlots}
                           onClick={() => startBooking(doc)}
-                          className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 ${
+                          className={`flex-1 md:flex-none px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 shadow-xs flex items-center justify-center gap-2 ${
                             hasSlots
-                              ? "bg-[#25836F] hover:bg-[#1f6f5e] text-white hover:shadow-sm cursor-pointer"
-                              : "bg-[#E5EEF1] text-[#577877] cursor-not-allowed opacity-75"
+                              ? "bg-[#1A7D67] hover:bg-[#156654] text-white hover:shadow-md cursor-pointer"
+                              : "bg-zinc-100 text-zinc-400 cursor-not-allowed opacity-75"
                           }`}
                           title={
                             hasSlots
