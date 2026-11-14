@@ -151,44 +151,42 @@ export default function Navbar() {
         <NavLink
           to="/"
           onClick={() => setOpen(false)}
-          className="flex shrink-0 items-center gap-3 rounded-xl focus:outline-none"
+          className={`flex shrink-0 items-center rounded-xl focus:outline-none transition-colors duration-300 ${
+            useSolidWhiteHeader ? "text-[#162623]" : "text-white"
+          }`}
         >
-          <div
-            className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-300 ${
-              useSolidWhiteHeader ? "bg-[#1A7D67] text-white shadow-xs" : "bg-transparent text-white"
-            }`}
+          <svg
+            width="210"
+            height="42"
+            viewBox="0 0 210 42"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-8 sm:h-9 w-auto"
+            aria-label="Kaizen Care"
           >
-            <svg
-              width="24"
-              height="28"
-              viewBox="0 0 35 42"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-auto"
-              aria-hidden="true"
-            >
-              <path
-                d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
-                fill="currentColor"
-              />
-              <rect
-                width="12.629"
-                height="32.626"
-                rx="6.315"
-                transform="rotate(-45 16.202 6.711)"
-                fill="currentColor"
-              />
-            </svg>
-          </div>
-          <div>
-            <p
-              className={`text-lg font-bold leading-none tracking-tight transition-colors duration-300 ${
-                useSolidWhiteHeader ? "text-[#162623]" : "text-white"
-              }`}
+            <path
+              d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
+              fill="currentColor"
+            />
+            <rect
+              width="12.629"
+              height="32.626"
+              rx="6.315"
+              transform="rotate(-45 16.202 6.711)"
+              fill="currentColor"
+            />
+            <text
+              x="44"
+              y="29"
+              fill="currentColor"
+              fontFamily="'Poppins', system-ui, sans-serif"
+              fontSize="24"
+              fontWeight="700"
+              letterSpacing="-0.4"
             >
               Kaizen Care
-            </p>
-          </div>
+            </text>
+          </svg>
         </NavLink>
 
         {/* Desktop Navigation Links */}
