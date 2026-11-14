@@ -31,6 +31,7 @@ import DoctorPatientsScreen from "./components/screens/DoctorPatientsScreen";
 import DoctorAvailabilityScreen from "./components/screens/DoctorAvailabilityScreen";
 import DoctorSettingsScreen from "./components/screens/DoctorSettingsScreen";
 import DoctorConsultationScreen from "./components/screens/DoctorConsultationScreen";
+import DoctorNotificationsScreen from "./components/screens/DoctorNotificationsScreen";
 import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
 
 const PATH_TO_TAB = {
@@ -244,6 +245,8 @@ export default function App() {
       switch (routedTab) {
         case "doctor-dashboard":
           return <DoctorDashboardScreen onNavigate={handleNavigate} />;
+        case "notifications":
+          return <DoctorNotificationsScreen />;
         case "doctor-appointments":
           return <DoctorAppointmentsScreen onNavigate={handleNavigate} />;
         case "doctor-patients":

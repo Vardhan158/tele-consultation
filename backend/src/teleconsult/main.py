@@ -28,6 +28,7 @@ from teleconsult.modules.identity.routes import router as identity_router
 from teleconsult.modules.identity.settings_routes import router as settings_router
 from teleconsult.modules.notifications.patient_routes import router as notification_router
 from teleconsult.modules.notifications.routes import router as notifications_router
+from teleconsult.modules.notifications.doctor_routes import router as doctor_notifications_router
 from teleconsult.modules.patient_portal.routes import public_router as public_patient_router
 from teleconsult.modules.patient_portal.routes import router as patient_router
 from teleconsult.modules.payments.patient_routes import router as payment_router
@@ -161,6 +162,7 @@ def create_app() -> FastAPI:
     app.include_router(consent_router)
     app.include_router(payments_router)
     app.include_router(notifications_router)
+    app.include_router(doctor_notifications_router)
     app.include_router(reporting_router)
     app.include_router(support_access_router)
     app.include_router(audit_router)

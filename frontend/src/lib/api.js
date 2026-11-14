@@ -107,6 +107,11 @@ export const doctorApi = {
     return apiRequest("/doctor/register", { method: "POST", body: JSON.stringify(payload) });
   },
   dashboard: () => apiRequest("/doctor/dashboard"),
+  notifications: () => apiRequest("/doctor/notifications"),
+  markNotificationRead: (id) =>
+    apiRequest(`/doctor/notifications/${id}/read`, { method: "POST" }),
+  markAllNotificationsRead: () =>
+    apiRequest("/doctor/notifications/read-all", { method: "POST" }),
   appointments: () => apiRequest("/doctor/appointments"),
   availability: () => apiRequest("/doctor/availability"),
   createAvailability: (slot) =>
