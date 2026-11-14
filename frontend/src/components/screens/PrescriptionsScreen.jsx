@@ -228,6 +228,23 @@ export default function PrescriptionsScreen({
     setTimeout(() => setToastMessage(""), 3500);
   };
 
+  const handleDownloadSummary = async (summary) => {
+    if (!summary) return;
+    try {
+      const blob = await clinicalApi.downloadSummary(summary.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `consultation-summary-${summary.id}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setToastMessage("Consultation summary downloaded.");
+    } catch (err) {
+      setToastMessage(err.message || "Consultation summary downloaded.");
+    }
+    setTimeout(() => setToastMessage(""), 3500);
+  };
+
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -265,33 +282,48 @@ export default function PrescriptionsScreen({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleDownloadMedList}
-            className="bg-white border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer self-start sm:self-auto"
-          >
-            <span className="material-symbols-outlined !text-[#25836F] text-base">
-              download
-            </span>
-            <span>Download medication list</span>
-          </button>
+          {currentMode === "prescriptions" ? (
+            <button
+              type="button"
+              onClick={handleDownloadMedList}
+              className="bg-white border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer self-start sm:self-auto"
+            >
+              <span className="material-symbols-outlined !text-[#25836F] text-base">
+                download
+              </span>
+              <span>Download medication list</span>
+            </button>
+          ) : summariesList.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => handleDownloadSummary(summariesList[0])}
+              className="bg-white border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer self-start sm:self-auto"
+            >
+              <span className="material-symbols-outlined !text-[#25836F] text-base">
+                download
+              </span>
+              <span>Download summary</span>
+            </button>
+          ) : null}
         </div>
 
-        {/* Top Safety Banner */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3.5">
-          <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5">
-            health_and_safety
-          </span>
-          <div className="text-xs space-y-0.5">
-            <h2 className="font-bold text-[#162623]">
-              Take medicines only as prescribed
-            </h2>
-            <p className="text-[#577877] leading-relaxed">
-              Don't change or stop medication without speaking to your
-              clinician. If your list looks wrong, contact your care team.
-            </p>
+        {/* Top Safety Banner - Prescriptions Mode Only */}
+        {currentMode === "prescriptions" && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3.5">
+            <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5">
+              health_and_safety
+            </span>
+            <div className="text-xs space-y-0.5">
+              <h2 className="font-bold text-[#162623]">
+                Take medicines only as prescribed
+              </h2>
+              <p className="text-[#577877] leading-relaxed">
+                Don't change or stop medication without speaking to your
+                clinician. If your list looks wrong, contact your care team.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Status Tabs Row */}
         <div className="flex items-center gap-8 border-b border-[#577877]/20 pt-1 text-sm font-semibold">
@@ -596,6 +628,19 @@ export default function PrescriptionsScreen({
                           Recommended Plan
                         </span>
                         <p className="text-[#162623]">{sum.care_plan || sum.plan || "Follow clinician recommendations."}</p>
+                      </div>
+
+                      <div className="flex justify-end pt-2 border-t border-[#577877]/15">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadSummary(sum)}
+                          className="btn-secondary !px-4 !py-2 text-xs rounded-xl font-semibold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm">
+                            download
+                          </span>
+                          <span>Download Summary</span>
+                        </button>
                       </div>
                     </div>
                   ))
