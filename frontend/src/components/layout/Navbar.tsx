@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
-interface NavItem {
-  label: string;
-  path: string;
-  sectionId?: string;
-}
-
-const PUBLIC_NAV_LINKS: NavItem[] = [
+const PUBLIC_NAV_LINKS = [
   { label: "Home", path: "/" },
   { label: "Find Doctors", path: "/find-doctors" },
   { label: "Services", path: "/#services", sectionId: "services" },
@@ -33,7 +27,7 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
+    const closeOnEscape = (event) => event.key === "Escape" && setOpen(false);
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, []);
@@ -51,7 +45,7 @@ export default function Navbar() {
     }
   }, [location.pathname, location.hash]);
 
-  const handleLinkClick = (item: NavItem, e: React.MouseEvent) => {
+  const handleLinkClick = (item, e) => {
     setOpen(false);
     if (item.sectionId) {
       if (location.pathname === "/") {
@@ -73,7 +67,7 @@ export default function Navbar() {
   const isLightPage = ["/find-doctors", "/faqs", "/services"].includes(location.pathname);
   const useSolidWhiteHeader = isScrolled || isLightPage;
 
-  const renderNavLink = (item: NavItem, isMobile = false) => {
+  const renderNavLink = (item, isMobile = false) => {
     let isActive = false;
     if (item.path !== "/" && !item.sectionId && item.path === location.pathname) {
       isActive = true;
@@ -132,7 +126,7 @@ export default function Navbar() {
     );
   };
 
-  const go = (path: string) => {
+  const go = (path) => {
     setOpen(false);
     navigate(path);
   };

@@ -94,11 +94,18 @@ export const patientApi = {
 };
 
 export const doctorApi = {
-  register: (payload) =>
-    apiRequest("/doctor/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  register: (payload) => {
+    if (payload?.credential_document instanceof File) {
+      const form = new FormData();
+      Object.entries(payload).forEach(([key, value]) => {
+        if (key === "credential_document") form.append(key, value);
+        else if (Array.isArray(value)) form.append(key, value.join(","));
+        else if (value !== undefined && value !== null) form.append(key, String(value));
+      });
+      return apiRequest("/doctor/register", { method: "POST", body: form });
+    }
+    return apiRequest("/doctor/register", { method: "POST", body: JSON.stringify(payload) });
+  },
   dashboard: () => apiRequest("/doctor/dashboard"),
   appointments: () => apiRequest("/doctor/appointments"),
   availability: () => apiRequest("/doctor/availability"),

@@ -5,9 +5,11 @@ import secrets
 import struct
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from sqlalchemy import select
@@ -28,6 +30,9 @@ from teleconsult.modules.patient_portal.models import Doctor
 
 router = APIRouter(prefix="/doctor", tags=["doctor-onboarding"])
 OTP_EXPIRY_MINUTES = 5
+CREDENTIAL_TYPES = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
+MAX_CREDENTIAL_BYTES = 10 * 1024 * 1024
+PRIVATE_CREDENTIAL_ROOT = Path(__file__).resolve().parents[4] / "private_storage" / "credentials"
 
 
 def generate_verification_otp() -> str:
@@ -62,13 +67,44 @@ def _totp(secret: str, counter: int | None = None) -> str:
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register_doctor(payload: DoctorRegistration, session: AsyncSession | None = Depends(auth_database_session)):
+async def register_doctor(
+    request: Request,
+    session: AsyncSession | None = Depends(auth_database_session),
+):
+    credential = None
+    if request.headers.get("content-type", "").startswith("multipart/form-data"):
+        form = await request.form()
+        values = {key: form.get(key) for key in DoctorRegistration.model_fields}
+        values["qualifications"] = [v.strip() for v in str(values.get("qualifications") or "").split(",") if v.strip()]
+        values["languages"] = [v.strip() for v in str(values.get("languages") or "").split(",") if v.strip()]
+        payload = DoctorRegistration.model_validate(values)
+        upload = form.get("credential_document")
+        if upload is None or not hasattr(upload, "read"):
+            raise HTTPException(status_code=422, detail="Credential document is required")
+        content_type = getattr(upload, "content_type", "") or ""
+        if content_type not in CREDENTIAL_TYPES:
+            raise HTTPException(status_code=415, detail="Credential must be a PDF, JPG, or PNG file")
+        raw_name = Path(getattr(upload, "filename", "credential") or "credential")
+        if raw_name.suffix.lower() != CREDENTIAL_TYPES[content_type]:
+            raise HTTPException(status_code=415, detail="Credential file extension does not match its type")
+        data = await upload.read(MAX_CREDENTIAL_BYTES + 1)
+        if len(data) > MAX_CREDENTIAL_BYTES:
+            raise HTTPException(status_code=413, detail="Credential file exceeds the 10 MB limit")
+        credential = (raw_name.name, content_type, data)
+    else:
+        try:
+            payload = DoctorRegistration.model_validate(await request.json())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Registration payload is invalid") from exc
     email = payload.email.strip().lower()
     settings = get_settings()
     if settings.mongodb_enabled:
         if not mongo_database.enabled:
             raise HTTPException(status_code=503, detail="MongoDB is enabled but not connected")
         tenant_id = settings.default_tenant_id
+        db = mongo_database.database()
+        if await db["doctors"].find_one({"tenant_id": tenant_id, "registration_number": payload.registration_number.strip()}):
+            raise HTTPException(status_code=409, detail="This professional registration number is already registered.")
         user_id = str(uuid4())
         now = datetime.now(UTC)
         user = {
@@ -105,15 +141,37 @@ async def register_doctor(payload: DoctorRegistration, session: AsyncSession | N
             "created_at": now,
         }
         code = generate_verification_otp()
+        credential_path = None
+        credential_meta = None
+        if credential:
+            filename, content_type, data = credential
+            credential_path = PRIVATE_CREDENTIAL_ROOT / tenant_id / f"{user_id}{CREDENTIAL_TYPES[content_type]}"
+            credential_path.parent.mkdir(parents=True, exist_ok=True)
+            credential_path.write_bytes(data)
+            credential_meta = {
+                "doctor_id": user_id,
+                "tenant_id": tenant_id,
+                "registration_number": payload.registration_number.strip(),
+                "storage_key": str(credential_path.relative_to(PRIVATE_CREDENTIAL_ROOT)),
+                "file_name": filename,
+                "content_type": content_type,
+                "size_bytes": len(data),
+                "status": "pending_verification",
+                "created_at": now,
+            }
         try:
-            await mongo_database.database()["users"].insert_one(user)
-            await mongo_database.database()["doctors"].insert_one(doctor)
-            await mongo_database.database()["recovery_tokens"].insert_one({
+            await db["users"].insert_one(user)
+            await db["doctors"].insert_one(doctor)
+            if credential_meta:
+                await db["doctor_credentials"].insert_one(credential_meta)
+            await db["recovery_tokens"].insert_one({
                 "id": str(uuid4()), "user_id": user_id, "token_hash": token_hash(code),
                 "expires_at": otp_expiry(now), "used_at": None, "attempts": 0,
             })
             await send_verification_email(email, code)
         except DuplicateKeyError:
+            if credential_path and credential_path.is_file():
+                credential_path.unlink()
             existing_user = await mongo_database.database()["users"].find_one({
                 "tenant_id": tenant_id, "email": email
             })
@@ -140,6 +198,8 @@ async def register_doctor(payload: DoctorRegistration, session: AsyncSession | N
 
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
+    if credential:
+        raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
     existing_user = await session.scalar(select(UserAccount).where(UserAccount.email == email))
     if existing_user:
         if existing_user.verified_at is None:
@@ -265,6 +325,27 @@ async def pending_doctors(
         }
         for row in rows
     ]
+
+
+@router.get("/{doctor_id}/credentials")
+async def get_doctor_credentials(doctor_id: str, request: Request):
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if "clinic:doctor:read" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    settings = get_settings()
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
+    document = await mongo_database.database()["doctor_credentials"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "doctor_id": str(doctor_id),
+    })
+    if not document:
+        raise HTTPException(status_code=404, detail="Credential document not found")
+    path = (PRIVATE_CREDENTIAL_ROOT / document["storage_key"]).resolve()
+    if PRIVATE_CREDENTIAL_ROOT.resolve() not in path.parents or not path.is_file():
+        raise HTTPException(status_code=404, detail="Credential content is unavailable")
+    return FileResponse(path, media_type=document["content_type"], filename=document["file_name"], content_disposition_type="attachment")
 
 
 @router.post("/{doctor_id}/reject")

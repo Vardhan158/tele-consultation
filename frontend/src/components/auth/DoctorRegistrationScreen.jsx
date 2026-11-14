@@ -88,18 +88,9 @@ function ClinicianBrandPanel({ onBack }) {
   );
 }
 
-const generateRegNumber = (fullName = "", mobile = "") => {
-  const nameClean = fullName
-    .replace(/^dr\.?\s*/i, "")
-    .replace(/[^a-zA-Z]/g, "")
-    .toUpperCase();
-  const namePart = nameClean.slice(0, 3) || "DOC";
-
-  const mobileClean = mobile.replace(/\D/g, "");
-  const mobilePart = mobileClean.length >= 4 ? mobileClean.slice(-4) : "1234";
-
-  return `KMC-${namePart}${mobilePart}`;
-};
+const SUPPORTED_SPECIALTIES = ["General Medicine", "Cardiology", "Dermatology", "Pediatrics", "Neurology", "Orthopedics"];
+const CREDENTIAL_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+const MAX_CREDENTIAL_BYTES = 10 * 1024 * 1024;
 
 export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchToPatientAuth }) {
   const [form, setForm] = useState({
@@ -114,44 +105,42 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
     qualifications: "",
     languages: "",
   });
-  const [isRegManual, setIsRegManual] = useState(false);
+  const [credentialDocument, setCredentialDocument] = useState(null);
   const [state, setState] = useState("idle");
   const [message, setMessage] = useState("");
 
   const update = (event) => {
     const { name, value } = event.target;
-    if (name === "registration_number") {
-      setIsRegManual(true);
-      setForm((curr) => ({ ...curr, registration_number: value }));
-      return;
-    }
-
-    setForm((curr) => {
-      const next = { ...curr, [name]: value };
-      if (!isRegManual && (name === "full_name" || name === "mobile_number")) {
-        next.registration_number = generateRegNumber(
-          name === "full_name" ? value : curr.full_name,
-          name === "mobile_number" ? value : curr.mobile_number,
-        );
-      }
-      return next;
-    });
+    setForm((curr) => ({ ...curr, [name]: value }));
   };
 
-  const handleAutoGenerateReg = () => {
-    const autoGen = generateRegNumber(form.full_name, form.mobile_number);
-    setForm((curr) => ({ ...curr, registration_number: autoGen }));
-    setIsRegManual(false);
+  const handleCredentialDocument = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) { setCredentialDocument(null); return; }
+    if (!CREDENTIAL_TYPES.includes(file.type) || !/\.(pdf|jpe?g|png)$/i.test(file.name)) {
+      setCredentialDocument({ error: "Upload a PDF, JPG, or PNG credential document." }); return;
+    }
+    if (file.size > MAX_CREDENTIAL_BYTES) {
+      setCredentialDocument({ error: "Credential documents must be 10 MB or smaller." }); return;
+    }
+    setCredentialDocument(file);
   };
 
   const submit = async (event) => {
     event.preventDefault();
+    const mobile = form.mobile_number.replace(/[\s()-]/g, "");
+    const experience = Number(form.experience_years);
+    if (!/^\+?[0-9]{7,15}$/.test(mobile)) { setState("error"); setMessage("Enter a valid mobile number."); return; }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,128}$/.test(form.password)) { setState("error"); setMessage("Password must be at least 8 characters and include uppercase, lowercase, number, and symbol."); return; }
+    if (!Number.isInteger(experience) || experience < 0) { setState("error"); setMessage("Experience must be a nonnegative whole number."); return; }
+    if (credentialDocument?.error) { setState("error"); setMessage(credentialDocument.error); return; }
     setState("loading");
     setMessage("");
     try {
       await doctorApi.register({
         ...form,
-        experience_years: Number(form.experience_years),
+        experience_years: experience,
+        credential_document: credentialDocument || undefined,
         qualifications: form.qualifications
           .split(",")
           .map((item) => item.trim())
@@ -172,29 +161,13 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F5F7] font-sans grid grid-cols-1 lg:grid-cols-2 text-[#162623]">
+    <div className="min-h-screen bg-[#F0F5F7] font-sans grid grid-cols-1 lg:grid-cols-2 text-[#162623] lg:h-screen lg:overflow-hidden">
       <ClinicianBrandPanel onBack={onBack} />
 
-      <main className="flex flex-col justify-between p-6 sm:p-10 lg:p-14 xl:p-16 min-h-screen overflow-y-auto">
-        <div className="max-w-xl w-full mx-auto space-y-6">
+      <main className="flex flex-col justify-between p-6 sm:p-10 lg:p-8 xl:p-10 min-h-screen overflow-y-auto lg:h-screen">
+        <div className="max-w-xl w-full mx-auto space-y-3">
           {/* Header Switcher Pills */}
           <div className="flex items-center justify-between">
-            <div className="inline-flex rounded-xl bg-[#25836F]/10 p-1 border border-[#577877]/15">
-              <button
-                type="button"
-                onClick={onSwitchToPatientAuth || onBack}
-                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#577877] hover:text-[#162623] transition cursor-pointer"
-              >
-                Patient Auth
-              </button>
-              <button
-                type="button"
-                className="rounded-lg bg-[#25836F] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs cursor-default"
-              >
-                Clinician Registration
-              </button>
-            </div>
-
             {onBack && (
               <button
                 type="button"
@@ -216,8 +189,8 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
             </p>
           </div>
 
-          <form onSubmit={submit} className="space-y-4">
-            <div className="grid gap-3.5 sm:grid-cols-2">
+          <form onSubmit={submit} className="space-y-3">
+            <div className="grid gap-2.5 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-[#162623]">
                   Full Name <span className="text-red-600">*</span>
@@ -231,6 +204,12 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   placeholder="Dr. Harshavardhan m v"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="block text-xs font-semibold text-[#162623]">Credential Document <span className="text-[#577877] font-normal">(PDF, JPG, or PNG; max 10 MB)</span></label>
+                <input required type="file" accept="application/pdf,image/jpeg,image/png" onChange={handleCredentialDocument} className="w-full rounded-xl border border-[#577877]/25 bg-white px-3 py-2 text-xs text-[#162623] file:mr-3 file:rounded-lg file:border-0 file:bg-[#EEF6F3] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[#25836F]" />
+                <p className="text-[11px] text-[#577877]">Upload your professional registration certificate for administrator verification.</p>
               </div>
 
               <div className="space-y-1">
@@ -256,6 +235,8 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   required
                   name="mobile_number"
                   type="text"
+                  inputMode="tel"
+                  pattern="[+]?[0-9\s() -]{7,20}"
                   value={form.mobile_number}
                   onChange={update}
                   placeholder="+91 9876543210"
@@ -271,6 +252,8 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   required
                   name="password"
                   type="password"
+                  minLength={8}
+                  autoComplete="new-password"
                   value={form.password}
                   onChange={update}
                   placeholder="••••••••"
@@ -282,15 +265,10 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 <label className="block text-xs font-semibold text-[#162623]">
                   Medical Specialty <span className="text-red-600">*</span>
                 </label>
-                <input
-                  required
-                  name="specialty"
-                  type="text"
-                  value={form.specialty}
-                  onChange={update}
-                  placeholder="e.g. ENT, Cardiology, Internal Medicine"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
-                />
+                <select required name="specialty" value={form.specialty} onChange={update} className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]">
+                  <option value="">Select a supported specialty</option>
+                  {SUPPORTED_SPECIALTIES.map((specialty) => <option key={specialty} value={specialty}>{specialty}</option>)}
+                </select>
               </div>
 
               <div className="space-y-1">
@@ -313,14 +291,6 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   <label className="block text-xs font-semibold text-[#162623]">
                     Registration Number <span className="text-red-600">*</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAutoGenerateReg}
-                    className="text-[10px] font-bold text-[#25836F] hover:underline cursor-pointer flex items-center gap-0.5"
-                    title="Auto-generate registration number based on name and mobile number"
-                  >
-                    <span>⚡ Auto-Generate</span>
-                  </button>
                 </div>
                 <input
                   required
@@ -328,7 +298,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   type="text"
                   value={form.registration_number}
                   onChange={update}
-                  placeholder="KMC-HAR3210"
+                  placeholder="Enter your professional registration number"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
@@ -343,6 +313,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   type="number"
                   min="0"
                   max="60"
+                  step="1"
                   value={form.experience_years}
                   onChange={update}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
@@ -414,7 +385,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
           </p>
         </div>
 
-        <footer className="pt-8 text-center text-xs text-[#577877]">
+        <footer className="pt-3 text-center text-xs text-[#577877]">
           © 2026 Kaizen Care · Clinician Credentialing Workspace.
         </footer>
       </main>
