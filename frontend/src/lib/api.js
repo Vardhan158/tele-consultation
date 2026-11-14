@@ -142,10 +142,10 @@ export const doctorApi = {
       method: "POST",
     }),
   amendments: (noteId) => apiRequest(`/doctor/notes/${noteId}/amendments`),
-  amendNote: (noteId, content_reference) =>
+  amendNote: (noteId, content_reference, reason = "") =>
     apiRequest(`/doctor/notes/${noteId}/amend`, {
       method: "POST",
-      body: JSON.stringify({ content_reference }),
+      body: JSON.stringify({ content_reference, reason }),
     }),
   enrollMfa: () => apiRequest("/doctor/mfa/enroll", { method: "POST" }),
   verifyMfa: (code) =>

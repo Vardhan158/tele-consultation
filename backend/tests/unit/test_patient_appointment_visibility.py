@@ -195,6 +195,27 @@ async def test_mongodb_doctor_can_finalize_legacy_note(portal, monkeypatch):
     assert db["clinical_notes"].rows[0]["status"] == "finalized"
 
 
+async def test_finalized_note_is_locked_and_amendment_is_separate(portal, monkeypatch):
+    from fastapi import HTTPException
+
+    from teleconsult.modules.consultation import doctor_routes
+
+    rows, _ = portal
+    rows["clinical_notes"] = [{"id": "note-final", "tenant_id": "1", "appointment_id": "apt-45bde4b19136", "consultation_id": "apt-45bde4b19136", "doctor_id": DOCTOR, "author_id": DOCTOR, "status": "finalized", "content_reference": "Original"}]
+    rows["clinical_note_amendments"] = []
+    db = {key: Collection(value) for key, value in rows.items()}
+    monkeypatch.setattr(doctor_routes.mongo_database, "database", lambda: db)
+    monkeypatch.setattr(doctor_routes, "get_settings", lambda: SimpleNamespace(mongodb_enabled=True))
+    principal = Principal(DOCTOR, "1", frozenset({"doctor"}), frozenset({"clinical:write", "clinical:read"}))
+    with pytest.raises(HTTPException) as error:
+        await doctor_routes.update_draft_note("note-final", doctor_routes.NotePayload(content_reference="overwrite"), None, principal)
+    assert error.value.status_code == 409
+    result = await doctor_routes.amend_note("note-final", doctor_routes.NotePayload(content_reference="Changed diagnosis", reason="Corrected coding"), None, principal)
+    assert result["version"] == 1
+    assert db["clinical_notes"].rows[0]["content_reference"] == "Original"
+    assert "Corrected coding" in db["clinical_note_amendments"].rows[0]["content_reference"]
+
+
 @pytest.mark.parametrize("change", [{"id": "missing"}, {"patient_id": "other"}, {"tenant_id": "2"}])
 async def test_join_not_found_never_creates_appointment(portal, change):
     rows, principal = portal

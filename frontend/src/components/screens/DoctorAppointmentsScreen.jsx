@@ -33,6 +33,9 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
   const [selected, setSelected] = useState(null);
   const [noteFields, setNoteFields] = useState(emptyClinicalNote);
   const [amendments, setAmendments] = useState([]);
+  const [amendmentOpen, setAmendmentOpen] = useState(false);
+  const [amendmentReason, setAmendmentReason] = useState("");
+  const [amendmentFields, setAmendmentFields] = useState(emptyClinicalNote);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -82,9 +85,12 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
 
   const amend = async () => {
     try {
-      await doctorApi.amendNote(selected.note_id, serializeClinicalNote(noteFields));
+      await doctorApi.amendNote(selected.note_id, serializeClinicalNote(amendmentFields), amendmentReason);
       const history = await doctorApi.amendments(selected.note_id);
       setAmendments(history);
+      setAmendmentOpen(false);
+      setAmendmentReason("");
+      setAmendmentFields(emptyClinicalNote());
       setMessage("Amendment recorded.");
     } catch (err) {
       setError(err.message || "Failed to record amendment.");
@@ -101,6 +107,9 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
         note?.status === "finalized" ? await doctorApi.amendments(note.id) : [],
       );
       setMessage("");
+      setAmendmentOpen(false);
+      setAmendmentReason("");
+      setAmendmentFields(emptyClinicalNote());
     } catch (err) {
       setError(err.message || "Unable to load clinical notes.");
     }
@@ -257,13 +266,20 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
                 <textarea
                   value={noteFields[key]}
                   onChange={(e) => setNoteFields({ ...noteFields, [key]: e.target.value })}
+                  readOnly={selected.note_status === "finalized"}
                   rows={key === "findings" || key === "treatmentPlan" || key === "prescription" ? 4 : 3}
-                  className="mt-1.5 w-full rounded-xl border border-[#577877]/25 p-3 text-xs font-normal text-[#162623] focus:border-[#25836F] focus:outline-none"
+                  className={`mt-1.5 w-full rounded-xl border border-[#577877]/25 p-3 text-xs font-normal text-[#162623] focus:border-[#25836F] focus:outline-none ${selected.note_status === "finalized" ? "bg-[#F0F5F7] cursor-not-allowed" : ""}`}
                   placeholder={`Enter ${label.toLowerCase()}...`}
                 />
               </label>
             ))}
           </div>
+
+          {selected.note_status === "finalized" && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
+              Finalized — Read Only
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {selected.note_status !== "finalized" && (
@@ -290,13 +306,36 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
             {selected.note_id && selected.note_status === "finalized" && (
               <button
                 type="button"
-                onClick={amend}
+                onClick={() => setAmendmentOpen(true)}
                 className="rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-xs font-semibold text-[#25836F] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 Record Amendment
               </button>
             )}
           </div>
+
+          {amendmentOpen && selected.note_status === "finalized" && (
+            <div className="rounded-2xl border border-[#25836F]/25 bg-[#F0F5F7] p-4 space-y-4">
+              <div>
+                <h3 className="text-sm font-bold">Record Amendment</h3>
+                <p className="mt-1 text-xs text-[#577877]">The finalized note remains unchanged. Record only the reason and changed information below.</p>
+              </div>
+              <label className="block text-xs font-semibold">Reason
+                <textarea value={amendmentReason} onChange={(e) => setAmendmentReason(e.target.value)} rows={2} className="mt-1.5 w-full rounded-xl border border-[#577877]/25 p-3 text-xs font-normal" />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {CLINICAL_NOTE_FIELDS.map(([key, label]) => (
+                  <label key={key} className="text-xs font-semibold">{label}
+                    <textarea value={amendmentFields[key]} onChange={(e) => setAmendmentFields({ ...amendmentFields, [key]: e.target.value })} rows={3} className="mt-1.5 w-full rounded-xl border border-[#577877]/25 p-3 text-xs font-normal" />
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button type="button" disabled={!amendmentReason.trim() || !Object.values(amendmentFields).some((value) => value.trim())} onClick={amend} className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">Save Amendment</button>
+                <button type="button" onClick={() => setAmendmentOpen(false)} className="rounded-xl border border-[#577877]/30 px-4 py-2 text-xs font-semibold">Cancel</button>
+              </div>
+            </div>
+          )}
 
           {amendments.length > 0 && (
             <div className="space-y-2 pt-2 border-t border-[#577877]/15">

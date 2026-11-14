@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
-from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.consultation.clinical_models import ClinicalNote, ClinicalNoteAmendment
@@ -109,6 +108,7 @@ class DoctorSlot(BaseModel):
 
 class NotePayload(BaseModel):
     content_reference: str
+    reason: str = ""
 
 
 @router.get("/dashboard")
@@ -536,9 +536,27 @@ async def appointment_notes(appointment_id: str, session: AsyncSession | None = 
     return [{"id": note.id, "status": note.status, "content_reference": note.content_reference, "created_at": note.created_at} for note in notes]
 
 @router.patch("/notes/{note_id}")
-async def update_draft_note(note_id: UUID, payload: NotePayload, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinical:write"))):
+async def update_draft_note(note_id: str, payload: NotePayload, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:write"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doctor = await db["doctors"].find_one({"tenant_id": str(principal.tenant_id), "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}, {"user_account_id": str(principal.user_id)}]})
+        if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+        note = await db["clinical_notes"].find_one({"tenant_id": str(principal.tenant_id), "doctor_id": str(doctor.get("id")), "id": str(note_id)})
+        if note is None:
+            raise HTTPException(status_code=404, detail="Clinical note not found")
+        if note.get("status") != "draft":
+            raise HTTPException(status_code=409, detail="Finalized notes cannot be edited; create an amendment")
+        await db["clinical_notes"].update_one({"tenant_id": str(principal.tenant_id), "id": str(note_id)}, {"$set": {"content_reference": payload.content_reference}})
+        return {"id": str(note_id), "status": "draft"}
+    if session is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
+    try:
+        note_uuid = UUID(note_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Clinical note not found") from exc
     doctor = await _doctor(session, principal)
-    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_id, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
+    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_uuid, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
     if note is None:
         raise HTTPException(status_code=404, detail="Clinical note not found")
     if note.status != "draft":
@@ -750,23 +768,59 @@ async def finalize_note(appointment_id: str, note_id: str, session: AsyncSession
 
 
 @router.get("/notes/{note_id}/amendments")
-async def note_amendments(note_id: UUID, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinical:read"))):
+async def note_amendments(note_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:read"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doctor = await db["doctors"].find_one({"tenant_id": str(principal.tenant_id), "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}, {"user_account_id": str(principal.user_id)}]})
+        if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+        note = await db["clinical_notes"].find_one({"tenant_id": str(principal.tenant_id), "doctor_id": str(doctor.get("id")), "id": str(note_id)})
+        if note is None:
+            raise HTTPException(status_code=404, detail="Clinical note not found")
+        rows = await db["clinical_note_amendments"].find({"tenant_id": str(principal.tenant_id), "note_id": str(note_id)}).sort("version", 1).to_list(100)
+        return [{"id": row.get("id") or str(row.get("_id")), "version": row.get("version", 1), "content_reference": row.get("content_reference", ""), "created_at": row.get("created_at")} for row in rows]
+    if session is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
+    try:
+        note_uuid = UUID(note_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Clinical note not found") from exc
     doctor = await _doctor(session, principal)
-    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_id, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
+    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_uuid, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
     if note is None:
         raise HTTPException(status_code=404, detail="Clinical note not found")
-    rows = await session.scalars(select(ClinicalNoteAmendment).where(ClinicalNoteAmendment.note_id == note_id, ClinicalNoteAmendment.tenant_id == doctor.tenant_id).order_by(ClinicalNoteAmendment.version))
+    rows = await session.scalars(select(ClinicalNoteAmendment).where(ClinicalNoteAmendment.note_id == note_uuid, ClinicalNoteAmendment.tenant_id == doctor.tenant_id).order_by(ClinicalNoteAmendment.version))
     return list(rows)
 
 
 @router.post("/notes/{note_id}/amend", status_code=201)
-async def amend_note(note_id: UUID, payload: NotePayload, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinical:write"))):
+async def amend_note(note_id: str, payload: NotePayload, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:write"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doctor = await db["doctors"].find_one({"tenant_id": str(principal.tenant_id), "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}, {"user_account_id": str(principal.user_id)}]})
+        if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+        note = await db["clinical_notes"].find_one({"tenant_id": str(principal.tenant_id), "doctor_id": str(doctor.get("id")), "id": str(note_id)})
+        if note is None or note.get("status") != "finalized":
+            raise HTTPException(status_code=409, detail="Only finalized notes can be amended")
+        latest = await db["clinical_note_amendments"].find({"tenant_id": str(principal.tenant_id), "note_id": str(note_id)}).sort("version", -1).to_list(1)
+        version = int(latest[0].get("version", 0)) + 1 if latest else 1
+        amendment = {"id": f"amend-{secrets.token_hex(8)}", "tenant_id": str(principal.tenant_id), "note_id": str(note_id), "author_id": str(principal.user_id), "version": version, "content_reference": f"Reason:\n{payload.reason.strip()}\n\nChanged information:\n{payload.content_reference}", "created_at": datetime.now(UTC).isoformat()}
+        await db["clinical_note_amendments"].insert_one(amendment)
+        return {"id": amendment["id"], "version": version}
+    if session is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
+    try:
+        note_uuid = UUID(note_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="Only finalized notes can be amended") from exc
     doctor = await _doctor(session, principal)
-    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_id, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
+    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_uuid, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
     if note is None or note.status != "finalized":
         raise HTTPException(status_code=409, detail="Only finalized notes can be amended")
-    latest = await session.scalar(select(func.max(ClinicalNoteAmendment.version)).where(ClinicalNoteAmendment.note_id == note_id))
-    amendment = ClinicalNoteAmendment(tenant_id=doctor.tenant_id, note_id=note.id, author_id=UUID(principal.user_id), version=(latest or 0) + 1, content_reference=payload.content_reference)
+    latest = await session.scalar(select(func.max(ClinicalNoteAmendment.version)).where(ClinicalNoteAmendment.note_id == note_uuid))
+    amendment_content = f"Reason:\n{payload.reason.strip()}\n\nChanged information:\n{payload.content_reference}"
+    amendment = ClinicalNoteAmendment(tenant_id=doctor.tenant_id, note_id=note.id, author_id=UUID(principal.user_id), version=(latest or 0) + 1, content_reference=amendment_content)
     session.add(amendment)
     session.add(AuditRecord(tenant_id=doctor.tenant_id, actor_id=UUID(principal.user_id), action="clinical_note.amend", resource_type="clinical_note", resource_id=note.id, purpose="clinical documentation amendment", metadata_json={"version": amendment.version}))
     await session.flush()
