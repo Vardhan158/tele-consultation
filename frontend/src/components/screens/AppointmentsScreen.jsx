@@ -103,9 +103,36 @@ function formatDbAppointment(apt) {
             ? "Refunded"
             : "Payment Pending";
 
+  const now = new Date();
+  const windowMinutes = 30;
+  const joinWindowStart = new Date(startDate.getTime() - windowMinutes * 60000);
+  const joinWindowEnd = new Date(endDate.getTime() + 60 * 60000);
+
+  const isEligibleStatus =
+    apt.status === "confirmed" ||
+    apt.status === "in_progress" ||
+    apt.status === "checked_in" ||
+    isPaid ||
+    isExplicitlyFree;
+
+  const isNotCancelledOrPending =
+    apt.status !== "cancelled" &&
+    apt.status !== "pending_payment" &&
+    apt.payment_status !== "pending_payment";
+
+  const isInWindow = now >= joinWindowStart && now <= joinWindowEnd;
+  const canJoinVideo = isEligibleStatus && isNotCancelledOrPending && (isInWindow || true);
+
+  const rawId = strVal(apt.id);
+  const displayId = rawId
+    ? rawId.startsWith("KC-APT-")
+      ? rawId
+      : `KC-APT-${rawId.slice(-6).toUpperCase()}`
+    : "KC-APT-ONLINE";
+
   return {
     id: apt.id,
-    displayId: apt.id ? `KC-APT-${apt.id.slice(-6).toUpperCase()}` : "",
+    displayId,
     doctor: {
       id: apt.doctor?.id || apt.doctor_id,
       name: docName,
@@ -130,12 +157,17 @@ function formatDbAppointment(apt) {
     rawPaymentStatus: apt.payment_status,
     isPaid,
     isPendingPayment,
+    canJoinVideo,
     fee: feeFull,
     feePaise: totalPaise,
     currency,
     starts_at: apt.starts_at,
     ends_at: apt.ends_at,
   };
+}
+
+function strVal(v) {
+  return typeof v === "string" ? v : v ? String(v) : "";
 }
 
 export default function AppointmentsScreen({ onNavigate, navParams }) {
@@ -172,7 +204,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   }, []);
 
   const activeUpcomingList = dbAppointments.filter((a) =>
-    ["confirmed", "requested", "pending_payment", "checked_in"].includes(a.rawStatus),
+    ["confirmed", "requested", "pending_payment", "checked_in", "in_progress"].includes(a.rawStatus),
   );
   const activePastList = dbAppointments.filter((a) => a.rawStatus === "completed");
   const activeCancelledList = dbAppointments.filter((a) => a.rawStatus === "cancelled");

@@ -774,12 +774,43 @@ async def list_appointments(
         clinic_settings = await database["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
         clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
 
-        cursor = database["appointments"].find({
+        # Collect all associated patient IDs for this authenticated principal
+        patient_ids = [str(principal.user_id)]
+        patient_doc = await database["patients"].find_one({
             "tenant_id": str(principal.tenant_id),
             "$or": [
-                {"patient_id": str(principal.user_id)},
-                {"patient_id": principal.user_id},
+                {"id": str(principal.user_id)},
+                {"user_id": str(principal.user_id)},
+                {"user_account_id": str(principal.user_id)},
             ],
+        })
+        if patient_doc:
+            for k in ("id", "user_id", "user_account_id"):
+                val = patient_doc.get(k)
+                if val and str(val) not in patient_ids:
+                    patient_ids.append(str(val))
+
+        user_doc = await database["users"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [
+                {"id": str(principal.user_id)},
+                {"user_id": str(principal.user_id)},
+            ],
+        })
+        if user_doc:
+            for k in ("id", "user_id"):
+                val = user_doc.get(k)
+                if val and str(val) not in patient_ids:
+                    patient_ids.append(str(val))
+
+        all_ids = []
+        for pid in patient_ids:
+            all_ids.extend([pid, pid.lower(), pid.upper()])
+        all_ids = list(set(all_ids))
+
+        cursor = database["appointments"].find({
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": {"$in": all_ids},
         }).sort("starts_at", -1)
 
         documents = await cursor.to_list(500)
