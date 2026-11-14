@@ -17,9 +17,11 @@ import SupportScreen from "./components/screens/SupportScreen";
 import ConsentScreen from "./components/screens/ConsentScreen";
 import AuthScreen from "./components/auth/AuthScreen";
 import { authApi } from "./lib/api";
+import ServicesScreen from "./components/public/ServicesScreen";
 import LandingScreen from "./components/public/LandingScreen";
 import HowItWorksScreen from "./components/public/HowItWorksScreen";
 import AboutUsScreen from "./components/public/AboutUsScreen";
+import FaqsScreen from "./components/public/FaqsScreen";
 import ContactScreen from "./components/public/ContactScreen";
 import DoctorDashboardScreen from "./components/screens/DoctorDashboardScreen";
 import DoctorRegistrationScreen from "./components/auth/DoctorRegistrationScreen";
@@ -139,8 +141,10 @@ export default function App() {
 
   if (authChecking) return null;
 
+  if (location.pathname === "/services") return <ServicesScreen />;
   if (location.pathname === "/how-it-works") return <HowItWorksScreen />;
-  if (location.pathname === "/about-us") return <AboutUsScreen />;
+  if (location.pathname === "/about" || location.pathname === "/about-us") return <AboutUsScreen />;
+  if (location.pathname === "/faqs") return <FaqsScreen />;
   if (location.pathname === "/contact") return <ContactScreen />;
 
   if (!authenticated) {

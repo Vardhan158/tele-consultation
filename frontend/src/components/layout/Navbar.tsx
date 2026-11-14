@@ -10,10 +10,10 @@ interface NavItem {
 const PUBLIC_NAV_LINKS: NavItem[] = [
   { label: "Home", path: "/" },
   { label: "Find Doctors", path: "/find-doctors" },
-  { label: "How It Works", path: "/#how-it-works", sectionId: "how-it-works" },
-  { label: "Services", path: "/#services", sectionId: "services" },
-  { label: "About", path: "/#about", sectionId: "about" },
-  { label: "FAQs", path: "/#faqs", sectionId: "faqs" },
+  { label: "How It Works", path: "/how-it-works" },
+  { label: "Services", path: "/services" },
+  { label: "About", path: "/about" },
+  { label: "FAQs", path: "/faqs" },
 ];
 
 export default function Navbar() {
@@ -21,6 +21,16 @@ export default function Navbar() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [activeHash, setActiveHash] = useState("");
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
@@ -42,6 +52,8 @@ export default function Navbar() {
   }, [location.pathname, location.hash]);
 
   const handleLinkClick = (item: NavItem, e: React.MouseEvent) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
     setOpen(false);
     if (item.sectionId) {
       if (location.pathname === "/") {
@@ -64,16 +76,24 @@ export default function Navbar() {
     let isActive = false;
     if (item.path === "/" && location.pathname === "/" && !location.hash) {
       isActive = true;
-    } else if (item.path === "/find-doctors" && location.pathname === "/find-doctors") {
+    } else if (item.path !== "/" && !item.sectionId && item.path === location.pathname) {
       isActive = true;
     } else if (item.sectionId && location.pathname === "/" && activeHash === `#${item.sectionId}`) {
       isActive = true;
     }
 
+    if (isScrolled) {
+      return `rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
+        isActive
+          ? "bg-[#EEF6F3] text-[#1A7D67] font-bold"
+          : "text-[#577877] hover:bg-[#F0F5F7] hover:text-[#162623]"
+      }`;
+    }
+
     return `rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
       isActive
-        ? "bg-[#EEF6F3] text-[#1A7D67] font-bold"
-        : "text-[#577877] hover:bg-[#F0F5F7] hover:text-[#162623]"
+        ? "bg-white/20 text-white font-bold backdrop-blur-xs"
+        : "text-white/85 hover:bg-white/10 hover:text-white"
     }`;
   };
 
@@ -83,7 +103,13 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#577877]/15 bg-white/95 backdrop-blur-md select-none">
+    <header
+      className={`sticky top-0 z-50 select-none transition-all duration-300 ${
+        isScrolled
+          ? "bg-white/95 backdrop-blur-md border-b border-[#577877]/15 shadow-xs"
+          : "bg-[#1A7D67] border-b border-white/10 shadow-none"
+      }`}
+    >
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-6 py-3.5 lg:px-10">
         {/* Brand Logo */}
         <NavLink
@@ -91,14 +117,18 @@ export default function Navbar() {
           onClick={() => setOpen(false)}
           className="flex shrink-0 items-center gap-3 rounded-xl focus:outline-none"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1A7D67] text-white shadow-sm">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-xs transition-colors duration-300 ${
+              isScrolled ? "bg-[#1A7D67] text-white" : "bg-white text-[#1A7D67]"
+            }`}
+          >
             <svg
               width="24"
               height="28"
               viewBox="0 0 35 42"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-auto text-white"
+              className="h-6 w-auto"
               aria-hidden="true"
             >
               <path
@@ -115,10 +145,18 @@ export default function Navbar() {
             </svg>
           </div>
           <div>
-            <p className="text-lg font-bold leading-none tracking-tight text-[#162623]">
+            <p
+              className={`text-lg font-bold leading-none tracking-tight transition-colors duration-300 ${
+                isScrolled ? "text-[#162623]" : "text-white"
+              }`}
+            >
               Kaizen Care
             </p>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-[#577877]">
+            <p
+              className={`mt-0.5 text-[10px] font-semibold uppercase tracking-widest transition-colors duration-300 ${
+                isScrolled ? "text-[#577877]" : "text-white/80"
+              }`}
+            >
               Telehealth Platform
             </p>
           </div>
@@ -131,6 +169,7 @@ export default function Navbar() {
               key={item.label}
               href={item.path}
               onClick={(e) => handleLinkClick(item, e)}
+              aria-current={!item.sectionId && location.pathname === item.path ? "page" : undefined}
               className={getLinkClass(item)}
             >
               {item.label}
@@ -143,21 +182,33 @@ export default function Navbar() {
           <button
             type="button"
             onClick={() => go("/doctor/register")}
-            className="rounded-lg px-2.5 py-2 text-xs font-semibold text-[#1A7D67] hover:bg-[#EEF6F3] transition cursor-pointer"
+            className={`rounded-lg px-2.5 py-2 text-xs font-semibold transition cursor-pointer ${
+              isScrolled
+                ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
+                : "text-white/90 hover:bg-white/10 hover:text-white"
+            }`}
           >
             Clinician Registration
           </button>
           <button
             type="button"
             onClick={() => go("/login")}
-            className="inline-flex items-center justify-center rounded-xl border border-[#577877]/30 bg-white px-4 py-2 text-xs font-semibold text-[#162623] hover:bg-[#F0F5F7] transition cursor-pointer"
+            className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold transition cursor-pointer ${
+              isScrolled
+                ? "border border-[#577877]/30 bg-white text-[#162623] hover:bg-[#F0F5F7]"
+                : "border border-white/40 bg-white/10 text-white hover:bg-white/20 backdrop-blur-xs"
+            }`}
           >
             Sign In
           </button>
           <button
             type="button"
             onClick={() => go("/find-doctors")}
-            className="inline-flex items-center justify-center rounded-xl bg-[#1A7D67] hover:bg-[#156654] px-4.5 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer"
+            className={`inline-flex items-center justify-center rounded-xl px-4.5 py-2 text-xs font-bold transition cursor-pointer shadow-xs ${
+              isScrolled
+                ? "bg-[#1A7D67] hover:bg-[#156654] text-white"
+                : "bg-white hover:bg-white/90 text-[#1A7D67]"
+            }`}
           >
             Book Appointment
           </button>
@@ -170,7 +221,11 @@ export default function Navbar() {
           aria-expanded={open}
           aria-controls="public-mobile-navigation"
           onClick={() => setOpen((prev) => !prev)}
-          className="rounded-lg p-2 text-[#1A7D67] hover:bg-[#EEF6F3] transition lg:hidden cursor-pointer"
+          className={`rounded-lg p-2 transition xl:hidden cursor-pointer ${
+            isScrolled
+              ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
+              : "text-white hover:bg-white/10"
+          }`}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
             {open ? "close" : "menu"}
@@ -182,7 +237,11 @@ export default function Navbar() {
       {open && (
         <div
           id="public-mobile-navigation"
-          className="border-t border-[#577877]/15 bg-white px-6 py-4 lg:hidden animate-in fade-in slide-in-from-top-2 duration-200"
+          className={`border-t px-6 py-4 xl:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+            isScrolled
+              ? "border-[#577877]/15 bg-white text-[#162623]"
+              : "border-white/10 bg-[#1A7D67] text-white"
+          }`}
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1.5">
             {PUBLIC_NAV_LINKS.map((item) => (
@@ -190,7 +249,8 @@ export default function Navbar() {
                 key={item.label}
                 href={item.path}
                 onClick={(e) => handleLinkClick(item, e)}
-                className={getLinkClass(item)}
+                aria-current={!item.sectionId && location.pathname === item.path ? "page" : undefined}
+              className={getLinkClass(item)}
               >
                 {item.label}
               </a>
@@ -198,22 +258,38 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => go("/doctor/register")}
-              className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-[#1A7D67] hover:bg-[#EEF6F3] cursor-pointer"
+              className={`rounded-lg px-3 py-2 text-left text-sm font-semibold cursor-pointer ${
+                isScrolled
+                  ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
+                  : "text-white/90 hover:bg-white/10"
+              }`}
             >
               Clinician Registration
             </button>
-            <div className="mt-3 flex gap-2 border-t border-[#577877]/15 pt-4">
+            <div
+              className={`mt-3 flex gap-2 border-t pt-4 ${
+                isScrolled ? "border-[#577877]/15" : "border-white/10"
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => go("/login")}
-                className="flex-1 rounded-xl border border-[#577877]/30 bg-white px-3 py-2.5 text-xs font-semibold text-[#162623] cursor-pointer"
+                className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold cursor-pointer ${
+                  isScrolled
+                    ? "border border-[#577877]/30 bg-white text-[#162623]"
+                    : "border border-white/40 bg-white/10 text-white"
+                }`}
               >
                 Sign In
               </button>
               <button
                 type="button"
                 onClick={() => go("/find-doctors")}
-                className="flex-1 rounded-xl bg-[#1A7D67] px-3 py-2.5 text-xs font-bold text-white cursor-pointer"
+                className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold cursor-pointer ${
+                  isScrolled
+                    ? "bg-[#1A7D67] text-white"
+                    : "bg-white text-[#1A7D67]"
+                }`}
               >
                 Book Appointment
               </button>

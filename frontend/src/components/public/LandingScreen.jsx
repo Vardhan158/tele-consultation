@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Lenis from "lenis";
 import PublicNavbar from "./PublicNavbar";
 import "./landing-theme.css";
@@ -123,7 +123,10 @@ export default function LandingScreen({
   const [menuOpen, setMenuOpen] = useState(false);
   const [heroMounted, setHeroMounted] = useState(true);
   const [scrolled, setScrolled] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const lenisRef = useRef(null);
 
@@ -292,16 +295,13 @@ export default function LandingScreen({
                   <path d="m12 5 7 7-7 7"></path>
                 </svg>
               </button>
-              <a
-                href="#how-it-works"
-                onClick={(e) => {
-                  e.preventDefault();
-                  scrollToSection("how-it-works");
-                }}
+              <button
+                type="button"
+                onClick={() => navigate("/how-it-works")}
                 className="inline-flex items-center justify-center rounded-lg bg-white hover:bg-white/95 text-[#165849] text-sm sm:text-base font-medium px-6 py-3.5 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
               >
                 How It Works
-              </a>
+              </button>
             </div>
 
             {/* Factual Messaging & Security Proof */}
@@ -467,6 +467,17 @@ export default function LandingScreen({
             </ScrollReveal>
           ))}
         </div>
+
+        <div className="mt-12 text-center">
+          <button
+            type="button"
+            onClick={() => navigate("/how-it-works")}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#1A7D67]/30 bg-[#EEF6F3] px-5 py-2.5 text-sm font-bold text-[#1A7D67] hover:bg-[#1A7D67] hover:text-white transition duration-300 cursor-pointer shadow-xs"
+          >
+            <span>Explore Complete Care Journey Guide</span>
+            <span className="material-symbols-outlined text-lg">arrow_forward</span>
+          </button>
+        </div>
       </section>
 
       {/* ========================================================= */}
@@ -592,141 +603,7 @@ export default function LandingScreen({
       {/* ========================================================= */}
       {/* 4. OUR SERVICES SECTION                                   */}
       {/* ========================================================= */}
-      <section
-        id="services"
-        className="scroll-mt-16 py-24 md:py-32 bg-[#F9FBFA] border-y border-zinc-200"
-      >
-        <div className="w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 space-y-12">
-          {/* Section Header with Fade-Up */}
-          <ScrollReveal animation="fade-up">
-            <div className="flex flex-col items-center text-center max-w-2xl mx-auto space-y-3">
-              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
-                <span className="size-2 rounded-full bg-[#1A7D67]"></span>
-                Our Services
-              </div>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
-                Healthcare Services Designed for You
-              </h2>
-              <p className="text-zinc-600 text-sm sm:text-base max-w-xl">
-                Connect with qualified healthcare professionals through online consultations, appointment booking, digital health records, and follow-up care.
-              </p>
-            </div>
-          </ScrollReveal>
-
-          {/* Services Grid with Staggered Cascading Animation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                title: "General Consultation",
-                desc: "Connect with qualified doctors for general health concerns through online consultations.",
-                svg: (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
-                    <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
-                    <circle cx="20" cy="10" r="2" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Preventive Health Guidance",
-                desc: "Receive preventive health advice, wellness recommendations, and follow-up guidance through online consultations.",
-                svg: (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <path d="m9 12 2 2 4-4" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Specialist Consultation",
-                desc: "Consult available medical specialists for expert advice and ongoing care.",
-                svg: (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-                    <path d="M12 5v14" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Online Video Consultation",
-                desc: "Attend scheduled, secure video consultations with your doctor from a supported device.",
-                svg: (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect width="15" height="14" x="1" y="5" rx="2" ry="2" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Digital Prescriptions & Records",
-                desc: "Access doctor-issued prescriptions, consultation summaries, and available medical records.",
-                svg: (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Follow-up & Support",
-                desc: "Schedule follow-up appointments and receive continued consultation-related assistance.",
-                svg: (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                    <path d="M16 16h5v5" />
-                  </svg>
-                ),
-              },
-            ].map((service, idx) => (
-              <ScrollReveal
-                key={idx}
-                animation="fade-up"
-                delay={idx * 100}
-                duration={700}
-                className="h-full"
-              >
-                <div className="flex flex-col items-center text-center bg-white hover:bg-[#EEF6F3]/50 border border-zinc-200 hover:border-[#1A7D67]/40 rounded-2xl px-8 py-10 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1.5 justify-between h-full group">
-                  <div>
-                    <div className="size-16 rounded-full bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center mb-6 mx-auto transition-colors duration-300 shadow-xs">
-                      {service.svg}
-                    </div>
-                    <h3 className="font-semibold text-lg text-zinc-800 mb-3 group-hover:text-[#1A7D67] transition-colors">
-                      {service.title}
-                    </h3>
-                    <p className="text-zinc-600 text-sm leading-relaxed mb-6">
-                      {service.desc}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onFindDoctor}
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1A7D67] hover:text-[#124B3E] transition group/btn cursor-pointer"
-                  >
-                    <span>Book Consultation</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="transition-transform group-hover/btn:translate-x-1.5"
-                    >
-                      <path d="M5 12h14" />
-                      <path d="m12 5 7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </ScrollReveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ServicesSection />
 
       {/* ========================================================= */}
       {/* 5. TESTIMONIALS / WHAT OUR PATIENTS SAY                   */}
@@ -1050,20 +927,20 @@ export default function LandingScreen({
                   Home
                 </a>
                 <a
-                  href="#about"
+                  href="/about"
                   onClick={(e) => {
                     e.preventDefault();
-                    scrollToSection("about");
+                    navigate("/about");
                   }}
                   className="hover:text-white transition"
                 >
                   About
                 </a>
                 <a
-                  href="#services"
+                  href="/services"
                   onClick={(e) => {
                     e.preventDefault();
-                    scrollToSection("services");
+                    navigate("/services");
                   }}
                   className="hover:text-white transition"
                 >
@@ -1141,21 +1018,268 @@ export default function LandingScreen({
 
           {/* Bottom Bar */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 text-xs text-zinc-500">
-            <p>© 2026 Kaizen Care · All Right Reserved.</p>
+            <p>© 2026 Kaizen Care · All Rights Reserved.</p>
             <div className="flex gap-6">
-              <span className="hover:text-zinc-400 cursor-pointer">
+              <button
+                type="button"
+                onClick={() => setShowPrivacyModal(true)}
+                className="hover:text-zinc-300 cursor-pointer"
+              >
                 Privacy Policy
-              </span>
-              <span className="hover:text-zinc-400 cursor-pointer">
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(true)}
+                className="hover:text-zinc-300 cursor-pointer"
+              >
                 Terms of Service
-              </span>
-              <span className="hover:text-zinc-400 cursor-pointer">
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPrivacyModal(true)}
+                className="hover:text-zinc-300 cursor-pointer"
+              >
                 Patient Security
-              </span>
+              </button>
             </div>
           </div>
         </div>
       </footer>
+
+      {/* Privacy Policy Modal */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-[#1A7D67] text-2xl">policy</span>
+                <h3 className="text-base font-bold text-[#162623]">Kaizen Care Privacy Policy</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPrivacyModal(false)}
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            <div className="space-y-3 text-xs text-[#577877] leading-relaxed max-h-72 overflow-y-auto pr-1">
+              <p>
+                <strong>1. Data Encryption &amp; Security:</strong> All patient personal health information (PHI) is encrypted at rest and in transit using TLS 1.3 and AES-256 standards.
+              </p>
+              <p>
+                <strong>2. Telehealth Consultations:</strong> Video consultations are conducted over tokenized, end-to-end peer WebRTC connections. Video streams are private and never recorded without explicit consent.
+              </p>
+              <p>
+                <strong>3. Patient Rights:</strong> You maintain full control over your profile details and clinical record access permissions.
+              </p>
+            </div>
+            <div className="pt-2 text-right">
+              <button
+                type="button"
+                onClick={() => setShowPrivacyModal(false)}
+                className="rounded-xl bg-[#1A7D67] px-5 py-2 text-xs font-semibold text-white hover:bg-[#156654] cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms of Service Modal */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-[#1A7D67] text-2xl">gavel</span>
+                <h3 className="text-base font-bold text-[#162623]">Kaizen Care Terms of Service</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            <div className="space-y-3 text-xs text-[#577877] leading-relaxed max-h-72 overflow-y-auto pr-1">
+              <p>
+                <strong>1. Platform Scope:</strong> Kaizen Care facilitates appointment booking, online video consultations, and digital record access with licensed medical professionals.
+              </p>
+              <p>
+                <strong>2. Medical Emergency Disclaimer:</strong> Telehealth is not for medical emergencies. If you are experiencing a life-threatening emergency, please call your local emergency services immediately.
+              </p>
+              <p>
+                <strong>3. Clinician Credentials:</strong> Healthcare providers listed on Kaizen Care undergo medical license verification.
+              </p>
+            </div>
+            <div className="pt-2 text-right">
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="rounded-xl bg-[#1A7D67] px-5 py-2 text-xs font-semibold text-white hover:bg-[#156654] cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export function ServicesSection({ limit = 6 }) {
+  const navigate = useNavigate();
+  return (
+      <section
+        id="services"
+        className="scroll-mt-16 pt-16 pb-24 md:pt-20 md:pb-32 bg-[#F9FBFA] border-y border-zinc-200"
+      >
+        <div className="w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 space-y-12">
+          {/* Section Header with Fade-Up */}
+          <ScrollReveal animation="fade-up">
+            <div className="flex flex-col items-center text-center max-w-2xl mx-auto space-y-3">
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold">
+                <span className="size-2 rounded-full bg-[#1A7D67]"></span>
+                Our Services
+              </div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight">
+                Healthcare Services Designed for You
+              </h2>
+              <p className="text-zinc-600 text-sm sm:text-base max-w-xl">
+                Connect with qualified healthcare professionals through online consultations, appointment booking, digital health records, and follow-up care.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          {/* Services Grid with Staggered Cascading Animation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                title: "General Consultation",
+                actionLabel: "Find a Doctor",
+                actionPath: "/find-doctors?specialty=General%20Medicine",
+                desc: "Connect with qualified doctors for general health concerns through online consultations.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+                    <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
+                    <circle cx="20" cy="10" r="2" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Preventive Health Guidance",
+                actionLabel: "Find a Doctor",
+                actionPath: "/find-doctors",
+                desc: "Receive preventive health advice, wellness recommendations, and follow-up guidance through online consultations.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Specialist Consultation",
+                actionLabel: "Find a Specialist",
+                actionPath: "/find-doctors",
+                desc: "Consult available medical specialists for expert advice and ongoing care.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                    <path d="M12 5v14" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Online Video Consultation",
+                actionLabel: "Book Video Consultation",
+                actionPath: "/video-consultation",
+                desc: "Attend scheduled, secure video consultations with your doctor from a supported device.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect width="15" height="14" x="1" y="5" rx="2" ry="2" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Digital Prescriptions & Records",
+                actionLabel: "Sign In to View Records",
+                actionPath: "/prescriptions",
+                desc: "Access doctor-issued prescriptions, consultation summaries, and available medical records.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Follow-up & Support",
+                actionLabel: "Manage Follow-ups",
+                actionPath: "/follow-up",
+                desc: "Schedule follow-up appointments and receive continued consultation-related assistance.",
+                svg: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                    <path d="M16 16h5v5" />
+                  </svg>
+                ),
+              },
+            ].slice(0, limit).map((service, idx) => (
+              <ScrollReveal
+                key={idx}
+                animation="fade-up"
+                delay={idx * 100}
+                duration={700}
+                className="h-full"
+              >
+                <div className="flex flex-col items-center text-center bg-white hover:bg-[#EEF6F3]/50 border border-zinc-200 hover:border-[#1A7D67]/40 rounded-2xl px-8 py-10 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1.5 justify-between h-full group">
+                  <div>
+                    <div className="size-16 rounded-full bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center mb-6 mx-auto transition-colors duration-300 shadow-xs">
+                      {service.svg}
+                    </div>
+                    <h3 className="font-semibold text-lg text-zinc-800 mb-3 group-hover:text-[#1A7D67] transition-colors">
+                      {service.title}
+                    </h3>
+                    <p className="text-zinc-600 text-sm leading-relaxed mb-6">
+                      {service.desc}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(service.actionPath)}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1A7D67] hover:text-[#124B3E] transition group/btn cursor-pointer"
+                  >
+                    <span>{service.actionLabel}</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="transition-transform group-hover/btn:translate-x-1.5"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
   );
 }

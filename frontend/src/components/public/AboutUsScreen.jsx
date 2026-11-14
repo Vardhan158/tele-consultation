@@ -1,46 +1,14 @@
+import { useNavigate } from "react-router-dom";
 import PublicNavbar from "./PublicNavbar";
-
-const principles = [
-  { title: "Patient-first by design", description: "Every interaction is shaped around clarity, dignity, and helping patients feel confident about their next step.", icon: "favorite" },
-  { title: "Connected care", description: "Appointments, conversations, and clinician-released information come together in one thoughtful patient experience.", icon: "hub" },
-  { title: "Care with clarity", description: "Simple workflows help patients find the right specialist, understand their options, and stay engaged with follow-up care.", icon: "lightbulb" },
-];
+import "./landing-theme.css";
 
 export default function AboutUsScreen() {
+  const navigate = useNavigate();
   return (
-    <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623]">
+    <div className="min-h-screen bg-white font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white overflow-x-hidden">
       <PublicNavbar />
       <main>
-        <section className="bg-[#25836F] px-6 py-20 text-white lg:px-10 lg:py-28">
-          <div className="mx-auto max-w-4xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F0F5F7]/75">About Kaizen Care</p>
-            <h1 className="mt-4 text-4xl font-bold leading-tight text-white sm:text-5xl">Care that feels connected, personal, and clear.</h1>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#F0F5F7]/85 sm:text-lg">Kaizen Care brings the essential parts of a modern healthcare journey together so patients can spend less time navigating systems and more time focusing on their wellbeing.</p>
-          </div>
-        </section>
-
-        <section className="mx-auto grid max-w-7xl gap-12 px-6 py-20 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:px-10 lg:py-24">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">Our mission</span>
-            <h2 className="mt-3 text-2xl font-bold text-[#162623] sm:text-3xl">Make high-quality care easier to find and easier to follow.</h2>
-            <p className="mt-5 text-sm leading-7 text-[#577877]">Healthcare can feel fragmented. We are building a calmer, more connected way for patients to discover trusted care specialists, arrange appointments, meet their care team, and keep track of what comes next.</p>
-            <p className="mt-4 text-sm leading-7 text-[#577877]">Our patient-first approach means every workflow is designed to be understandable, respectful, and useful at the moment it matters.</p>
-          </div>
-          <div className="rounded-[1.75rem] border border-[rgba(87,120,119,0.15)] bg-white p-7 shadow-[0_10px_30px_-8px_rgba(22,38,35,0.12)] sm:p-9">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#577877]">The platform</p>
-            <h3 className="mt-3 text-xl font-bold text-[#162623]">One place for your healthcare journey</h3>
-            <div className="mt-6 space-y-4 text-sm text-[#577877]">
-              {['Find care specialists by what matters to you', 'Choose appointment times that fit your life', 'Meet your care team through a simple patient portal', 'Keep follow-up details close at hand'].map((item) => <div key={item} className="flex items-start gap-3"><span className="material-symbols-outlined !text-[#25836F] text-lg">check_circle</span><span>{item}</span></div>)}
-            </div>
-          </div>
-        </section>
-
-        <section className="border-y border-[#577877]/15 bg-white px-6 py-20 lg:px-10">
-          <div className="mx-auto max-w-7xl">
-            <div className="max-w-2xl"><span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">What guides us</span><h2 className="mt-3 text-2xl font-bold text-[#162623] sm:text-3xl">Built around the patient experience</h2></div>
-            <div className="mt-10 grid gap-6 md:grid-cols-3">{principles.map((principle) => <article key={principle.title} className="rounded-2xl border border-[rgba(87,120,119,0.15)] bg-[#F0F5F7] p-6"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white"><span className="material-symbols-outlined !text-[#25836F]">{principle.icon}</span></span><h3 className="mt-5 text-base font-bold text-[#162623]">{principle.title}</h3><p className="mt-2 text-xs leading-relaxed text-[#577877]">{principle.description}</p></article>)}</div>
-          </div>
-        </section>
+        <section className="w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 py-16 md:py-24 lg:py-28"><div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16"><div className="w-full lg:w-1/2 flex justify-center"><div className="relative w-full max-w-[530px] overflow-hidden rounded-2xl shadow-xl border border-zinc-200 group"><img src="/assets/about.png" alt="Personalized Care, Trusted Results" className="w-full h-auto object-cover rounded-2xl transition-transform duration-700 group-hover:scale-103" /></div></div><div className="w-full lg:w-1/2 flex flex-col items-start"><div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-300 text-xs sm:text-sm text-zinc-600 uppercase font-semibold mb-6"><span className="size-2 rounded-full bg-[#1A7D67] animate-ping"></span>About Us</div><h1 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-zinc-800 leading-tight tracking-tight mb-4 max-w-lg">Personalized Care, Wherever You Are</h1><p className="text-zinc-600 text-sm sm:text-base leading-relaxed mb-4 max-w-xl">Kaizen Care is an online teleconsultation platform connecting patients with qualified healthcare professionals. Patients can discover doctors, book appointments, attend secure video consultations, and access their consultation records through one convenient digital platform.</p><p className="text-zinc-600 text-sm sm:text-base leading-relaxed mb-8 max-w-xl">Our goal is to make healthcare more accessible by simplifying the entire patient journey, from appointment booking to consultation completion and follow-up care.</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full mb-8"><div className="flex items-start gap-3 p-3 rounded-xl"><div className="h-10 w-10 rounded-xl bg-[#EEF6F3] text-[#1A7D67] flex items-center justify-center shrink-0"><span className="material-symbols-outlined">verified_user</span></div><div><h2 className="text-sm font-semibold text-zinc-800">Qualified Healthcare Professionals</h2><p className="text-xs text-zinc-500 mt-0.5">Connect with doctors across available medical specialties.</p></div></div><div className="flex items-start gap-3 p-3 rounded-xl"><div className="h-10 w-10 rounded-xl bg-[#EEF6F3] text-[#1A7D67] flex items-center justify-center shrink-0"><span className="material-symbols-outlined">description</span></div><div><h2 className="text-sm font-semibold text-zinc-800">Digital Health Records</h2><p className="text-xs text-zinc-500 mt-0.5">Access consultation summaries, doctor-issued prescriptions, and available medical records securely.</p></div></div></div><div className="flex flex-wrap items-center gap-4"><button type="button" onClick={() => navigate("/find-doctors")} className="bg-[#197C66] hover:bg-[#156755] text-white text-sm font-medium px-6 py-3 rounded-lg transition duration-300 shadow-sm">Meet Our Doctors</button><button type="button" onClick={() => navigate("/register")} className="border border-zinc-300 hover:border-zinc-400 bg-white text-zinc-700 text-sm font-medium px-6 py-3 rounded-lg transition duration-300">Register As Patient</button></div></div></div></section>
       </main>
       <footer className="border-t border-[#577877]/20 bg-[#F0F5F7] px-6 py-8 text-xs text-[#577877] lg:px-10"><div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row"><p>© 2026 Kaizen Care · Patient Portal. All rights reserved.</p><div className="flex gap-6"><span>Privacy Policy</span><span>Terms of Use</span></div></div></footer>
     </div>

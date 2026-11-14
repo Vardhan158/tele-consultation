@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { patientApi } from "../../lib/api";
 import PublicNavbar from "../public/PublicNavbar";
 
@@ -55,6 +56,8 @@ export default function FindDoctorsScreen({
   authenticated = true,
   onRequireAuth,
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSpecialty = searchParams.get("specialty") || "all";
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -218,11 +221,30 @@ export default function FindDoctorsScreen({
     return [...new Set(doctors.map((d) => d.specialty).filter(Boolean))].sort();
   }, [doctors]);
 
+  // Resolve deep links against the live directory, falling back to all doctors.
+  useEffect(() => {
+    if (loading) return;
+    const specialty = specialties.find(
+      (value) => value.toLowerCase() === requestedSpecialty.toLowerCase(),
+    ) || "all";
+    setSelectedSpecialty(specialty);
+    setAppliedFilters((current) => ({ ...current, specialty }));
+    setPage(1);
+  }, [requestedSpecialty, specialties, loading]);
+
+  const updateSpecialtyUrl = (specialty) => {
+    const next = new URLSearchParams(searchParams);
+    if (specialty === "all") next.delete("specialty");
+    else next.set("specialty", specialty);
+    setSearchParams(next, { replace: true });
+  };
+
   const languages = useMemo(() => {
     return [...new Set(doctors.flatMap((d) => d.languages || []).filter(Boolean))].sort();
   }, [doctors]);
 
   const handleApplyFilters = () => {
+    updateSpecialtyUrl(selectedSpecialty);
     setAppliedFilters({
       search: searchInput.trim(),
       specialty: selectedSpecialty,
@@ -235,6 +257,7 @@ export default function FindDoctorsScreen({
   };
 
   const handleClearFilters = () => {
+    updateSpecialtyUrl("all");
     setSearchInput("");
     setSelectedSpecialty("all");
     setAvailabilityFilter("Any time");
@@ -497,28 +520,7 @@ export default function FindDoctorsScreen({
     <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623]">
       {!authenticated && <PublicNavbar />}
       <div className="space-y-6 max-w-7xl mx-auto px-5 py-6 lg:px-10">
-        {/* 1. Compact Heading Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
-            Care Specialists &amp; Teleconsultation
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-            Find Doctors &amp; Specialists
-          </h1>
-          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
-            Search available doctors, check real-time schedule availability, and book teleconsultations with confidence.
-          </p>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-2 text-xs bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20 shrink-0 self-start sm:self-center shadow-xs">
-          <span className="material-symbols-outlined !text-[#A3E2D4] text-lg">medical_services</span>
-          <span className="font-medium text-white/95">Qualified Healthcare Professionals</span>
-        </div>
-      </div>
-
-      {/* 2. Compact Horizontal Filter Section */}
+        {/* 2. Compact Horizontal Filter Section */}
       <div className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs space-y-4">
         {/* Row 1: Full-width search bar + Mobile Filter Toggle button */}
         <div className="flex items-center gap-3">
