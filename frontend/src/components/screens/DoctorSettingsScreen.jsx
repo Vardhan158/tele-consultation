@@ -39,9 +39,12 @@ export default function DoctorSettingsScreen() {
         )}
         {enrollment && (
           <>
-            <p className="font-mono text-sm break-all">
-              Secret: {enrollment.secret}
-            </p>
+            <div className="space-y-2 text-sm">
+              <p>Open Google Authenticator or Microsoft Authenticator, choose <strong>Set up key manually</strong>, and enter this key:</p>
+              <p className="font-mono break-all">{enrollment.secret}</p>
+              <p className="text-xs text-[#577877] break-all">Issuer: Kaizentrix Care · Account: your doctor login</p>
+              <p className="text-xs text-amber-700">This setup expires in {enrollment.expires_in_minutes || 10} minutes. The secret is shown only during enrollment.</p>
+            </div>
             <p className="text-xs text-[#577877]">
               Store recovery codes securely; they are shown only during
               enrollment.
@@ -59,7 +62,9 @@ export default function DoctorSettingsScreen() {
               <button className="btn-primary" type="submit">
                 Verify
               </button>
+              <button type="button" className="rounded-lg border px-3" onClick={() => { setEnrollment(null); setCode(""); setMessage("Enrollment cancelled."); }}>Cancel</button>
             </form>
+            {enrollment.recovery_codes?.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-xs"><p className="font-semibold">Save these recovery codes now. Each works once.</p><p className="font-mono break-all mt-1">{enrollment.recovery_codes.join(" · ")}</p></div>}
           </>
         )}
         {message && <p className="text-sm text-[#25836F]">{message}</p>}
