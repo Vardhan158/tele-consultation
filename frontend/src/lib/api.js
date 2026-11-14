@@ -148,6 +148,7 @@ export const doctorApi = {
       body: JSON.stringify({ content_reference, reason }),
     }),
   enrollMfa: () => apiRequest("/doctor/mfa/enroll", { method: "POST" }),
+  cancelMfaEnrollment: () => apiRequest("/doctor/mfa/enroll/cancel", { method: "POST" }),
   verifyMfa: (code) =>
     apiRequest("/doctor/mfa/verify", {
       method: "POST",

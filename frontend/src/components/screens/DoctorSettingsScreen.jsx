@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { doctorApi } from "../../lib/api";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function DoctorSettingsScreen() {
   const [enrollment, setEnrollment] = useState(null);
@@ -7,9 +8,21 @@ export default function DoctorSettingsScreen() {
   const [message, setMessage] = useState("");
   const [showSetupKey, setShowSetupKey] = useState(false);
   const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState([]);
+  useEffect(() => {
+    if (!enrollment) return undefined;
+    const timer = window.setTimeout(() => {
+      setEnrollment(null);
+      setCode("");
+      setShowSetupKey(false);
+      setMessage("MFA enrollment expired. Start enrollment again.");
+    }, (enrollment.expires_in_minutes || 10) * 60 * 1000);
+    return () => window.clearTimeout(timer);
+  }, [enrollment]);
   const enroll = async () => {
     try {
       setEnrollment(await doctorApi.enrollMfa());
+      setRecoveryCodes([]);
       setShowSetupKey(false);
       setShowRecoveryCodes(false);
       setMessage(
@@ -22,8 +35,11 @@ export default function DoctorSettingsScreen() {
   const verify = async (event) => {
     event.preventDefault();
     try {
-      await doctorApi.verifyMfa(code);
-      setMessage("MFA enabled for future doctor logins.");
+      const result = await doctorApi.verifyMfa(code);
+      setEnrollment(null);
+      setCode("");
+      setRecoveryCodes(result.recovery_codes || []);
+      setMessage("MFA Enabled Successfully");
     } catch (err) {
       setMessage(err.message);
     }
@@ -44,9 +60,9 @@ export default function DoctorSettingsScreen() {
         {enrollment && (
           <>
             <div className="space-y-2 text-sm">
-              <p>Open Google Authenticator or Microsoft Authenticator, choose <strong>Set up key manually</strong>, and enter this key:</p>
-              <p className="font-mono break-all">{showSetupKey ? enrollment.secret : "••••••••••••••••••••"}</p>
-              <button type="button" className="text-xs font-semibold text-[#25836F] hover:underline" onClick={() => setShowSetupKey((value) => !value)}>{showSetupKey ? "Hide setup key" : "Reveal setup key"}</button>
+              <p>Open Google Authenticator or Microsoft Authenticator and scan this QR code.</p>
+              <QRCodeSVG value={enrollment.otpauth_uri} size={192} level="M" includeMargin className="max-w-full h-auto" />
+              <details><summary className="cursor-pointer text-xs font-semibold text-[#25836F]">Can&apos;t scan? Enter key manually</summary><p className="font-mono break-all mt-2">{showSetupKey ? enrollment.secret : "••••••••••••••••••••"}</p><button type="button" className="text-xs font-semibold text-[#25836F] hover:underline" onClick={() => setShowSetupKey((value) => !value)}>{showSetupKey ? "Hide setup key" : "Reveal setup key"}</button></details>
               <p className="text-xs text-[#577877] break-all">Issuer: Kaizentrix Care · Account: your doctor login</p>
               <p className="text-xs text-amber-700">This setup expires in {enrollment.expires_in_minutes || 10} minutes. The secret is shown only during enrollment.</p>
             </div>
@@ -67,9 +83,9 @@ export default function DoctorSettingsScreen() {
               <button className="btn-primary" type="submit">
                 Verify
               </button>
-              <button type="button" className="rounded-lg border px-3" onClick={() => { setEnrollment(null); setCode(""); setMessage("Enrollment cancelled."); }}>Cancel</button>
+              <button type="button" className="rounded-lg border px-3" onClick={async () => { await doctorApi.cancelMfaEnrollment().catch(() => {}); setEnrollment(null); setCode(""); setShowSetupKey(false); setMessage("Enrollment cancelled."); }}>Cancel</button>
             </form>
-            {enrollment.recovery_codes?.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-xs"><p className="font-semibold">Recovery codes are hidden by default. Each code works once.</p><button type="button" className="mt-1 font-semibold text-[#25836F] hover:underline" onClick={() => setShowRecoveryCodes((value) => !value)}>{showRecoveryCodes ? "Hide recovery codes" : "Reveal recovery codes"}</button>{showRecoveryCodes && <p className="font-mono break-all mt-1">{enrollment.recovery_codes.join(" · ")}</p>}</div>}
+            {recoveryCodes.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-xs"><p className="font-semibold">Save these recovery codes now. Each code works once.</p><button type="button" className="mt-1 font-semibold text-[#25836F] hover:underline" onClick={() => setShowRecoveryCodes((value) => !value)}>{showRecoveryCodes ? "Hide recovery codes" : "Reveal recovery codes"}</button>{showRecoveryCodes && <p className="font-mono break-all mt-1">{recoveryCodes.join(" · ")}</p>}</div>}
           </>
         )}
         {message && <p className="text-sm text-[#25836F]">{message}</p>}

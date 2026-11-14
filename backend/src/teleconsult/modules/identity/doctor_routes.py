@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
@@ -466,28 +466,29 @@ async def reject_doctor(
 
 
 @router.post("/mfa/enroll")
-async def enroll_mfa(session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+async def enroll_mfa(response: Response, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+    response.headers["Cache-Control"] = "no-store"
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
         if user is None:
             raise HTTPException(status_code=404, detail="Doctor account not found")
         secret = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
-        recovery_codes = [secrets.token_urlsafe(8) for _ in range(8)]
-        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$set": {"mfa_secret": secret, "mfa_recovery_code_hashes": [hashlib.sha256(code.encode()).hexdigest() for code in recovery_codes], "mfa_enabled": False, "mfa_enrollment_expires_at": datetime.now(UTC) + timedelta(minutes=10), "mfa_last_counter": None, "mfa_failed_attempts": 0}})
-        return {"secret": secret, "otpauth_uri": f"otpauth://totp/Kaizentrix%20Care?secret={secret}&issuer=Kaizentrix%20Care", "recovery_codes": recovery_codes, "expires_in_minutes": 10}
+        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$set": {"mfa_secret": secret, "mfa_recovery_code_hashes": [], "mfa_enabled": False, "mfa_enrollment_expires_at": datetime.now(UTC) + timedelta(minutes=10), "mfa_last_counter": None, "mfa_failed_attempts": 0}})
+        return {"secret": secret, "otpauth_uri": f"otpauth://totp/Kaizentrix%20Care?secret={secret}&issuer=Kaizentrix%20Care", "expires_in_minutes": 10}
     if session is None:
         raise HTTPException(status_code=503, detail="Application database is unavailable")
     user = await session.get(UserAccount, UUID(principal.user_id))
     if user is None:
         raise HTTPException(status_code=404, detail="Doctor account not found")
     user.mfa_secret = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
-    user.mfa_recovery_codes = [secrets.token_urlsafe(8) for _ in range(8)]
-    return {"secret": user.mfa_secret, "otpauth_uri": f"otpauth://totp/Kaizentrix%20Care?secret={user.mfa_secret}&issuer=Kaizentrix%20Care", "recovery_codes": user.mfa_recovery_codes, "expires_in_minutes": 10}
+    user.mfa_recovery_codes = []
+    return {"secret": user.mfa_secret, "otpauth_uri": f"otpauth://totp/Kaizentrix%20Care?secret={user.mfa_secret}&issuer=Kaizentrix%20Care", "expires_in_minutes": 10}
 
 
 @router.post("/mfa/verify")
-async def verify_mfa(payload: MfaCode, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+async def verify_mfa(payload: MfaCode, response: Response, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+    response.headers["Cache-Control"] = "no-store"
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
@@ -496,12 +497,39 @@ async def verify_mfa(payload: MfaCode, session: AsyncSession | None = Depends(au
             if user:
                 await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$inc": {"mfa_failed_attempts": 1}})
             raise HTTPException(status_code=400, detail="Invalid MFA code")
-        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$set": {"mfa_enabled": True, "mfa_enrollment_expires_at": None, "mfa_failed_attempts": 0, "mfa_last_counter": int(time.time() // 30)}})
-        return {"status": "enabled"}
+        recovery_codes = [secrets.token_urlsafe(8) for _ in range(8)]
+        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$set": {"mfa_enabled": True, "mfa_recovery_code_hashes": [hashlib.sha256(code.encode()).hexdigest() for code in recovery_codes], "mfa_enrollment_expires_at": None, "mfa_failed_attempts": 0, "mfa_last_counter": int(time.time() // 30)}})
+        return {"status": "enabled", "recovery_codes": recovery_codes}
     if session is None:
         raise HTTPException(status_code=503, detail="Application database is unavailable")
     user = await session.get(UserAccount, UUID(principal.user_id))
     if user is None or not _valid_mfa_code(user.mfa_secret if user else None, payload.code):
         raise HTTPException(status_code=400, detail="Invalid MFA code")
+    recovery_codes = [secrets.token_urlsafe(8) for _ in range(8)]
+    user.mfa_recovery_codes = recovery_codes
     user.mfa_enabled = True
-    return {"status": "enabled"}
+    return {"status": "enabled", "recovery_codes": recovery_codes}
+
+
+@router.post("/mfa/enroll/cancel")
+async def cancel_mfa_enrollment(response: Response, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+    response.headers["Cache-Control"] = "no-store"
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
+        if user is None:
+            raise HTTPException(status_code=404, detail="Doctor account not found")
+        if user.get("mfa_enabled"):
+            raise HTTPException(status_code=409, detail="Active MFA must be reset through reauthentication")
+        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "mfa_enabled": {"$ne": True}}, {"$set": {"mfa_secret": None, "mfa_enrollment_expires_at": None, "mfa_failed_attempts": 0}})
+        return {"status": "cancelled"}
+    if session is None:
+        raise HTTPException(status_code=503, detail="Application database is unavailable")
+    user = await session.get(UserAccount, UUID(principal.user_id))
+    if user is None:
+        raise HTTPException(status_code=404, detail="Doctor account not found")
+    if user.mfa_enabled:
+        raise HTTPException(status_code=409, detail="Active MFA must be reset through reauthentication")
+    user.mfa_secret = None
+    user.mfa_recovery_codes = []
+    return {"status": "cancelled"}

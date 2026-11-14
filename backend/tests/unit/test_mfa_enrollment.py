@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+from fastapi import Response
 
 from teleconsult.kernel.authz.policy import Principal
 from teleconsult.modules.identity import doctor_routes
@@ -27,13 +28,15 @@ async def test_mongodb_mfa_enrollment_and_verification(monkeypatch):
     monkeypatch.setattr(doctor_routes, "get_settings", lambda: SimpleNamespace(mongodb_enabled=True))
     principal = Principal("doctor-1", "tenant-1", frozenset({"doctor"}), frozenset({"doctor:profile:write"}))
 
-    enrolled = await doctor_routes.enroll_mfa(None, principal)
+    enrolled = await doctor_routes.enroll_mfa(Response(), None, principal)
     assert len(enrolled["secret"]) >= 16
-    assert len(enrolled["recovery_codes"]) == 8
+    assert "recovery_codes" not in enrolled
     assert users.document["mfa_enabled"] is False
 
     code = doctor_routes._totp(users.document["mfa_secret"])
-    assert await doctor_routes.verify_mfa(doctor_routes.MfaCode(code=code), None, principal) == {"status": "enabled"}
+    verified = await doctor_routes.verify_mfa(doctor_routes.MfaCode(code=code), Response(), None, principal)
+    assert verified["status"] == "enabled"
+    assert len(verified["recovery_codes"]) == 8
     assert users.document["mfa_enabled"] is True
 
 
@@ -45,5 +48,5 @@ async def test_mongodb_mfa_verification_rejects_malformed_legacy_state(monkeypat
     monkeypatch.setattr(doctor_routes, "get_settings", lambda: SimpleNamespace(mongodb_enabled=True))
     principal = Principal("doctor-1", "tenant-1", frozenset({"doctor"}), frozenset({"doctor:profile:write"}))
     with pytest.raises(Exception) as error:
-        await doctor_routes.verify_mfa(doctor_routes.MfaCode(code="123456"), None, principal)
+        await doctor_routes.verify_mfa(doctor_routes.MfaCode(code="123456"), Response(), None, principal)
     assert getattr(error.value, "status_code", None) == 400
