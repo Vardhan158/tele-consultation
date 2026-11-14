@@ -57,9 +57,9 @@ class AppointmentCreate(BaseModel):
 
 class AppointmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    doctor_id: UUID
-    patient_id: UUID
+    id: UUID | str
+    doctor_id: UUID | str
+    patient_id: UUID | str
     starts_at: datetime
     ends_at: datetime
     status: str
@@ -69,6 +69,7 @@ class AppointmentResponse(BaseModel):
     total_payable_paise: int | None = None
     currency: str | None = None
     doctor: DoctorResponse | None = None
+    join_window_minutes: int = 30
 
 
 class AppointmentReschedule(BaseModel):

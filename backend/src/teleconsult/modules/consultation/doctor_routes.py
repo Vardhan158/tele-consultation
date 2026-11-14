@@ -17,6 +17,7 @@ from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.consultation.clinical_models import ClinicalNote, ClinicalNoteAmendment
 from teleconsult.modules.consultation.video_models import VideoSession
 from teleconsult.modules.identity.auth_routes import auth_database_session
+from teleconsult.modules.patient_portal.appointment_access import appointment_times, latest_payment
 from teleconsult.modules.patient_portal.models import (
     Appointment,
     Doctor,
@@ -203,7 +204,9 @@ async def doctor_appointments(session: AsyncSession | None = Depends(auth_databa
             patient_doc = await db["patients"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": str(pat_id)}, {"user_id": str(pat_id)}]}) if pat_id else None
             patient_name = patient_doc.get("full_name") if patient_doc else "Emma Mitchell"
 
-            raw_pay = str(item.get("payment_status") or "not_required").lower()
+            payment = await latest_payment(db, principal.tenant_id, item.get("id") or str(item.get("_id")))
+            raw_pay = str((payment or {}).get("status") or item.get("payment_status") or "pending").lower()
+            starts_at, ends_at = appointment_times(item)
             pay_label = (
                 "Paid" if raw_pay in {"captured", "success"}
                 else "No Payment Required" if raw_pay in {"not_required", "no_payment_required"}
@@ -216,8 +219,8 @@ async def doctor_appointments(session: AsyncSession | None = Depends(auth_databa
                 "id": item.get("id") or str(item.get("_id")),
                 "patient_id": pat_id,
                 "patient_name": patient_name,
-                "starts_at": item.get("starts_at"),
-                "ends_at": item.get("ends_at"),
+                "starts_at": starts_at,
+                "ends_at": ends_at,
                 "status": item.get("status", "confirmed"),
                 "payment_status": pay_label,
                 "raw_payment_status": raw_pay,

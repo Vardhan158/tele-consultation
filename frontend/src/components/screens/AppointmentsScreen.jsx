@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { patientApi, consultationApi } from "../../lib/api";
+import { appointmentCategory, canJoinAppointment } from "../../lib/appointmentRules";
 import WebRtcConsultation from "../consultation/WebRtcConsultation";
 
 const loadRazorpayScript = () => {
@@ -103,26 +104,6 @@ function formatDbAppointment(apt) {
             ? "Refunded"
             : "Payment Pending";
 
-  const now = new Date();
-  const windowMinutes = 30;
-  const joinWindowStart = new Date(startDate.getTime() - windowMinutes * 60000);
-  const joinWindowEnd = new Date(endDate.getTime() + 60 * 60000);
-
-  const isEligibleStatus =
-    apt.status === "confirmed" ||
-    apt.status === "in_progress" ||
-    apt.status === "checked_in" ||
-    isPaid ||
-    isExplicitlyFree;
-
-  const isNotCancelledOrPending =
-    apt.status !== "cancelled" &&
-    apt.status !== "pending_payment" &&
-    apt.payment_status !== "pending_payment";
-
-  const isInWindow = now >= joinWindowStart && now <= joinWindowEnd;
-  const canJoinVideo = isEligibleStatus && isNotCancelledOrPending && (isInWindow || true);
-
   const rawId = strVal(apt.id);
   const displayId = rawId
     ? rawId.startsWith("KC-APT-")
@@ -157,7 +138,7 @@ function formatDbAppointment(apt) {
     rawPaymentStatus: apt.payment_status,
     isPaid,
     isPendingPayment,
-    canJoinVideo,
+    join_window_minutes: apt.join_window_minutes,
     fee: feeFull,
     feePaise: totalPaise,
     currency,
@@ -177,6 +158,12 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
 
   const [activeTab, setActiveTab] = useState("upcoming");
   const [dbAppointments, setDbAppointments] = useState([]);
+  const [loadError, setLoadError] = useState("");
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [loading, setLoading] = useState(true);
 
   const [consultationRoom, setConsultationRoom] = useState(null);
@@ -187,13 +174,14 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
 
   const fetchAppointments = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const items = await patientApi.appointments();
       if (Array.isArray(items)) {
         setDbAppointments(items.map(formatDbAppointment).filter(Boolean));
       }
-    } catch {
-      // Dev resilience
+    } catch (error) {
+      setLoadError(error.message || "Unable to load appointments. Please retry.");
     } finally {
       setLoading(false);
     }
@@ -203,11 +191,9 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
     fetchAppointments();
   }, []);
 
-  const activeUpcomingList = dbAppointments.filter((a) =>
-    ["confirmed", "requested", "pending_payment", "checked_in", "in_progress"].includes(a.rawStatus),
-  );
-  const activePastList = dbAppointments.filter((a) => a.rawStatus === "completed");
-  const activeCancelledList = dbAppointments.filter((a) => a.rawStatus === "cancelled");
+  const activeUpcomingList = dbAppointments.filter((a) => appointmentCategory(a, now) === "upcoming");
+  const activePastList = dbAppointments.filter((a) => appointmentCategory(a, now) === "past");
+  const activeCancelledList = dbAppointments.filter((a) => appointmentCategory(a, now) === "cancelled");
 
   // Selected appointment
   const rawTarget = navParams?.appointment || activeUpcomingList[0] || dbAppointments[0] || null;
@@ -365,6 +351,11 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
       return;
     }
 
+    if (!canJoinAppointment(aptToJoin)) {
+      setToastMessage("Consultation joining window is closed or the appointment is not eligible.");
+      return;
+    }
+    setConsultationRoom(null);
     setDetailAppointment(aptToJoin);
     setView("waiting-room");
     setConsultationError("");
@@ -380,7 +371,9 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   const handleEnterConsultation = async () => {
     if (!consultationRoom?.session_id) {
       setToastMessage("Preparing video consultation room...");
+      return;
     }
+    if (!canJoinAppointment(activeApt)) return;
     setConnectionStatus("Connected");
     setView("consultation");
   };
@@ -777,13 +770,14 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                   </div>
 
                   <div className="pt-2 space-y-2">
-                    <button
+                    {canJoinAppointment(apt, now) && <button
                       type="button"
                       onClick={handleEnterConsultation}
+                      disabled={!consultationRoom?.session_id}
                       className="w-full rounded-xl bg-[#25836F] py-3 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] cursor-pointer transition"
                     >
                       Join Consultation Room
-                    </button>
+                    </button>}
 
                     <button
                       type="button"
@@ -846,6 +840,8 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
           </button>
         </div>
 
+        {loadError && <div role="alert">{loadError} <button onClick={fetchAppointments}>Retry</button></div>}
+        {loading && <p role="status">Loading appointments...</p>}
         {/* Status Tabs */}
         <div className="flex items-center gap-6 border-b border-[#577877]/20 pb-2 text-xs font-semibold">
           {[
@@ -869,7 +865,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
         </div>
 
         {/* List of Appointments */}
-        {activeTab === "upcoming" && (
+        {!loading && !loadError && activeTab === "upcoming" && (
           <div className="space-y-4">
             {activeUpcomingList.length === 0 ? (
               <div className="care-card p-12 text-center text-[#577877] space-y-2">
@@ -928,7 +924,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                           >
                             Complete Payment ({apt.fee})
                           </button>
-                        ) : apt.canJoinVideo ? (
+                        ) : canJoinAppointment(apt, now) ? (
                           <button
                             type="button"
                             onClick={() => handleJoinWaitingRoom(apt)}
@@ -937,7 +933,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                             Join Video Room
                           </button>
                         ) : (
-                          <span className="text-xs text-[#577877]">Video access unavailable until payment is verified.</span>
+                          <span className="text-xs text-[#577877]">Joining is available during the consultation window after payment verification.</span>
                         )}
                       </div>
                     </div>
@@ -948,7 +944,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
           </div>
         )}
 
-        {activeTab === "past" && (
+        {!loading && !loadError && activeTab === "past" && (
           <div className="space-y-4">
             {activePastList.length === 0 ? (
               <div className="care-card p-12 text-center text-[#577877]">
@@ -961,6 +957,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                     <span className="font-bold text-[#162623]">{apt.doctor.name}</span>
                     <span className="text-[#577877]">{apt.dateShort}</span>
                   </div>
+                  <p className="text-xs">{apt.displayId} / {apt.status} / {apt.paymentStatus}</p>
                   <p className="text-xs text-[#577877]">{apt.reason} • {apt.fee}</p>
                 </div>
               ))
@@ -968,7 +965,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
           </div>
         )}
 
-        {activeTab === "cancelled" && (
+        {!loading && !loadError && activeTab === "cancelled" && (
           <div className="space-y-4">
             {activeCancelledList.length === 0 ? (
               <div className="care-card p-12 text-center text-[#577877]">

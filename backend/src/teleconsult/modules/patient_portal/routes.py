@@ -1,9 +1,11 @@
+import hashlib
+import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
-import re
 from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -16,6 +18,11 @@ from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.identity.auth_routes import auth_database_session
 from teleconsult.modules.notifications.service import queue_patient_notification
+from teleconsult.modules.patient_portal.appointment_access import (
+    appointment_times,
+    latest_payment,
+    patient_identity_ids,
+)
 from teleconsult.modules.patient_portal.consent import PatientConsent
 from teleconsult.modules.patient_portal.intake import MedicalIntake
 from teleconsult.modules.patient_portal.models import (
@@ -774,43 +781,11 @@ async def list_appointments(
         clinic_settings = await database["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
         clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
 
-        # Collect all associated patient IDs for this authenticated principal
-        patient_ids = [str(principal.user_id)]
-        patient_doc = await database["patients"].find_one({
-            "tenant_id": str(principal.tenant_id),
-            "$or": [
-                {"id": str(principal.user_id)},
-                {"user_id": str(principal.user_id)},
-                {"user_account_id": str(principal.user_id)},
-            ],
-        })
-        if patient_doc:
-            for k in ("id", "user_id", "user_account_id"):
-                val = patient_doc.get(k)
-                if val and str(val) not in patient_ids:
-                    patient_ids.append(str(val))
-
-        user_doc = await database["users"].find_one({
-            "tenant_id": str(principal.tenant_id),
-            "$or": [
-                {"id": str(principal.user_id)},
-                {"user_id": str(principal.user_id)},
-            ],
-        })
-        if user_doc:
-            for k in ("id", "user_id"):
-                val = user_doc.get(k)
-                if val and str(val) not in patient_ids:
-                    patient_ids.append(str(val))
-
-        all_ids = []
-        for pid in patient_ids:
-            all_ids.extend([pid, pid.lower(), pid.upper()])
-        all_ids = list(set(all_ids))
+        patient_ids = await patient_identity_ids(database, principal)
 
         cursor = database["appointments"].find({
             "tenant_id": str(principal.tenant_id),
-            "patient_id": {"$in": all_ids},
+            "patient_id": {"$in": patient_ids},
         }).sort("starts_at", -1)
 
         documents = await cursor.to_list(500)
@@ -839,25 +814,14 @@ async def list_appointments(
                         registration_number=doctor.get("registration_number"),
                     )
 
-                starts_at_dt = _parse_datetime(appointment.get("starts_at"))
-                ends_at_val = appointment.get("ends_at")
-                if ends_at_val:
-                    ends_at_dt = _parse_datetime(ends_at_val)
-                else:
-                    dur = _to_int(appointment.get("duration_minutes")) or 30
-                    ends_at_dt = starts_at_dt + timedelta(minutes=dur)
+                starts_at_dt, ends_at_dt = appointment_times(appointment)
 
-                fee_paise = _to_int(appointment.get("fee_paise"))
+                fee_paise = _to_int(appointment.get("total_payable_paise", appointment.get("fee_paise")))
                 base_fee_paise = _to_int(appointment.get("base_fee_paise"))
                 platform_fee_paise = _to_int(appointment.get("platform_fee_paise"))
 
                 apt_id_str = str(appointment.get("id") or appointment.get("_id") or "")
-                payment_cursor = database["payments"].find({
-                    "tenant_id": str(principal.tenant_id),
-                    "appointment_id": apt_id_str,
-                }).sort("created_at", -1).limit(1)
-                payments = await payment_cursor.to_list(1)
-                payment = payments[0] if payments else None
+                payment = await latest_payment(database, principal.tenant_id, apt_id_str)
 
                 if payment:
                     fee_paise = fee_paise or _to_int(payment.get("amount_paise") or payment.get("amount"))
@@ -867,16 +831,17 @@ async def list_appointments(
                 total_payable_paise = fee_paise or (
                     (base_fee_paise or 0) + (platform_fee_paise or 0) if base_fee_paise is not None else None
                 )
-                payment_status = str(payment.get("status") if payment else appointment.get("payment_status", "pending"))
+                payment_status = str((payment or {}).get("status") or appointment.get("payment_status") or "pending")
 
                 results.append(AppointmentResponse(
-                    id=_to_uuid(apt_id_str or str(uuid4())),
-                    doctor_id=_to_uuid(doctor_id_raw or principal.user_id),
-                    patient_id=_to_uuid(appointment.get("patient_id") or principal.user_id),
+                    id=apt_id_str,
+                    doctor_id=str(doctor_id_raw or principal.user_id),
+                    patient_id=str(appointment.get("patient_id") or principal.user_id),
                     starts_at=starts_at_dt,
                     ends_at=ends_at_dt,
-                    status=str(appointment.get("status", "confirmed")),
-                    payment_status=payment_status,
+                    status=str(appointment.get("status", "confirmed")).lower(),
+                    payment_status=payment_status.lower(),
+                    join_window_minutes=get_settings().video_join_window_minutes,
                     base_fee_paise=base_fee_paise,
                     platform_fee_paise=platform_fee_paise,
                     total_payable_paise=total_payable_paise,
@@ -886,7 +851,7 @@ async def list_appointments(
             except Exception as exc:
                 import logging
                 logging.getLogger("teleconsult.portal").exception(f"Error parsing appointment item: {exc}")
-                continue
+                raise HTTPException(status_code=500, detail="Unable to load appointments") from exc
 
         return results
     if session is None:
@@ -908,6 +873,7 @@ async def list_appointments(
             ends_at=a.ends_at,
             status=a.status,
             payment_status=a.payment_status,
+            join_window_minutes=get_settings().video_join_window_minutes,
             doctor=DoctorResponse.model_validate(doctors_map[a.doctor_id]) if a.doctor_id in doctors_map else None,
         )
         for a in appointments
