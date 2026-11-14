@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { notificationApi } from "../../lib/api";
+import { ChangeLocationButton } from "../location/LocationProvider";
 
 export default function Header({
   onOpenMobile,
@@ -155,6 +156,7 @@ export default function Header({
 
       {/* Right Header Elements */}
       <div className="flex items-center gap-3 sm:gap-4 text-xs">
+        <ChangeLocationButton />
         {/* Notifications (Patient only) */}
         {!isAdmin && !isDoctor && (
           <button

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSelectedLocation } from "./components/location/LocationProvider";
 import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import DashboardScreen from "./components/screens/DashboardScreen";
@@ -99,6 +100,11 @@ export default function App() {
   const [entryMode, setEntryMode] = useState(() => entryModeFromLocation());
   const [patient, setPatient] = useState(null);
   const [registeredDoctorEmail, setRegisteredDoctorEmail] = useState("");
+  const { setIdentity } = useSelectedLocation();
+  const locationUserId = authenticated ? patient?.user_id : null;
+  useEffect(() => {
+    if (!authChecking) setIdentity(locationUserId || null);
+  }, [authChecking, locationUserId, setIdentity]);
 
   const refreshUser = () =>
     authApi
