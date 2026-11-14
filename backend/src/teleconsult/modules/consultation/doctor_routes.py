@@ -454,6 +454,7 @@ async def save_note(appointment_id: str, payload: NotePayload, session: AsyncSes
             "consultation_id": str(appointment_id),
             "appointment_id": str(appointment_id),
             "doctor_id": str(doctor.get("id")),
+            "author_id": str(principal.user_id),
             "content_reference": payload.content_reference,
             "status": "draft",
             "created_at": datetime.now(UTC).isoformat(),

@@ -163,6 +163,7 @@ async def test_mongodb_doctor_can_save_note_for_legacy_appointment_id(portal, mo
     )
     assert result["status"] == "draft"
     assert db["clinical_notes"].rows[0]["consultation_id"] == "apt-45bde4b19136"
+    assert db["clinical_notes"].rows[0]["author_id"] == DOCTOR
 
 
 @pytest.mark.parametrize("change", [{"id": "missing"}, {"patient_id": "other"}, {"tenant_id": "2"}])
