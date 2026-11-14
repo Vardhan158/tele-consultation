@@ -214,6 +214,14 @@ export const settingsApi = {
 
 export const paymentApi = {
   list: () => apiRequest("/patient/payments"),
+  getReceipt: (id) => apiRequest(`/patient/payments/${id}`),
+  downloadReceipt: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/patient/payments/${id}/download`, {
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("Unable to download payment receipt.");
+    return response.blob();
+  },
   initiate: (appointmentId) =>
     apiRequest("/patient/payments/initiate", {
       method: "POST",

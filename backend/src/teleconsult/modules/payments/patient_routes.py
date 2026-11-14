@@ -73,23 +73,145 @@ class VerifyPaymentPayload(BaseModel):
     razorpay_signature: str
 
 
+def _to_uuid(val: Any) -> UUID:
+    if isinstance(val, UUID):
+        return val
+    val_str = str(val or "")
+    if len(val_str) == 36:
+        try:
+            return UUID(val_str)
+        except ValueError:
+            pass
+    raw_bytes = hashlib.md5(val_str.encode(), usedforsecurity=False).digest()
+    return UUID(bytes=raw_bytes)
+
+
+async def _resolve_patient_ids(db: Any, tenant_id: str, user_id: str) -> list[str]:
+    patient_ids = [str(user_id)]
+    patient_doc = await db["patients"].find_one({
+        "tenant_id": str(tenant_id),
+        "$or": [
+            {"id": str(user_id)},
+            {"user_id": str(user_id)},
+            {"user_account_id": str(user_id)},
+        ],
+    })
+    if patient_doc:
+        for k in ("id", "user_id", "user_account_id"):
+            val = patient_doc.get(k)
+            if val and str(val) not in patient_ids:
+                patient_ids.append(str(val))
+
+    user_doc = await db["users"].find_one({
+        "tenant_id": str(tenant_id),
+        "$or": [
+            {"id": str(user_id)},
+            {"user_id": str(user_id)},
+        ],
+    })
+    if user_doc:
+        for k in ("id", "user_id"):
+            val = user_doc.get(k)
+            if val and str(val) not in patient_ids:
+                patient_ids.append(str(val))
+
+    all_ids = []
+    for pid in patient_ids:
+        all_ids.extend([pid, pid.lower(), pid.upper()])
+    return list(set(all_ids))
+
+
+async def _build_payment_response(db: Any, tenant_id: str, principal_user_id: str, doc: dict[str, Any]) -> PaymentResponse:
+    apt = None
+    apt_id = doc.get("appointment_id")
+    if apt_id:
+        apt = await db["appointments"].find_one({
+            "tenant_id": str(tenant_id),
+            "id": str(apt_id),
+        })
+
+    doctor_name = "Authorized Clinician"
+    doctor_specialty = "General Teleconsultation"
+    if apt and apt.get("doctor_id"):
+        doc_record = await db["doctors"].find_one({
+            "tenant_id": str(tenant_id),
+            "$or": [{"id": str(apt["doctor_id"])}, {"user_id": str(apt["doctor_id"])}],
+        })
+        if doc_record:
+            doctor_name = doc_record.get("full_name") or doctor_name
+            doctor_specialty = doc_record.get("specialty") or doctor_specialty
+
+    patient_name = "Patient"
+    pat_record = await db["patients"].find_one({
+        "tenant_id": str(tenant_id),
+        "$or": [{"id": str(principal_user_id)}, {"user_id": str(principal_user_id)}],
+    })
+    if pat_record:
+        patient_name = pat_record.get("full_name") or patient_name
+
+    raw_status = str(doc.get("status", "pending")).lower()
+    formatted_status = (
+        "Paid" if raw_status in {"captured", "success", "paid"}
+        else "Refunded" if raw_status == "refunded"
+        else "Failed" if raw_status == "failed"
+        else "Pending"
+    )
+
+    amount_paise = int(doc.get("amount_paise") or doc.get("amount") or 0)
+    currency = str(doc.get("currency", "INR"))
+    symbol = "₹" if currency == "INR" else "$" if currency == "USD" else f"{currency} "
+    formatted_amount = f"{symbol}{(amount_paise / 100.0):.2f}"
+
+    apt_date = ""
+    if apt and apt.get("starts_at"):
+        try:
+            dt = datetime.fromisoformat(str(apt["starts_at"]).replace("Z", "+00:00"))
+            apt_date = dt.strftime("%B %d, %Y")
+        except ValueError:
+            apt_date = str(apt["starts_at"])
+
+    created_at_val = doc.get("created_at")
+
+    return PaymentResponse(
+        id=_to_uuid(doc.get("id") or doc.get("_id")),
+        appointment_id=_to_uuid(doc.get("appointment_id") or principal_user_id),
+        amount_paise=amount_paise,
+        currency=currency,
+        status=raw_status,
+        provider=doc.get("provider", "razorpay"),
+        provider_transaction_id=doc.get("provider_transaction_id") or doc.get("razorpay_payment_id"),
+        order_id=doc.get("provider_order_id") or doc.get("razorpay_order_id"),
+        receipt=doc.get("receipt") or f"KC-RC-{str(doc.get('id'))[:4].upper()}",
+        created_at=created_at_val,
+        doctor_name=doctor_name,
+        doctor_specialty=doctor_specialty,
+        patient_name=patient_name,
+        appointment_date=apt_date,
+        appointment_type=apt.get("type") if apt else "Video Consultation",
+        formatted_amount=formatted_amount,
+        formatted_status=formatted_status,
+    )
+
+
 @router.get("", response_model=list[PaymentResponse])
 async def list_payments(
     session: AsyncSession | None = Depends(payment_session),
     principal: Principal = Depends(require("payment:read")),
 ) -> list[PaymentResponse]:
     if get_settings().mongodb_enabled:
-        documents = mongo_database.database()["payments"].find({
-            "tenant_id": principal.tenant_id, "patient_id": principal.user_id,
-        }).sort("created_at", -1)
-        return [PaymentResponse(
-            id=UUID(document["id"]) if len(document["id"]) == 36 else UUID(int=hash(document["id"]) & 0xffffffffffffffffffffffffffffffff),
-            appointment_id=UUID(document["appointment_id"]) if len(document["appointment_id"]) == 36 else UUID(int=hash(document["appointment_id"]) & 0xffffffffffffffffffffffffffffffff),
-            amount_paise=int(document["amount_paise"]), currency=document.get("currency", "INR"),
-            status=document["status"], provider=document.get("provider", "razorpay"),
-            provider_transaction_id=document.get("provider_transaction_id"),
-            order_id=document.get("provider_order_id") or document.get("razorpay_order_id"), receipt=document.get("receipt"),
-        ) async for document in documents]
+        db = mongo_database.database()
+        patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+
+        documents = await db["payments"].find({
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": {"$in": patient_ids},
+        }).sort("created_at", -1).to_list(500)
+
+        results = []
+        for doc in documents:
+            resp = await _build_payment_response(db, principal.tenant_id, principal.user_id, doc)
+            results.append(resp)
+        return results
 
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
@@ -108,6 +230,88 @@ async def list_payments(
         )
         for tx in result
     ]
+
+
+@router.get("/{payment_id}", response_model=PaymentResponse)
+async def get_payment_receipt(
+    payment_id: str,
+    session: AsyncSession | None = Depends(payment_session),
+    principal: Principal = Depends(require("payment:read")),
+) -> PaymentResponse:
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+
+        payment = await db["payments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [{"id": str(payment_id)}, {"id": str(payment_id).lower()}],
+        })
+        if not payment:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment record not found")
+
+        # Patient Ownership Enforcement
+        if str(payment.get("patient_id")) not in patient_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You are not authorized to view this payment receipt.",
+            )
+
+        return await _build_payment_response(db, principal.tenant_id, principal.user_id, payment)
+
+    raise HTTPException(status_code=503, detail="No application database is configured")
+
+
+@router.get("/{payment_id}/download")
+async def download_payment_receipt(
+    payment_id: str,
+    session: AsyncSession | None = Depends(payment_session),
+    principal: Principal = Depends(require("payment:read")),
+):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+
+        payment = await db["payments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [{"id": str(payment_id)}, {"id": str(payment_id).lower()}],
+        })
+        if not payment:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment record not found")
+
+        # Patient Ownership Enforcement
+        if str(payment.get("patient_id")) not in patient_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You are not authorized to download this payment receipt.",
+            )
+
+        resp = await _build_payment_response(db, principal.tenant_id, principal.user_id, payment)
+
+        tx_id = payment.get("provider_transaction_id") or payment.get("razorpay_payment_id") or "TXN-VERIFIED"
+        receipt_text = (
+            f"KAIZEN CARE TELEHEALTH - OFFICIAL PAYMENT RECEIPT\n"
+            f"Receipt No: {resp.receipt}\n"
+            f"Transaction ID: {tx_id}\n"
+            f"Date Paid: {resp.created_at or resp.appointment_date or 'N/A'}\n"
+            f"--------------------------------------------------\n"
+            f"Patient Name: {resp.patient_name}\n"
+            f"Attending Clinician: {resp.doctor_name} ({resp.doctor_specialty})\n"
+            f"Visit Type: {resp.appointment_type}\n"
+            f"Amount Paid: {resp.formatted_amount} ({resp.currency})\n"
+            f"Payment Status: {resp.formatted_status}\n"
+            f"Payment Method: Razorpay Online Payment\n"
+            f"--------------------------------------------------\n"
+            f"Thank you for choosing Kaizen Care Telehealth.\n"
+        )
+
+        from fastapi.responses import PlainTextResponse
+        filename = f"KaizenCare_Receipt_{str(payment.get('id'))[:8]}.txt"
+        return PlainTextResponse(
+            receipt_text,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 @router.post("/create-order")
