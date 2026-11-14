@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+import re
 from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -65,24 +66,63 @@ async def doctor_pricing(doctor_id: UUID, appointment_type: str = Query(min_leng
     if not settings.mongodb_enabled:
         raise HTTPException(status_code=503, detail="Service pricing is unavailable")
     db = mongo_database.database()
+    doc_id_str = str(doctor_id)
     apt_clean = appointment_type.strip(" .,;:")
     escaped_apt = re.escape(apt_clean)
+
+    # 1. Primary lookup: active service matching appointment_type and assigned to this doctor
     services = await db["services"].find({
         "tenant_id": str(public_tenant_id()),
         "active": True,
-        "assigned_doctors": str(doctor_id),
+        "assigned_doctors": doc_id_str,
         "appointment_types": {"$regex": f"^{escaped_apt}[\\s\\.]*$", "$options": "i"},
     }).to_list(5)
 
+    # 2. Fallback lookup: active service matching appointment_type for clinic
     if not services:
+        services = await db["services"].find({
+            "tenant_id": str(public_tenant_id()),
+            "active": True,
+            "appointment_types": {"$regex": f"^{escaped_apt}[\\s\\.]*$", "$options": "i"},
+        }).to_list(5)
+
+    # 3. Fallback lookup: any active service assigned to doctor
+    if not services:
+        services = await db["services"].find({
+            "tenant_id": str(public_tenant_id()),
+            "active": True,
+            "assigned_doctors": doc_id_str,
+        }).to_list(5)
+
+    # 4. Fallback lookup: any active service in clinic
+    if not services:
+        services = await db["services"].find({
+            "tenant_id": str(public_tenant_id()),
+            "active": True,
+        }).to_list(5)
+
+    if not services:
+        doctor_doc = await db["doctors"].find_one({
+            "tenant_id": str(public_tenant_id()),
+            "$or": [{"id": doc_id_str}, {"user_id": doc_id_str}, {"user_account_id": doc_id_str}],
+        })
+        if doctor_doc and doctor_doc.get("fee_paise") is not None:
+            base_fee = int(doctor_doc.get("fee_paise", 0))
+            return {
+                "service_id": f"doctor_default_{doc_id_str}",
+                "base_fee_paise": base_fee,
+                "platform_fee_paise": 0,
+                "total_payable_paise": base_fee,
+                "currency": doctor_doc.get("currency", "INR"),
+            }
         raise HTTPException(status_code=404, detail="Fee unavailable for this appointment type")
 
     service = services[0]
-    base = int(service.get("base_fee", 0)) * 100
-    platform = int(service.get("platform_fee", 0)) * 100
+    base = int(service.get("base_fee_paise", int(service.get("base_fee", 0)) * 100))
+    platform = int(service.get("platform_fee_paise", int(service.get("platform_fee", 0)) * 100))
     currency = service.get("currency", "INR")
     return {
-        "service_id": service.get("id"),
+        "service_id": str(service.get("id", service.get("_id"))),
         "base_fee_paise": base,
         "platform_fee_paise": platform,
         "total_payable_paise": base + platform,
