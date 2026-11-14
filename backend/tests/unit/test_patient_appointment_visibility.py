@@ -49,6 +49,9 @@ class Collection:
     async def find_one(self, query, **kwargs):
         return next((deepcopy(row) for row in self.rows if matches(row, query)), None)
 
+    async def insert_one(self, document):
+        self.rows.append(deepcopy(document))
+
 
 @pytest.fixture
 def portal(monkeypatch):
@@ -140,6 +143,26 @@ async def test_mongodb_doctor_notes_support_legacy_appointment_id(portal, monkey
     assert await doctor_routes.appointment_notes("apt-45bde4b19136", None, principal) == [{
         "id": "note-1", "status": "draft", "content_reference": "Follow up", "created_at": "2026-11-16T04:30:00Z",
     }]
+
+
+async def test_mongodb_doctor_can_save_note_for_legacy_appointment_id(portal, monkeypatch):
+    from teleconsult.modules.consultation import doctor_routes
+
+    rows, _ = portal
+    rows["appointments"][0]["status"] = "completed"
+    rows["clinical_notes"] = []
+    db = {key: Collection(value) for key, value in rows.items()}
+    monkeypatch.setattr(doctor_routes.mongo_database, "database", lambda: db)
+    monkeypatch.setattr(doctor_routes, "get_settings", lambda: SimpleNamespace(mongodb_enabled=True))
+    principal = Principal(DOCTOR, "1", frozenset({"doctor"}), frozenset({"clinical:write"}))
+    result = await doctor_routes.save_note(
+        "apt-45bde4b19136",
+        doctor_routes.NotePayload(content_reference="Diagnosis:\nViral URI"),
+        None,
+        principal,
+    )
+    assert result["status"] == "draft"
+    assert db["clinical_notes"].rows[0]["consultation_id"] == "apt-45bde4b19136"
 
 
 @pytest.mark.parametrize("change", [{"id": "missing"}, {"patient_id": "other"}, {"tenant_id": "2"}])

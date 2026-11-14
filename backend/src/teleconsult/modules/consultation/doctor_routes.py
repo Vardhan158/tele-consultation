@@ -427,10 +427,49 @@ async def delete_availability(
 
 
 @router.post("/appointments/{appointment_id}/notes", status_code=201)
-async def save_note(appointment_id: UUID, payload: NotePayload, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinical:write"))):
+async def save_note(appointment_id: str, payload: NotePayload, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:write"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doctor = await db["doctors"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [
+                {"id": str(principal.user_id)},
+                {"user_id": str(principal.user_id)},
+                {"user_account_id": str(principal.user_id)},
+            ],
+        })
+        if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+        appointment = await db["appointments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": str(doctor.get("id")),
+            "id": str(appointment_id),
+            "status": {"$in": ["in_progress", "completed"]},
+        })
+        if appointment is None:
+            raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
+        note = {
+            "id": f"note-{secrets.token_hex(8)}",
+            "tenant_id": str(principal.tenant_id),
+            "consultation_id": str(appointment_id),
+            "appointment_id": str(appointment_id),
+            "doctor_id": str(doctor.get("id")),
+            "content_reference": payload.content_reference,
+            "status": "draft",
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        await db["clinical_notes"].insert_one(note)
+        return {"id": note["id"], "status": note["status"]}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
+    try:
+        appointment_uuid = UUID(appointment_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Authorized clinical encounter not found") from exc
     doctor = await _doctor(session, principal)
     appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == appointment_id, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id,
+        Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id,
         Appointment.status.in_(["in_progress", "completed"])))
     if appointment is None:
         raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
