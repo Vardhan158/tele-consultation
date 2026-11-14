@@ -765,28 +765,36 @@ async def list_appointments(
         clinic_settings = await database["clinic_settings"].find_one({"tenant_id": principal.tenant_id})
         clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
 
-        documents = database["appointments"].find({
-            "tenant_id": principal.tenant_id, "patient_id": principal.user_id,
+        cursor = database["appointments"].find({
+            "tenant_id": principal.tenant_id,
+            "$or": [
+                {"patient_id": principal.user_id},
+                {"patient_id": str(principal.user_id)},
+            ],
         }).sort("starts_at", -1)
 
+        documents = await cursor.to_list(500)
         results = []
-        async for appointment in documents:
+        for appointment in documents:
             doctor_id_raw = appointment.get("doctor_id")
-            doctor = await database["doctors"].find_one({
-                "tenant_id": principal.tenant_id,
-                "$or": [{"id": str(doctor_id_raw)}, {"user_id": str(doctor_id_raw)}],
-            }) if doctor_id_raw else None
+            doctor = None
+            if doctor_id_raw:
+                doctor = await database["doctors"].find_one({
+                    "tenant_id": principal.tenant_id,
+                    "$or": [{"id": str(doctor_id_raw)}, {"user_id": str(doctor_id_raw)}],
+                })
 
             doctor_response = None
             if doctor:
+                doc_fee = doctor.get("fee_paise")
                 doctor_response = DoctorResponse(
                     id=_to_uuid(doctor.get("id") or doctor.get("user_id")),
                     full_name=doctor.get("full_name", ""),
                     specialty=doctor.get("specialty", ""),
                     clinic_name=doctor.get("clinic_name", ""),
-                    fee_paise=int(doctor["fee_paise"]) if doctor.get("fee_paise") is not None else None,
+                    fee_paise=int(doc_fee) if doc_fee is not None else None,
                     timezone=doctor.get("timezone") or clinic_timezone,
-                    supported_languages=doctor.get("supported_languages", []),
+                    supported_languages=doctor.get("supported_languages") or [],
                     registration_number=doctor.get("registration_number"),
                 )
 
@@ -801,13 +809,19 @@ async def list_appointments(
             fee_paise = appointment.get("fee_paise")
             base_fee_paise = appointment.get("base_fee_paise")
             platform_fee_paise = appointment.get("platform_fee_paise")
-            payment = await database["payments"].find_one({
-                "tenant_id": principal.tenant_id, "appointment_id": appointment.get("id")
-            }, sort=[("created_at", -1)])
+
+            payment_cursor = database["payments"].find({
+                "tenant_id": principal.tenant_id,
+                "appointment_id": appointment.get("id"),
+            }).sort("created_at", -1).limit(1)
+            payments = await payment_cursor.to_list(1)
+            payment = payments[0] if payments else None
+
             if payment:
                 fee_paise = fee_paise or payment.get("amount_paise")
                 base_fee_paise = base_fee_paise if base_fee_paise is not None else payment.get("base_fee_paise")
                 platform_fee_paise = platform_fee_paise if platform_fee_paise is not None else payment.get("platform_fee_paise")
+
             total_payable_paise = fee_paise or (
                 (base_fee_paise or 0) + (platform_fee_paise or 0) if base_fee_paise is not None else None
             )
@@ -815,7 +829,7 @@ async def list_appointments(
 
             results.append(AppointmentResponse(
                 id=_to_uuid(appointment.get("id")),
-                doctor_id=_to_uuid(doctor_id_raw),
+                doctor_id=_to_uuid(doctor_id_raw) if doctor_id_raw else _to_uuid(principal.user_id),
                 patient_id=_to_uuid(appointment.get("patient_id")),
                 starts_at=starts_at_dt,
                 ends_at=ends_at_dt,
@@ -824,7 +838,7 @@ async def list_appointments(
                 base_fee_paise=base_fee_paise,
                 platform_fee_paise=platform_fee_paise,
                 total_payable_paise=total_payable_paise,
-                currency=appointment.get("currency") or (payment.get("currency") if payment else None),
+                currency=appointment.get("currency") or (payment.get("currency") if payment else "INR"),
                 doctor=doctor_response,
             ))
         return results
