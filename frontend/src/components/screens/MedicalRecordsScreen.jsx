@@ -123,6 +123,9 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  const [deletingRecord, setDeletingRecord] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
 
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -306,17 +309,39 @@ export default function MedicalRecordsScreen({ onNavigate }) {
     setTimeout(() => setToastMessage(""), 3500);
   };
 
-  const handleDeleteRecord = async (rec) => {
-    if (!window.confirm(`Delete ${rec.name}? This cannot be undone.`)) return;
-    try {
-      await recordsApi.remove(rec.id);
-      setDbRecords((current) => current.filter((item) => item.id !== rec.id));
-      setToastMessage(`Deleted ${rec.name}`);
-    } catch (err) {
-      setToastMessage(err.message);
-    }
-    setTimeout(() => setToastMessage(""), 3500);
+  const closeDeleteModal = () => {
+    if (isDeleting) return;
+    setDeletingRecord(null);
+    setDeleteError("");
   };
+
+  const confirmDeleteRecord = async () => {
+    if (!deletingRecord || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await recordsApi.remove(deletingRecord.id);
+      await fetchRecords();
+      setToastMessage("Medical record deleted successfully.");
+      setDeletingRecord(null);
+    } catch (err) {
+      setDeleteError(err.message || "Unable to delete medical record.");
+    } finally {
+      setIsDeleting(false);
+      setTimeout(() => setToastMessage(""), 3500);
+    }
+  };
+
+  // Keyboard accessibility: Escape key closes delete modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && deletingRecord && !isDeleting) {
+        closeDeleteModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deletingRecord, isDeleting]);
 
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
@@ -518,7 +543,10 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                           <span className="text-[#577877]">·</span>
                           <button
                             type="button"
-                            onClick={() => handleDeleteRecord(rec)}
+                            onClick={() => {
+                              setDeleteError("");
+                              setDeletingRecord(rec);
+                            }}
                             className="hover:underline cursor-pointer text-rose-700"
                           >
                             Delete
@@ -855,6 +883,88 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           </div>
         );
       })()}
+
+      {/* Delete Confirmation Modal */}
+      {deletingRecord && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-5 text-center relative">
+            {/* Red Outlined Trash Icon */}
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto shrink-0 shadow-xs">
+              <span className="material-symbols-outlined text-2xl !text-rose-600">
+                delete_outline
+              </span>
+            </div>
+
+            {/* Heading & Message */}
+            <div className="space-y-1.5">
+              <h3 id="delete-modal-title" className="text-lg font-bold text-[#162623]">
+                Delete Medical Record?
+              </h3>
+              <p className="text-xs text-[#577877] leading-relaxed">
+                Are you sure you want to delete this medical record?
+              </p>
+            </div>
+
+            {/* Filename Container */}
+            <div
+              className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 text-xs font-semibold text-[#162623] truncate shadow-2xs"
+              title={deletingRecord.name}
+            >
+              {deletingRecord.name}
+            </div>
+
+            {/* Warning Message */}
+            <p className="text-[11px] font-semibold text-rose-600 flex items-center justify-center gap-1">
+              <span className="material-symbols-outlined text-xs">warning</span>
+              <span>This action cannot be undone.</span>
+            </p>
+
+            {/* Error Message Banner */}
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold text-left flex items-start gap-2">
+                <span className="material-symbols-outlined text-base text-rose-600 shrink-0 mt-0.5">
+                  error
+                </span>
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={closeDeleteModal}
+                className="w-1/2 py-2.5 rounded-xl border border-[#577877]/30 bg-white text-xs font-semibold text-[#577877] hover:bg-[#F0F5F7] transition cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDeleteRecord}
+                className="w-1/2 py-2.5 rounded-xl bg-rose-600 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isDeleting ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin text-sm">
+                      sync
+                    </span>
+                    <span>Deleting…</span>
+                  </>
+                ) : (
+                  "Delete Record"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
