@@ -387,6 +387,18 @@ async def get_profile(
             }
             await db["patients"].insert_one(dict(document))
 
+        allergies_val = document.get("allergies")
+        if not allergies_val:
+            intake_doc = await db["intake"].find_one({
+                "tenant_id": principal.tenant_id,
+                "$or": [{"patient_id": str(principal.user_id)}, {"patient_id": principal.user_id}],
+            }) or await db["medical_intakes"].find_one({
+                "tenant_id": principal.tenant_id,
+                "$or": [{"patient_id": str(principal.user_id)}, {"patient_id": principal.user_id}],
+            })
+            if intake_doc and intake_doc.get("allergies"):
+                allergies_val = intake_doc.get("allergies")
+
         return PatientResponse(
             id=_to_uuid(document.get("id") or document.get("user_id")),
             full_name=document.get("full_name", "Patient"),
@@ -396,6 +408,10 @@ async def get_profile(
             preferred_language=document.get("preferred_language", "English"),
             address=document.get("address"),
             emergency_contact=document.get("emergency_contact"),
+            preferred_pharmacy=document.get("preferred_pharmacy"),
+            pharmacy_address=document.get("pharmacy_address"),
+            pharmacy_phone=document.get("pharmacy_phone"),
+            allergies=allergies_val,
         )
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
@@ -444,8 +460,11 @@ async def update_profile(
             preferred_language=document.get("preferred_language", "English"),
             address=document.get("address"),
             emergency_contact=document.get("emergency_contact"),
+            preferred_pharmacy=document.get("preferred_pharmacy"),
+            pharmacy_address=document.get("pharmacy_address"),
+            pharmacy_phone=document.get("pharmacy_phone"),
+            allergies=document.get("allergies"),
         )
-        return PatientResponse(id=UUID(document.get("id", document["user_id"])), **{key: document.get(key) for key in ("full_name", "email", "phone", "date_of_birth", "preferred_language", "address", "emergency_contact")})
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
     patient = await session.scalar(select(Patient).where(Patient.id == UUID(principal.user_id), Patient.tenant_id == UUID(principal.tenant_id)))
