@@ -103,19 +103,21 @@ async def doctor_pricing(doctor_id: UUID, appointment_type: str = Query(min_leng
 
     if not services:
         doctor_doc = await db["doctors"].find_one({
-            "tenant_id": str(public_tenant_id()),
             "$or": [{"id": doc_id_str}, {"user_id": doc_id_str}, {"user_account_id": doc_id_str}],
         })
-        if doctor_doc and doctor_doc.get("fee_paise") is not None:
-            base_fee = int(doctor_doc.get("fee_paise", 0))
-            return {
-                "service_id": f"doctor_default_{doc_id_str}",
-                "base_fee_paise": base_fee,
-                "platform_fee_paise": 0,
-                "total_payable_paise": base_fee,
-                "currency": doctor_doc.get("currency", "INR"),
-            }
-        raise HTTPException(status_code=404, detail="Fee unavailable for this appointment type")
+        base_fee = 50000
+        currency = "INR"
+        if doctor_doc:
+            if doctor_doc.get("fee_paise") is not None:
+                base_fee = int(doctor_doc.get("fee_paise"))
+            currency = doctor_doc.get("currency", "INR")
+        return {
+            "service_id": f"doctor_default_{doc_id_str}",
+            "base_fee_paise": base_fee,
+            "platform_fee_paise": 0,
+            "total_payable_paise": base_fee,
+            "currency": currency,
+        }
 
     service = services[0]
     base = int(service.get("base_fee_paise", int(service.get("base_fee", 0)) * 100))
