@@ -689,10 +689,55 @@ async def doctor_patient_detail(patient_id: str, session: AsyncSession | None = 
 
 
 @router.post("/appointments/{appointment_id}/notes/{note_id}/finalize")
-async def finalize_note(appointment_id: UUID, note_id: UUID, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("clinical:write"))):
+async def finalize_note(appointment_id: str, note_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:write"))):
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        doctor = await db["doctors"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [
+                {"id": str(principal.user_id)},
+                {"user_id": str(principal.user_id)},
+                {"user_account_id": str(principal.user_id)},
+            ],
+        })
+        if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
+            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+        appointment = await db["appointments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": str(doctor.get("id")),
+            "id": str(appointment_id),
+        })
+        if appointment is None:
+            raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
+        note = await db["clinical_notes"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": str(doctor.get("id")),
+            "id": str(note_id),
+            "$or": [
+                {"consultation_id": str(appointment_id)},
+                {"appointment_id": str(appointment_id)},
+            ],
+        })
+        if note is None:
+            raise HTTPException(status_code=404, detail="Clinical note not found")
+        if note.get("status") == "finalized":
+            raise HTTPException(status_code=409, detail="Clinical note is already finalized")
+        await db["clinical_notes"].update_one(
+            {"tenant_id": str(principal.tenant_id), "id": str(note_id)},
+            {"$set": {"status": "finalized", "finalized_at": datetime.now(UTC).isoformat()}},
+        )
+        return {"id": str(note_id), "status": "finalized"}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
+    try:
+        appointment_uuid = UUID(appointment_id)
+        note_uuid = UUID(note_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Clinical note not found") from exc
     doctor = await _doctor(session, principal)
     note = await session.scalar(select(ClinicalNote).where(
-        ClinicalNote.id == note_id, ClinicalNote.consultation_id == appointment_id,
+        ClinicalNote.id == note_uuid, ClinicalNote.consultation_id == appointment_uuid,
         ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
     if note is None:
         raise HTTPException(status_code=404, detail="Clinical note not found")

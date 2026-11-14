@@ -52,6 +52,12 @@ class Collection:
     async def insert_one(self, document):
         self.rows.append(deepcopy(document))
 
+    async def update_one(self, query, update):
+        for row in self.rows:
+            if matches(row, query):
+                row.update(update.get("$set", {}))
+                return
+
 
 @pytest.fixture
 def portal(monkeypatch):
@@ -164,6 +170,29 @@ async def test_mongodb_doctor_can_save_note_for_legacy_appointment_id(portal, mo
     assert result["status"] == "draft"
     assert db["clinical_notes"].rows[0]["consultation_id"] == "apt-45bde4b19136"
     assert db["clinical_notes"].rows[0]["author_id"] == DOCTOR
+
+
+async def test_mongodb_doctor_can_finalize_legacy_note(portal, monkeypatch):
+    from teleconsult.modules.consultation import doctor_routes
+
+    rows, _ = portal
+    rows["appointments"][0]["status"] = "completed"
+    rows["clinical_notes"] = [{
+        "id": "note-9fdea84cda8f6ab3",
+        "tenant_id": "1",
+        "appointment_id": "apt-45bde4b19136",
+        "consultation_id": "apt-45bde4b19136",
+        "doctor_id": DOCTOR,
+        "author_id": DOCTOR,
+        "status": "draft",
+    }]
+    db = {key: Collection(value) for key, value in rows.items()}
+    monkeypatch.setattr(doctor_routes.mongo_database, "database", lambda: db)
+    monkeypatch.setattr(doctor_routes, "get_settings", lambda: SimpleNamespace(mongodb_enabled=True))
+    principal = Principal(DOCTOR, "1", frozenset({"doctor"}), frozenset({"clinical:write"}))
+    result = await doctor_routes.finalize_note("apt-45bde4b19136", "note-9fdea84cda8f6ab3", None, principal)
+    assert result == {"id": "note-9fdea84cda8f6ab3", "status": "finalized"}
+    assert db["clinical_notes"].rows[0]["status"] == "finalized"
 
 
 @pytest.mark.parametrize("change", [{"id": "missing"}, {"patient_id": "other"}, {"tenant_id": "2"}])
