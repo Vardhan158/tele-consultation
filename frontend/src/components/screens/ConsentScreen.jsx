@@ -51,6 +51,20 @@ const formatConsentTitle = (consentType) => {
   return consentType.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 };
 
+const getFormattedTimestamp = (dtInput) => {
+  const dt = dtInput ? new Date(dtInput) : new Date();
+  const dateFormatted = dt.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const timeFormatted = dt.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${dateFormatted} at ${timeFormatted}`;
+};
+
 export default function ConsentScreen({ onNavigate }) {
   const [permissions, setPermissions] = useState(() =>
     basePermissionsList.map((perm) => ({
@@ -61,7 +75,7 @@ export default function ConsentScreen({ onNavigate }) {
     }))
   );
   const [activity, setActivity] = useState([]);
-  const [lastSaved, setLastSaved] = useState("Checking saved directives...");
+  const [lastSaved, setLastSaved] = useState(() => getFormattedTimestamp(new Date()));
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
@@ -99,19 +113,9 @@ export default function ConsentScreen({ onNavigate }) {
         // Update Last Saved Date Banner from latest consent record
         if (items.length > 0) {
           const latest = items[0];
-          const latestDt = new Date(latest.granted_at || Date.now());
-          const dateFormatted = latestDt.toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          });
-          const timeFormatted = latestDt.toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-          });
-          setLastSaved(`${dateFormatted} at ${timeFormatted}`);
+          setLastSaved(getFormattedTimestamp(latest.granted_at || latest.created_at));
         } else {
-          setLastSaved("Default Preferences");
+          setLastSaved(getFormattedTimestamp(new Date()));
         }
 
         // Map Audit History Table with formatted titles
@@ -162,17 +166,21 @@ export default function ConsentScreen({ onNavigate }) {
           version: "v1.0",
         });
         setToastMessage(`Consent for "${target.title}" granted.`);
-      } else if (target.dbId) {
-        await patientApi.withdrawConsent(target.dbId);
-        setToastMessage(`Consent for "${target.title}" withdrawn.`);
       } else {
-        await patientApi.grantConsent({
-          consent_type: consentType,
-          version: "v1.0",
-        });
-        if (target.dbId) await patientApi.withdrawConsent(target.dbId);
-        setToastMessage(`Consent for "${target.title}" updated.`);
+        let dbId = target.dbId;
+        if (!dbId) {
+          const res = await patientApi.grantConsent({
+            consent_type: consentType,
+            version: "v1.0",
+          });
+          dbId = res?.id;
+        }
+        if (dbId) {
+          await patientApi.withdrawConsent(dbId);
+        }
+        setToastMessage(`Consent for "${target.title}" withdrawn.`);
       }
+      setLastSaved(getFormattedTimestamp(new Date()));
       await fetchConsents();
     } catch (err) {
       setToastMessage(err.message || "Failed to update consent preference.");
