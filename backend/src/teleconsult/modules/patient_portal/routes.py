@@ -943,6 +943,41 @@ def _to_uuid(val: Any) -> UUID:
     return UUID(bytes=raw_bytes)
 
 
+async def _resolve_patient_ids(db: Any, tenant_id: str, user_id: str) -> list[str]:
+    patient_ids = [str(user_id)]
+    patient_doc = await db["patients"].find_one({
+        "tenant_id": str(tenant_id),
+        "$or": [
+            {"id": str(user_id)},
+            {"user_id": str(user_id)},
+            {"user_account_id": str(user_id)},
+        ],
+    })
+    if patient_doc:
+        for k in ("id", "user_id", "user_account_id"):
+            val = patient_doc.get(k)
+            if val and str(val) not in patient_ids:
+                patient_ids.append(str(val))
+
+    user_doc = await db["users"].find_one({
+        "tenant_id": str(tenant_id),
+        "$or": [
+            {"id": str(user_id)},
+            {"user_id": str(user_id)},
+        ],
+    })
+    if user_doc:
+        for k in ("id", "user_id"):
+            val = user_doc.get(k)
+            if val and str(val) not in patient_ids:
+                patient_ids.append(str(val))
+
+    all_ids = []
+    for pid in patient_ids:
+        all_ids.extend([pid, pid.lower(), pid.upper()])
+    return list(set(all_ids))
+
+
 def _parse_datetime(val: Any) -> datetime:
     if isinstance(val, datetime):
         return val
