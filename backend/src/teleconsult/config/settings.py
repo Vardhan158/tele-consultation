@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     video_join_window_minutes: int = 30
     audio_only_allowed: bool = False
     cancellation_deadline_hours: int = 24
+    payment_deadline_minutes: int = 15
     max_reschedules: int = 1
     mobile_launch_mode: str = "responsive_web"
     clinical_record_retention_days: int = 2555

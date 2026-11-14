@@ -20,6 +20,7 @@ from teleconsult.modules.identity.auth_routes import auth_database_session
 from teleconsult.modules.notifications.service import queue_patient_notification
 from teleconsult.modules.patient_portal.appointment_access import (
     appointment_times,
+    expire_pending_payment,
     latest_payment,
     patient_identity_ids,
 )
@@ -822,6 +823,7 @@ async def list_appointments(
 ) -> list[AppointmentResponse]:
     if get_settings().mongodb_enabled:
         database = mongo_database.database()
+        await expire_pending_payment(database, tenant_id=principal.tenant_id)
         clinic_settings = await database["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
         clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
 

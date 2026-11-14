@@ -5,7 +5,7 @@ import os
 import re
 import secrets
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -20,6 +20,7 @@ from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.notifications.service import queue_patient_notification
 from teleconsult.modules.patient_portal.models import Appointment, Doctor
+from teleconsult.modules.patient_portal.appointment_access import expire_pending_payment
 from teleconsult.modules.payments.models import PaymentTransaction
 from teleconsult.modules.payments.schemas import (
     PaymentInitiateRequest,
@@ -122,6 +123,8 @@ async def create_payment_order(
 
     db = mongo_database.database()
 
+    await expire_pending_payment(db, tenant_id=principal.tenant_id)
+
     # 1. Recalculate Service Pricing Server-side authoritatively
     from teleconsult.modules.patient_portal.routes import compute_doctor_pricing
 
@@ -156,6 +159,8 @@ async def create_payment_order(
     })
 
     if existing_apt:
+        if existing_apt.get("status") == "expired":
+            raise HTTPException(status_code=409, detail="Booking has expired; please select a new slot")
         if existing_apt.get("status") == "confirmed" or existing_apt.get("payment_status") == "captured":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -174,6 +179,7 @@ async def create_payment_order(
                     "fee_paise": total_payable_paise,
                     "status": "pending_payment",
                     "payment_status": "pending_payment",
+                    "payment_deadline_at": (datetime.now(UTC) + timedelta(minutes=get_settings().payment_deadline_minutes)).isoformat(),
                 }
             },
         )
@@ -197,6 +203,7 @@ async def create_payment_order(
             "fee": total_payable_paise / 100.0,
             "fee_paise": total_payable_paise,
             "created_at": datetime.now(UTC).isoformat(),
+            "payment_deadline_at": (datetime.now(UTC) + timedelta(minutes=get_settings().payment_deadline_minutes)).isoformat(),
         }
         await db["appointments"].insert_one(dict(apt_doc))
 
@@ -283,6 +290,11 @@ async def verify_razorpay_payment(
     })
     if not payment:
         raise HTTPException(status_code=404, detail="Payment record not found")
+
+    await expire_pending_payment(db, tenant_id=principal.tenant_id, appointment_id=payment.get("appointment_id"))
+    appointment = await db["appointments"].find_one({"id": payment.get("appointment_id"), "tenant_id": principal.tenant_id})
+    if appointment and appointment.get("status") == "expired" and payment.get("status") not in {"captured", "success"}:
+        raise HTTPException(status_code=409, detail="Booking payment window has expired")
 
     # Idempotency check: If already captured/success, return verified state immediately!
     if payment.get("status") in {"captured", "success"}:

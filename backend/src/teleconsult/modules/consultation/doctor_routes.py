@@ -16,7 +16,7 @@ from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.consultation.clinical_models import ClinicalNote, ClinicalNoteAmendment
 from teleconsult.modules.consultation.video_models import VideoSession
 from teleconsult.modules.identity.auth_routes import auth_database_session
-from teleconsult.modules.patient_portal.appointment_access import appointment_times, latest_payment
+from teleconsult.modules.patient_portal.appointment_access import appointment_times, expire_pending_payment, latest_payment
 from teleconsult.modules.patient_portal.models import (
     Appointment,
     Doctor,
@@ -39,6 +39,7 @@ async def _doctor(session: AsyncSession, principal: Principal) -> Doctor:
 async def doctor_join_consultation(appointment_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("consultation:admit"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
+        await expire_pending_payment(db, tenant_id=principal.tenant_id)
         doctor_doc = await db["doctors"].find_one({
             "tenant_id": principal.tenant_id,
             "$or": [
@@ -207,8 +208,10 @@ async def doctor_appointments(session: AsyncSession | None = Depends(auth_databa
             payment = await latest_payment(db, principal.tenant_id, item.get("id") or str(item.get("_id")))
             raw_pay = str((payment or {}).get("status") or item.get("payment_status") or "pending").lower()
             starts_at, ends_at = appointment_times(item)
+            expired_unpaid = item.get("status") == "expired" and raw_pay == "expired"
             pay_label = (
-                "Paid" if raw_pay in {"captured", "success"}
+                "Payment Expired" if expired_unpaid
+                else "Paid" if raw_pay in {"captured", "success"}
                 else "No Payment Required" if raw_pay in {"not_required", "no_payment_required"}
                 else "Payment Failed" if raw_pay == "failed"
                 else "Refunded" if raw_pay == "refunded"

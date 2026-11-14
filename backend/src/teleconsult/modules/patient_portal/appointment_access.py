@@ -1,6 +1,7 @@
 """Shared, read-only appointment ownership and joining rules."""
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from pymongo import ReturnDocument
 
 from teleconsult.kernel.authz.policy import Principal
 
@@ -49,3 +50,31 @@ async def latest_payment(database: Any, tenant_id: str, appointment_id: str) -> 
         {"tenant_id": str(tenant_id), "appointment_id": str(appointment_id)},
         sort=[("created_at", -1)],
     )
+
+
+async def expire_pending_payment(database: Any, *, tenant_id: str, appointment_id: str | None = None, now: datetime | None = None) -> bool:
+    """Expire an unpaid booking atomically and release only its reserved slot."""
+    now = now or datetime.now(UTC)
+    query: dict[str, Any] = {
+        "tenant_id": str(tenant_id),
+        "status": {"$in": ["pending_payment", "payment_failed"]},
+        "payment_status": {"$in": ["pending", "pending_payment", "failed"]},
+        "$or": [
+            {"payment_deadline_at": {"$lte": now.isoformat()}},
+            {"payment_deadline_at": {"$exists": False}, "ends_at": {"$lte": now.isoformat()}},
+        ],
+    }
+    if appointment_id is not None:
+        query["id"] = str(appointment_id)
+    appointment = await database["appointments"].find_one_and_update(
+        query,
+        {"$set": {"status": "expired", "payment_status": "expired", "expired_at": now.isoformat(), "expiry_reason": "payment_deadline"}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not appointment:
+        return False
+    await database["doctor_availability"].update_one(
+        {"tenant_id": str(tenant_id), "doctor_id": str(appointment.get("doctor_id")), "starts_at": appointment.get("starts_at"), "status": "reserved"},
+        {"$set": {"status": "available", "booked": False}, "$unset": {"reservation_id": ""}},
+    )
+    return True
