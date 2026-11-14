@@ -497,9 +497,44 @@ async def audit(session: AsyncSession, principal: Principal, action: str, resour
 @router.post("/consents", response_model=ConsentResponse, status_code=status.HTTP_201_CREATED)
 async def grant_consent(
     payload: ConsentCreate,
-    session: AsyncSession = Depends(tenant_session),
+    session: AsyncSession | None = Depends(patient_session),
     principal: Principal = Depends(require("patient:profile:write")),
-) -> PatientConsent:
+) -> ConsentResponse:
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        consent_id = str(uuid4())
+        now = datetime.now(UTC)
+        doc = {
+            "id": consent_id,
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": str(principal.user_id),
+            "consent_type": payload.consent_type,
+            "version": payload.version,
+            "status": "granted",
+            "granted_at": now.isoformat(),
+            "created_at": now.isoformat(),
+        }
+        await db["consents"].insert_one(dict(doc))
+        audit_doc = {
+            "id": str(uuid4()),
+            "tenant_id": str(principal.tenant_id),
+            "actor_id": str(principal.user_id),
+            "action": "consent.grant",
+            "resource_type": "patient_consent",
+            "resource_id": consent_id,
+            "purpose": payload.consent_type,
+            "occurred_at": now.isoformat(),
+        }
+        await db["audit_logs"].insert_one(dict(audit_doc))
+        return ConsentResponse(
+            id=_to_uuid(consent_id),
+            consent_type=payload.consent_type,
+            version=payload.version,
+            status="granted",
+            granted_at=now,
+        )
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
     consent = PatientConsent(tenant_id=UUID(principal.tenant_id), patient_id=UUID(principal.user_id),
         ends_at=datetime(9999, 12, 31, tzinfo=UTC), **payload.model_dump())
     session.add(consent)
@@ -507,39 +542,117 @@ async def grant_consent(
     session.add(AuditRecord(tenant_id=consent.tenant_id, actor_id=consent.patient_id, action="consent.grant",
         resource_type="patient_consent", resource_id=consent.id, purpose=consent.consent_type,
         metadata_json={"version": consent.version, "status": consent.status}))
-    return consent
+    return ConsentResponse(
+        id=consent.id,
+        consent_type=consent.consent_type,
+        version=consent.version,
+        status=consent.status,
+        granted_at=consent.granted_at,
+    )
 
 
 @router.get("/consents", response_model=list[ConsentResponse])
 async def list_consents(
     session: AsyncSession | None = Depends(patient_session),
     principal: Principal = Depends(require("patient:profile:read")),
-) -> list[PatientConsent]:
+) -> list[ConsentResponse]:
     if get_settings().mongodb_enabled:
-        documents = mongo_database.database()["consents"].find({
-            "tenant_id": principal.tenant_id, "patient_id": principal.user_id,
-        }).sort("granted_at", -1)
-        return [ConsentResponse(
-            id=UUID(document["id"]), consent_type=document["consent_type"],
-            version=document["version"], status=document.get("status", "active"),
-            granted_at=document.get("granted_at", document.get("created_at")),
-        ) async for document in documents]
+        db = mongo_database.database()
+        patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+
+        documents = await db["consents"].find({
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": {"$in": patient_ids},
+        }).sort("granted_at", -1).to_list(500)
+
+        results = []
+        for document in documents:
+            dt_val = document.get("granted_at") or document.get("created_at")
+            if isinstance(dt_val, str):
+                try:
+                    dt = datetime.fromisoformat(dt_val.replace("Z", "+00:00"))
+                except ValueError:
+                    dt = datetime.now(UTC)
+            elif isinstance(dt_val, datetime):
+                dt = dt_val
+            else:
+                dt = datetime.now(UTC)
+
+            results.append(ConsentResponse(
+                id=_to_uuid(document.get("id") or document.get("_id")),
+                consent_type=document.get("consent_type", "general"),
+                version=document.get("version", "v1.0"),
+                status=document.get("status", "granted"),
+                granted_at=dt,
+            ))
+        return results
+
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
     result = await session.scalars(select(PatientConsent).where(
         PatientConsent.tenant_id == UUID(principal.tenant_id), PatientConsent.patient_id == UUID(principal.user_id)
     ).order_by(PatientConsent.granted_at.desc()))
-    return list(result)
+    return [
+        ConsentResponse(
+            id=c.id,
+            consent_type=c.consent_type,
+            version=c.version,
+            status=c.status,
+            granted_at=c.granted_at,
+        )
+        for c in result
+    ]
 
 
 @router.post("/consents/{consent_id}/withdraw", response_model=ConsentResponse)
 async def withdraw_consent(
-    consent_id: UUID,
-    session: AsyncSession = Depends(tenant_session),
+    consent_id: str,
+    session: AsyncSession | None = Depends(patient_session),
     principal: Principal = Depends(require("patient:profile:write")),
-) -> PatientConsent:
+) -> ConsentResponse:
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+        now = datetime.now(UTC)
+
+        doc = await db["consents"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": {"$in": patient_ids},
+            "$or": [{"id": str(consent_id)}, {"id": str(consent_id).lower()}],
+        })
+        if not doc:
+            raise HTTPException(status_code=404, detail="Consent record not found")
+
+        await db["consents"].update_one(
+            {"_id": doc["_id"]},
+            {"$set": {"status": "withdrawn", "withdrawn_at": now.isoformat()}},
+        )
+
+        audit_doc = {
+            "id": str(uuid4()),
+            "tenant_id": str(principal.tenant_id),
+            "actor_id": str(principal.user_id),
+            "action": "consent.withdraw",
+            "resource_type": "patient_consent",
+            "resource_id": str(doc["id"]),
+            "purpose": doc.get("consent_type", "general"),
+            "occurred_at": now.isoformat(),
+        }
+        await db["audit_logs"].insert_one(dict(audit_doc))
+
+        return ConsentResponse(
+            id=_to_uuid(doc["id"]),
+            consent_type=doc.get("consent_type", "general"),
+            version=doc.get("version", "v1.0"),
+            status="withdrawn",
+            granted_at=now,
+        )
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+    c_uuid = _to_uuid(consent_id)
     consent = await session.scalar(select(PatientConsent).where(
-        PatientConsent.id == consent_id, PatientConsent.tenant_id == UUID(principal.tenant_id),
+        PatientConsent.id == c_uuid, PatientConsent.tenant_id == UUID(principal.tenant_id),
         PatientConsent.patient_id == UUID(principal.user_id)
     ))
     if consent is None:
@@ -549,7 +662,13 @@ async def withdraw_consent(
     session.add(AuditRecord(tenant_id=consent.tenant_id, actor_id=consent.patient_id, action="consent.withdraw",
         resource_type="patient_consent", resource_id=consent.id, purpose=consent.consent_type,
         metadata_json={"version": consent.version}))
-    return consent
+    return ConsentResponse(
+        id=consent.id,
+        consent_type=consent.consent_type,
+        version=consent.version,
+        status=consent.status,
+        granted_at=consent.granted_at,
+    )
 
 
 @router.post("/profile", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
