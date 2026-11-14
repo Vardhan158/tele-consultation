@@ -28,3 +28,19 @@ export function serializeClinicalNote(fields) {
     .map(([key, label]) => `${label}:\n${String(fields[key] || "").trim()}`)
     .join("\n\n");
 }
+
+export function parseAmendment(value) {
+  const text = String(value || "");
+  const marker = "Changed information:\n";
+  const index = text.indexOf(marker);
+  const reason = text.startsWith("Reason:\n")
+    ? text.slice("Reason:\n".length, index >= 0 ? index : undefined).trim()
+    : "";
+  const fields = parseClinicalNote(index >= 0 ? text.slice(index + marker.length) : text);
+  return {
+    reason,
+    fields: Object.fromEntries(
+      CLINICAL_NOTE_FIELDS.filter(([key]) => fields[key]?.trim()).map(([key, label]) => [label, fields[key].trim()]),
+    ),
+  };
+}

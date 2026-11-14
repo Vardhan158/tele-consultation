@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { doctorApi } from "../../lib/api";
-import { CLINICAL_NOTE_FIELDS, emptyClinicalNote, parseClinicalNote, serializeClinicalNote } from "../../lib/clinicalNotes";
+import { CLINICAL_NOTE_FIELDS, emptyClinicalNote, parseAmendment, parseClinicalNote, serializeClinicalNote } from "../../lib/clinicalNotes";
 
 function formatPaymentLabel(raw) {
   const p = (raw || "").toLowerCase();
@@ -345,7 +345,17 @@ export default function DoctorAppointmentsScreen({ onNavigate }) {
                   <div className="font-semibold text-[#25836F]">
                     Version {item.version} · {new Date(item.created_at).toLocaleString()}
                   </div>
-                  <p className="text-[#577877]">{item.content_reference}</p>
+                  {(() => {
+                    const amendment = parseAmendment(item.content_reference);
+                    return (
+                      <>
+                        {amendment.reason && <p><span className="font-semibold">Reason:</span> {amendment.reason}</p>}
+                        {Object.entries(amendment.fields).map(([label, value]) => (
+                          <p key={label} className="text-[#577877]"><span className="font-semibold text-[#162623]">{label}:</span> {value}</p>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
