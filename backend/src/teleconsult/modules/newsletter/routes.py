@@ -42,20 +42,26 @@ def digest(token: str) -> str:
 def website_url() -> str:
     value = get_settings().newsletter_website_url.strip().rstrip("/")
     if not value.startswith("https://"):
+        value = get_settings().frontend_origins.split(",")[0].strip().rstrip("/")
+    if not value.startswith("http"):
         raise HTTPException(503, "Newsletter website URL is not configured")
     return value
 
 
-def api_url() -> str:
+def api_url(request: Request | None = None) -> str:
     value = get_settings().newsletter_api_base_url.strip().rstrip("/")
+    if not value and request is not None:
+        value = str(request.base_url).rstrip("/")
     if not value.startswith("https://"):
+        if get_settings().environment in {"dev", "local"} and value.startswith("http://"):
+            return value
         raise HTTPException(503, "Newsletter API URL is not configured")
     return value
 
 
 def email_html(kind: str, link: str | None = None) -> str:
     settings = get_settings()
-    site = html.escape(website_url())
+    site = html.escape(website_url()) if kind == "welcome" else ""
     contact = html.escape(getattr(settings, "brevo_sender_email", "") or getattr(settings, "email_from", "") or "")
     poster = html.escape(settings.newsletter_poster_url.strip()) if settings.newsletter_poster_url.startswith("https://") else ""
     if kind == "verify":
@@ -128,7 +134,8 @@ async def subscribe(payload: SubscribeRequest, request: Request):
     except DuplicateKeyError:
         return {"message": GENERIC_MESSAGE}
     await audit("subscription_pending", email)
-    link = f"{api_url()}/api/newsletter/verify?{urlencode({'token': token})}"
+    link = f"{api_url(request)}/api/newsletter/verify?{urlencode({'token': token})}"
+    update["api_base_url"] = api_url(request)
     asyncio.create_task(send_with_retries(email, "Confirm your Kaizen Care subscription", "Confirm your subscription: " + link, email_html("verify", link)))
     return {"message": GENERIC_MESSAGE}
 
@@ -141,7 +148,7 @@ async def verify(token: str):
     if not record:
         raise HTTPException(400, "This verification link is invalid or expired")
     welcome_token = secrets.token_urlsafe(24)
-    unsubscribe = f"{api_url()}/api/newsletter/unsubscribe?{urlencode({'token': welcome_token})}"
+    unsubscribe = f"{record.get('api_base_url') or api_url()}/api/newsletter/unsubscribe?{urlencode({'token': welcome_token})}"
     await subscribers.update_one({"_id": record["_id"], "status": "pending"}, {"$set": {"status": "active", "subscribed_at": now, "updated_at": now, "unsubscribe_token_hash": digest(welcome_token)}, "$unset": {"verification_token_hash": "", "verification_expires_at": ""}})
     await audit("subscription_activated", record["email"])
     asyncio.create_task(send_with_retries(record["email"], "Welcome to Kaizen Care", "Explore Kaizen Care: " + website_url(), email_html("welcome", unsubscribe)))
