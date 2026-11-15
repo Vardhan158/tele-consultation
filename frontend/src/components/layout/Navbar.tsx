@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { ChangeLocationButton } from "../location/LocationProvider";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 const PUBLIC_NAV_LINKS = [
@@ -182,7 +181,6 @@ export default function Navbar() {
 
         {/* Right Desktop Actions */}
         <div className="hidden items-center gap-3 lg:flex">
-          <ChangeLocationButton />
           <button
             type="button"
             onClick={() => go("/doctor/register")}
@@ -253,7 +251,6 @@ export default function Navbar() {
           }`}
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1.5">
-            <ChangeLocationButton />
             {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, true))}
             <button
               type="button"
