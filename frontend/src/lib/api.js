@@ -30,7 +30,20 @@ export async function apiRequest(path, options = {}) {
         : raw;
     throw new Error(message || `Request failed (${response.status})`);
   }
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json") && !contentType.toLowerCase().includes("+json")) {
+    throw new Error(
+      `API returned an unexpected response (HTTP ${response.status}, ${contentType || "unknown content type"}) for ${response.url || `${API_BASE_URL}${path}`}. Check VITE_API_BASE_URL and that the FastAPI backend is running; the request may be reaching the frontend HTML server instead.`,
+    );
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new Error(
+      `API returned invalid JSON (HTTP ${response.status}) for ${response.url || `${API_BASE_URL}${path}`}.`,
+    );
+  }
 }
 
 export const patientApi = {
