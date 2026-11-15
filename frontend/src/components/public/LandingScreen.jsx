@@ -125,10 +125,38 @@ export default function LandingScreen({
   const [scrolled, setScrolled] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [newsletterConsent, setNewsletterConsent] = useState(false);
+  const [newsletterState, setNewsletterState] = useState("idle");
+  const [newsletterMessage, setNewsletterMessage] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
 
   const lenisRef = useRef(null);
+
+  const subscribeNewsletter = async (event) => {
+    event.preventDefault();
+    if (!newsletterConsent || newsletterState === "loading") return;
+    setNewsletterState("loading");
+    setNewsletterMessage("");
+    try {
+      const newsletterApiBase = (import.meta.env.VITE_NEWSLETTER_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+      const response = await fetch(`${newsletterApiBase}/api/newsletter/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newsletterEmail.trim(), consent: true }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || "We could not process your subscription. Please try again.");
+      setNewsletterState("success");
+      setNewsletterMessage(data.message || "Please check your inbox to confirm your subscription.");
+      setNewsletterEmail("");
+      setNewsletterConsent(false);
+    } catch (error) {
+      setNewsletterState("error");
+      setNewsletterMessage(error.message);
+    }
+  };
 
   // Initialize 60+ FPS inertia smooth scrolling with Lenis
   useEffect(() => {
@@ -870,9 +898,9 @@ export default function LandingScreen({
       {/* ========================================================= */}
       <footer className="w-full bg-[#162623] text-white pt-16 pb-8 border-t border-zinc-800">
         <div className="px-6 sm:px-10 lg:px-16 xl:px-20 w-full max-w-[1440px] mx-auto">
-          <div className="flex flex-col md:flex-row flex-wrap justify-between items-start gap-12 pb-16 border-b border-zinc-800">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start gap-8 lg:gap-10 pb-12 border-b border-zinc-800">
             {/* Logo and About */}
-            <div className="flex flex-col items-start max-w-sm">
+            <div className="flex min-w-0 flex-col items-start">
               <div className="flex items-center gap-2.5 mb-4 select-none">
                 <svg
                   width="32"
@@ -902,6 +930,19 @@ export default function LandingScreen({
               <p className="text-sm text-zinc-400 leading-relaxed">
                 Connecting patients with qualified healthcare professionals through online doctor consultations, easy appointment booking, and secure digital healthcare services.
               </p>
+            </div>
+
+            <div className="footer-newsletter order-5 sm:col-span-2 lg:col-span-4 w-full border-t border-zinc-800 pt-8">
+              <p className="font-semibold text-sm text-white mb-2">Healthcare updates, delivered to your inbox.</p>
+              <p className="text-sm text-zinc-400 leading-relaxed mb-4">Subscribe to receive our Kaizen Care introduction, healthcare service updates and platform announcements.</p>
+              <form onSubmit={subscribeNewsletter} className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input type="email" required value={newsletterEmail} onChange={(event) => setNewsletterEmail(event.target.value)} placeholder="Email address" aria-label="Email address" className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-white px-4 py-3 text-sm text-[#162623] outline-none focus:border-[#29E2B9]" />
+                  <button type="submit" disabled={newsletterState === "loading" || !newsletterConsent} className="rounded-lg bg-[#29E2B9] px-5 py-3 text-sm font-bold text-[#162623] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">{newsletterState === "loading" ? "Subscribing…" : "Subscribe"}</button>
+                </div>
+                <label className="flex items-start gap-2 text-xs leading-relaxed text-zinc-400"><input type="checkbox" required checked={newsletterConsent} onChange={(event) => setNewsletterConsent(event.target.checked)} className="mt-0.5 accent-[#29E2B9]" />I agree to receive Kaizen Care marketing emails. I can unsubscribe at any time.</label>
+                {newsletterMessage && <p role={newsletterState === "error" ? "alert" : "status"} className={`text-xs ${newsletterState === "error" ? "text-red-300" : "text-[#29E2B9]"}`}>{newsletterMessage}</p>}
+              </form>
             </div>
 
             {/* Quick Links */}

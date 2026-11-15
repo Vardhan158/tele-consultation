@@ -1,0 +1,1 @@
+"""Public email subscription module."""
