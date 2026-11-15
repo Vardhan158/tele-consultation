@@ -896,12 +896,24 @@ export default function LandingScreen({
       {/* ========================================================= */}
       {/* 9. FOOTER (Kaizen Care)                                   */}
       {/* ========================================================= */}
-      <footer className="w-full bg-[#162623] text-white pt-16 pb-8 border-t border-zinc-800">
-        <div className="px-6 sm:px-10 lg:px-16 xl:px-20 w-full max-w-[1440px] mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 items-start gap-8 lg:gap-10 pb-12 border-b border-zinc-800">
+      <footer className="relative w-full bg-[#142C27] text-white pt-16 pb-12 overflow-hidden">
+        {/* Background Watermark Typography */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 flex items-end justify-center pointer-events-none select-none z-0 overflow-hidden"
+        >
+          <span className="footer-bg-wordmark">
+            KAIZEN CARE
+          </span>
+        </div>
+
+        {/* Foreground Content */}
+        <div className="relative z-10 px-4 sm:px-8 lg:px-16 xl:px-20 w-full max-w-[1440px] mx-auto space-y-10 sm:space-y-12">
+          {/* Main Content Grid: Branding & Nav Links */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 items-start">
             {/* Logo and About */}
-            <div className="flex min-w-0 flex-col items-start">
-              <div className="flex items-center gap-2.5 mb-4 select-none">
+            <div className="flex min-w-0 flex-col items-start space-y-3.5">
+              <div className="flex items-center gap-2.5 select-none">
                 <svg
                   width="32"
                   height="36"
@@ -927,27 +939,14 @@ export default function LandingScreen({
                   Kaizen Care
                 </span>
               </div>
-              <p className="text-sm text-zinc-400 leading-relaxed">
+              <p className="text-sm text-zinc-400 leading-relaxed pr-2">
                 Connecting patients with qualified healthcare professionals through online doctor consultations, easy appointment booking, and secure digital healthcare services.
               </p>
             </div>
 
-            <div className="footer-newsletter order-5 sm:col-span-2 lg:col-span-4 w-full border-t border-zinc-800 pt-8">
-              <p className="font-semibold text-sm text-white mb-2">Healthcare updates, delivered to your inbox.</p>
-              <p className="text-sm text-zinc-400 leading-relaxed mb-4">Subscribe to receive our Kaizen Care introduction, healthcare service updates and platform announcements.</p>
-              <form onSubmit={subscribeNewsletter} className="space-y-3">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input type="email" required value={newsletterEmail} onChange={(event) => setNewsletterEmail(event.target.value)} placeholder="Email address" aria-label="Email address" className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-white px-4 py-3 text-sm text-[#162623] outline-none focus:border-[#29E2B9]" />
-                  <button type="submit" disabled={newsletterState === "loading" || !newsletterConsent} className="rounded-lg bg-[#29E2B9] px-5 py-3 text-sm font-bold text-[#162623] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">{newsletterState === "loading" ? "Subscribing…" : "Subscribe"}</button>
-                </div>
-                <label className="flex items-start gap-2 text-xs leading-relaxed text-zinc-400"><input type="checkbox" required checked={newsletterConsent} onChange={(event) => setNewsletterConsent(event.target.checked)} className="mt-0.5 accent-[#29E2B9]" />I agree to receive Kaizen Care marketing emails. I can unsubscribe at any time.</label>
-                {newsletterMessage && <p role={newsletterState === "error" ? "alert" : "status"} className={`text-xs ${newsletterState === "error" ? "text-red-300" : "text-[#29E2B9]"}`}>{newsletterMessage}</p>}
-              </form>
-            </div>
-
             {/* Quick Links */}
             <div>
-              <p className="font-semibold text-sm text-white mb-4 uppercase tracking-wider">
+              <p className="font-semibold text-xs text-[#29E2B9] mb-4 uppercase tracking-wider">
                 Quick Links
               </p>
               <div className="flex flex-col gap-2.5 text-sm text-zinc-400">
@@ -957,7 +956,7 @@ export default function LandingScreen({
                     e.preventDefault();
                     scrollToSection("home");
                   }}
-                  className="hover:text-white transition"
+                  className="hover:text-[#29E2B9] transition-colors duration-200"
                 >
                   Home
                 </a>
@@ -967,7 +966,7 @@ export default function LandingScreen({
                     e.preventDefault();
                     navigate("/about");
                   }}
-                  className="hover:text-white transition"
+                  className="hover:text-[#29E2B9] transition-colors duration-200"
                 >
                   About
                 </a>
@@ -977,7 +976,7 @@ export default function LandingScreen({
                     e.preventDefault();
                     navigate("/services");
                   }}
-                  className="hover:text-white transition"
+                  className="hover:text-[#29E2B9] transition-colors duration-200"
                 >
                   Services
                 </a>
@@ -987,14 +986,14 @@ export default function LandingScreen({
                     e.preventDefault();
                     scrollToSection("testimonials");
                   }}
-                  className="hover:text-white transition"
+                  className="hover:text-[#29E2B9] transition-colors duration-200"
                 >
                   Testimonials
                 </a>
                 <button
                   type="button"
                   onClick={onRegister}
-                  className="text-left hover:text-white transition cursor-pointer"
+                  className="text-left hover:text-[#29E2B9] transition-colors duration-200 cursor-pointer"
                 >
                   Book Appointment
                 </button>
@@ -1003,33 +1002,44 @@ export default function LandingScreen({
 
             {/* Our Services */}
             <div>
-              <p className="font-semibold text-sm text-white mb-4 uppercase tracking-wider">
+              <p className="font-semibold text-xs text-[#29E2B9] mb-4 uppercase tracking-wider">
                 Our Services
               </p>
               <div className="flex flex-col gap-2.5 text-sm text-zinc-400">
-                <span>General Consultation</span>
-                <span>Preventive Health Guidance</span>
-                <span>Specialist Consultation</span>
-                <span>Online Video Consultation</span>
-                <span>Digital Prescriptions & Records</span>
-                <span>Follow-up & Support</span>
+                <span className="hover:text-zinc-200 transition-colors duration-200 cursor-default">General Consultation</span>
+                <span className="hover:text-zinc-200 transition-colors duration-200 cursor-default">Preventive Health Guidance</span>
+                <span className="hover:text-zinc-200 transition-colors duration-200 cursor-default">Specialist Consultation</span>
+                <span className="hover:text-zinc-200 transition-colors duration-200 cursor-default">Online Video Consultation</span>
+                <span className="hover:text-zinc-200 transition-colors duration-200 cursor-default">Digital Prescriptions &amp; Records</span>
+                <span className="hover:text-zinc-200 transition-colors duration-200 cursor-default">Follow-up &amp; Support</span>
               </div>
             </div>
 
-            {/* Support & Inquiries */}
+            {/* Support & Inquiries & Newsletter */}
             <div>
-              <p className="font-semibold text-sm text-white mb-4 uppercase tracking-wider">
-                Support & Inquiries
+              <p className="font-semibold text-xs text-[#29E2B9] mb-4 uppercase tracking-wider">
+                Support &amp; Inquiries
               </p>
-              <div className="flex flex-col gap-3 text-sm text-zinc-400">
+              <div className="flex flex-col gap-3 text-sm text-zinc-400 mb-5">
                 <div className="flex items-center gap-2.5">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#29E2B9] shrink-0">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-[#29E2B9] shrink-0"
+                  >
                     <rect width="20" height="16" x="2" y="4" rx="2" />
                     <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                   </svg>
                   <a
                     href="mailto:support@kaizentrixcare.local"
-                    className="hover:text-white transition"
+                    className="hover:text-[#29E2B9] transition-colors duration-200"
                   >
                     support@kaizentrixcare.local
                   </a>
@@ -1038,41 +1048,74 @@ export default function LandingScreen({
                   <span className="material-symbols-outlined text-[#29E2B9] text-base shrink-0">
                     headset_mic
                   </span>
-                  <span>Online Telehealth & Patient Support</span>
+                  <span>Online Telehealth &amp; Patient Support</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={onDoctorRegister}
-                  className="text-left text-xs font-semibold text-[#29E2B9] hover:underline pt-2 cursor-pointer"
-                >
-                  Clinician Registration Portal →
-                </button>
               </div>
+
+              {/* Newsletter Subscription Controls */}
+              <form onSubmit={subscribeNewsletter} className="footer-newsletter space-y-2.5 pt-1">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="email"
+                    required
+                    value={newsletterEmail}
+                    onChange={(event) => setNewsletterEmail(event.target.value)}
+                    placeholder="Email address"
+                    aria-label="Email address"
+                    className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-white px-3.5 py-2.5 text-sm text-[#162623] outline-none focus:border-[#29E2B9]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={newsletterState === "loading" || !newsletterConsent}
+                    className="rounded-lg bg-[#29E2B9] px-4 py-2.5 text-sm font-bold text-[#162623] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer shrink-0"
+                  >
+                    {newsletterState === "loading" ? "Subscribing…" : "Subscribe"}
+                  </button>
+                </div>
+                <label className="flex items-start gap-2 text-xs leading-relaxed text-zinc-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={newsletterConsent}
+                    onChange={(event) => setNewsletterConsent(event.target.checked)}
+                    className="mt-0.5 accent-[#29E2B9] cursor-pointer"
+                  />
+                  <span>I agree to receive Kaizen Care marketing emails. I can unsubscribe at any time.</span>
+                </label>
+                {newsletterMessage && (
+                  <p
+                    role={newsletterState === "error" ? "alert" : "status"}
+                    className={`text-xs ${newsletterState === "error" ? "text-red-300" : "text-[#29E2B9]"}`}
+                  >
+                    {newsletterMessage}
+                  </p>
+                )}
+              </form>
             </div>
           </div>
 
-          {/* Bottom Bar */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-8 text-xs text-zinc-500">
+          {/* Compact Bottom Bar */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 text-xs text-zinc-400">
             <p>© 2026 Kaizen Care · All Rights Reserved.</p>
-            <div className="flex gap-6">
+            <div className="flex items-center gap-6">
               <button
                 type="button"
                 onClick={() => setShowPrivacyModal(true)}
-                className="hover:text-zinc-300 cursor-pointer"
+                className="hover:text-[#29E2B9] transition-colors duration-200 cursor-pointer"
               >
                 Privacy Policy
               </button>
               <button
                 type="button"
                 onClick={() => setShowTermsModal(true)}
-                className="hover:text-zinc-300 cursor-pointer"
+                className="hover:text-[#29E2B9] transition-colors duration-200 cursor-pointer"
               >
                 Terms of Service
               </button>
               <button
                 type="button"
                 onClick={() => setShowPrivacyModal(true)}
-                className="hover:text-zinc-300 cursor-pointer"
+                className="hover:text-[#29E2B9] transition-colors duration-200 cursor-pointer"
               >
                 Patient Security
               </button>

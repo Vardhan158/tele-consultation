@@ -141,14 +141,14 @@ async def subscribe(payload: SubscribeRequest, request: Request):
 
 
 @router.get("/verify")
-async def verify(token: str):
+async def verify(token: str, request: Request):
     subscribers, _ = await _collections()
     now = datetime.now(UTC)
     record = await subscribers.find_one({"verification_token_hash": digest(token), "status": "pending", "verification_expires_at": {"$gt": now}})
     if not record:
         raise HTTPException(400, "This verification link is invalid or expired")
     welcome_token = secrets.token_urlsafe(24)
-    unsubscribe = f"{record.get('api_base_url') or api_url()}/api/newsletter/unsubscribe?{urlencode({'token': welcome_token})}"
+    unsubscribe = f"{record.get('api_base_url') or api_url(request)}/api/newsletter/unsubscribe?{urlencode({'token': welcome_token})}"
     await subscribers.update_one({"_id": record["_id"], "status": "pending"}, {"$set": {"status": "active", "subscribed_at": now, "updated_at": now, "unsubscribe_token_hash": digest(welcome_token)}, "$unset": {"verification_token_hash": "", "verification_expires_at": ""}})
     await audit("subscription_activated", record["email"])
     asyncio.create_task(send_with_retries(record["email"], "Welcome to Kaizen Care", "Explore Kaizen Care: " + website_url(), email_html("welcome", unsubscribe)))

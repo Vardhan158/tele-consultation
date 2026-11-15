@@ -3,7 +3,6 @@ from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal
 from teleconsult.modules.admin.routes import get_clinic_settings, update_clinic_settings, ClinicSettingsPayload
 
-
 class MockMongoCollection:
     def __init__(self, data=None):
         self._data = data or []
