@@ -948,15 +948,26 @@ function SupportDashboardContent({ user, onLogout }) {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-mono text-xs font-bold text-[#1A7D67]">{t.id}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                          t.priority === "urgent" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                        }`}>
-                          {t.priority}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {t.sla && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                              t.sla.status === "breached" ? "bg-red-100 text-red-700 border border-red-200" :
+                              t.sla.status === "near_breach" ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                              t.sla.status === "met" ? "bg-green-100 text-green-800" : "bg-blue-50 text-blue-700"
+                            }`}>
+                              SLA: {t.sla.status.replace("_", " ")}
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                            t.priority === "urgent" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                          }`}>
+                            {t.priority}
+                          </span>
+                        </div>
                       </div>
                       <h4 className="font-bold text-sm text-zinc-900 mt-1.5">{t.subject}</h4>
                       <div className="flex items-center justify-between text-xs text-zinc-500 mt-2">
-                        <span className="capitalize">{t.status}</span>
+                        <span className="capitalize font-semibold text-zinc-700">{t.status?.replace("_", " ")}</span>
                         <span>{new Date(t.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
@@ -965,7 +976,7 @@ function SupportDashboardContent({ user, onLogout }) {
               </div>
 
               {/* Selected Ticket Detail & Internal Staff Notes */}
-              <div className="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-xs p-6">
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-xs p-6 space-y-6">
                 {!selectedTicket ? (
                   <div className="py-20 text-center text-zinc-400 flex flex-col items-center gap-2">
                     <span className="material-symbols-outlined text-4xl">headset_mic</span>
@@ -979,6 +990,15 @@ function SupportDashboardContent({ user, onLogout }) {
                           <span className="font-mono text-xs font-bold text-[#1A7D67]">{selectedTicket.id}</span>
                           <span className="text-xs bg-zinc-100 text-zinc-700 px-2.5 py-0.5 rounded-full font-semibold uppercase">{selectedTicket.category?.replace("_", " ")}</span>
                           <span className="text-xs bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-semibold uppercase">{selectedTicket.user_type || "patient"}</span>
+                          {selectedTicket.sla && (
+                            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full uppercase ${
+                              selectedTicket.sla.status === "breached" ? "bg-red-100 text-red-700 border border-red-200" :
+                              selectedTicket.sla.status === "near_breach" ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                              selectedTicket.sla.status === "met" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
+                            }`}>
+                              SLA ({selectedTicket.sla.hours_target}h): {selectedTicket.sla.status.replace("_", " ")}
+                            </span>
+                          )}
                           {selectedTicket.escalated_to && (
                             <span className="text-xs bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
                               <span className="material-symbols-outlined text-xs">warning</span>
@@ -1066,6 +1086,29 @@ function SupportDashboardContent({ user, onLogout }) {
                           Add Note
                         </button>
                       </form>
+                    </div>
+
+                    {/* Support Audit History Timeline */}
+                    <div className="space-y-3 pt-2 border-t border-zinc-100">
+                      <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm text-[#1A7D67]">history</span>
+                        Ticket Audit Trail &amp; History
+                      </h4>
+                      {!selectedTicket.history?.length ? (
+                        <p className="text-xs text-zinc-400 italic">No history records logged yet.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {selectedTicket.history.map((h) => (
+                            <div key={h.id} className="p-2.5 bg-zinc-50 rounded-lg border border-zinc-100 text-xs flex justify-between gap-3">
+                              <div>
+                                <span className="font-semibold text-zinc-800">{h.details}</span>
+                                <p className="text-[10px] text-zinc-400">Actor: {h.actor_id}</p>
+                              </div>
+                              <span className="text-[10px] text-zinc-400 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

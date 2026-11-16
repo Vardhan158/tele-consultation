@@ -93,6 +93,42 @@ def auto_triage_ticket(category: str, subject: str, description: str, current_pr
     return cat, prio
 
 
+def calculate_sla_due_at(created_at: datetime, priority: str) -> datetime:
+    hours_map = {"urgent": 2, "high": 4, "medium": 12, "low": 24}
+    hours = hours_map.get(priority.lower(), 12)
+    return created_at + timedelta(hours=hours)
+
+
+def get_sla_info(created_at_val: Any, priority: str, status: str) -> dict[str, Any]:
+    if isinstance(created_at_val, str):
+        try:
+            created_dt = datetime.fromisoformat(created_at_val.replace("Z", "+00:00"))
+        except Exception:
+            created_dt = datetime.now(UTC)
+    elif isinstance(created_at_val, datetime):
+        created_dt = created_at_val
+    else:
+        created_dt = datetime.now(UTC)
+
+    due_at = calculate_sla_due_at(created_dt, priority)
+    now = datetime.now(UTC)
+
+    if status in {"resolved", "closed"}:
+        sla_state = "met"
+    elif now > due_at:
+        sla_state = "breached"
+    elif (due_at - now).total_seconds() <= 3600:
+        sla_state = "near_breach"
+    else:
+        sla_state = "on_track"
+
+    return {
+        "due_at": due_at.isoformat(),
+        "status": sla_state,
+        "hours_target": 2 if priority == "urgent" else 4 if priority == "high" else 12 if priority == "medium" else 24,
+    }
+
+
 class AppointmentSupportAction(BaseModel):
     action: str = Field(pattern="^(reschedule|cancel)$")
     starts_at: str | None = None
@@ -408,6 +444,8 @@ async def support_tickets(
     if category:
         query["category"] = category
     items = [_clean(x) async for x in db["support_tickets"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
+    for item in items:
+        item["sla"] = get_sla_info(item.get("created_at"), item.get("priority", "medium"), item.get("status", "open"))
     total = await db["support_tickets"].count_documents(query)
     return {"items": items, "total": total, "offset": offset, "limit": limit}
 
@@ -422,6 +460,14 @@ async def create_support_ticket(
     now = datetime.now(UTC)
 
     cat, prio = auto_triage_ticket(payload.category, payload.subject, payload.description, payload.priority)
+
+    history_entry = {
+        "id": str(uuid4()),
+        "action": "ticket_created",
+        "actor_id": principal.user_id,
+        "details": f"Support ticket created and triaged as {cat.upper()} ({prio.upper()} Priority)",
+        "created_at": now.isoformat(),
+    }
 
     ticket_doc = {
         "id": ticket_id,
@@ -442,6 +488,7 @@ async def create_support_ticket(
         "assigned_to": principal.user_id,
         "escalated_to": None,
         "notes": [],
+        "history": [history_entry],
         "created_at": now,
         "updated_at": now,
     }
@@ -455,7 +502,9 @@ async def create_support_ticket(
         "metadata": {"category": cat, "priority": prio},
         "created_at": now,
     })
-    return _clean(ticket_doc)
+    res = _clean(ticket_doc)
+    res["sla"] = get_sla_info(now, prio, "open")
+    return res
 
 
 @router.patch("/tickets/{ticket_id}")
@@ -471,16 +520,52 @@ async def update_support_ticket(
 
     now = datetime.now(UTC)
     updates: dict[str, Any] = {"updated_at": now}
+    history_logs = []
+
     if payload.status:
         updates["status"] = payload.status
+        if payload.status in {"resolved", "closed"}:
+            updates["resolved_at"] = now
+            updates["resolved_by"] = principal.user_id
+        history_logs.append({
+            "id": str(uuid4()),
+            "action": "status_changed",
+            "actor_id": principal.user_id,
+            "details": f"Status updated to {payload.status.replace('_', ' ').title()}",
+            "created_at": now.isoformat(),
+        })
+
     if payload.priority:
         updates["priority"] = payload.priority
+        history_logs.append({
+            "id": str(uuid4()),
+            "action": "priority_changed",
+            "actor_id": principal.user_id,
+            "details": f"Priority updated to {payload.priority.title()}",
+            "created_at": now.isoformat(),
+        })
+
     if payload.assigned_to:
         updates["assigned_to"] = payload.assigned_to
+        history_logs.append({
+            "id": str(uuid4()),
+            "action": "assigned",
+            "actor_id": principal.user_id,
+            "details": f"Assigned to support agent {payload.assigned_to}",
+            "created_at": now.isoformat(),
+        })
+
     if payload.escalated_to:
         updates["escalated_to"] = payload.escalated_to
         if not payload.status:
             updates["status"] = "escalated"
+        history_logs.append({
+            "id": str(uuid4()),
+            "action": "escalated",
+            "actor_id": principal.user_id,
+            "details": f"Escalated to specialist team: {payload.escalated_to}",
+            "created_at": now.isoformat(),
+        })
 
     if payload.note:
         note_entry = {
@@ -489,9 +574,21 @@ async def update_support_ticket(
             "text": payload.note,
             "created_at": now.isoformat(),
         }
+        history_logs.append({
+            "id": str(uuid4()),
+            "action": "note_added",
+            "actor_id": principal.user_id,
+            "details": f"Internal support note added",
+            "created_at": now.isoformat(),
+        })
         await db["support_tickets"].update_one(
             {"tenant_id": principal.tenant_id, "id": ticket_id},
-            {"$push": {"notes": note_entry}, "$set": updates},
+            {"$push": {"notes": note_entry, "history": {"$each": history_logs}}, "$set": updates},
+        )
+    elif history_logs:
+        await db["support_tickets"].update_one(
+            {"tenant_id": principal.tenant_id, "id": ticket_id},
+            {"$push": {"history": {"$each": history_logs}}, "$set": updates},
         )
     else:
         await db["support_tickets"].update_one(
@@ -525,7 +622,9 @@ async def update_support_ticket(
     })
 
     updated_ticket = await db["support_tickets"].find_one({"tenant_id": principal.tenant_id, "id": ticket_id})
-    return _clean(updated_ticket or {})
+    res = _clean(updated_ticket or {})
+    res["sla"] = get_sla_info(res.get("created_at"), res.get("priority", "medium"), res.get("status", "open"))
+    return res
 
 
 def secrets_ticket_id() -> str:
