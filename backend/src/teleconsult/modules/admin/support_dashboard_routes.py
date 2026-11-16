@@ -1136,6 +1136,30 @@ async def support_tickets(
     return {"items": items, "total": total, "offset": offset, "limit": limit}
 
 
+async def dispatch_support_notification(
+    db: Any,
+    tenant_id: str,
+    recipient_id: str | None,
+    notif_type: str,
+    title: str,
+    message: str,
+) -> None:
+    if not recipient_id:
+        return
+    now = datetime.now(UTC)
+    clean_message = message.replace("password_hash", "***").replace("mfa_secret", "***")
+    await db["notifications"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": tenant_id,
+        "recipient_id": recipient_id,
+        "type": notif_type,
+        "title": title,
+        "message": clean_message,
+        "read_at": None,
+        "created_at": now,
+    })
+
+
 @router.post("/tickets")
 async def create_support_ticket(
     payload: TicketCreate,
@@ -1191,7 +1215,6 @@ async def create_support_ticket(
         "resolved_at": None,
     }
 
-    # Write to support_tickets and support_ticket_events collections (PRD Section 15)
     await db["support_tickets"].insert_one(ticket_doc)
     await db["support_ticket_events"].insert_one({
         "id": str(uuid4()),
@@ -1202,6 +1225,14 @@ async def create_support_ticket(
         "details": f"Ticket created with category {cat.upper()} and priority {prio.upper()}",
         "created_at": now.isoformat(),
     })
+
+    # Trigger 1: Ticket Created Confirmation to Requester (PRD Section 16)
+    await dispatch_support_notification(
+        db, principal.tenant_id, req_id,
+        "support_ticket_created",
+        f"Support Ticket #{ticket_id} Received",
+        f"Your support request '{payload.subject}' has been received and assigned reference #{ticket_id}."
+    )
 
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
@@ -1326,20 +1357,62 @@ async def update_support_ticket(
             {"$set": updates},
         )
 
-    # Notify recipient (patient / doctor / reporter) of ticket status update
-    recipient_id = ticket.get("patient_id") or ticket.get("reporter_id") or ticket.get("created_by")
-    if recipient_id and (payload.status or payload.note or payload.escalated_to):
-        status_text = (payload.status or ticket.get("status", "updated")).replace("_", " ").title()
-        await db["notifications"].insert_one({
-            "id": str(uuid4()),
-            "tenant_id": principal.tenant_id,
-            "recipient_id": recipient_id,
-            "type": "support_ticket_update",
-            "title": f"Support Ticket #{ticket_id} {status_text}",
-            "message": f"Your support ticket '{ticket.get('subject')}' was updated to {status_text}.",
-            "read_at": None,
-            "created_at": now,
-        })
+    # PRD Section 16 Specific Notification Dispatch Triggers
+    req_id = ticket.get("requester_id") or ticket.get("patient_id") or ticket.get("created_by")
+    assigned_agent = payload.assigned_to or ticket.get("assigned_to")
+
+    if payload.assigned_to:
+        # Trigger 2: Ticket assigned -> Alert to support agent
+        await dispatch_support_notification(
+            db, principal.tenant_id, payload.assigned_to,
+            "support_ticket_assigned",
+            f"Ticket #{ticket_id} Assigned to You",
+            f"Support ticket #{ticket_id} ('{ticket.get('subject')}') has been assigned to you."
+        )
+
+    if payload.status:
+        st_upper = payload.status.upper()
+        if st_upper == "WAITING_FOR_USER":
+            # Trigger 3: Agent requests info -> Message to requester
+            await dispatch_support_notification(
+                db, principal.tenant_id, req_id,
+                "support_ticket_info_requested",
+                f"Action Required: Ticket #{ticket_id}",
+                f"Support agent requested additional information regarding ticket '{ticket.get('subject')}'. Please reply in your Help & Support portal."
+            )
+        elif st_upper == "RESOLVED":
+            # Trigger 6: Ticket resolved -> Resolution notification to requester
+            await dispatch_support_notification(
+                db, principal.tenant_id, req_id,
+                "support_ticket_resolved",
+                f"Support Ticket #{ticket_id} Resolved",
+                f"Your support ticket #{ticket_id} ('{ticket.get('subject')}') has been resolved."
+            )
+        elif st_upper == "REOPENED":
+            # Trigger 7: Ticket reopened -> Alert to assigned agent
+            await dispatch_support_notification(
+                db, principal.tenant_id, assigned_agent,
+                "support_ticket_reopened",
+                f"Support Ticket #{ticket_id} Reopened",
+                f"Ticket #{ticket_id} ('{ticket.get('subject')}') was reopened."
+            )
+        elif st_upper == "CLOSED":
+            # Trigger 8: Ticket closed -> Closure confirmation to requester
+            await dispatch_support_notification(
+                db, principal.tenant_id, req_id,
+                "support_ticket_closed",
+                f"Support Ticket #{ticket_id} Closed",
+                f"Support ticket #{ticket_id} has been closed."
+            )
+
+    if payload.escalated_to:
+        # Trigger 4: Ticket escalated -> Notification to destination team
+        await dispatch_support_notification(
+            db, principal.tenant_id, payload.escalated_to,
+            "support_ticket_escalated",
+            f"Support Ticket #{ticket_id} Escalated",
+            f"Ticket #{ticket_id} ('{ticket.get('subject')}') has been escalated to {payload.escalated_to}."
+        )
 
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
@@ -1490,6 +1563,14 @@ async def create_escalation(
          "$push": {"history": ticket_history_entry}},
     )
 
+    # Trigger 4: Ticket escalated -> Notification to destination team (PRD Section 16)
+    await dispatch_support_notification(
+        db, principal.tenant_id, team,
+        "support_ticket_escalated",
+        f"Escalation {escalation_id} to {team}",
+        f"Ticket #{payload.original_ticket_id} ('{ticket.get('subject')}') escalated to {team}."
+    )
+
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
         "tenant_id": principal.tenant_id,
@@ -1585,6 +1666,16 @@ async def update_escalation(
             {"tenant_id": principal.tenant_id, "id": esc["original_ticket_id"]},
             {"$set": {"status": "resolved", "resolved_at": now, "resolved_by": principal.user_id},
              "$push": {"history": ticket_history_entry}},
+        )
+
+    # Trigger 5: Escalation updated -> Update to relevant support owner (PRD Section 16)
+    owner_id = esc.get("created_by") or esc.get("assigned_owner") or principal.user_id
+    if payload.status or payload.assigned_owner or payload.resolution_summary:
+        await dispatch_support_notification(
+            db, principal.tenant_id, owner_id,
+            "escalation_updated",
+            f"Escalation {escalation_id} Updated",
+            f"Escalation {escalation_id} status updated to {payload.status or 'In Progress'}."
         )
 
     await db["audit_logs"].insert_one({
