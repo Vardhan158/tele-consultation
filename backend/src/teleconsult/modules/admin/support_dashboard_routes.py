@@ -75,9 +75,17 @@ class TicketCreate(BaseModel):
     description: str = Field(min_length=5, max_length=5000)
     category: str = Field(default="general", max_length=50)  # billing, technical, appointment, account_access, clinical, general
     priority: str = Field(default="medium", max_length=20)   # low, medium, high, urgent, critical
+    requester_id: str | None = None
+    requester_name: str | None = None
+    requester_email: str | None = None
+    requester_role: str | None = Field(default="patient", max_length=30)  # patient, doctor, clinic_admin, other
     patient_id: str | None = None
     doctor_id: str | None = None
     appointment_id: str | None = None
+    related_record_id: str | None = None
+    reporter_name: str | None = None
+    reporter_email: str | None = None
+    user_type: str | None = Field(default="patient", max_length=30)  # patient, doctor, clinic_admin, other
     related_record_id: str | None = None
     reporter_name: str | None = None
     reporter_email: str | None = None
@@ -1170,14 +1178,16 @@ async def create_support_ticket(
     now = datetime.now(UTC)
 
     cat, prio = auto_triage_ticket(payload.category, payload.subject, payload.description, payload.priority)
-    req_id = payload.patient_id or principal.user_id
-    req_role = (payload.user_type or "PATIENT").upper()
+    req_id = payload.requester_id or payload.patient_id or payload.doctor_id or principal.user_id
+    req_name = payload.requester_name or payload.reporter_name or "Anonymous Requester"
+    req_email = payload.requester_email or payload.reporter_email or ""
+    req_role = (payload.requester_role or payload.user_type or "PATIENT").upper()
 
     history_entry = {
         "id": str(uuid4()),
         "action": "ticket_created",
         "actor_id": principal.user_id,
-        "details": f"Support ticket created and triaged as {cat.upper()} ({prio.upper()} Priority)",
+        "details": f"Support ticket created and triaged as {cat.upper()} ({prio.upper()} Priority) for {req_name} ({req_role})",
         "created_at": now.isoformat(),
     }
 
@@ -1187,19 +1197,29 @@ async def create_support_ticket(
         "tenant_id": principal.tenant_id,
         "clinic_id": principal.clinic_id,
         "requester_id": req_id,
+        "requester_name": req_name,
+        "requester_email": req_email,
         "requester_role": req_role,
+        "patient_id": payload.patient_id or (req_id if req_role == "PATIENT" else None),
+        "doctor_id": payload.doctor_id or (req_id if req_role == "DOCTOR" else None),
+        "appointment_id": payload.appointment_id or payload.related_record_id,
+        "reporter_name": req_name,
+        "reporter_email": req_email,
+        "user_type": req_role.lower(),
         "subject": payload.subject,
         "description": payload.description,
         "category": cat.upper(),
         "priority": prio.upper(),
         "status": "OPEN",
-        "patient_id": payload.patient_id or req_id,
-        "doctor_id": payload.doctor_id,
-        "appointment_id": payload.appointment_id,
-        "reporter_name": payload.reporter_name,
-        "reporter_email": payload.reporter_email,
-        "user_type": payload.user_type or "patient",
-        "created_by": principal.user_id,
+        "created_by": principal.user_id,          # Logged-in support agent ID
+        "created_by_agent_id": principal.user_id, # Explicit support agent reference
+        "assigned_to": principal.user_id,         # Logged-in support agent
+        "escalated_to": None,
+        "related_resources": {
+            "appointment_id": payload.appointment_id or payload.related_record_id,
+            "doctor_id": payload.doctor_id,
+            "related_record_id": payload.related_record_id,
+        },
         "assigned_to": principal.user_id,
         "escalated_to": None,
         "related_resources": {

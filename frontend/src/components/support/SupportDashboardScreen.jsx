@@ -119,9 +119,49 @@ function SupportDashboardContent({ user, onLogout }) {
     description: "",
     category: "general",
     priority: "medium",
-    patient_id: "",
-    doctor_id: "",
+    requester_type: "Patient",
+    requester_search: "",
+    requester_id: "",
+    requester_name: "",
+    requester_email: "",
+    appointment_id: "",
   });
+  const [requesterSearchResults, setRequesterSearchResults] = useState([]);
+  const [isSearchingRequester, setIsSearchingRequester] = useState(false);
+
+  const handleSearchRequesters = async (term) => {
+    setNewTicketForm((prev) => ({ ...prev, requester_search: term }));
+    if (!term || term.length < 2) {
+      setRequesterSearchResults([]);
+      return;
+    }
+    setIsSearchingRequester(true);
+    try {
+      if (newTicketForm.requester_type === "Doctor") {
+        const res = await supportDashboardApi.doctors(term);
+        const candidates = (res.items || []).map((d) => ({
+          id: d.id,
+          name: d.full_name || d.name,
+          email: d.email || `${d.id}@kaizencare.in`,
+          role: "DOCTOR",
+        }));
+        setRequesterSearchResults(candidates);
+      } else {
+        const res = await supportDashboardApi.patients(term);
+        const candidates = (res.items || []).map((p) => ({
+          id: p.id,
+          name: p.full_name || p.name,
+          email: p.email || `${p.id}@kaizencare.in`,
+          role: "PATIENT",
+        }));
+        setRequesterSearchResults(candidates);
+      }
+    } catch (err) {
+      setRequesterSearchResults([]);
+    } finally {
+      setIsSearchingRequester(false);
+    }
+  };
 
   // Load Overview Data
   const loadOverview = async () => {
@@ -448,11 +488,54 @@ function SupportDashboardContent({ user, onLogout }) {
   // Create Ticket Submit
   const handleCreateTicket = async (e) => {
     e.preventDefault();
+    if (!newTicketForm.subject.trim()) {
+      addToast("Ticket Subject is required", "warning");
+      return;
+    }
+    if (!newTicketForm.description.trim()) {
+      addToast("Ticket Description is required", "warning");
+      return;
+    }
+    if (!newTicketForm.requester_id && !newTicketForm.requester_search.trim()) {
+      addToast("Please search and select a Requester or enter Requester details", "warning");
+      return;
+    }
+
     try {
-      await supportDashboardApi.createTicket(newTicketForm);
+      const reqRole = newTicketForm.requester_type.toUpperCase().replace(" ", "_");
+      await supportDashboardApi.createTicket({
+        subject: newTicketForm.subject.trim(),
+        description: newTicketForm.description.trim(),
+        category: newTicketForm.category,
+        priority: newTicketForm.priority,
+        user_type: newTicketForm.requester_type.toLowerCase().replace(" ", "_"),
+        requester_role: reqRole,
+        requester_id: newTicketForm.requester_id || user?.user_id,
+        requester_name: newTicketForm.requester_name || newTicketForm.requester_search,
+        requester_email: newTicketForm.requester_email,
+        patient_id: reqRole === "PATIENT" ? newTicketForm.requester_id : null,
+        doctor_id: reqRole === "DOCTOR" ? newTicketForm.requester_id : null,
+        appointment_id: newTicketForm.appointment_id.trim() || null,
+        related_record_id: newTicketForm.appointment_id.trim() || null,
+        reporter_name: newTicketForm.requester_name || newTicketForm.requester_search,
+        reporter_email: newTicketForm.requester_email,
+      });
+
       addToast("Support ticket created successfully", "success");
       setShowCreateTicketModal(false);
-      setNewTicketForm({ subject: "", description: "", category: "general", priority: "medium", patient_id: "", doctor_id: "" });
+      setNewTicketForm({
+        subject: "",
+        description: "",
+        category: "general",
+        priority: "medium",
+        requester_type: "Patient",
+        requester_search: "",
+        requester_id: "",
+        requester_name: "",
+        requester_email: "",
+        appointment_id: "",
+      });
+      setRequesterSearchResults([]);
       if (activeTab === "tickets") loadTickets();
     } catch (err) {
       addToast(err.message || "Failed to create ticket", "error");
@@ -2505,15 +2588,20 @@ function SupportDashboardContent({ user, onLogout }) {
         </div>
       )}
 
-      {/* Create Ticket Modal */}
+      {/* Improved Create Support Ticket Modal */}
       {showCreateTicketModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-zinc-200 space-y-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-zinc-200 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
-              <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#1A7D67]">add_comment</span>
-                New Platform Support Ticket
-              </h3>
+              <div>
+                <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#176354]">add_comment</span>
+                  Create Platform Support Ticket
+                </h3>
+                <p className="text-[11px] text-[#577877] mt-0.5">
+                  Log a support ticket on behalf of a Patient, Doctor, or Clinic Admin.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowCreateTicketModal(false)}
@@ -2523,26 +2611,139 @@ function SupportDashboardContent({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateTicket} className="space-y-4">
+            <form onSubmit={handleCreateTicket} className="space-y-4 text-xs">
+              {/* Logged-In Agent Badge */}
+              <div className="p-3 rounded-xl bg-[#E8F3F3] border border-[#176354]/20 flex items-center justify-between">
+                <span className="font-semibold text-[#176354] flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">support_agent</span>
+                  Created By Agent: <strong className="text-[#123D35]">{user?.full_name || user?.user_id || "Support Agent"}</strong>
+                </span>
+                <span className="text-[10px] uppercase font-bold text-[#176354] bg-white px-2 py-0.5 rounded">
+                  Agent ID Saved
+                </span>
+              </div>
+
+              {/* Requester Type Selection */}
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">Subject</label>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
+                  Requester Type <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {["Patient", "Doctor", "Clinic Admin", "Other"].map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setNewTicketForm({
+                          ...newTicketForm,
+                          requester_type: type,
+                          requester_id: "",
+                          requester_name: "",
+                          requester_email: "",
+                          requester_search: "",
+                        });
+                        setRequesterSearchResults([]);
+                      }}
+                      className={`py-2 px-1 rounded-xl text-center font-bold text-xs border transition cursor-pointer ${
+                        newTicketForm.requester_type === type
+                          ? "bg-[#176354] text-white border-[#176354]"
+                          : "bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Searchable Requester Selection */}
+              <div className="relative space-y-1">
+                <label className="block text-xs font-semibold text-zinc-700">
+                  Search &amp; Select {newTicketForm.requester_type} Requester <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-zinc-400 text-lg">person_search</span>
+                  <input
+                    type="text"
+                    value={newTicketForm.requester_search}
+                    onChange={(e) => handleSearchRequesters(e.target.value)}
+                    placeholder={`Type ${newTicketForm.requester_type} name or email to search…`}
+                    className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border border-zinc-300 outline-none focus:border-[#176354]"
+                  />
+                  {isSearchingRequester && (
+                    <span className="absolute right-3 top-2.5 text-[10px] text-zinc-400 font-medium">Searching…</span>
+                  )}
+                </div>
+
+                {/* Candidate Search Dropdown */}
+                {requesterSearchResults.length > 0 && (
+                  <div className="absolute left-0 right-0 z-20 mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl max-h-40 overflow-y-auto divide-y divide-zinc-100">
+                    {requesterSearchResults.map((cand) => (
+                      <div
+                        key={cand.id}
+                        onClick={() => {
+                          setNewTicketForm({
+                            ...newTicketForm,
+                            requester_id: cand.id,
+                            requester_name: cand.name,
+                            requester_email: cand.email,
+                            requester_search: `${cand.name} (${cand.email})`,
+                          });
+                          setRequesterSearchResults([]);
+                        }}
+                        className="p-2.5 hover:bg-[#E8F3F3] cursor-pointer text-xs flex justify-between items-center"
+                      >
+                        <div>
+                          <p className="font-bold text-zinc-900">{cand.name}</p>
+                          <p className="text-[10px] text-zinc-500">{cand.email}</p>
+                        </div>
+                        <span className="font-mono text-[10px] text-[#176354] bg-[#E8F3F3] px-2 py-0.5 rounded font-bold">Select</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Selected Requester Confirmation Box */}
+                {newTicketForm.requester_id && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex justify-between items-center mt-1">
+                    <div>
+                      <p className="font-bold">{newTicketForm.requester_name}</p>
+                      <p className="text-[10px] text-emerald-700">ID: {newTicketForm.requester_id} • {newTicketForm.requester_email || "No email"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNewTicketForm({ ...newTicketForm, requester_id: "", requester_name: "", requester_email: "", requester_search: "" })}
+                      className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                  Subject <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={newTicketForm.subject}
                   onChange={(e) => setNewTicketForm({ ...newTicketForm, subject: e.target.value })}
                   placeholder="Short ticket summary…"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-sm outline-none focus:border-[#1A7D67]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-xs outline-none focus:border-[#176354]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Category, Priority & Optional Related Appointment ID Grid */}
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 mb-1">Category</label>
                   <select
                     value={newTicketForm.category}
                     onChange={(e) => setNewTicketForm({ ...newTicketForm, category: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-zinc-300 text-sm outline-none"
+                    className="w-full px-2.5 py-2 rounded-xl border border-zinc-300 text-xs outline-none"
                   >
                     <option value="general">General</option>
                     <option value="billing">Billing / Refund</option>
@@ -2551,12 +2752,13 @@ function SupportDashboardContent({ user, onLogout }) {
                     <option value="clinical">Clinical Notes</option>
                   </select>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-zinc-700 mb-1">Priority</label>
                   <select
                     value={newTicketForm.priority}
                     onChange={(e) => setNewTicketForm({ ...newTicketForm, priority: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-zinc-300 text-sm outline-none"
+                    className="w-full px-2.5 py-2 rounded-xl border border-zinc-300 text-xs outline-none"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -2564,17 +2766,31 @@ function SupportDashboardContent({ user, onLogout }) {
                     <option value="urgent">Urgent</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 mb-1">Related Appt ID (Optional)</label>
+                  <input
+                    type="text"
+                    value={newTicketForm.appointment_id}
+                    onChange={(e) => setNewTicketForm({ ...newTicketForm, appointment_id: e.target.value })}
+                    placeholder="e.g. APT-1029"
+                    className="w-full px-2.5 py-2 rounded-xl border border-zinc-300 font-mono text-xs outline-none focus:border-[#176354]"
+                  />
+                </div>
               </div>
 
+              {/* Detailed Description */}
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">Detailed Description</label>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                  Detailed Description <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   required
                   rows={4}
                   value={newTicketForm.description}
                   onChange={(e) => setNewTicketForm({ ...newTicketForm, description: e.target.value })}
                   placeholder="Describe the issue or support request in detail…"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-sm outline-none focus:border-[#1A7D67]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-xs outline-none focus:border-[#176354]"
                 />
               </div>
 
