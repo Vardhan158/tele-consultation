@@ -4,9 +4,8 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 const PUBLIC_NAV_LINKS = [
   { label: "Home", path: "/" },
   { label: "Find Doctors", path: "/find-doctors" },
-  { label: "Services", path: "/#services", sectionId: "services" },
   { label: "About", path: "/#about", sectionId: "about" },
-  { label: "FAQs", path: "/#faqs", sectionId: "faqs" },
+  { label: "Services", path: "/#services", sectionId: "services" },
 ];
 
 export default function Navbar() {
@@ -64,7 +63,7 @@ export default function Navbar() {
     }
   };
 
-  const isLightPage = ["/find-doctors", "/faqs", "/services"].includes(location.pathname);
+  const isLightPage = ["/find-doctors", "/faqs", "/services", "/about", "/about-us"].includes(location.pathname);
   const useSolidWhiteHeader = isScrolled || isLightPage;
 
   const renderNavLink = (item, isMobile = false) => {
@@ -72,6 +71,8 @@ export default function Navbar() {
     if (item.path !== "/" && !item.sectionId && item.path === location.pathname) {
       isActive = true;
     } else if (item.sectionId && location.pathname === "/" && activeHash === `#${item.sectionId}`) {
+      isActive = true;
+    } else if (item.path === "/" && location.pathname === "/" && !activeHash) {
       isActive = true;
     }
 
@@ -84,11 +85,11 @@ export default function Navbar() {
           className={`rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
             useSolidWhiteHeader
               ? isActive
-                ? "bg-[#EEF6F3]/90 text-[#1A7D67] font-bold"
+                ? "bg-[#EEF6F3]/90 text-[#165849] font-bold"
                 : "text-[#577877] hover:bg-[#F0F5F7]/80 hover:text-[#162623]"
               : isActive
               ? "bg-white/20 text-white font-bold"
-              : "text-white/85 hover:bg-white/10 hover:text-white"
+              : "text-white/90 hover:bg-white/10 hover:text-white"
           }`}
         >
           {item.label}
@@ -98,30 +99,20 @@ export default function Navbar() {
 
     const baseText = useSolidWhiteHeader
       ? isActive
-        ? "text-[#1A7D67] font-bold"
+        ? "text-[#165849] font-bold"
         : "text-[#577877] hover:text-[#162623]"
       : isActive
       ? "text-white font-bold"
-      : "text-white/85 hover:text-white";
-
-    const underlineGradient = useSolidWhiteHeader
-      ? "bg-gradient-to-r from-[#1A7D67] via-[#25836F] to-[#1A7D67] shadow-[0_0_8px_rgba(26,125,103,0.5)]"
-      : "bg-gradient-to-r from-white/70 via-white to-white/70 shadow-[0_0_8px_rgba(255,255,255,0.8)]";
+      : "text-white/90 hover:text-white";
 
     return (
       <a
         key={item.label}
         href={item.path}
         onClick={(e) => handleLinkClick(item, e)}
-        className={`group relative rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors duration-300 cursor-pointer ${baseText}`}
+        className={`px-4 py-2 text-[15px] font-semibold transition-colors duration-200 cursor-pointer ${baseText}`}
       >
         <span>{item.label}</span>
-        {/* Cinematic Animated Underline */}
-        <span
-          className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-[2px] rounded-full transition-all duration-300 ease-out pointer-events-none ${
-            isActive ? "w-4/5" : "w-0 group-hover:w-4/5"
-          } ${underlineGradient}`}
-        />
       </a>
     );
   };
@@ -139,7 +130,7 @@ export default function Navbar() {
           : "bg-transparent border-b border-transparent shadow-none"
       }`}
     >
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-6 sm:px-8 py-4.5 lg:px-12">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-6 sm:px-10 lg:px-16 xl:px-20 py-4.5 sm:py-5">
         {/* Brand Logo */}
         <NavLink
           to="/"
@@ -174,50 +165,49 @@ export default function Navbar() {
           </span>
         </NavLink>
 
-        {/* Desktop Navigation Links */}
-        <nav aria-label="Primary navigation" className="hidden items-center gap-1 xl:flex">
+        {/* Center Desktop Navigation Links */}
+        <nav aria-label="Primary navigation" className="hidden items-center gap-2 md:flex">
           {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, false))}
         </nav>
 
         {/* Right Desktop Actions */}
-        <div className="hidden items-center gap-3 lg:flex">
-          <button
-            type="button"
-            onClick={() => go("/doctor/register")}
-            className={`group relative rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors duration-300 cursor-pointer ${
-              useSolidWhiteHeader ? "text-[#1A7D67] hover:text-[#162623]" : "text-white/90 hover:text-white"
-            }`}
-          >
-            <span>Clinician Registration</span>
-            <span
-              className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-[2px] w-0 group-hover:w-4/5 rounded-full transition-all duration-300 ease-out pointer-events-none ${
-                useSolidWhiteHeader
-                  ? "bg-gradient-to-r from-[#1A7D67] via-[#25836F] to-[#1A7D67] shadow-[0_0_8px_rgba(26,125,103,0.5)]"
-                  : "bg-gradient-to-r from-white/70 via-white to-white/70 shadow-[0_0_8px_rgba(255,255,255,0.8)]"
-              }`}
-            />
-          </button>
+        <div className="hidden items-center gap-5 sm:flex">
           <button
             type="button"
             onClick={() => go("/login")}
-            className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold transition cursor-pointer ${
+            className={`text-sm sm:text-[15px] font-semibold transition-colors duration-200 cursor-pointer ${
               useSolidWhiteHeader
-                ? "border border-[#577877]/30 bg-white/90 hover:bg-white text-[#162623]"
-                : "border border-white/40 bg-white/10 text-white hover:bg-white/20 backdrop-blur-xs"
+                ? "text-[#165849] hover:text-[#124b3e]"
+                : "text-white hover:text-white/80"
             }`}
           >
             Sign In
           </button>
           <button
             type="button"
-            onClick={() => go("/find-doctors")}
-            className={`inline-flex items-center justify-center rounded-xl px-4.5 py-2 text-xs font-bold transition cursor-pointer shadow-xs ${
+            onClick={() => go("/doctor/register")}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 sm:px-6 sm:py-2.5 text-sm sm:text-[15px] font-semibold transition-all duration-200 cursor-pointer shadow-xs ${
               useSolidWhiteHeader
-                ? "bg-[#1A7D67] hover:bg-[#156654] text-white"
-                : "bg-white hover:bg-white/90 text-[#1A7D67]"
+                ? "bg-[#165849] hover:bg-[#124b3e] text-white"
+                : "bg-white hover:bg-[#f6f7f2] text-[#162623]"
             }`}
           >
-            Book Appointment
+            <span>Clinician Registration</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-[#162623]"
+            >
+              <path d="M5 12h14"></path>
+              <path d="m12 5 7 7-7 7"></path>
+            </svg>
           </button>
         </div>
 
@@ -228,9 +218,9 @@ export default function Navbar() {
           aria-expanded={open}
           aria-controls="public-mobile-navigation"
           onClick={() => setOpen((prev) => !prev)}
-          className={`rounded-lg p-2 transition lg:hidden cursor-pointer ${
+          className={`rounded-lg p-2 transition md:hidden cursor-pointer ${
             useSolidWhiteHeader
-              ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
+              ? "text-[#165849] hover:bg-[#EEF6F3]"
               : "text-white hover:bg-white/10"
           }`}
         >
@@ -244,34 +234,23 @@ export default function Navbar() {
       {open && (
         <div
           id="public-mobile-navigation"
-          className={`border-t px-6 py-4 lg:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+          className={`border-t px-6 py-4 md:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
             useSolidWhiteHeader
-              ? "border-white/40 bg-white/90 backdrop-blur-xl text-[#162623]"
-              : "border-white/10 bg-[#1A7D67]/95 backdrop-blur-xl text-white"
+              ? "border-white/40 bg-white/95 backdrop-blur-xl text-[#162623]"
+              : "border-white/10 bg-[#165849]/95 backdrop-blur-xl text-white"
           }`}
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1.5">
             {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, true))}
-            <button
-              type="button"
-              onClick={() => go("/doctor/register")}
-              className={`rounded-lg px-3 py-2 text-left text-sm font-semibold cursor-pointer ${
-                useSolidWhiteHeader
-                  ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
-                  : "text-white/90 hover:bg-white/10"
-              }`}
-            >
-              Clinician Registration
-            </button>
             <div
-              className={`mt-3 flex gap-2 border-t pt-4 ${
+              className={`mt-3 flex flex-col gap-2 border-t pt-4 ${
                 useSolidWhiteHeader ? "border-[#577877]/15" : "border-white/10"
               }`}
             >
               <button
                 type="button"
                 onClick={() => go("/login")}
-                className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold cursor-pointer ${
+                className={`w-full rounded-xl py-2.5 text-xs font-semibold cursor-pointer ${
                   useSolidWhiteHeader
                     ? "border border-[#577877]/30 bg-white text-[#162623]"
                     : "border border-white/40 bg-white/10 text-white"
@@ -281,14 +260,15 @@ export default function Navbar() {
               </button>
               <button
                 type="button"
-                onClick={() => go("/find-doctors")}
-                className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold cursor-pointer ${
+                onClick={() => go("/doctor/register")}
+                className={`w-full inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold cursor-pointer ${
                   useSolidWhiteHeader
-                    ? "bg-[#1A7D67] text-white"
-                    : "bg-white text-[#1A7D67]"
+                    ? "bg-[#165849] text-white"
+                    : "bg-white text-[#162623]"
                 }`}
               >
-                Book Appointment
+                <span>Clinician Registration</span>
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
               </button>
             </div>
           </nav>
