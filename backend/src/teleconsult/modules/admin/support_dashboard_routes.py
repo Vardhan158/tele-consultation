@@ -397,6 +397,167 @@ async def account_support_action(
     return {"status": "success", "action": action_type}
 
 
+class BookingActionRequest(BaseModel):
+    appointment_id: str
+    action: str = Field(pattern="^(reschedule|cancel|send_instructions|escalate_scheduling)$")
+    starts_at: str | None = None
+    reason: str = Field(min_length=3, max_length=500)
+    ticket_id: str | None = None
+
+
+# ============================================================================
+# Screen 3: Booking Issues & Appointment Diagnostics
+# ============================================================================
+
+@router.get("/booking-diagnostics")
+async def booking_diagnostics(
+    query: str = Query(..., min_length=2),
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    search_term = query.strip()
+
+    appointment = await db["appointments"].find_one({
+        "tenant_id": principal.tenant_id,
+        "$or": [
+            {"id": search_term},
+            {"id": {"$regex": search_term, "$options": "i"}},
+            {"patient_name": {"$regex": search_term, "$options": "i"}},
+            {"doctor_name": {"$regex": search_term, "$options": "i"}},
+        ],
+    })
+
+    if not appointment:
+        raise HTTPException(404, "Booking record not found for diagnostics")
+
+    appointment_id = appointment["id"]
+    patient_id = appointment.get("patient_id")
+    doctor_id = appointment.get("doctor_id")
+
+    patient = await db["patients"].find_one({"tenant_id": principal.tenant_id, "id": patient_id}) if patient_id else None
+    doctor = await db["doctors"].find_one({"tenant_id": principal.tenant_id, "id": doctor_id}) if doctor_id else None
+    payment = await db["payments"].find_one({"tenant_id": principal.tenant_id, "$or": [{"appointment_id": appointment_id}, {"id": appointment.get("payment_id")}]})
+
+    booking_history = [_clean(x) async for x in db["audit_logs"].find({
+        "tenant_id": principal.tenant_id,
+        "target_id": appointment_id,
+    }).sort("created_at", -1)]
+
+    linked_tickets = [_clean(x) async for x in db["support_tickets"].find({
+        "tenant_id": principal.tenant_id,
+        "appointment_id": appointment_id,
+    }).sort("created_at", -1)]
+
+    upcoming_slots = [_clean(x) async for x in db["doctor_schedules"].find({
+        "tenant_id": principal.tenant_id,
+        "doctor_id": doctor_id,
+        "status": "available",
+    }).sort("starts_at", 1).limit(10)]
+
+    return {
+        "booking_id": appointment_id,
+        "patient": {
+            "id": patient_id,
+            "name": patient.get("full_name") if patient else appointment.get("patient_name", "—"),
+            "email": patient.get("email") if patient else "—",
+            "phone": patient.get("phone") if patient else "—",
+        },
+        "doctor": {
+            "id": doctor_id,
+            "name": doctor.get("full_name") if doctor else appointment.get("doctor_name", "—"),
+            "specialty": doctor.get("specialty") if doctor else "General Medicine",
+        },
+        "clinic_id": appointment.get("clinic_id") or principal.clinic_id or "default",
+        "starts_at": appointment.get("starts_at"),
+        "appointment_type": appointment.get("appointment_type") or appointment.get("visit_type") or "Video Visit",
+        "booking_status": appointment.get("status", "booked"),
+        "payment": {
+            "id": payment.get("id") if payment else None,
+            "status": payment.get("status", "pending") if payment else ("paid" if appointment.get("status") == "booked" else "pending"),
+            "amount": payment.get("amount") if payment else appointment.get("fee", 0),
+        },
+        "booking_history": booking_history,
+        "linked_tickets": linked_tickets,
+        "available_doctor_slots": upcoming_slots,
+    }
+
+
+@router.post("/booking-action")
+async def booking_support_action(
+    payload: BookingActionRequest,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, str]:
+    db = mongo_database.database()
+    appointment = await db["appointments"].find_one({"tenant_id": principal.tenant_id, "id": payload.appointment_id})
+    if not appointment:
+        raise HTTPException(404, "Appointment not found")
+
+    now = datetime.now(UTC)
+    action_type = payload.action
+
+    if action_type == "cancel":
+        if appointment.get("status") in {"completed", "cancelled"}:
+            raise HTTPException(409, "Appointment cannot be cancelled in its current state")
+        await db["appointments"].update_one(
+            {"tenant_id": principal.tenant_id, "id": payload.appointment_id},
+            {"$set": {"status": "cancelled", "cancelled_by": principal.user_id, "cancelled_at": now, "cancellation_reason": payload.reason}},
+        )
+
+    elif action_type == "reschedule":
+        if not payload.starts_at:
+            raise HTTPException(422, "starts_at datetime is required for rescheduling")
+        if appointment.get("status") in {"completed", "cancelled"}:
+            raise HTTPException(409, "Appointment cannot be rescheduled in its current state")
+
+        conflict = await db["appointments"].find_one({
+            "tenant_id": principal.tenant_id,
+            "doctor_id": appointment["doctor_id"],
+            "starts_at": payload.starts_at,
+            "status": {"$nin": ["cancelled", "completed"]},
+            "id": {"$ne": payload.appointment_id},
+        })
+        if conflict:
+            raise HTTPException(409, "Doctor is already booked for that requested time slot")
+
+        await db["appointments"].update_one(
+            {"tenant_id": principal.tenant_id, "id": payload.appointment_id},
+            {"$set": {"starts_at": payload.starts_at, "status": "rescheduled", "rescheduled_by": principal.user_id, "rescheduled_at": now, "reschedule_reason": payload.reason}},
+        )
+
+    elif action_type == "send_instructions":
+        recipient_id = appointment.get("patient_id")
+        if recipient_id:
+            await db["notifications"].insert_one({
+                "id": str(uuid4()),
+                "tenant_id": principal.tenant_id,
+                "recipient_id": recipient_id,
+                "type": "booking_instructions",
+                "title": f"Appointment #{payload.appointment_id} Booking Confirmation & Access Guide",
+                "message": f"Your appointment is confirmed for {appointment.get('starts_at')}. Access your video room from My Appointments 10 minutes prior.",
+                "read_at": None,
+                "created_at": now,
+            })
+
+    elif action_type == "escalate_scheduling":
+        if payload.ticket_id:
+            await db["support_tickets"].update_one(
+                {"tenant_id": principal.tenant_id, "id": payload.ticket_id},
+                {"$set": {"status": "escalated", "escalated_to": "Clinic Admin", "priority": "high", "updated_at": now}},
+            )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": f"support.booking.{action_type}",
+        "target_id": payload.appointment_id,
+        "metadata": {"reason": payload.reason, "starts_at": payload.starts_at, "ticket_id": payload.ticket_id},
+        "created_at": now,
+    })
+
+    return {"status": "success", "action": action_type}
+
+
 @router.get("/patients")
 async def support_patients(
     search: str = "",

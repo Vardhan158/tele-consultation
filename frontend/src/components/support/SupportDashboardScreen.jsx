@@ -16,6 +16,11 @@ function SupportDashboardContent({ user, onLogout }) {
   const [accountDiagData, setAccountDiagData] = useState(null);
   const [accountDiagLoading, setAccountDiagLoading] = useState(false);
 
+  // Booking Diagnostics State
+  const [bookingQuery, setBookingQuery] = useState("");
+  const [bookingDiagData, setBookingDiagData] = useState(null);
+  const [bookingDiagLoading, setBookingDiagLoading] = useState(false);
+
   // Patients State
   const [patients, setPatients] = useState([]);
   const [patientSearch, setPatientSearch] = useState("");
@@ -187,9 +192,38 @@ function SupportDashboardContent({ user, onLogout }) {
     }
   };
 
+  const loadBookingDiagnostics = async () => {
+    if (!bookingQuery || bookingQuery.length < 2) {
+      addToast("Please enter at least 2 characters (Booking ID, patient name, or doctor name)", "warning");
+      return;
+    }
+    setBookingDiagLoading(true);
+    try {
+      const data = await supportDashboardApi.bookingDiagnostics(bookingQuery);
+      setBookingDiagData(data);
+    } catch (err) {
+      addToast(err.message || "Booking record not found", "error");
+      setBookingDiagData(null);
+    } finally {
+      setBookingDiagLoading(false);
+    }
+  };
+
+  const handleBookingAction = async (action, reason = "Support Action", startsAt = null, ticketId = null) => {
+    if (!bookingDiagData) return;
+    try {
+      await supportDashboardApi.bookingAction(bookingDiagData.booking_id, action, reason, startsAt, ticketId);
+      addToast(`Booking action '${action}' completed successfully`, "success");
+      loadBookingDiagnostics();
+    } catch (err) {
+      addToast(err.message || "Failed to execute booking action", "error");
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "overview") loadOverview();
     else if (activeTab === "account_access") { if (accountQuery) loadAccountDiagnostics(); }
+    else if (activeTab === "booking_issues") { if (bookingQuery) loadBookingDiagnostics(); }
     else if (activeTab === "patients") loadPatients();
     else if (activeTab === "doctors") loadDoctors();
     else if (activeTab === "appointments") loadAppointments();
@@ -294,6 +328,7 @@ function SupportDashboardContent({ user, onLogout }) {
   const tabs = [
     { id: "overview", label: "Live Operations", icon: "grid_view" },
     { id: "account_access", label: "Account & Access", icon: "manage_accounts" },
+    { id: "booking_issues", label: "Booking Issues", icon: "event_busy" },
     { id: "patients", label: "Patient Support", icon: "groups" },
     { id: "doctors", label: "Doctor Assistance", icon: "badge" },
     { id: "appointments", label: "Appointments", icon: "calendar_month" },
@@ -784,6 +819,212 @@ function SupportDashboardContent({ user, onLogout }) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* SCREEN 3: BOOKING ISSUES & DIAGNOSTICS                                    */}
+        {/* ========================================================================= */}
+        {activeTab === "booking_issues" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Search Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs flex flex-col sm:flex-row gap-3 justify-between items-center">
+              <div className="relative w-full sm:w-96">
+                <span className="material-symbols-outlined absolute left-3 top-2.5 text-zinc-400 text-lg">event_busy</span>
+                <input
+                  type="text"
+                  value={bookingQuery}
+                  onChange={(e) => setBookingQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && loadBookingDiagnostics()}
+                  placeholder="Enter Booking ID, Patient Name, or Doctor Name…"
+                  className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-300 outline-none focus:border-[#1A7D67]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={loadBookingDiagnostics}
+                className="w-full sm:w-auto px-4 py-2 bg-[#1A7D67] text-white rounded-xl text-xs font-semibold hover:bg-[#156654] cursor-pointer"
+              >
+                Inspect Booking Diagnostics
+              </button>
+            </div>
+
+            {/* Compliance Restrictions Alert */}
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-900 flex items-start gap-3">
+              <span className="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">verified_user</span>
+              <div>
+                <p className="font-bold">Booking Policy Restrictions (PRD Section 7.3)</p>
+                <p className="mt-0.5 text-amber-800">
+                  Support must not create duplicate bookings, override cancellation policies, bypass payment requirements, or manually modify appointment statuses in MongoDB without policy checks.
+                </p>
+              </div>
+            </div>
+
+            {/* Diagnostics View */}
+            {bookingDiagLoading ? (
+              <div className="bg-white p-12 rounded-2xl border border-zinc-200 text-center text-zinc-400">
+                Retrieving booking diagnostics…
+              </div>
+            ) : !bookingDiagData ? (
+              <div className="bg-white p-12 rounded-2xl border border-zinc-200 text-center text-zinc-400 space-y-2">
+                <span className="material-symbols-outlined text-4xl text-zinc-300">calendar_month</span>
+                <p className="text-sm font-medium">Enter a Booking ID, Patient Name, or Doctor Name above to inspect appointment details.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Booking Detail Fields Grid (PRD 7.3) */}
+                <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs space-y-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-zinc-100">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-[#1A7D67]">Booking #{bookingDiagData.booking_id}</span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-bold uppercase">{bookingDiagData.appointment_type}</span>
+                      </div>
+                      <h2 className="text-xl font-bold text-zinc-900 mt-1">
+                        {bookingDiagData.patient?.name} ↔ {bookingDiagData.doctor?.name}
+                      </h2>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        Clinic Scope: <span className="font-semibold text-zinc-800">{bookingDiagData.clinic_id}</span> • Specialty: <span className="font-semibold text-zinc-800">{bookingDiagData.doctor?.specialty}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                        bookingDiagData.booking_status === "completed" ? "bg-green-100 text-green-800" :
+                        bookingDiagData.booking_status === "cancelled" ? "bg-red-100 text-red-800" :
+                        bookingDiagData.booking_status === "rescheduled" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"
+                      }`}>
+                        Booking: {bookingDiagData.booking_status}
+                      </span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                        bookingDiagData.payment?.status === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                      }`}>
+                        Payment: {bookingDiagData.payment?.status} (₹{bookingDiagData.payment?.amount || 0})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Detail Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                    <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                      <p className="text-zinc-500 font-medium">Scheduled Time</p>
+                      <p className="font-bold text-zinc-900 text-sm">{bookingDiagData.starts_at ? new Date(bookingDiagData.starts_at).toLocaleString() : "—"}</p>
+                    </div>
+
+                    <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                      <p className="text-zinc-500 font-medium">Patient Contact</p>
+                      <p className="font-semibold text-zinc-800">{bookingDiagData.patient?.email}</p>
+                      <p className="text-zinc-500">{bookingDiagData.patient?.phone || "No phone"}</p>
+                    </div>
+
+                    <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                      <p className="text-zinc-500 font-medium">Clinician</p>
+                      <p className="font-semibold text-zinc-800">{bookingDiagData.doctor?.name}</p>
+                      <p className="text-zinc-500">{bookingDiagData.doctor?.specialty}</p>
+                    </div>
+
+                    <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                      <p className="text-zinc-500 font-medium">Linked Payment ID</p>
+                      <p className="font-mono font-bold text-[#1A7D67]">{bookingDiagData.payment?.id || "None"}</p>
+                    </div>
+                  </div>
+
+                  {/* Available Doctor Slots */}
+                  {bookingDiagData.available_doctor_slots?.length > 0 && (
+                    <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-100 space-y-2">
+                      <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">schedule</span>
+                        Available Doctor Slots ({bookingDiagData.doctor?.name})
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {bookingDiagData.available_doctor_slots.map((slot) => (
+                          <button
+                            key={slot.id || slot.starts_at}
+                            type="button"
+                            onClick={() => {
+                              setActionModalAppointment({ id: bookingDiagData.booking_id });
+                              setActionType("reschedule");
+                              setRescheduleDate(slot.starts_at ? slot.starts_at.slice(0, 16) : "");
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-blue-100 border border-blue-200 text-blue-800 text-xs font-semibold rounded-lg transition cursor-pointer"
+                          >
+                            {new Date(slot.starts_at).toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Approved Booking Actions Toolbar */}
+                  <div className="space-y-3 pt-4 border-t border-zinc-100">
+                    <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Permitted Booking Actions (PRD Section 7.3)</h3>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActionModalAppointment({ id: bookingDiagData.booking_id });
+                          setActionType("reschedule");
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 text-blue-700 text-xs font-semibold rounded-xl hover:bg-blue-100 border border-blue-200 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-base">edit_calendar</span>
+                        <span>Authorized Reschedule</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActionModalAppointment({ id: bookingDiagData.booking_id });
+                          setActionType("cancel");
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-50 text-red-700 text-xs font-semibold rounded-xl hover:bg-red-100 border border-red-200 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-base">event_busy</span>
+                        <span>Authorized Cancellation</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleBookingAction("send_instructions", "Support Booking Instructions")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 text-[#1A7D67] text-xs font-semibold rounded-xl hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-base">send</span>
+                        <span>Send Booking Access Instructions</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleBookingAction("escalate_scheduling", "Escalated scheduling exception")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 text-amber-800 text-xs font-semibold rounded-xl hover:bg-amber-100 border border-amber-200 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-base">warning</span>
+                        <span>Escalate Scheduling Exception</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Booking Audit History Timeline */}
+                <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs space-y-4">
+                  <h3 className="text-base font-bold text-zinc-900">Booking Audit History Timeline</h3>
+                  {!bookingDiagData.booking_history?.length ? (
+                    <p className="text-xs text-zinc-400 py-4 italic">No audit history records found for this booking.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {bookingDiagData.booking_history.map((log) => (
+                        <div key={log.id} className="p-3 bg-zinc-50 rounded-xl border border-zinc-100 flex justify-between gap-3 text-xs">
+                          <div>
+                            <span className="font-semibold text-zinc-800">{log.action}</span>
+                            <p className="text-[10px] text-zinc-500">Actor: {log.actor_id} • {log.metadata?.reason || ""}</p>
+                          </div>
+                          <span className="text-[10px] text-zinc-400 shrink-0">{new Date(log.created_at).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

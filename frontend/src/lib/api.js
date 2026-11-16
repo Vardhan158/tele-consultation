@@ -491,6 +491,13 @@ export const supportDashboardApi = {
       method: "POST",
       body: JSON.stringify({ user_id: userId, action, ticket_id: ticketId, note }),
     }),
+  bookingDiagnostics: (query) =>
+    apiRequest(`/api/v1/support-dashboard/booking-diagnostics?query=${encodeURIComponent(query)}`),
+  bookingAction: (appointmentId, action, reason, startsAt = null, ticketId = null) =>
+    apiRequest("/api/v1/support-dashboard/booking-action", {
+      method: "POST",
+      body: JSON.stringify({ appointment_id: appointmentId, action, reason, starts_at: startsAt, ticket_id: ticketId }),
+    }),
   patients: (search = "", offset = 0, limit = 25) =>
     apiRequest(`/api/v1/support-dashboard/patients?search=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`),
   patientDetail: (id) => apiRequest(`/api/v1/support-dashboard/patients/${id}`),
