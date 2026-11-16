@@ -44,12 +44,29 @@ async def support_agent(request: Request) -> MongoPrincipal:
     return MongoPrincipal(user_id=user["id"], tenant_id=user["tenant_id"], role=user["role"], clinic_id=user.get("clinic_id"))
 
 
+SENSITIVE_FIELDS = {
+    "password_hash", "mfa_secret", "mfa_recovery_codes", "mfa_recovery_code_hashes",
+    "token_hash", "session_token", "verification_token_hash", "otp_code", "secret", "private_key"
+}
+
+
 def _clean(doc: dict[str, Any]) -> dict[str, Any]:
+    if not doc:
+        return {}
     doc.pop("_id", None)
+    for field in SENSITIVE_FIELDS:
+        doc.pop(field, None)
     for k, v in list(doc.items()):
         if hasattr(v, "isoformat"):
             doc[k] = v.isoformat()
     return doc
+
+
+def _support_scope(principal: MongoPrincipal) -> dict[str, Any]:
+    scope = {"tenant_id": principal.tenant_id}
+    if principal.clinic_id:
+        scope["clinic_id"] = principal.clinic_id
+    return scope
 
 
 class TicketCreate(BaseModel):
