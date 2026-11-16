@@ -36,6 +36,8 @@ COLLECTIONS = {
     "notification_preferences": {"bsonType": "object", "required": ["tenant_id", "user_id"]},
     "consents": {"bsonType": "object", "required": ["tenant_id", "patient_id", "consent_type"]},
     "support_tickets": {"bsonType": "object", "required": ["tenant_id", "requester_id"]},
+    "support_ticket_events": {"bsonType": "object", "required": ["tenant_id", "ticket_id", "action"]},
+    "support_escalations": {"bsonType": "object", "required": ["tenant_id", "original_ticket_id", "destination_team"]},
     "audit_logs": {"bsonType": "object", "required": ["tenant_id", "actor_id", "action"]},
     "blocked_dates": {"bsonType": "object", "required": ["tenant_id", "date"]},
     "user_sessions": {"bsonType": "object", "required": ["tenant_id", "user_id", "token_hash"]},
@@ -83,6 +85,20 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
     "audit_logs": [([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {})],
     "blocked_dates": [([("tenant_id", ASCENDING), ("date", ASCENDING)], {"unique": True})],
     "notifications": [([("tenant_id", ASCENDING), ("recipient_id", ASCENDING), ("created_at", DESCENDING)], {})],
+    "support_tickets": [
+        ([("tenant_id", ASCENDING), ("ticket_id", ASCENDING)], {"unique": True, "sparse": True}),
+        ([("tenant_id", ASCENDING), ("requester_id", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("assigned_to", ASCENDING), ("status", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("category", ASCENDING), ("status", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("priority", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)], {}),
+    ],
+    "support_ticket_events": [
+        ([("tenant_id", ASCENDING), ("ticket_id", ASCENDING), ("created_at", DESCENDING)], {}),
+    ],
+    "support_escalations": [
+        ([("tenant_id", ASCENDING), ("original_ticket_id", ASCENDING), ("status", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("id", ASCENDING)], {"unique": True, "sparse": True}),
+    ],
 }
 
 

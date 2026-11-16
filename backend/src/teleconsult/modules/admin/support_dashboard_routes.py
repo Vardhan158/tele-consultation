@@ -1142,10 +1142,12 @@ async def create_support_ticket(
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
     db = mongo_database.database()
-    ticket_id = f"TICK-{secrets_ticket_id()}"
+    ticket_id = f"SUP-{secrets_ticket_id()}"
     now = datetime.now(UTC)
 
     cat, prio = auto_triage_ticket(payload.category, payload.subject, payload.description, payload.priority)
+    req_id = payload.patient_id or principal.user_id
+    req_role = (payload.user_type or "PATIENT").upper()
 
     history_entry = {
         "id": str(uuid4()),
@@ -1157,14 +1159,17 @@ async def create_support_ticket(
 
     ticket_doc = {
         "id": ticket_id,
+        "ticket_id": ticket_id,
         "tenant_id": principal.tenant_id,
         "clinic_id": principal.clinic_id,
+        "requester_id": req_id,
+        "requester_role": req_role,
         "subject": payload.subject,
         "description": payload.description,
-        "category": cat,
-        "priority": prio,
-        "status": "open",
-        "patient_id": payload.patient_id,
+        "category": cat.upper(),
+        "priority": prio.upper(),
+        "status": "OPEN",
+        "patient_id": payload.patient_id or req_id,
         "doctor_id": payload.doctor_id,
         "appointment_id": payload.appointment_id,
         "reporter_name": payload.reporter_name,
@@ -1173,12 +1178,31 @@ async def create_support_ticket(
         "created_by": principal.user_id,
         "assigned_to": principal.user_id,
         "escalated_to": None,
+        "related_resources": {
+            "appointment_id": payload.appointment_id,
+            "doctor_id": payload.doctor_id,
+            "related_record_id": payload.related_record_id,
+        },
+        "version": 1,
         "notes": [],
         "history": [history_entry],
         "created_at": now,
         "updated_at": now,
+        "resolved_at": None,
     }
+
+    # Write to support_tickets and support_ticket_events collections (PRD Section 15)
     await db["support_tickets"].insert_one(ticket_doc)
+    await db["support_ticket_events"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "ticket_id": ticket_id,
+        "action": "ticket_created",
+        "actor_id": principal.user_id,
+        "details": f"Ticket created with category {cat.upper()} and priority {prio.upper()}",
+        "created_at": now.isoformat(),
+    })
+
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
         "tenant_id": principal.tenant_id,
@@ -1189,7 +1213,7 @@ async def create_support_ticket(
         "created_at": now,
     })
     res = _clean(ticket_doc)
-    res["sla"] = get_sla_info(now, prio, "open")
+    res["sla"] = get_sla_info(now, prio, "OPEN")
     return res
 
 
@@ -1253,6 +1277,17 @@ async def update_support_ticket(
             "created_at": now.isoformat(),
         })
 
+    for log_item in history_logs:
+        await db["support_ticket_events"].insert_one({
+            "id": log_item["id"],
+            "tenant_id": principal.tenant_id,
+            "ticket_id": ticket_id,
+            "action": log_item["action"],
+            "actor_id": principal.user_id,
+            "details": log_item["details"],
+            "created_at": log_item["created_at"],
+        })
+
     if payload.note:
         note_entry = {
             "id": str(uuid4()),
@@ -1265,6 +1300,15 @@ async def update_support_ticket(
             "action": "note_added",
             "actor_id": principal.user_id,
             "details": f"Internal support note added",
+            "created_at": now.isoformat(),
+        })
+        await db["support_ticket_events"].insert_one({
+            "id": note_entry["id"],
+            "tenant_id": principal.tenant_id,
+            "ticket_id": ticket_id,
+            "action": "note_added",
+            "actor_id": principal.user_id,
+            "details": payload.note,
             "created_at": now.isoformat(),
         })
         await db["support_tickets"].update_one(
