@@ -738,6 +738,38 @@ async def update_incident(
             {"$set": updates},
         )
 
+    if payload.status and payload.status.upper() in {"RESOLVED", "CLOSED"}:
+        st_upper = payload.status.upper()
+        # PRD Section 12: Sync incident resolution status to linked support escalations
+        linked_tickets = inc.get("linked_support_tickets", [])
+        esc_cursor = db["support_escalations"].find({"tenant_id": principal.tenant_id, "$or": [{"incident_id": incident_id}, {"original_ticket_id": {"$in": linked_tickets}}]})
+        async for esc_doc in esc_cursor:
+            esc_id = esc_doc["id"]
+            history_entry = {
+                "id": str(uuid4()),
+                "action": "incident_resolution_synced",
+                "actor_id": principal.user_id,
+                "details": f"Linked Operations Incident {incident_id} updated to {st_upper}. Resolution: {payload.resolution_summary or 'Service restored'}",
+                "created_at": now.isoformat(),
+            }
+            await db["support_escalations"].update_one(
+                {"tenant_id": principal.tenant_id, "id": esc_id},
+                {"$set": {"status": "RESOLVED", "updated_at": now}, "$push": {"history": history_entry}},
+            )
+            # Notify Support Owner of incident resolution (PRD 12)
+            support_owner = esc_doc.get("created_by") or esc_doc.get("assigned_owner")
+            if support_owner:
+                await db["notifications"].insert_one({
+                    "id": str(uuid4()),
+                    "tenant_id": principal.tenant_id,
+                    "recipient_id": support_owner,
+                    "type": "incident_resolution_update",
+                    "title": f"Incident {incident_id} Resolved",
+                    "message": f"Operations incident {incident_id} linked to escalation {esc_id} was resolved. Please confirm user outcome before closing support ticket.",
+                    "read_at": None,
+                    "created_at": now,
+                })
+
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
         "tenant_id": principal.tenant_id,
