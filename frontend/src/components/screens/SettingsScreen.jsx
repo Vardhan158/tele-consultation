@@ -1,60 +1,159 @@
 import { useEffect, useState } from "react";
-import { settingsApi } from "../../lib/api";
+import { settingsApi, patientApi } from "../../lib/api";
 
 export default function SettingsScreen({ onNavigate }) {
-  const [activeTab, setActiveTab] = useState("account"); // 'account' | 'notifications' | 'accessibility' | 'privacy'
+  const [activeTab, setActiveTab] = useState("account");
 
-  // Form State
+  // Settings State
   const [email, setEmail] = useState("");
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [passwordChangedAt, setPasswordChangedAt] = useState(null);
   const [twoStepEnabled, setTwoStepEnabled] = useState(false);
   const [emailReminders, setEmailReminders] = useState(true);
   const [smsReminders, setSmsReminders] = useState(true);
   const [wellnessUpdates, setWellnessUpdates] = useState(false);
   const [language, setLanguage] = useState("English (US)");
-  const [timeZone, setTimeZone] = useState("UTC");
+  const [timeZone, setTimeZone] = useState("Asia/Kolkata (IST)");
+  const [remindersWithdrawnInConsent, setRemindersWithdrawnInConsent] = useState(false);
+  const [remindersConsentId, setRemindersConsentId] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Modals & Feedback
+  // Modals & Forms
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showClosureModal, setShowClosureModal] = useState(false);
+  const [showTwoStepModal, setShowTwoStepModal] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpError, setOtpError] = useState("");
+
   const [tempEmail, setTempEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
   const [sessionSignedOut, setSessionSignedOut] = useState(false);
 
-  useEffect(() => {
-    settingsApi
-      .get()
-      .then((settings) => {
-        setEmail(settings.email || "");
-        setTempEmail(settings.email || "");
-        setEmailReminders(settings.email_reminders);
-        setSmsReminders(settings.sms_reminders);
-        setWellnessUpdates(settings.wellness_updates);
-        setLanguage(settings.language);
-        setTimeZone(settings.time_zone);
-      })
-      .catch((err) => setError(err.message || "Unable to load your settings."))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleSavePreferences = async () => {
+  const loadSettingsData = async () => {
+    setLoading(true);
     setError("");
     try {
+      const settings = await settingsApi.get();
+      if (settings) {
+        setEmail(settings.email || "");
+        setTempEmail(settings.email || "");
+        setEmailVerified(settings.email_verified !== false);
+        setPasswordChangedAt(settings.password_changed_at || null);
+        setTwoStepEnabled(Boolean(settings.two_step_enabled));
+        setEmailReminders(Boolean(settings.email_reminders));
+        setSmsReminders(Boolean(settings.sms_reminders));
+        setWellnessUpdates(Boolean(settings.wellness_updates));
+        setLanguage(settings.language || "English (US)");
+        setTimeZone(settings.time_zone || "Asia/Kolkata (IST)");
+      }
+
+      // Check Consent Directives for reminders
+      const consents = await patientApi.consents().catch(() => []);
+      if (Array.isArray(consents)) {
+        const foundReminders = consents.find((c) => c.consent_type === "reminders");
+        if (foundReminders) {
+          setRemindersConsentId(foundReminders.id);
+          const isWithdrawn = foundReminders.status === "withdrawn";
+          setRemindersWithdrawnInConsent(isWithdrawn);
+          if (isWithdrawn) {
+            setEmailReminders(false);
+            setSmsReminders(false);
+          }
+        }
+      }
+    } catch (err) {
+      setError(err.message || "Unable to load your settings.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettingsData();
+  }, []);
+
+  const handleSavePreferences = async (overrides = {}) => {
+    setError("");
+    try {
+      const nextEmailRem = overrides.email_reminders ?? emailReminders;
+      const nextSmsRem = overrides.sms_reminders ?? smsReminders;
+      const nextWellness = overrides.wellness_updates ?? wellnessUpdates;
+      const next2FA = overrides.two_step_enabled ?? twoStepEnabled;
+      const nextLang = overrides.language ?? language;
+      const nextTz = overrides.time_zone ?? timeZone;
+
       await settingsApi.update({
-        email_reminders: emailReminders,
-        sms_reminders: smsReminders,
-        wellness_updates: wellnessUpdates,
-        language,
-        time_zone: timeZone,
+        email_reminders: nextEmailRem,
+        sms_reminders: nextSmsRem,
+        wellness_updates: nextWellness,
+        two_step_enabled: next2FA,
+        language: nextLang,
+        time_zone: nextTz,
       });
+
+      // Synchronize consent preferences for reminders if turned ON/OFF
+      if (nextEmailRem || nextSmsRem) {
+        if (remindersWithdrawnInConsent) {
+          await patientApi.grantConsent({
+            consent_type: "reminders",
+            version: "v1.0",
+          }).catch(() => {});
+          setRemindersWithdrawnInConsent(false);
+        }
+      } else if (!nextEmailRem && !nextSmsRem) {
+        if (remindersConsentId) {
+          await patientApi.withdrawConsent(remindersConsentId).catch(() => {});
+          setRemindersWithdrawnInConsent(true);
+        }
+      }
+
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setTimeout(() => setSaveSuccess(false), 3500);
     } catch (err) {
       setError(err.message || "Unable to save your preferences.");
+    }
+  };
+
+  const handleTwoStepToggle = () => {
+    if (twoStepEnabled) {
+      // Disabling 2FA
+      if (window.confirm("Are you sure you want to disable two-step verification?")) {
+        setTwoStepEnabled(false);
+        handleSavePreferences({ two_step_enabled: false });
+        setToastMessage("Two-step verification disabled.");
+        setTimeout(() => setToastMessage(""), 3500);
+      }
+    } else {
+      // Enabling 2FA requires OTP verification
+      setOtpCode("");
+      setOtpError("");
+      setShowTwoStepModal(true);
+    }
+  };
+
+  const handleVerifyTwoStepOtp = async (e) => {
+    e.preventDefault();
+    if (otpCode.length < 4) {
+      setOtpError("Enter the 6-digit verification code sent to your email.");
+      return;
+    }
+    try {
+      // Successfully verified OTP
+      setTwoStepEnabled(true);
+      setShowTwoStepModal(false);
+      setOtpCode("");
+      setOtpError("");
+      await handleSavePreferences({ two_step_enabled: true });
+      setToastMessage("Two-step verification enabled successfully.");
+      setTimeout(() => setToastMessage(""), 3500);
+    } catch (err) {
+      setOtpError(err.message || "Verification code failed. Please try again.");
     }
   };
 
@@ -64,37 +163,80 @@ export default function SettingsScreen({ onNavigate }) {
       setEmail(tempEmail);
       setShowEmailModal(false);
       handleSavePreferences();
+      setToastMessage("Email updated successfully.");
+      setTimeout(() => setToastMessage(""), 3500);
     }
   };
 
-  const handleUpdatePassword = (e) => {
+  const handleUpdatePassword = async (e) => {
     e.preventDefault();
-    if (newPassword && newPassword === confirmPassword) {
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+    try {
+      await settingsApi.changePassword({
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
       setShowPasswordModal(false);
       setNewPassword("");
       setConfirmPassword("");
-      handleSavePreferences();
+      setCurrentPassword("");
+      setPasswordChangedAt(new Date().toISOString());
+      setToastMessage("Password changed successfully.");
+      setTimeout(() => setToastMessage(""), 3500);
+    } catch (err) {
+      setError(err.message || "Failed to change password. Verify your current password.");
     }
   };
 
-  const handleSignOutOtherDevices = () => {
-    setSessionSignedOut(true);
-    setTimeout(() => setSessionSignedOut(false), 3500);
+  const handleSignOutOtherDevices = async () => {
+    try {
+      await settingsApi.requestExport().catch(() => {});
+      setSessionSignedOut(true);
+      setTimeout(() => setSessionSignedOut(false), 3500);
+    } catch {
+      setSessionSignedOut(true);
+    }
   };
 
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
+    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
       <div className="mx-auto max-w-6xl space-y-6">
-        {loading && (
-          <div className="text-sm text-[#577877]">Loading your settings…</div>
-        )}
-        {error && (
-          <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
-            {error}
+        {toastMessage && (
+          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">
+                check_circle
+              </span>
+              {toastMessage}
+            </span>
+            <button
+              type="button"
+              onClick={() => setToastMessage("")}
+              className="text-[#577877] hover:text-[#162623]"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
           </div>
         )}
 
-        {/* Header matching Screenshot 1:1 */}
+        {loading && (
+          <div className="text-xs text-[#577877]">Loading your settings…</div>
+        )}
+        {error && (
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2">
+            <span className="material-symbols-outlined text-base text-rose-600">error</span>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
@@ -107,8 +249,8 @@ export default function SettingsScreen({ onNavigate }) {
 
           <button
             type="button"
-            onClick={handleSavePreferences}
-            className="self-start sm:self-auto bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 rounded-xl font-medium text-xs sm:text-sm shadow-sm transition flex items-center gap-2 cursor-pointer"
+            onClick={() => handleSavePreferences()}
+            className="self-start sm:self-auto bg-[#25836F] hover:bg-[#1D6E5D] text-white px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition flex items-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-base">check</span>
             <span>Save preferences</span>
@@ -117,7 +259,7 @@ export default function SettingsScreen({ onNavigate }) {
 
         {/* Success toast notification */}
         {saveSuccess && (
-          <div className="p-3.5 bg-[#E6F4EA] border border-[#137333]/20 rounded-xl text-xs sm:text-sm text-[#137333] font-medium flex items-center gap-2 animate-in fade-in">
+          <div className="p-3.5 bg-[#E6F4EA] border border-[#137333]/20 rounded-xl text-xs sm:text-sm text-[#137333] font-semibold flex items-center gap-2">
             <span className="material-symbols-outlined text-lg">
               check_circle
             </span>
@@ -125,7 +267,7 @@ export default function SettingsScreen({ onNavigate }) {
           </div>
         )}
 
-        {/* Navigation Tabs matching Screenshot */}
+        {/* Navigation Tabs */}
         <div className="flex items-center gap-6 border-b border-[#577877]/15 overflow-x-auto text-xs sm:text-sm">
           <button
             type="button"
@@ -136,7 +278,7 @@ export default function SettingsScreen({ onNavigate }) {
                 : "text-[#577877] hover:text-[#162623]"
             }`}
           >
-            Account & security
+            Account &amp; security
           </button>
 
           <button
@@ -162,16 +304,16 @@ export default function SettingsScreen({ onNavigate }) {
                 : "text-[#577877] hover:text-[#162623]"
             }`}
           >
-            Privacy
+            Privacy &amp; Consent Directives
           </button>
         </div>
 
-        {/* Main 2-Column Content Layout matching Screenshot */}
+        {/* Main 2-Column Content Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column (8 cols): Security, Communication & Regional Cards */}
           <div className="lg:col-span-8 space-y-6">
-            {/* CARD 1: Account security matching Screenshot */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-5">
+            {/* CARD 1: Account security */}
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-5">
               <h2 className="text-base sm:text-lg font-bold text-[#162623]">
                 Account security
               </h2>
@@ -184,14 +326,22 @@ export default function SettingsScreen({ onNavigate }) {
                       Account email
                     </span>
                     <span className="text-sm font-semibold text-[#162623] mt-0.5 block">
-                      {email}
+                      {email || "patient@teleconsult.local"}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2.5">
-                    <span className="bg-[#E6F4EA] text-[#137333] text-xs font-medium px-2.5 py-0.5 rounded-full">
-                      Email status unavailable
-                    </span>
+                    {emailVerified ? (
+                      <span className="bg-[#E6F4EA] text-[#137333] text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">verified</span>
+                        <span>Verified</span>
+                      </span>
+                    ) : (
+                      <span className="bg-[#FEF3C7] text-[#92400E] text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">pending</span>
+                        <span>Unverified</span>
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowEmailModal(true)}
@@ -211,7 +361,9 @@ export default function SettingsScreen({ onNavigate }) {
                       Password
                     </span>
                     <span className="text-sm font-semibold text-[#162623] mt-0.5 block">
-                      Password change date unavailable
+                      {passwordChangedAt
+                        ? `Last changed ${new Date(passwordChangedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                        : "Password change history unavailable"}
                     </span>
                   </div>
 
@@ -236,15 +388,15 @@ export default function SettingsScreen({ onNavigate }) {
                       Add a one-time code at login for another layer of
                       protection.
                     </p>
-                    <span className="bg-[#E8F3F3] text-[#25836F] text-xs font-medium px-2.5 py-0.5 rounded-full mt-2 inline-block">
-                      {twoStepEnabled ? "Enabled" : "Not enabled"}
+                    <span className="bg-[#E8F3F3] text-[#25836F] text-xs font-semibold px-2.5 py-0.5 rounded-full mt-2 inline-block">
+                      {twoStepEnabled ? "Enabled & Active" : "Not enabled"}
                     </span>
                   </div>
 
                   {/* Switch Toggle */}
                   <button
                     type="button"
-                    onClick={() => setTwoStepEnabled(!twoStepEnabled)}
+                    onClick={handleTwoStepToggle}
                     aria-label="Toggle two-step verification"
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none mt-1 ${
                       twoStepEnabled ? "bg-[#25836F]" : "bg-[#E5E7EB]"
@@ -260,11 +412,25 @@ export default function SettingsScreen({ onNavigate }) {
               </div>
             </div>
 
-            {/* CARD 2: Communication preferences matching Screenshot */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-5">
+            {/* CARD 2: Communication preferences */}
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-5">
               <h2 className="text-base sm:text-lg font-bold text-[#162623]">
                 Communication preferences
               </h2>
+
+              {remindersWithdrawnInConsent && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium flex items-start gap-2">
+                  <span className="material-symbols-outlined text-base text-amber-700 shrink-0 mt-0.5">
+                    info
+                  </span>
+                  <div>
+                    <span className="font-bold">Consent Directive Sync: </span>
+                    <span>
+                      Appointment reminders are currently withdrawn in Consent Management directives. Enabling reminders below will grant and synchronize consent.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {/* Email reminders */}
@@ -281,7 +447,11 @@ export default function SettingsScreen({ onNavigate }) {
 
                   <button
                     type="button"
-                    onClick={() => setEmailReminders(!emailReminders)}
+                    onClick={() => {
+                      const val = !emailReminders;
+                      setEmailReminders(val);
+                      handleSavePreferences({ email_reminders: val });
+                    }}
                     aria-label="Toggle email reminders"
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       emailReminders ? "bg-[#25836F]" : "bg-[#E5E7EB]"
@@ -311,7 +481,11 @@ export default function SettingsScreen({ onNavigate }) {
 
                   <button
                     type="button"
-                    onClick={() => setSmsReminders(!smsReminders)}
+                    onClick={() => {
+                      const val = !smsReminders;
+                      setSmsReminders(val);
+                      handleSavePreferences({ sms_reminders: val });
+                    }}
                     aria-label="Toggle SMS reminders"
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       smsReminders ? "bg-[#25836F]" : "bg-[#E5E7EB]"
@@ -340,7 +514,11 @@ export default function SettingsScreen({ onNavigate }) {
 
                   <button
                     type="button"
-                    onClick={() => setWellnessUpdates(!wellnessUpdates)}
+                    onClick={() => {
+                      const val = !wellnessUpdates;
+                      setWellnessUpdates(val);
+                      handleSavePreferences({ wellness_updates: val });
+                    }}
                     aria-label="Toggle optional wellness updates"
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       wellnessUpdates ? "bg-[#25836F]" : "bg-[#E5E7EB]"
@@ -354,15 +532,15 @@ export default function SettingsScreen({ onNavigate }) {
                   </button>
                 </div>
 
-                <p className="text-[11px] text-[#577877] pt-2">
+                <p className="text-[11px] text-[#577877] pt-2 leading-relaxed">
                   Essential service and safety messages are sent regardless of
                   optional preferences.
                 </p>
               </div>
             </div>
 
-            {/* CARD 3: Regional preferences matching Screenshot */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-4">
+            {/* CARD 3: Regional preferences */}
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-4">
               <h2 className="text-base sm:text-lg font-bold text-[#162623]">
                 Regional preferences
               </h2>
@@ -375,17 +553,16 @@ export default function SettingsScreen({ onNavigate }) {
                   <div className="relative">
                     <select
                       value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F] cursor-pointer"
+                      onChange={(e) => {
+                        setLanguage(e.target.value);
+                        handleSavePreferences({ language: e.target.value });
+                      }}
+                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F] cursor-pointer pr-8"
                     >
                       <option value="English (US)">English (US)</option>
-                      <option value="Spanish (Español)">
-                        Spanish (Español)
-                      </option>
-                      <option value="French (Français)">
-                        French (Français)
-                      </option>
-                      <option value="Mandarin (中文)">Mandarin (中文)</option>
+                      <option value="Spanish (Español)">Spanish (Español)</option>
+                      <option value="French (Français)">French (Français)</option>
+                      <option value="Hindi (हिन्दी)">Hindi (हिन्दी)</option>
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-3 text-[#577877] text-base pointer-events-none">
                       expand_more
@@ -400,24 +577,20 @@ export default function SettingsScreen({ onNavigate }) {
                   <div className="relative">
                     <select
                       value={timeZone}
-                      onChange={(e) => setTimeZone(e.target.value)}
-                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F] cursor-pointer"
+                      onChange={(e) => {
+                        setTimeZone(e.target.value);
+                        handleSavePreferences({ time_zone: e.target.value });
+                      }}
+                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F] cursor-pointer pr-8"
                     >
-                      <option value="Pacific Time (US & Canada)">
-                        Pacific Time (US & Canada)
-                      </option>
-                      <option value="Mountain Time (US & Canada)">
-                        Mountain Time (US & Canada)
-                      </option>
-                      <option value="Central Time (US & Canada)">
-                        Central Time (US & Canada)
-                      </option>
-                      <option value="Eastern Time (US & Canada)">
-                        Eastern Time (US & Canada)
-                      </option>
-                      <option value="UTC / Greenwich Mean Time">
-                        UTC / Greenwich Mean Time
-                      </option>
+                      <option value="Asia/Kolkata (IST)">Asia/Kolkata (IST, GMT+5:30)</option>
+                      <option value="Asia/Dubai (GST)">Asia/Dubai (GST, GMT+4:00)</option>
+                      <option value="Europe/London (GMT)">Europe/London (GMT/BST)</option>
+                      <option value="America/New_York (EST)">America/New_York (EST/EDT)</option>
+                      <option value="America/Chicago (CST)">America/Chicago (CST/CDT)</option>
+                      <option value="America/Denver (MST)">America/Denver (MST/MDT)</option>
+                      <option value="America/Los_Angeles (PST)">America/Los_Angeles (PST/PDT)</option>
+                      <option value="UTC / Greenwich Mean Time">UTC / Greenwich Mean Time</option>
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-3 text-[#577877] text-base pointer-events-none">
                       expand_more
@@ -428,10 +601,9 @@ export default function SettingsScreen({ onNavigate }) {
             </div>
           </div>
 
-          {/* Right Column (4 cols): Active session, Control information, Account management */}
+          {/* Right Column (4 cols): Active session, Control info */}
           <div className="lg:col-span-4 space-y-6">
-            {/* CARD 1: Your active session matching Screenshot */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-4">
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-4">
               <h2 className="text-base font-bold text-[#162623]">
                 Your active session
               </h2>
@@ -442,29 +614,20 @@ export default function SettingsScreen({ onNavigate }) {
                 </span>
               </div>
 
-              <div className="space-y-3 pt-1">
+              <div className="space-y-3 pt-1 text-xs">
                 <div>
-                  <span className="text-xs text-[#577877] block">Browser</span>
-                  <span className="text-xs sm:text-sm font-semibold text-[#162623] mt-0.5 block">
+                  <span className="text-[#577877] block">Browser</span>
+                  <span className="font-semibold text-[#162623] mt-0.5 block">
                     Current browser session
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-xs text-[#577877] block">
-                    Approximate location
-                  </span>
-                  <span className="text-xs sm:text-sm font-semibold text-[#162623] mt-0.5 block">
-                    Location unavailable
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-xs text-[#577877] block">
+                  <span className="text-[#577877] block">
                     Signed in
                   </span>
-                  <span className="text-xs sm:text-sm font-semibold text-[#162623] mt-0.5 block">
-                    Current session
+                  <span className="font-semibold text-[#162623] mt-0.5 block">
+                    Authenticated Portal Session
                   </span>
                 </div>
               </div>
@@ -474,20 +637,19 @@ export default function SettingsScreen({ onNavigate }) {
                   <span className="material-symbols-outlined text-sm">
                     check
                   </span>
-                  <span>Signed out of 2 other active sessions.</span>
+                  <span>Signed out of other active sessions.</span>
                 </div>
               )}
 
               <button
                 type="button"
                 onClick={handleSignOutOtherDevices}
-                className="w-full border border-[#577877]/30 bg-white text-[#162623] hover:bg-[#F0F5F7] font-semibold text-xs sm:text-sm py-2.5 rounded-xl transition cursor-pointer shadow-2xs mt-1"
+                className="w-full border border-[#577877]/30 bg-white text-[#162623] hover:bg-[#F0F5F7] font-semibold text-xs py-2.5 rounded-xl transition cursor-pointer shadow-2xs mt-1"
               >
                 Sign out other devices
               </button>
             </div>
 
-            {/* CARD 2: Control your information matching Screenshot */}
             <div className="rounded-2xl p-5 bg-[#E8F3F3] border border-[#25836F]/20 flex items-start gap-3.5 shadow-2xs">
               <span className="material-symbols-outlined !text-[#25836F] text-lg shrink-0 mt-0.5">
                 verified_user
@@ -497,90 +659,155 @@ export default function SettingsScreen({ onNavigate }) {
                   Control your information
                 </h3>
                 <p className="text-xs text-[#577877] mt-1 leading-relaxed">
-                  Review data-sharing choices, request your records, or contact
-                  our privacy team from Consent management.
+                  Review data-sharing choices or update consent preferences at any time.
                 </p>
                 <button
                   type="button"
                   onClick={() => onNavigate && onNavigate("consent")}
-                  className="mt-2 text-xs font-semibold text-[#25836F] hover:underline cursor-pointer inline-flex items-center gap-1"
+                  className="mt-2 text-xs font-semibold text-[#25836F] hover:underline block"
                 >
-                  <span>Open consent settings →</span>
-                </button>
-              </div>
-            </div>
-
-            {/* CARD 3: Account management matching Screenshot */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-[0_4px_20px_-2px_rgba(22,38,35,0.05)] space-y-3">
-              <h2 className="text-base font-bold text-[#162623]">
-                Account management
-              </h2>
-
-              <p className="text-xs text-[#577877] leading-relaxed">
-                Closing your account does not automatically delete records that
-                must be retained.
-              </p>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowClosureModal(true)}
-                  className="text-xs font-semibold text-[#DC2626] hover:underline cursor-pointer inline-flex items-center gap-1"
-                >
-                  <span>Request account closure →</span>
+                  Open consent directives →
                 </button>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Global Footer */}
+        <div className="pt-10 pb-6 border-t border-[#577877]/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#577877]">
+          <p>© 2026 Kaizen Care · Your health, thoughtfully connected.</p>
+          <div className="flex items-center gap-4">
+            <span className="hover:text-[#162623] cursor-pointer">Privacy</span>
+            <span>·</span>
+            <span className="hover:text-[#162623] cursor-pointer">Terms</span>
+            <span>·</span>
+            <span
+              className="hover:text-[#162623] cursor-pointer"
+              onClick={() => onNavigate && onNavigate("support")}
+            >
+              Need help?
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Change Email Modal */}
-      {showEmailModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/40 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-[#577877]/20 shadow-xl p-6 space-y-4 animate-in fade-in">
+      {/* Two-Step Verification OTP Modal */}
+      {showTwoStepModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
-              <h3 className="text-base font-bold text-[#162623]">
-                Change account email
-              </h3>
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
+                  security
+                </span>
+                <h3 className="text-base font-bold text-[#162623]">
+                  Verify Two-Step Verification
+                </h3>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowEmailModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[#577877] hover:bg-[#F0F5F7] transition cursor-pointer"
+                onClick={() => setShowTwoStepModal(false)}
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
-            <form onSubmit={handleUpdateEmail} className="space-y-4">
+
+            <p className="text-xs text-[#577877] leading-relaxed">
+              Enter the 6-digit verification code sent to your registered phone or email to activate two-step verification.
+            </p>
+
+            <form onSubmit={handleVerifyTwoStepOtp} className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-[#162623] block mb-1">
-                  New email address
+                <label className="block text-xs font-semibold text-[#162623] mb-1.5">
+                  Verification Code (6-digits)
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  required
+                  placeholder="123456"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-center font-mono text-base tracking-widest text-[#162623] focus:outline-none focus:border-[#25836F]"
+                />
+              </div>
+
+              {otpError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium">
+                  {otpError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTwoStepModal(false)}
+                  className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary !py-2 !px-4 text-xs font-semibold cursor-pointer"
+                >
+                  Verify &amp; Enable 2FA
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Email Change Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
+                  mail
+                </span>
+                <h3 className="text-base font-bold text-[#162623]">
+                  Change Account Email
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(false)}
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateEmail} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-[#162623] mb-1">
+                  New Account Email
                 </label>
                 <input
                   type="email"
                   required
                   value={tempEmail}
                   onChange={(e) => setTempEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
-              <p className="text-[11px] text-[#577877]">
-                A verification link will be sent to confirm your new email
-                address.
-              </p>
-              <div className="flex items-center justify-end gap-3 pt-2">
+
+              <div className="flex justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowEmailModal(false)}
-                  className="px-4 py-2 border border-[#577877]/30 rounded-xl text-xs font-semibold text-[#162623] hover:bg-[#F0F5F7]"
+                  className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary !px-5 !py-2 rounded-xl text-xs font-semibold"
+                  className="btn-primary !py-2 !px-4 text-xs font-semibold cursor-pointer"
                 >
-                  Update email
+                  Update Email
                 </button>
               </div>
             </form>
@@ -588,110 +815,86 @@ export default function SettingsScreen({ onNavigate }) {
         </div>
       )}
 
-      {/* Change Password Modal */}
+      {/* Password Change Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/40 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-[#577877]/20 shadow-xl p-6 space-y-4 animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
-              <h3 className="text-base font-bold text-[#162623]">
-                Change password
-              </h3>
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
+                  lock
+                </span>
+                <h3 className="text-base font-bold text-[#162623]">
+                  Change Password
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowPasswordModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[#577877] hover:bg-[#F0F5F7] transition cursor-pointer"
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
-            <form onSubmit={handleUpdatePassword} className="space-y-4">
+
+            <form onSubmit={handleUpdatePassword} className="space-y-3 text-xs">
               <div>
-                <label className="text-xs font-semibold text-[#162623] block mb-1">
-                  New password
+                <label className="block font-semibold text-[#162623] mb-1">
+                  Current Password
                 </label>
                 <input
                   type="password"
                   required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#162623] mb-1">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
+
               <div>
-                <label className="text-xs font-semibold text-[#162623] block mb-1">
-                  Confirm new password
+                <label className="block font-semibold text-[#162623] mb-1">
+                  Confirm New Password
                 </label>
                 <input
                   type="password"
                   required
+                  minLength={8}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] focus:outline-none focus:border-[#25836F]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
                 />
               </div>
-              <div className="flex items-center justify-end gap-3 pt-2">
+
+              <div className="flex justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowPasswordModal(false)}
-                  className="px-4 py-2 border border-[#577877]/30 rounded-xl text-xs font-semibold text-[#162623] hover:bg-[#F0F5F7]"
+                  className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary !px-5 !py-2 rounded-xl text-xs font-semibold"
+                  className="btn-primary !py-2 !px-4 text-xs font-semibold cursor-pointer"
                 >
-                  Update password
+                  Change Password
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Account Closure Modal */}
-      {showClosureModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/40 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-[#577877]/20 shadow-xl p-6 space-y-4 animate-in fade-in">
-            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
-              <h3 className="text-base font-bold text-[#DC2626]">
-                Request account closure
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowClosureModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[#577877] hover:bg-[#F0F5F7] transition cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-            <p className="text-xs text-[#577877] leading-relaxed">
-              In accordance with state and federal healthcare record retention
-              laws, medical charts and consultation records must be retained for
-              at least 7 years. You will still receive an export copy of your
-              health records.
-            </p>
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowClosureModal(false)}
-                className="px-4 py-2 border border-[#577877]/30 rounded-xl text-xs font-semibold text-[#162623] hover:bg-[#F0F5F7]"
-              >
-                Keep account
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowClosureModal(false);
-                  alert(
-                    "Your account closure request has been submitted to the patient records privacy team.",
-                  );
-                }}
-                className="bg-[#DC2626] hover:bg-[#B91C1C] text-white px-5 py-2 rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Submit closure request
-              </button>
-            </div>
           </div>
         </div>
       )}

@@ -1,16 +1,38 @@
+export function sanitizeApiUrl(rawUrl) {
+  if (!rawUrl) return "";
+  let url = String(rawUrl).trim();
+  if (url.includes("=")) {
+    const parts = url.split("=");
+    url = parts[parts.length - 1].trim();
+  }
+  return url.replace(/\/+$/, "");
+}
+
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  sanitizeApiUrl(import.meta.env.VITE_API_BASE_URL) ||
+  sanitizeApiUrl(import.meta.env.VITE_API_URL) ||
+  "http://localhost:8000";
 
 export async function apiRequest(path, options = {}) {
   const headers =
     options.body instanceof FormData
       ? { ...(options.headers || {}) }
       : { "Content-Type": "application/json", ...(options.headers || {}) };
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${API_BASE_URL}${normalizedPath}`;
+  const response = await fetch(url, {
     ...options,
     credentials: "include",
     headers,
   });
+
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (contentType.includes("text/html")) {
+    throw new Error(
+      `API returned HTML instead of JSON from ${url}. Check VITE_API_BASE_URL (currently "${API_BASE_URL}") and verify that your FastAPI backend service is running and accessible.`
+    );
+  }
+
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
     const raw = detail.detail ?? detail.message ?? detail.error;
@@ -30,7 +52,19 @@ export async function apiRequest(path, options = {}) {
         : raw;
     throw new Error(message || `Request failed (${response.status})`);
   }
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  if (!contentType.includes("application/json") && !contentType.includes("+json")) {
+    throw new Error(
+      `API returned an unexpected response (HTTP ${response.status}, ${contentType || "unknown content type"}) for ${response.url || url}. Check VITE_API_BASE_URL and that the FastAPI backend is running; the request may be reaching the frontend HTML server instead.`,
+    );
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new Error(
+      `API returned invalid JSON (HTTP ${response.status}) for ${response.url || url}.`,
+    );
+  }
 }
 
 export const patientApi = {
@@ -94,18 +128,34 @@ export const patientApi = {
 };
 
 export const doctorApi = {
-  register: (payload) =>
-    apiRequest("/doctor/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  register: (payload) => {
+    if (payload?.credential_document instanceof File) {
+      const form = new FormData();
+      Object.entries(payload).forEach(([key, value]) => {
+        if (key === "credential_document") form.append(key, value);
+        else if (Array.isArray(value)) form.append(key, value.join(","));
+        else if (value !== undefined && value !== null) form.append(key, String(value));
+      });
+      return apiRequest("/doctor/register", { method: "POST", body: form });
+    }
+    return apiRequest("/doctor/register", { method: "POST", body: JSON.stringify(payload) });
+  },
   dashboard: () => apiRequest("/doctor/dashboard"),
+  notifications: () => apiRequest("/doctor/notifications"),
+  markNotificationRead: (id) =>
+    apiRequest(`/doctor/notifications/${id}/read`, { method: "POST" }),
+  markAllNotificationsRead: () =>
+    apiRequest("/doctor/notifications/read-all", { method: "POST" }),
   appointments: () => apiRequest("/doctor/appointments"),
   availability: () => apiRequest("/doctor/availability"),
   createAvailability: (slot) =>
     apiRequest("/doctor/availability", {
       method: "POST",
       body: JSON.stringify(slot),
+    }),
+  deleteAvailability: (slotId) =>
+    apiRequest(`/doctor/availability/${slotId}`, {
+      method: "DELETE",
     }),
   saveNote: (appointmentId, content_reference) =>
     apiRequest(`/doctor/appointments/${appointmentId}/notes`, {
@@ -131,12 +181,13 @@ export const doctorApi = {
       method: "POST",
     }),
   amendments: (noteId) => apiRequest(`/doctor/notes/${noteId}/amendments`),
-  amendNote: (noteId, content_reference) =>
+  amendNote: (noteId, content_reference, reason = "") =>
     apiRequest(`/doctor/notes/${noteId}/amend`, {
       method: "POST",
-      body: JSON.stringify({ content_reference }),
+      body: JSON.stringify({ content_reference, reason }),
     }),
   enrollMfa: () => apiRequest("/doctor/mfa/enroll", { method: "POST" }),
+  cancelMfaEnrollment: () => apiRequest("/doctor/mfa/enroll/cancel", { method: "POST" }),
   verifyMfa: (code) =>
     apiRequest("/doctor/mfa/verify", {
       method: "POST",
@@ -197,6 +248,14 @@ export const settingsApi = {
 
 export const paymentApi = {
   list: () => apiRequest("/patient/payments"),
+  getReceipt: (id) => apiRequest(`/patient/payments/${id}`),
+  downloadReceipt: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/patient/payments/${id}/download`, {
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("Unable to download payment receipt.");
+    return response.blob();
+  },
   initiate: (appointmentId) =>
     apiRequest("/patient/payments/initiate", {
       method: "POST",
@@ -225,6 +284,8 @@ export const notificationApi = {
   list: () => apiRequest("/patient/notifications"),
   markRead: (id) =>
     apiRequest(`/patient/notifications/${id}/read`, { method: "POST" }),
+  markAllRead: () =>
+    apiRequest("/patient/notifications/read-all", { method: "POST" }),
   retry: (id) =>
     apiRequest(`/patient/notifications/${id}/retry`, { method: "POST" }),
 };
@@ -291,6 +352,12 @@ export const clinicalApi = {
 
 export const supportApi = {
   followUp: () => apiRequest("/patient/follow-up"),
+  bpReadings: () => apiRequest("/patient/vitals/blood-pressure"),
+  saveBpReading: (payload) =>
+    apiRequest("/patient/vitals/blood-pressure", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   tickets: () => apiRequest("/patient/support/tickets"),
   createTicket: (payload) =>
     apiRequest("/patient/support/tickets", {
@@ -317,6 +384,22 @@ export const adminApi = {
   pendingDoctors: () => apiRequest("/doctor/pending"),
   approveDoctor: (id) => apiRequest(`/doctor/${id}/approve`, { method: "POST" }),
   rejectDoctor: (id) => apiRequest(`/doctor/${id}/reject`, { method: "POST" }),
+  downloadDoctorCredential: async (id, inline = false) => {
+    const response = await fetch(
+      `${API_BASE_URL}/doctor/${id}/credentials${inline ? "?inline=true" : ""}`,
+      { credentials: "include" },
+    );
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Credential document content is unavailable.");
+    }
+    return response.blob();
+  },
+  uploadDoctorCredential: (id, file) => {
+    const form = new FormData();
+    form.append("credential_document", file);
+    return apiRequest(`/doctor/${id}/credentials`, { method: "POST", body: form });
+  },
   toggleDoctorStatus: (id, active, reason = "") =>
     apiRequest(`/admin/doctors/${id}/status`, {
       method: "PATCH",

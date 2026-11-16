@@ -28,6 +28,8 @@ from teleconsult.modules.identity.routes import router as identity_router
 from teleconsult.modules.identity.settings_routes import router as settings_router
 from teleconsult.modules.notifications.patient_routes import router as notification_router
 from teleconsult.modules.notifications.routes import router as notifications_router
+from teleconsult.modules.newsletter.routes import router as newsletter_router
+from teleconsult.modules.notifications.doctor_routes import router as doctor_notifications_router
 from teleconsult.modules.patient_portal.routes import public_router as public_patient_router
 from teleconsult.modules.patient_portal.routes import router as patient_router
 from teleconsult.modules.payments.patient_routes import router as payment_router
@@ -44,6 +46,7 @@ from teleconsult.modules.tenancy.routes import router as tenancy_router
 
 # Routes that are intentionally unauthenticated. Keep this list tiny and reviewed.
 PUBLIC_PATHS = frozenset({
+    "/api/newsletter/subscribe", "/api/newsletter/verify", "/api/newsletter/unsubscribe",
     "/health", "/health/mongodb", "/health/mongodb/transactions", "/config/patient-portal", "/auth/register", "/auth/login",
     "/auth/verify-email", "/auth/recovery", "/auth/recovery/reset",
     "/auth/me", "/auth/logout", "/patient/payments/webhook",
@@ -145,6 +148,7 @@ def create_app() -> FastAPI:
     app.include_router(scheduling_admin_router)
     app.include_router(admin_router)
     app.include_router(config_router)
+    app.include_router(newsletter_router)
     # Versioned API contract. The module-native paths above remain available
     # for local compatibility while clients migrate to /api/v1.
     app.include_router(public_patient_router, prefix="/api/v1")
@@ -161,6 +165,7 @@ def create_app() -> FastAPI:
     app.include_router(consent_router)
     app.include_router(payments_router)
     app.include_router(notifications_router)
+    app.include_router(doctor_notifications_router)
     app.include_router(reporting_router)
     app.include_router(support_access_router)
     app.include_router(audit_router)

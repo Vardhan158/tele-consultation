@@ -144,8 +144,10 @@ export default function Sidebar({
       {/* Secondary Navigation */}
       {!isAdmin && (
         <nav aria-label="Account navigation" className="space-y-1">
-          {secondaryNavItems.map((item) => {
-            const isActive = activeTab === item.id;
+          {secondaryNavItems
+            .filter((item) => !(isDoctor && item.id === "settings"))
+            .map((item) => {
+              const isActive = activeTab === item.id || (isDoctor && item.id === "settings" && activeTab === "doctor-settings");
             return (
               <button
                 key={item.id}

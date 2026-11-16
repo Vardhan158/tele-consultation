@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { patientApi } from "../../lib/api";
+import PublicNavbar from "../public/PublicNavbar";
 
 const AVAILABILITY_OPTIONS = [
   "Any time",
@@ -54,9 +56,12 @@ export default function FindDoctorsScreen({
   authenticated = true,
   onRequireAuth,
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSpecialty = searchParams.get("specialty") || "all";
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [selectedProfileDoctor, setSelectedProfileDoctor] = useState(null);
 
   const loadDoctors = () => {
     setLoading(true);
@@ -65,34 +70,60 @@ export default function FindDoctorsScreen({
       .doctors()
       .then(async (items) => {
         if (!Array.isArray(items)) return;
+        const now = new Date();
         const mapped = await Promise.all(
           items.map(async (doctor) => {
-            const slots = await patientApi
+            const rawSlots = await patientApi
               .availability(doctor.id)
               .catch(() => []);
-            const nextSlot =
-              Array.isArray(slots) && slots.length ? slots[0] : null;
+
+            // Filter to ONLY future bookable slots (starts_at > now)
+            const futureSlots = Array.isArray(rawSlots)
+              ? rawSlots.filter(
+                  (slot) => slot && slot.starts_at && new Date(slot.starts_at) > now,
+                )
+              : [];
+
+            futureSlots.sort(
+              (a, b) => new Date(a.starts_at) - new Date(b.starts_at),
+            );
+
+            const nextSlot = futureSlots.length ? futureSlots[0] : null;
+
+            const qualList = Array.isArray(doctor.qualifications)
+              ? doctor.qualifications.join(", ")
+              : doctor.qualifications || "MBBS, MD";
+
+            const isVerified = Boolean(
+              doctor.approved_for_consultation || doctor.approval_status === "approved",
+            );
+
             return {
               ...doctor,
               name: doctor.full_name,
               fullName: doctor.full_name,
               clinic: doctor.clinic_name,
-              languages: doctor.supported_languages || [],
-              fee: doctor.fee_paise == null ? null : doctor.fee_paise / 100,
+              isVerified,
+              qualificationsDisplay: qualList,
+              experienceYears: doctor.experience_years ?? 5,
+              registrationNumber: doctor.registration_number || doctor.registrationNo || "Registration on File",
+              bio: doctor.bio || doctor.about || `Qualified ${doctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`,
+              languages: doctor.supported_languages || doctor.languages || ["English"],
+              fee: (doctor.total_payable_paise ?? doctor.fee_paise) == null ? null : (doctor.total_payable_paise ?? doctor.fee_paise) / 100,
               feeDisplay:
-                doctor.fee_paise == null
-                  ? ""
-                  : `${doctor.currency || ""} ${(doctor.fee_paise / 100).toFixed(2)}`,
+                (doctor.total_payable_paise ?? doctor.fee_paise) == null
+                  ? "Fee calculated at booking"
+                  : `${doctor.currency === "USD" ? "$" : doctor.currency === "INR" ? "₹" : (doctor.currency || "INR") + " "} ${((doctor.total_payable_paise ?? doctor.fee_paise) / 100).toFixed(2)}`,
               feeVideoVisit:
-                doctor.fee_paise == null
-                  ? ""
-                  : `${doctor.currency || ""} ${(doctor.fee_paise / 100).toFixed(2)} per video visit`,
-              availability: Array.isArray(slots) ? slots : [],
-              timezone: doctor.timezone,
+                (doctor.total_payable_paise ?? doctor.fee_paise) == null
+                  ? "Fee calculated at booking"
+                  : `${doctor.currency === "USD" ? "$" : doctor.currency === "INR" ? "₹" : (doctor.currency || "INR") + " "} ${((doctor.total_payable_paise ?? doctor.fee_paise) / 100).toFixed(2)} per video visit`,
+              availability: futureSlots,
+              timezone: doctor.timezone || "Asia/Kolkata",
               availableToday: Boolean(
                 nextSlot &&
                   new Date(nextSlot.starts_at).toDateString() ===
-                    new Date().toDateString(),
+                    now.toDateString(),
               ),
               nextSlot,
               nextSlotLabel: nextSlot
@@ -103,7 +134,7 @@ export default function FindDoctorsScreen({
                     hour: "numeric",
                     minute: "2-digit",
                   })
-                : "No upcoming slots",
+                : "No upcoming slots available",
             };
           }),
         );
@@ -190,11 +221,30 @@ export default function FindDoctorsScreen({
     return [...new Set(doctors.map((d) => d.specialty).filter(Boolean))].sort();
   }, [doctors]);
 
+  // Resolve deep links against the live directory, falling back to all doctors.
+  useEffect(() => {
+    if (loading) return;
+    const specialty = specialties.find(
+      (value) => value.toLowerCase() === requestedSpecialty.toLowerCase(),
+    ) || "all";
+    setSelectedSpecialty(specialty);
+    setAppliedFilters((current) => ({ ...current, specialty }));
+    setPage(1);
+  }, [requestedSpecialty, specialties, loading]);
+
+  const updateSpecialtyUrl = (specialty) => {
+    const next = new URLSearchParams(searchParams);
+    if (specialty === "all") next.delete("specialty");
+    else next.set("specialty", specialty);
+    setSearchParams(next, { replace: true });
+  };
+
   const languages = useMemo(() => {
     return [...new Set(doctors.flatMap((d) => d.languages || []).filter(Boolean))].sort();
   }, [doctors]);
 
   const handleApplyFilters = () => {
+    updateSpecialtyUrl(selectedSpecialty);
     setAppliedFilters({
       search: searchInput.trim(),
       specialty: selectedSpecialty,
@@ -207,6 +257,7 @@ export default function FindDoctorsScreen({
   };
 
   const handleClearFilters = () => {
+    updateSpecialtyUrl("all");
     setSearchInput("");
     setSelectedSpecialty("all");
     setAvailabilityFilter("Any time");
@@ -466,224 +517,232 @@ export default function FindDoctorsScreen({
   };
 
   return (
-    <div className="space-y-6 font-sans text-[#162623]">
-      {/* 1. Compact Heading Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
-            Care Specialists &amp; Teleconsultation
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-            Find Doctors &amp; Specialists
-          </h1>
-          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
-            Search verified clinicians, check real-time schedule availability, and book teleconsultations with confidence.
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#F9FBFA] font-sans text-zinc-800 antialiased selection:bg-[#1A7D67] selection:text-white">
+      {!authenticated && <PublicNavbar />}
 
-        <div className="hidden sm:flex items-center gap-2 text-xs bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20 shrink-0 self-start sm:self-center shadow-xs">
-          <span className="material-symbols-outlined !text-[#A3E2D4] text-lg">verified</span>
-          <span className="font-medium text-white/95">Board-Certified Doctors</span>
-        </div>
-      </div>
+      <div className={`max-w-7xl mx-auto px-5 py-6 lg:px-10 space-y-6 ${!authenticated ? "pt-24 sm:pt-28" : ""}`}>
 
-      {/* 2. Compact Horizontal Filter Section */}
-      <div className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs space-y-4">
-        {/* Row 1: Full-width search bar + Mobile Filter Toggle button */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#577877] text-lg pointer-events-none">
-              search
-            </span>
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleApplyFilters();
-              }}
-              placeholder="Doctor name, specialty, or clinic…"
-              className="w-full rounded-xl border border-[#577877]/25 pl-10 pr-4 py-2.5 text-xs text-[#162623] placeholder:text-[#577877]/70 bg-[#F0F5F7]/50 focus:bg-white focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => setSearchInput("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
-                title="Clear search text"
-              >
-                <span className="material-symbols-outlined text-base">close</span>
-              </button>
+        {/* Mobile Filter Toggle Header (Visible only on < lg screens) */}
+        <div className="lg:hidden flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs">
+          <div className="flex items-center gap-2 text-xs font-semibold text-zinc-800">
+            <span className="material-symbols-outlined text-[#1A7D67] text-xl">tune</span>
+            <span>Filter Clinicians</span>
+            {hasActiveFilters && (
+              <span className="px-2 py-0.5 rounded-full bg-[#EEF6F3] text-[#1A7D67] text-[10px] font-bold">
+                Active Filters
+              </span>
             )}
           </div>
-
-          {/* Mobile Filter Toggle */}
           <button
             type="button"
             onClick={() => setMobileFiltersOpen((prev) => !prev)}
-            className="md:hidden inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs font-semibold text-[#162623] bg-[#F0F5F7] hover:bg-white transition cursor-pointer shrink-0"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1A7D67] text-white text-xs font-bold shadow-xs hover:bg-[#156654] transition cursor-pointer"
           >
-            <span className="material-symbols-outlined text-base text-[#25836F]">
-              tune
+            <span className="material-symbols-outlined text-sm">
+              {mobileFiltersOpen ? "close" : "tune"}
             </span>
-            <span>Filters</span>
-            {hasActiveFilters && (
-              <span className="w-2 h-2 rounded-full bg-[#25836F]" />
-            )}
+            <span>{mobileFiltersOpen ? "Hide Filters" : "Filters"}</span>
           </button>
         </div>
 
-        {/* Row 2: Dropdowns & Filter Actions (Desktop inline / Tablet 2-col / Mobile collapsible) */}
-        <div
-          className={`${
-            mobileFiltersOpen ? "block" : "hidden"
-          } md:block border-t border-[#577877]/10 pt-4 space-y-4`}
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Specialty Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-[#25836F]">medical_services</span>
-                Specialty
-              </label>
-              <select
-                value={selectedSpecialty}
-                onChange={(e) => setSelectedSpecialty(e.target.value)}
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
-              >
-                <option value="all">All Specialties</option>
-                {specialties.map((spec) => (
-                  <option key={spec} value={spec}>
-                    {spec}
-                  </option>
-                ))}
-              </select>
-            </div>
+        {/* Main 2-Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
 
-            {/* Availability Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-[#25836F]">event_available</span>
-                Availability
-              </label>
-              <select
-                value={availabilityFilter}
-                onChange={(e) => setAvailabilityFilter(e.target.value)}
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
-              >
-                {AVAILABILITY_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* ========================================================= */}
+          {/* LEFT SIDEBAR FILTER PANEL                                 */}
+          {/* ========================================================= */}
+          <aside
+            className={`${
+              mobileFiltersOpen ? "block" : "hidden"
+            } lg:block lg:col-span-4 xl:col-span-3 space-y-5 lg:sticky lg:top-24 z-10`}
+          >
+            <div className="rounded-2xl bg-white border border-zinc-200 p-5 sm:p-6 shadow-xs space-y-5">
+              {/* Filter Panel Header */}
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#1A7D67] text-xl">tune</span>
+                  <h2 className="text-base font-bold text-zinc-800">Filters</h2>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="text-xs font-semibold text-[#1A7D67] hover:underline cursor-pointer"
+                  >
+                    Reset All
+                  </button>
+                )}
+              </div>
 
-            {/* Language Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-[#25836F]">translate</span>
-                Language
-              </label>
-              <select
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
-              >
-                <option value="all">All Languages</option>
-                {languages.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {/* Search Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">search</span>
+                  Search Doctor
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleApplyFilters();
+                    }}
+                    placeholder="Name, specialty, or clinic…"
+                    className="w-full rounded-xl border border-zinc-300 pl-3.5 pr-8 py-2.5 text-xs text-zinc-800 placeholder:text-zinc-400 bg-[#F9FBFA] focus:bg-white focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition"
+                  />
+                  {searchInput && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchInput("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                      title="Clear search"
+                    >
+                      <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                  )}
+                </div>
+              </div>
 
-            {/* Sort By Dropdown */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-[#25836F]">swap_vert</span>
-                Sort By
-              </label>
-              <select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value)}
-                className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white text-[#162623] focus:border-[#25836F] focus:ring-2 focus:ring-[#25836F]/15 focus:outline-none transition cursor-pointer"
-              >
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+              {/* Specialty Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">medical_services</span>
+                  Specialty
+                </label>
+                <select
+                  value={selectedSpecialty}
+                  onChange={(e) => setSelectedSpecialty(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-xs bg-white text-zinc-800 focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="all">All Specialties</option>
+                  {specialties.map((spec) => (
+                    <option key={spec} value={spec}>
+                      {spec}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {/* Row 3: Action Buttons (Apply & Clear) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#577877]/10">
-            <div className="text-xs text-[#577877]">
-              {hasActiveFilters ? (
-                <span className="inline-flex items-center gap-1.5 text-[#25836F] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#25836F]" />
-                  Custom filters active
-                </span>
-              ) : (
-                <span>Showing standard directory recommendations</span>
+              {/* Availability Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">event_available</span>
+                  Availability
+                </label>
+                <select
+                  value={availabilityFilter}
+                  onChange={(e) => setAvailabilityFilter(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-xs bg-white text-zinc-800 focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition cursor-pointer"
+                >
+                  {AVAILABILITY_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Language Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">translate</span>
+                  Language
+                </label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-xs bg-white text-zinc-800 focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition cursor-pointer"
+                >
+                  <option value="all">All Languages</option>
+                  {languages.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort By Filter */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs text-[#1A7D67]">swap_vert</span>
+                  Sort By
+                </label>
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-xs bg-white text-zinc-800 focus:border-[#1A7D67] focus:ring-2 focus:ring-[#1A7D67]/15 focus:outline-none transition cursor-pointer"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter Actions */}
+              <div className="pt-3 border-t border-zinc-100 space-y-2">
+                <button
+                  type="button"
+                  onClick={handleApplyFilters}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1A7D67] hover:bg-[#156654] text-white text-xs font-bold shadow-xs hover:shadow-md transition duration-300 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">filter_alt</span>
+                  Apply Filters
+                </button>
+
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="w-full px-4 py-2 rounded-xl border border-zinc-300 bg-white text-zinc-600 hover:text-zinc-800 hover:bg-[#F9FBFA] text-xs font-semibold transition cursor-pointer"
+                  >
+                    Clear All Filters
+                  </button>
+                )}
+              </div>
+            </div>
+          </aside>
+
+          {/* ========================================================= */}
+          {/* RIGHT MAIN CONTENT SECTION                                */}
+          {/* ========================================================= */}
+          <main className="lg:col-span-8 xl:col-span-9 space-y-5">
+            {/* Results Count & Active Filter Pills Bar */}
+            <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:px-5 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="text-zinc-500">
+                Showing{" "}
+                <span className="font-bold text-zinc-800">
+                  {sortedDoctors.length}
+                </span>{" "}
+                available doctor{sortedDoctors.length === 1 ? "" : "s"}
+                {appliedFilters.specialty !== "all" && (
+                  <span className="ml-1 text-[#1A7D67] font-semibold">
+                    in {appliedFilters.specialty}
+                  </span>
+                )}
+              </div>
+
+              {hasActiveFilters && (
+                <div className="flex items-center gap-2">
+                  <span className="text-zinc-500">Active filters applied</span>
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="text-xs font-semibold text-[#1A7D67] hover:underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                className="px-4 py-2 rounded-xl border border-[#577877]/25 bg-white text-[#577877] hover:text-[#162623] hover:bg-[#F0F5F7] text-xs font-semibold transition cursor-pointer"
-              >
-                Clear Filters
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyFilters}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#25836F] hover:bg-[#1f6f5e] text-white text-xs font-bold shadow-xs hover:shadow-sm transition cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-sm">filter_alt</span>
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Result Count & Meta Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
-        <div className="text-xs text-[#577877]">
-          Showing{" "}
-          <span className="font-bold text-[#162623]">
-            {sortedDoctors.length}
-          </span>{" "}
-          verified clinician{sortedDoctors.length === 1 ? "" : "s"}
-          {appliedFilters.specialty !== "all" && (
-            <span className="ml-1 text-[#25836F] font-semibold">
-              in {appliedFilters.specialty}
-            </span>
-          )}
-        </div>
-
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer self-start sm:self-auto"
-          >
-            Reset all filters
-          </button>
-        )}
-      </div>
-
-      {/* 4. Doctor Listing */}
-      {loading ? (
-        <div className="rounded-2xl bg-white border border-[#577877]/15 p-16 flex flex-col items-center justify-center gap-3 text-[#577877]">
-          <span className="material-symbols-outlined animate-spin text-4xl text-[#25836F]">
+            {/* Doctor Cards Listing / States */}
+            {loading ? (
+        <div className="rounded-2xl bg-white border border-zinc-200 p-16 flex flex-col items-center justify-center gap-3 text-zinc-500">
+          <span className="material-symbols-outlined animate-spin text-4xl text-[#1A7D67]">
             sync
           </span>
           <p className="text-xs font-medium">Loading clinical directory and schedules…</p>
@@ -700,16 +759,16 @@ export default function FindDoctorsScreen({
           </button>
         </div>
       ) : paginatedDoctors.length === 0 ? (
-        /* 5. Helpful Empty State */
-        <div className="rounded-2xl bg-white border border-[#577877]/15 p-12 sm:p-16 text-center text-[#577877] space-y-4 max-w-xl mx-auto shadow-xs">
-          <div className="w-16 h-16 rounded-2xl bg-[#F0F5F7] text-[#25836F] mx-auto flex items-center justify-center">
+        /* Helpful Empty State */
+        <div className="rounded-2xl bg-white border border-zinc-200 p-12 sm:p-16 text-center text-zinc-500 space-y-4 max-w-xl mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-full bg-[#EEF6F3] text-[#1A7D67] mx-auto flex items-center justify-center">
             <span className="material-symbols-outlined text-3xl">person_search</span>
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-bold text-[#162623]">
+            <h3 className="text-base font-bold text-zinc-800">
               No Clinicians Match Your Criteria
             </h3>
-            <p className="text-xs text-[#577877] max-w-md mx-auto leading-relaxed">
+            <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
               We couldn't find any doctors matching your search or filter combination. Try clearing your filters or selecting a different specialty.
             </p>
           </div>
@@ -717,7 +776,7 @@ export default function FindDoctorsScreen({
             <button
               type="button"
               onClick={handleClearFilters}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#1f6f5e] transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1A7D67] px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#156654] transition cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm">restart_alt</span>
               Clear All Filters
@@ -725,7 +784,7 @@ export default function FindDoctorsScreen({
           </div>
         </div>
       ) : (
-        /* 6. Redesigned Doctor Cards with Consistent Grid */
+        /* Redesigned Doctor Cards matching Landing Page & Our Services Cards */
         <div className="space-y-4">
           {paginatedDoctors.map((doc) => {
             const hasSlots = Array.isArray(doc.availability) && doc.availability.length > 0;
@@ -740,48 +799,69 @@ export default function FindDoctorsScreen({
             return (
               <div
                 key={doc.id}
-                className="rounded-2xl bg-white border border-[#577877]/15 p-5 sm:p-6 shadow-xs hover:shadow-md hover:border-[#25836F]/40 transition-all duration-200"
+                className="rounded-2xl bg-white hover:bg-[#EEF6F3]/40 border border-zinc-200 hover:border-[#1A7D67]/40 p-5 sm:p-6 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
               >
                 {/* Main Card Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
                   {/* Left Column: Avatar & Doctor Details (md: col-span-7 lg: col-span-8) */}
                   <div className="md:col-span-7 lg:col-span-8 flex items-start gap-4 min-w-0">
-                    {/* Avatar */}
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#185A4D] text-white flex items-center justify-center text-lg sm:text-xl font-bold shadow-xs shrink-0 select-none">
+                    {/* Avatar Pill Circle */}
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center text-lg sm:text-xl font-bold transition-colors duration-300 shadow-xs shrink-0 select-none">
                       {initials}
                     </div>
 
                     {/* Details */}
                     <div className="space-y-1.5 min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-bold text-[#162623] truncate">
-                          {doc.fullName}
-                        </h3>
-                        <span
-                          className="material-symbols-outlined text-[#25836F] text-base shrink-0"
-                          title="Verified Clinician"
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProfileDoctor(doc)}
+                          className="text-base sm:text-lg font-bold text-zinc-800 group-hover:text-[#1A7D67] transition-colors truncate text-left cursor-pointer"
                         >
-                          verified
-                        </span>
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#F0F5F7] text-[#185A4D]">
+                          {doc.fullName}
+                        </button>
+                        {doc.isVerified && (
+                          <span
+                            className="material-symbols-outlined text-[#1A7D67] text-base shrink-0"
+                            title="Verified Credentials"
+                          >
+                            verified
+                          </span>
+                        )}
+                        <span className="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#EEF6F3] text-[#1A7D67]">
                           {doc.specialty || "General Specialist"}
+                        </span>
+                        {doc.qualificationsDisplay && (
+                          <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60">
+                            {doc.qualificationsDisplay}
+                          </span>
+                        )}
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                          {doc.experienceYears ? `${doc.experienceYears} Yrs Exp` : "5+ Yrs Exp"}
                         </span>
                       </div>
 
                       {doc.clinic && (
-                        <p className="text-xs text-[#577877] flex items-center gap-1.5 truncate">
-                          <span className="material-symbols-outlined text-sm text-[#577877]/80 shrink-0">
-                            apartment
+                        <p className="text-xs text-zinc-500 flex flex-wrap items-center gap-x-3 gap-y-1 truncate">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span className="material-symbols-outlined text-sm text-zinc-400 shrink-0">
+                              apartment
+                            </span>
+                            <span className="truncate">{doc.clinic}</span>
                           </span>
-                          <span className="truncate">{doc.clinic}</span>
+                          {doc.registrationNumber && (
+                            <span className="text-[11px] text-zinc-500">
+                              Reg No: <strong className="font-semibold text-zinc-700">{doc.registrationNumber}</strong>
+                            </span>
+                          )}
                         </p>
                       )}
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#577877] pt-0.5">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500 pt-0.5">
                         <span className="inline-flex items-center gap-1">
-                          <span className="material-symbols-outlined text-xs text-[#25836F]">translate</span>
+                          <span className="material-symbols-outlined text-xs text-[#1A7D67]">translate</span>
                           Languages:{" "}
-                          <strong className="font-semibold text-[#162623]">
+                          <strong className="font-semibold text-zinc-700">
                             {(doc.languages && doc.languages.length > 0)
                               ? doc.languages.join(", ")
                               : "English"}
@@ -790,7 +870,7 @@ export default function FindDoctorsScreen({
 
                         {doc.timezone && (
                           <span className="inline-flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs text-[#577877]">schedule</span>
+                            <span className="material-symbols-outlined text-xs text-zinc-400">schedule</span>
                             {doc.timezone}
                           </span>
                         )}
@@ -799,21 +879,21 @@ export default function FindDoctorsScreen({
                   </div>
 
                   {/* Right Column: Fee, Availability & Booking Action (md: col-span-5 lg: col-span-4) */}
-                  <div className="md:col-span-5 lg:col-span-4 flex flex-col md:items-end justify-between gap-3 border-t md:border-t-0 md:border-l border-[#577877]/15 pt-4 md:pt-0 md:pl-5">
+                  <div className="md:col-span-5 lg:col-span-4 flex flex-col md:items-end justify-between gap-3 border-t md:border-t-0 md:border-l border-zinc-100 pt-4 md:pt-0 md:pl-5">
                     {/* Fee & Next Available */}
                     <div className="md:text-right space-y-0.5">
                       <div className="flex md:block items-baseline justify-between gap-2">
-                        <span className="text-[11px] text-[#577877] md:hidden">Consultation Fee</span>
-                        <div className="text-lg font-bold text-[#185A4D]">
+                        <span className="text-[11px] text-zinc-500 md:hidden">Consultation Fee</span>
+                        <div className="text-lg font-bold text-[#1A7D67]">
                           {doc.feeDisplay || "Fee calculated at booking"}
                         </div>
                       </div>
 
-                      <div className="text-[11px] text-[#577877] pt-0.5">
+                      <div className="text-[11px] text-zinc-500 pt-0.5">
                         Next slot:{" "}
                         <span
                           className={`font-semibold ${
-                            hasSlots ? "text-[#162623]" : "text-amber-700"
+                            hasSlots ? "text-zinc-800" : "text-amber-700"
                           }`}
                         >
                           {doc.nextSlotLabel}
@@ -821,28 +901,40 @@ export default function FindDoctorsScreen({
                       </div>
                     </div>
 
-                    {/* Booking Action */}
+                    {/* Booking & Profile Actions */}
                     <div className="w-full md:w-auto flex flex-col sm:flex-row md:flex-col items-stretch md:items-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        disabled={!hasSlots}
-                        onClick={() => startBooking(doc)}
-                        className={`w-full md:w-auto px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 ${
-                          hasSlots
-                            ? "bg-[#25836F] hover:bg-[#1f6f5e] text-white hover:shadow-sm cursor-pointer"
-                            : "bg-[#E5EEF1] text-[#577877] cursor-not-allowed opacity-75"
-                        }`}
-                        title={
-                          hasSlots
-                            ? "Book an appointment with this doctor"
-                            : "No appointment slots are currently available for this doctor"
-                        }
-                      >
-                        <span className="material-symbols-outlined text-sm">
-                          {hasSlots ? "calendar_add_on" : "event_busy"}
-                        </span>
-                        <span>{hasSlots ? "Book Appointment" : "No Slots Available"}</span>
-                      </button>
+                      <div className="flex items-center gap-2 w-full md:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProfileDoctor(doc)}
+                          className="px-3.5 py-2.5 rounded-xl border border-zinc-300 bg-white hover:bg-white/95 text-zinc-700 hover:text-[#1A7D67] hover:border-[#1A7D67]/30 text-xs font-semibold transition-all duration-300 shadow-2xs cursor-pointer flex items-center justify-center gap-1 shrink-0"
+                          title="View detailed doctor profile"
+                        >
+                          <span className="material-symbols-outlined text-sm text-[#1A7D67]">visibility</span>
+                          <span>View Profile</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={!hasSlots}
+                          onClick={() => startBooking(doc)}
+                          className={`flex-1 md:flex-none px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 shadow-xs flex items-center justify-center gap-2 ${
+                            hasSlots
+                              ? "bg-[#1A7D67] hover:bg-[#156654] text-white hover:shadow-md cursor-pointer"
+                              : "bg-zinc-100 text-zinc-400 cursor-not-allowed opacity-75"
+                          }`}
+                          title={
+                            hasSlots
+                              ? "Book an appointment with this doctor"
+                              : "No appointment slots are currently available for this doctor"
+                          }
+                        >
+                          <span className="material-symbols-outlined text-sm">
+                            {hasSlots ? "calendar_add_on" : "event_busy"}
+                          </span>
+                          <span>{hasSlots ? "Book" : "No Slots"}</span>
+                        </button>
+                      </div>
 
                       <div className="text-center md:text-right text-[11px] text-[#577877]">
                         {hasSlots ? (
@@ -888,6 +980,174 @@ export default function FindDoctorsScreen({
               </div>
             </div>
           )}
+        </div>
+      )}
+          </main>
+        </div>
+
+      {/* Detailed Doctor Profile Modal */}
+      {selectedProfileDoctor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="care-card max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-8 relative animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-[#577877]/15 pb-4">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-[#185A4D] text-white flex items-center justify-center text-xl font-bold shadow-xs shrink-0 select-none">
+                  {(selectedProfileDoctor.fullName || "MD")
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-[#162623]">
+                      {selectedProfileDoctor.fullName}
+                    </h2>
+                    {selectedProfileDoctor.isVerified && (
+                      <span className="material-symbols-outlined text-[#25836F] text-lg" title="Verified Credentials">
+                        verified
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#F0F5F7] text-[#185A4D]">
+                      {selectedProfileDoctor.specialty || "General Specialist"}
+                    </span>
+                    {selectedProfileDoctor.clinic && (
+                      <span className="text-xs text-[#577877]">
+                        · {selectedProfileDoctor.clinic}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedProfileDoctor(null)}
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] hover:text-[#162623] transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            {/* Detailed Doctor Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#F0F5F7]/60 p-4 rounded-xl border border-[#577877]/15">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Qualifications</div>
+                <div className="text-xs font-bold text-[#162623] mt-0.5 truncate" title={selectedProfileDoctor.qualificationsDisplay}>
+                  {selectedProfileDoctor.qualificationsDisplay || "MBBS"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Experience</div>
+                <div className="text-xs font-bold text-[#162623] mt-0.5">
+                  {selectedProfileDoctor.experienceYears ? `${selectedProfileDoctor.experienceYears} Years` : "5+ Years"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Consultation Fee</div>
+                <div className="text-xs font-bold text-[#1A7D67] mt-0.5">
+                  {selectedProfileDoctor.feeDisplay || "Fee calculated at booking"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#577877]">Reg. Number</div>
+                <div className="text-xs font-bold text-[#162623] mt-0.5 truncate" title={selectedProfileDoctor.registrationNumber}>
+                  {selectedProfileDoctor.registrationNumber || "Reg. on File"}
+                </div>
+              </div>
+            </div>
+
+            {/* Specialization & Scope of Practice */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-[#25836F]">clinical_notes</span>
+                Clinical Specialization & Scope of Practice
+              </h3>
+              <p className="text-xs text-[#162623] leading-relaxed bg-white p-3.5 rounded-xl border border-[#577877]/15">
+                {selectedProfileDoctor.bio ||
+                  `Qualified ${selectedProfileDoctor.specialty || "medical"} specialist providing high-quality teleconsultations, clinical evaluations, and treatment guidance.`}
+              </p>
+            </div>
+
+            {/* Languages & Location */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="space-y-1">
+                <span className="font-bold text-[#577877] uppercase text-[11px] tracking-wider block">Languages Spoken</span>
+                <span className="font-semibold text-[#162623]">
+                  {Array.isArray(selectedProfileDoctor.languages) && selectedProfileDoctor.languages.length > 0
+                    ? selectedProfileDoctor.languages.join(", ")
+                    : "English"}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <span className="font-bold text-[#577877] uppercase text-[11px] tracking-wider block">Time Zone</span>
+                <span className="font-semibold text-[#162623]">
+                  {selectedProfileDoctor.timezone || "Asia/Kolkata"}
+                </span>
+              </div>
+            </div>
+
+            {/* Real-time Schedule Availability */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-[#25836F]">calendar_month</span>
+                Available Consultation Schedule ({selectedProfileDoctor.availability?.length || 0} Slots)
+              </h3>
+              {Array.isArray(selectedProfileDoctor.availability) && selectedProfileDoctor.availability.length > 0 ? (
+                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                  {selectedProfileDoctor.availability.map((slot, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2.5 rounded-lg bg-[#F0F5F7] border border-[#577877]/10 text-xs">
+                      <span className="font-semibold text-[#162623]">
+                        {new Date(slot.starts_at).toLocaleString([], {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <span className="text-[11px] font-bold text-[#25836F] bg-white px-2 py-0.5 rounded border border-[#25836F]/20">
+                        {slot.duration_minutes || 30} mins
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-[#577877] italic bg-[#F0F5F7] p-3 rounded-xl">
+                  No upcoming schedule slots available at this moment.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 border-t border-[#577877]/15 pt-4">
+              <button
+                type="button"
+                onClick={() => setSelectedProfileDoctor(null)}
+                className="px-4 py-2 rounded-xl border border-[#577877]/25 text-xs font-semibold text-[#577877] hover:bg-[#F0F5F7] transition cursor-pointer"
+              >
+                Close Profile
+              </button>
+              {Array.isArray(selectedProfileDoctor.availability) && selectedProfileDoctor.availability.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const docToBook = selectedProfileDoctor;
+                    setSelectedProfileDoctor(null);
+                    startBooking(docToBook);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-[#25836F] hover:bg-[#1f6f5e] text-white text-xs font-bold shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-sm">calendar_add_on</span>
+                  Book Consultation Now
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1042,6 +1302,9 @@ export default function FindDoctorsScreen({
                         ? "Audio"
                         : visitFormat}{" "}
                       · {appointmentType || "Not selected"}
+                      {bookingPricing?.duration_minutes
+                        ? ` · ${bookingPricing.duration_minutes} mins`
+                        : " · 30 mins"}
                     </span>
                   </div>
                 </div>
@@ -1203,6 +1466,7 @@ export default function FindDoctorsScreen({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

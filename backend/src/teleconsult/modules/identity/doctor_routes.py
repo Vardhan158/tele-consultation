@@ -1,13 +1,16 @@
 import base64
+import binascii
 import hashlib
 import hmac
 import secrets
 import struct
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from sqlalchemy import select
@@ -15,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
-from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.identity.auth_routes import (
     auth_database_session,
@@ -28,6 +30,9 @@ from teleconsult.modules.patient_portal.models import Doctor
 
 router = APIRouter(prefix="/doctor", tags=["doctor-onboarding"])
 OTP_EXPIRY_MINUTES = 5
+CREDENTIAL_TYPES = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
+MAX_CREDENTIAL_BYTES = 10 * 1024 * 1024
+PRIVATE_CREDENTIAL_ROOT = Path(__file__).resolve().parents[4] / "private_storage" / "credentials"
 
 
 def generate_verification_otp() -> str:
@@ -61,14 +66,66 @@ def _totp(secret: str, counter: int | None = None) -> str:
     return str((struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7fffffff) % 1_000_000).zfill(6)
 
 
+def _mfa_expired(value) -> bool:
+    if not value:
+        return False
+    try:
+        expiry = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=UTC)
+        return expiry <= datetime.now(UTC)
+    except (TypeError, ValueError, OverflowError):
+        return True
+
+
+def _valid_mfa_code(secret: str | None, code: str) -> bool:
+    if not secret:
+        return False
+    try:
+        return any(hmac.compare_digest(_totp(secret, int(time.time() // 30) + offset), code) for offset in (-1, 0, 1))
+    except (ValueError, TypeError, binascii.Error):
+        return False
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register_doctor(payload: DoctorRegistration, session: AsyncSession | None = Depends(auth_database_session)):
+async def register_doctor(
+    request: Request,
+    session: AsyncSession | None = Depends(auth_database_session),
+):
+    credential = None
+    if request.headers.get("content-type", "").startswith("multipart/form-data"):
+        form = await request.form()
+        values = {key: form.get(key) for key in DoctorRegistration.model_fields}
+        values["qualifications"] = [v.strip() for v in str(values.get("qualifications") or "").split(",") if v.strip()]
+        values["languages"] = [v.strip() for v in str(values.get("languages") or "").split(",") if v.strip()]
+        payload = DoctorRegistration.model_validate(values)
+        upload = form.get("credential_document")
+        if upload is None or not hasattr(upload, "read"):
+            raise HTTPException(status_code=422, detail="Credential document is required")
+        content_type = getattr(upload, "content_type", "") or ""
+        if content_type not in CREDENTIAL_TYPES:
+            raise HTTPException(status_code=415, detail="Credential must be a PDF, JPG, or PNG file")
+        raw_name = Path(getattr(upload, "filename", "credential") or "credential")
+        if raw_name.suffix.lower() != CREDENTIAL_TYPES[content_type]:
+            raise HTTPException(status_code=415, detail="Credential file extension does not match its type")
+        data = await upload.read(MAX_CREDENTIAL_BYTES + 1)
+        if len(data) > MAX_CREDENTIAL_BYTES:
+            raise HTTPException(status_code=413, detail="Credential file exceeds the 10 MB limit")
+        credential = (raw_name.name, content_type, data)
+    else:
+        try:
+            payload = DoctorRegistration.model_validate(await request.json())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Registration payload is invalid") from exc
     email = payload.email.strip().lower()
     settings = get_settings()
     if settings.mongodb_enabled:
         if not mongo_database.enabled:
             raise HTTPException(status_code=503, detail="MongoDB is enabled but not connected")
         tenant_id = settings.default_tenant_id
+        db = mongo_database.database()
+        if await db["doctors"].find_one({"tenant_id": tenant_id, "registration_number": payload.registration_number.strip()}):
+            raise HTTPException(status_code=409, detail="This professional registration number is already registered.")
         user_id = str(uuid4())
         now = datetime.now(UTC)
         user = {
@@ -105,15 +162,41 @@ async def register_doctor(payload: DoctorRegistration, session: AsyncSession | N
             "created_at": now,
         }
         code = generate_verification_otp()
+        credential_path = None
+        credential_meta = None
+        if credential:
+            filename, content_type, data = credential
+            credential_path = PRIVATE_CREDENTIAL_ROOT / tenant_id / f"{user_id}{CREDENTIAL_TYPES[content_type]}"
+            credential_path.parent.mkdir(parents=True, exist_ok=True)
+            credential_path.write_bytes(data)
+            file_b64 = base64.b64encode(data).decode('utf-8')
+            credential_meta = {
+                "doctor_id": user_id,
+                "tenant_id": tenant_id,
+                "registration_number": payload.registration_number.strip(),
+                "storage_key": str(credential_path.relative_to(PRIVATE_CREDENTIAL_ROOT)),
+                "file_name": filename,
+                "content_type": content_type,
+                "size_bytes": len(data),
+                "file_data_base64": file_b64,
+                "status": "pending_verification",
+                "created_at": now,
+                "uploaded_at": now,
+                "uploaded_by": user_id,
+            }
         try:
-            await mongo_database.database()["users"].insert_one(user)
-            await mongo_database.database()["doctors"].insert_one(doctor)
-            await mongo_database.database()["recovery_tokens"].insert_one({
+            await db["users"].insert_one(user)
+            await db["doctors"].insert_one(doctor)
+            if credential_meta:
+                await db["doctor_credentials"].insert_one(credential_meta)
+            await db["recovery_tokens"].insert_one({
                 "id": str(uuid4()), "user_id": user_id, "token_hash": token_hash(code),
                 "expires_at": otp_expiry(now), "used_at": None, "attempts": 0,
             })
             await send_verification_email(email, code)
         except DuplicateKeyError:
+            if credential_path and credential_path.is_file():
+                credential_path.unlink()
             existing_user = await mongo_database.database()["users"].find_one({
                 "tenant_id": tenant_id, "email": email
             })
@@ -140,6 +223,8 @@ async def register_doctor(payload: DoctorRegistration, session: AsyncSession | N
 
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
+    if credential:
+        raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
     existing_user = await session.scalar(select(UserAccount).where(UserAccount.email == email))
     if existing_user:
         if existing_user.verified_at is None:
@@ -189,6 +274,9 @@ async def approve_doctor(
 
     if settings.mongodb_enabled:
         db = mongo_database.database()
+        credential = await db["doctor_credentials"].find_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)})
+        if not credential or not credential.get("storage_key"):
+            raise HTTPException(status_code=409, detail="Credential document must be uploaded before approval.")
         result = await db["doctors"].update_one(
             {
                 "tenant_id": settings.default_tenant_id,
@@ -199,15 +287,20 @@ async def approve_doctor(
                     "approval_status": "approved",
                     "active": True,
                     "approved_for_consultation": True,
+                    "approval_decided_by": str(principal.user_id),
+                    "approval_decided_at": datetime.now(UTC),
                 }
             },
         )
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Doctor not found")
+        await db["audit_logs"].insert_one({"id": str(uuid4()), "tenant_id": settings.default_tenant_id, "actor_id": str(principal.user_id), "action": "doctor.approval", "resource_type": "doctor", "resource_id": str(doctor_id), "purpose": "credential verification", "metadata": {"decision": "approved"}, "occurred_at": datetime.now(UTC)})
+        await db["doctor_credentials"].update_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)}, {"$set": {"status": "approved", "reviewed_by": str(principal.user_id), "reviewed_at": datetime.now(UTC)}})
         return {"status": "approved", "doctor_id": str(doctor_id)}
 
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
+    raise HTTPException(status_code=409, detail="Credential document must be uploaded before approval.")
     doctor = await session.scalar(
         select(Doctor).where(
             Doctor.id == UUID(doctor_id), Doctor.tenant_id == UUID(principal.tenant_id)
@@ -267,6 +360,112 @@ async def pending_doctors(
     ]
 
 
+@router.get("/{doctor_id}/credentials")
+async def get_doctor_credentials(doctor_id: str, request: Request):
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if principal.user_id != str(doctor_id) and "clinic:doctor:read" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    settings = get_settings()
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
+
+    db = mongo_database.database()
+    doctor = await db["doctors"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+    })
+    doc_target_id = str(doctor.get("id") or doctor.get("user_id") or doctor_id) if doctor else str(doctor_id)
+
+    document = await db["doctor_credentials"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [{"doctor_id": doc_target_id}, {"doctor_id": str(doctor_id)}],
+    })
+    if not document:
+        raise HTTPException(status_code=404, detail="Credential document not found")
+
+    file_bytes = None
+    path = (PRIVATE_CREDENTIAL_ROOT / document.get("storage_key", "")).resolve()
+    if PRIVATE_CREDENTIAL_ROOT.resolve() in path.parents and path.is_file():
+        file_bytes = path.read_bytes()
+    elif document.get("file_data_base64"):
+        try:
+            file_bytes = base64.b64decode(document["file_data_base64"])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(file_bytes)
+        except Exception:
+            pass
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=404,
+            detail="Credential content is unavailable. Please re-upload the clinician's credential document.",
+        )
+
+    is_inline = request.query_params.get("inline") == "true"
+    disposition = "inline" if is_inline else "attachment"
+    safe_filename = document.get("file_name", "credential_document.pdf")
+    content_type = document.get("content_type", "application/pdf")
+
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={"Content-Disposition": f'{disposition}; filename="{safe_filename}"'},
+    )
+
+
+@router.post("/{doctor_id}/credentials")
+async def upload_doctor_credentials(doctor_id: str, request: Request):
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if principal.user_id != str(doctor_id) and "clinic:doctor:read" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    settings = get_settings()
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
+    form = await request.form()
+    upload = form.get("credential_document")
+    if upload is None or not hasattr(upload, "read"):
+        raise HTTPException(status_code=422, detail="Credential document is required")
+    content_type = getattr(upload, "content_type", "") or ""
+    if content_type not in CREDENTIAL_TYPES:
+        raise HTTPException(status_code=415, detail="Credential must be a PDF, JPG, or PNG file")
+    raw_name = Path(getattr(upload, "filename", "credential") or "credential")
+    if raw_name.suffix.lower() != CREDENTIAL_TYPES[content_type]:
+        raise HTTPException(status_code=415, detail="Credential file extension does not match its type")
+    data = await upload.read(MAX_CREDENTIAL_BYTES + 1)
+    if len(data) > MAX_CREDENTIAL_BYTES:
+        raise HTTPException(status_code=413, detail="Credential file exceeds the 10 MB limit")
+    db = mongo_database.database()
+    doctor = await db["doctors"].find_one({"tenant_id": settings.default_tenant_id, "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}]})
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    now = datetime.now(UTC)
+    path = PRIVATE_CREDENTIAL_ROOT / settings.default_tenant_id / f"{doctor.get('id') or doctor.get('user_id')}{CREDENTIAL_TYPES[content_type]}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    file_b64 = base64.b64encode(data).decode('utf-8')
+
+    await db["doctor_credentials"].update_one(
+        {"tenant_id": settings.default_tenant_id, "$or": [{"doctor_id": str(doctor.get("id"))}, {"doctor_id": str(doctor.get("user_id"))}, {"doctor_id": str(doctor_id)}]},
+        {"$set": {
+            "doctor_id": str(doctor.get("id") or doctor.get("user_id")),
+            "registration_number": doctor.get("registration_number"),
+            "storage_key": str(path.relative_to(PRIVATE_CREDENTIAL_ROOT)),
+            "file_name": raw_name.name,
+            "content_type": content_type,
+            "size_bytes": len(data),
+            "file_data_base64": file_b64,
+            "status": "pending_verification",
+            "created_at": now,
+            "uploaded_at": now,
+            "uploaded_by": str(principal.user_id),
+        }},
+        upsert=True,
+    )
+    return {"status": "stored", "doctor_id": str(doctor.get("id") or doctor.get("user_id")), "file_name": raw_name.name, "uploaded_at": now, "approval_status": doctor.get("approval_status", "pending")}
+
+
 @router.post("/{doctor_id}/reject")
 async def reject_doctor(
     doctor_id: str,
@@ -291,11 +490,15 @@ async def reject_doctor(
                     "approval_status": "rejected",
                     "active": False,
                     "approved_for_consultation": False,
+                    "approval_decided_by": str(principal.user_id),
+                    "approval_decided_at": datetime.now(UTC),
                 }
             },
         )
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Doctor not found")
+        await db["audit_logs"].insert_one({"id": str(uuid4()), "tenant_id": settings.default_tenant_id, "actor_id": str(principal.user_id), "action": "doctor.approval", "resource_type": "doctor", "resource_id": str(doctor_id), "purpose": "credential verification", "metadata": {"decision": "rejected"}, "occurred_at": datetime.now(UTC)})
+        await db["doctor_credentials"].update_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)}, {"$set": {"status": "rejected", "reviewed_by": str(principal.user_id), "reviewed_at": datetime.now(UTC)}})
         return {"status": "rejected", "doctor_id": str(doctor_id)}
 
     if session is None:
@@ -312,19 +515,70 @@ async def reject_doctor(
 
 
 @router.post("/mfa/enroll")
-async def enroll_mfa(session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("doctor:profile:write"))):
+async def enroll_mfa(response: Response, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+    response.headers["Cache-Control"] = "no-store"
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
+        if user is None:
+            raise HTTPException(status_code=404, detail="Doctor account not found")
+        secret = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
+        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$set": {"mfa_secret": secret, "mfa_recovery_code_hashes": [], "mfa_enabled": False, "mfa_enrollment_expires_at": datetime.now(UTC) + timedelta(minutes=10), "mfa_last_counter": None, "mfa_failed_attempts": 0}})
+        return {"secret": secret, "otpauth_uri": f"otpauth://totp/Kaizentrix%20Care?secret={secret}&issuer=Kaizentrix%20Care", "expires_in_minutes": 10}
+    if session is None:
+        raise HTTPException(status_code=503, detail="Application database is unavailable")
     user = await session.get(UserAccount, UUID(principal.user_id))
     if user is None:
         raise HTTPException(status_code=404, detail="Doctor account not found")
     user.mfa_secret = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
-    user.mfa_recovery_codes = [secrets.token_urlsafe(8) for _ in range(8)]
-    return {"secret": user.mfa_secret, "recovery_codes": user.mfa_recovery_codes}
+    user.mfa_recovery_codes = []
+    return {"secret": user.mfa_secret, "otpauth_uri": f"otpauth://totp/Kaizentrix%20Care?secret={user.mfa_secret}&issuer=Kaizentrix%20Care", "expires_in_minutes": 10}
 
 
 @router.post("/mfa/verify")
-async def verify_mfa(payload: MfaCode, session: AsyncSession = Depends(tenant_session), principal: Principal = Depends(require("doctor:profile:write"))):
+async def verify_mfa(payload: MfaCode, response: Response, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+    response.headers["Cache-Control"] = "no-store"
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
+        secret = user.get("mfa_secret") if user else None
+        if user is None or _mfa_expired(user.get("mfa_enrollment_expires_at")) or user.get("mfa_failed_attempts", 0) >= 5 or not _valid_mfa_code(secret, payload.code):
+            if user:
+                await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$inc": {"mfa_failed_attempts": 1}})
+            raise HTTPException(status_code=400, detail="Invalid MFA code")
+        recovery_codes = [secrets.token_urlsafe(8) for _ in range(8)]
+        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id)}, {"$set": {"mfa_enabled": True, "mfa_recovery_code_hashes": [hashlib.sha256(code.encode()).hexdigest() for code in recovery_codes], "mfa_enrollment_expires_at": None, "mfa_failed_attempts": 0, "mfa_last_counter": int(time.time() // 30)}})
+        return {"status": "enabled", "recovery_codes": recovery_codes}
+    if session is None:
+        raise HTTPException(status_code=503, detail="Application database is unavailable")
     user = await session.get(UserAccount, UUID(principal.user_id))
-    if user is None or not user.mfa_secret or not any(hmac.compare_digest(_totp(user.mfa_secret, int(time.time() // 30) + offset), payload.code) for offset in (-1, 0, 1)):
+    if user is None or not _valid_mfa_code(user.mfa_secret if user else None, payload.code):
         raise HTTPException(status_code=400, detail="Invalid MFA code")
+    recovery_codes = [secrets.token_urlsafe(8) for _ in range(8)]
+    user.mfa_recovery_codes = recovery_codes
     user.mfa_enabled = True
-    return {"status": "enabled"}
+    return {"status": "enabled", "recovery_codes": recovery_codes}
+
+
+@router.post("/mfa/enroll/cancel")
+async def cancel_mfa_enrollment(response: Response, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:profile:write"))):
+    response.headers["Cache-Control"] = "no-store"
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        user = await db["users"].find_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "role": "doctor"})
+        if user is None:
+            raise HTTPException(status_code=404, detail="Doctor account not found")
+        if user.get("mfa_enabled"):
+            raise HTTPException(status_code=409, detail="Active MFA must be reset through reauthentication")
+        await db["users"].update_one({"tenant_id": str(principal.tenant_id), "id": str(principal.user_id), "mfa_enabled": {"$ne": True}}, {"$set": {"mfa_secret": None, "mfa_enrollment_expires_at": None, "mfa_failed_attempts": 0}})
+        return {"status": "cancelled"}
+    if session is None:
+        raise HTTPException(status_code=503, detail="Application database is unavailable")
+    user = await session.get(UserAccount, UUID(principal.user_id))
+    if user is None:
+        raise HTTPException(status_code=404, detail="Doctor account not found")
+    if user.mfa_enabled:
+        raise HTTPException(status_code=409, detail="Active MFA must be reset through reauthentication")
+    user.mfa_secret = None
+    user.mfa_recovery_codes = []
+    return {"status": "cancelled"}

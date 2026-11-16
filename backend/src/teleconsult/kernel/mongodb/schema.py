@@ -93,17 +93,17 @@ async def ensure_clinic_seeded(db: Any = None) -> None:
     now_iso = datetime.now(UTC).isoformat()
 
     # 1. Seed / Upsert Clinic Settings
-    admin_email = os.getenv("CLINIC_ADMIN_EMAIL", "clinic-admin@teleconsult.local")
+    admin_email = os.getenv("CLINIC_ADMIN_EMAIL", "admin@kaizencare.in")
     admin_password = os.getenv("CLINIC_ADMIN_PASSWORD", "AdminPassword123!")
-    clinic_name = os.getenv("CLINIC_NAME", "Kaizentrix Care Telehealth Center")
+    clinic_name = os.getenv("CLINIC_NAME", "Kaizen Care Telehealth Center")
     clinic_tz = os.getenv("CLINIC_TIMEZONE", "Asia/Kolkata")
 
     clinic_settings_doc = {
         "tenant_id": tenant_id,
         "clinic_name": clinic_name,
-        "address": os.getenv("CLINIC_ADDRESS", "742 Medical Center Blvd, San Francisco, CA 94107"),
-        "contact_email": os.getenv("CLINIC_CONTACT_EMAIL", "support@kaizentrixcare.local"),
-        "contact_phone": os.getenv("CLINIC_CONTACT_PHONE", "+1 (800) 555-KAIZEN"),
+        "address": os.getenv("CLINIC_ADDRESS", "Kaizen Care Health Tower, MG Road, Bengaluru, Karnataka 560001, India"),
+        "contact_email": os.getenv("CLINIC_CONTACT_EMAIL", "support@kaizencare.in"),
+        "contact_phone": os.getenv("CLINIC_CONTACT_PHONE", "+91 80 4567 8900"),
         "timezone": clinic_tz,
         "cancellation_deadline_hours": 24,
         "intake_policy": "clinic_configured",
@@ -125,9 +125,9 @@ async def ensure_clinic_seeded(db: Any = None) -> None:
         "tenant_id": tenant_id,
         "name": clinic_name,
         "clinic_name": clinic_name,
-        "address": os.getenv("CLINIC_ADDRESS", "742 Medical Center Blvd, San Francisco, CA 94107"),
-        "contact_email": os.getenv("CLINIC_CONTACT_EMAIL", "support@kaizentrixcare.local"),
-        "contact_phone": os.getenv("CLINIC_CONTACT_PHONE", "+1 (800) 555-KAIZEN"),
+        "address": os.getenv("CLINIC_ADDRESS", "Kaizen Care Health Tower, MG Road, Bengaluru, Karnataka 560001, India"),
+        "contact_email": os.getenv("CLINIC_CONTACT_EMAIL", "support@kaizencare.in"),
+        "contact_phone": os.getenv("CLINIC_CONTACT_PHONE", "+91 80 4567 8900"),
         "timezone": clinic_tz,
         "operating_hours": os.getenv("CLINIC_OPERATING_HOURS", "Mon - Sat: 08:00 AM - 08:00 PM IST"),
         "active": True,

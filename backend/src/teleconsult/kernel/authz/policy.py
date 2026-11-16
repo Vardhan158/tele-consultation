@@ -61,11 +61,11 @@ async def get_principal(request: Request) -> Principal:
             }
         else:
             permissions = {
-                "notification:read", "notification:retry", "patient:profile:read", "appointment:read",
-                "records:read", "prescription:read", "followup:read", "support:read",
-                "payment:read", "payment:create", "payment:verify", "payment:refund",
-                "directory:read", "appointment:create", "appointment:write", "consultation:join",
-                "records:upload", "support:create",
+                "notification:read", "notification:retry", "patient:profile:read", "patient:profile:write",
+                "patient:intake:write", "appointment:read", "appointment:create", "appointment:write",
+                "records:read", "records:upload", "prescription:read", "followup:read", "support:read",
+                "support:create", "payment:read", "payment:create", "payment:verify", "payment:refund",
+                "directory:read", "consultation:join",
             }
         return Principal(
             user_id=user["id"], tenant_id=user["tenant_id"], roles=frozenset({role}),

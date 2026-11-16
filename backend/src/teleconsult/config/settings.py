@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     video_join_window_minutes: int = 30
     audio_only_allowed: bool = False
     cancellation_deadline_hours: int = 24
+    payment_deadline_minutes: int = 15
     max_reschedules: int = 1
     mobile_launch_mode: str = "responsive_web"
     clinical_record_retention_days: int = 2555
@@ -46,6 +47,11 @@ class Settings(BaseSettings):
     brevo_api_key: str = Field(default="", validation_alias="BREVO_API_KEY")
     brevo_sender_email: str = Field(default="", validation_alias="BREVO_SENDER_EMAIL")
     brevo_sender_name: str = Field(default="Kaizentrix Care", validation_alias="BREVO_SENDER_NAME")
+    newsletter_website_url: str = Field(default="", validation_alias="NEWSLETTER_WEBSITE_URL")
+    newsletter_api_base_url: str = Field(default="", validation_alias="NEWSLETTER_API_BASE_URL")
+    newsletter_poster_url: str = Field(default="", validation_alias="NEWSLETTER_POSTER_URL")
+    newsletter_token_ttl_minutes: int = Field(default=60, validation_alias="NEWSLETTER_TOKEN_TTL_MINUTES")
+    newsletter_rate_limit_per_hour: int = Field(default=5, validation_alias="NEWSLETTER_RATE_LIMIT_PER_HOUR")
 
     # Payment Gateway (Razorpay)
     razorpay_key_id: str = Field(default="", validation_alias="RAZORPAY_KEY_ID")

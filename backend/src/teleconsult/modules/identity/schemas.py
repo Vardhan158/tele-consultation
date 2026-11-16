@@ -15,6 +15,7 @@ class LoginRequest(BaseModel):
     email: str
     password: str
     mfa_code: str | None = Field(default=None, min_length=6, max_length=6, pattern=r"^\d{6}$")
+    recovery_code: str | None = Field(default=None, min_length=8, max_length=64)
 
 
 class VerifyEmailRequest(BaseModel):

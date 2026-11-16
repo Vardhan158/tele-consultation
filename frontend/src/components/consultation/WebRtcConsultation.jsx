@@ -34,6 +34,7 @@ export default function WebRtcConsultation({
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [audioOnlyAvailable, setAudioOnlyAvailable] = useState(false);
+  const [remoteMedia, setRemoteMedia] = useState({ audio: false, video: false });
   const startRef = useRef(null);
   const startingRef = useRef(false);
   const remoteKindsRef = useRef(new Set());
@@ -62,10 +63,19 @@ export default function WebRtcConsultation({
         console.debug("[WebRTC]", { appointmentId, role, event, ...details });
       }
     };
-    const setRemoteStream = (stream) => {
-      remoteStreamRef.current = stream;
-      if (!remoteVideo.current || !stream) return;
-      remoteVideo.current.srcObject = stream;
+    const setRemoteStream = (stream, track) => {
+      const remote = remoteStreamRef.current || new MediaStream();
+      for (const remoteTrack of stream?.getTracks?.() || []) {
+        if (!remote.getTracks().some((existing) => existing.id === remoteTrack.id)) remote.addTrack(remoteTrack);
+      }
+      if (track && !remote.getTracks().some((existing) => existing.id === track.id)) remote.addTrack(track);
+      remoteStreamRef.current = remote;
+      setRemoteMedia({
+        audio: remote.getAudioTracks().some((remoteTrack) => remoteTrack.readyState === "live"),
+        video: remote.getVideoTracks().some((remoteTrack) => remoteTrack.readyState === "live"),
+      });
+      if (!remoteVideo.current) return;
+      remoteVideo.current.srcObject = remote;
       remoteVideo.current
         .play?.()
         .catch(() => diagnostic("remote-play-blocked"));
@@ -115,10 +125,23 @@ export default function WebRtcConsultation({
         });
         peerRef.current = peer;
         stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+        if (role === "doctor" && !stream.getVideoTracks().length) {
+          peer.addTransceiver("video", { direction: "recvonly" });
+        }
         peer.ontrack = (event) => {
-          diagnostic("track", event.track.kind);
+          diagnostic("track", {
+            kind: event.track.kind,
+            readyState: event.track.readyState,
+            enabled: event.track.enabled,
+            muted: event.track.muted,
+            connectionState: peer.connectionState,
+            iceConnectionState: peer.iceConnectionState,
+            signalingState: peer.signalingState,
+          });
           remoteKindsRef.current.add(event.track.kind);
-          setRemoteStream(event.streams?.[0] || new MediaStream([event.track]));
+          event.track.onunmute = () => setRemoteStream(event.streams?.[0], event.track);
+          event.track.onended = () => setRemoteMedia((current) => ({ ...current, [event.track.kind]: false }));
+          setRemoteStream(event.streams?.[0], event.track);
           if (peer.connectionState === "connected") setStatus("in_progress");
         };
         peer.onicecandidate = (event) => {
@@ -279,7 +302,7 @@ export default function WebRtcConsultation({
           {status === "in_progress" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-              Connected · Live Consultation
+              {remoteMedia.video ? "Connected · Video + Audio Live" : remoteMedia.audio ? "Connected · Audio Live" : "Connected · Peer Connected"}
             </span>
           ) : status === "waiting" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold uppercase tracking-wider">
@@ -294,7 +317,7 @@ export default function WebRtcConsultation({
           ) : status === "reconnecting" || status === "disconnected" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-bold uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
-              Doctor Disconnected · Reconnecting…
+              {role === "doctor" ? "Patient Disconnected · Reconnecting…" : "Doctor Disconnected · Reconnecting…"}
             </span>
           ) : status === "device_unavailable" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-900 font-bold uppercase tracking-wider">Device Unavailable</span>
@@ -318,7 +341,7 @@ export default function WebRtcConsultation({
       <div className="relative rounded-2xl overflow-hidden bg-[#162623] shadow-lg aspect-16/10 flex flex-col justify-between">
         {/* Remote Doctor Stream or Waiting Overlay */}
         <div className="w-full h-full relative flex items-center justify-center bg-[#162623]">
-          {status === "in_progress" ? (
+          {status === "in_progress" && (remoteMedia.video || remoteMedia.audio) ? (
             <video
               ref={remoteVideo}
               autoPlay
@@ -334,7 +357,7 @@ export default function WebRtcConsultation({
                 {status === "waiting"
                   ? role === "doctor" ? "Waiting for Patient to Join" : "Waiting for Doctor to Join"
                   : status === "connecting"
-                  ? "Connecting to Doctor…"
+                  ? role === "doctor" ? "Connecting to Patient…" : "Connecting to Doctor…"
                   : status === "device_unavailable"
                   ? "Camera or microphone unavailable"
                   : status === "disconnected" || status === "reconnecting"

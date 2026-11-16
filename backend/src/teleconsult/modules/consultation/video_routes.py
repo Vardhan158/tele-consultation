@@ -14,6 +14,12 @@ from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.consultation.video_models import VideoSession
 from teleconsult.modules.consultation.video_schemas import VideoJoinResponse, VideoStatusResponse
+from teleconsult.modules.patient_portal.appointment_access import (
+    SETTLED_STATUSES,
+    join_eligible,
+    latest_payment,
+    patient_identity_ids,
+)
 from teleconsult.modules.patient_portal.models import Appointment
 
 router = APIRouter(prefix="/patient/consultations", tags=["video-consultation"])
@@ -57,87 +63,26 @@ async def join_waiting_room(
     session: AsyncSession | None = Depends(video_session),
     principal: Principal = Depends(require("consultation:join")),
 ) -> VideoJoinResponse:
-    print(f"DEBUG ENTER join_waiting_room appointment_id={appointment_id}")
     now = datetime.now(UTC)
     settings = get_settings()
 
     if settings.mongodb_enabled:
         db = mongo_database.database()
+        patient_ids = await patient_identity_ids(db, principal)
         apt_doc = await db["appointments"].find_one({
-            "$or": [
-                {"id": str(appointment_id)},
-                {"id": str(appointment_id).lower()},
-                {"id": str(appointment_id).upper()},
-            ],
+            "tenant_id": str(principal.tenant_id),
+            "id": str(appointment_id),
+            "patient_id": {"$in": patient_ids},
         })
         if not apt_doc:
-            doc_record = await db["doctors"].find_one({"tenant_id": principal.tenant_id, "active": True})
-            if doc_record:
-                apt_doc = {
-                    "id": str(appointment_id),
-                    "tenant_id": principal.tenant_id,
-                    "patient_id": principal.user_id,
-                    "doctor_id": doc_record.get("id"),
-                    "starts_at": now.isoformat(),
-                    "status": "confirmed",
-                    "payment_status": "not_required",
-                    "idempotency_key": f"idemp-{appointment_id}",
-                    "created_at": now.isoformat(),
-                }
-                await db["appointments"].insert_one(dict(apt_doc))
-            else:
-                raise HTTPException(status_code=404, detail="Appointment not found")
+            raise HTTPException(status_code=404, detail="Appointment not found")
 
-        # Enforce appointment ownership: patient_id must match principal.user_id
-        apt_patient_id = str(apt_doc.get("patient_id", ""))
-        if (
-            "patient" in principal.roles
-            and apt_patient_id
-            and apt_patient_id != str(principal.user_id)
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not authorized to access this consultation room.",
-            )
-
-        status_val = apt_doc.get("status")
-        pay_status = (apt_doc.get("payment_status") or "").lower()
-        payment_doc = await db["payments"].find_one(
-            {"tenant_id": principal.tenant_id, "appointment_id": str(appointment_id)},
-            sort=[("created_at", -1)],
-        )
-        if payment_doc:
-            pay_status = (payment_doc.get("status") or pay_status).lower()
-
-        # Reject if appointment requires payment and payment_status is pending/failed
-        is_free_or_paid = pay_status in {"captured", "success", "not_required", "no_payment_required", "not_needed"}
-        if not is_free_or_paid:
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail="Payment is required before joining the consultation room.",
-            )
-
-        # Validate permitted joining window on backend
-        starts_at_str = apt_doc.get("starts_at")
-        ends_at_str = apt_doc.get("ends_at")
-        if starts_at_str and settings.environment not in {"dev", "local_test"}:
-            try:
-                starts_dt = datetime.fromisoformat(str(starts_at_str).replace("Z", "+00:00"))
-                if ends_at_str:
-                    ends_dt = datetime.fromisoformat(str(ends_at_str).replace("Z", "+00:00"))
-                else:
-                    ends_dt = starts_dt + timedelta(minutes=30)
-
-                join_window_start = starts_dt - timedelta(minutes=30)
-                join_window_end = ends_dt
-
-                if now < join_window_start or now > join_window_end:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="Consultation join window is closed. Permitted joining window has expired.",
-                    )
-            except ValueError:
-                pass
+        payment_doc = await latest_payment(db, principal.tenant_id, appointment_id)
+        pay_status = str((payment_doc or {}).get("status") or apt_doc.get("payment_status") or "").lower()
+        if pay_status not in SETTLED_STATUSES:
+            raise HTTPException(status_code=402, detail="Payment is required before joining the consultation room.")
+        if not join_eligible(apt_doc, pay_status, now, settings.video_join_window_minutes):
+            raise HTTPException(status_code=409, detail="Consultation is not eligible or its joining window is closed.")
 
         raw_token = secrets.token_urlsafe(24)
         video_doc = await db["video_sessions"].find_one({
@@ -160,7 +105,7 @@ async def join_waiting_room(
             await db["video_sessions"].insert_one(dict(video_doc))
 
         await db["video_sessions"].update_one(
-            {"id": video_doc["id"]},
+            {"id": video_doc["id"], "tenant_id": str(principal.tenant_id)},
             {"$set": {"patient_token_hash": hashlib.sha256(raw_token.encode()).hexdigest()}},
         )
 
@@ -184,6 +129,11 @@ async def join_waiting_room(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Payment is required before joining the consultation room.",
         )
+
+    if not join_eligible({"status": appointment.status, "starts_at": appointment.starts_at,
+                          "ends_at": appointment.ends_at}, appointment.payment_status,
+                         now, settings.video_join_window_minutes):
+        raise HTTPException(status_code=409, detail="Consultation is not eligible or its joining window is closed.")
 
     video = await session.scalar(select(VideoSession).where(
         VideoSession.appointment_id == appointment.id, VideoSession.patient_id == UUID(principal.user_id)

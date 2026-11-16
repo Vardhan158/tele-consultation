@@ -120,6 +120,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const [dbRecords, setDbRecords] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [previewRecord, setPreviewRecord] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [deletingRecord, setDeletingRecord] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
 
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -128,14 +134,56 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const [isTooLarge, setIsTooLarge] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Fetch actual document blob and manage object URL lifecycle for preview
+  useEffect(() => {
+    if (!previewRecord) {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      setPreviewError("");
+      setPreviewLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setPreviewLoading(true);
+    setPreviewError("");
+
+    recordsApi
+      .download(previewRecord.id)
+      .then((blob) => {
+        if (!isMounted) return;
+        const objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setPreviewError(err.message || "Failed to load document preview.");
+      })
+      .finally(() => {
+        if (isMounted) setPreviewLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+    };
+  }, [previewRecord?.id]);
+
   const fetchRecords = async () => {
     try {
       const items = await recordsApi.list();
-      if (Array.isArray(items) && items.length > 0) {
+      if (Array.isArray(items)) {
         setDbRecords(
           items.map((doc) => ({
             id: doc.id,
             name: doc.file_name || doc.title || "Document.pdf",
+            contentType: doc.content_type || "",
+            status: doc.status || "available",
             date: doc.created_at
               ? new Date(doc.created_at).toLocaleDateString("en-US", {
                   month: "short",
@@ -144,12 +192,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                 })
               : "Nov 4, 2026",
             addedBy:
-              doc.category === "imaging"
-                ? "Bayview Radiology"
-                : doc.file_name?.toLowerCase().includes("log") ||
-                    doc.file_name?.toLowerCase().includes("history")
-                  ? "You"
-                  : "Dr. Sarah Chen",
+              doc.uploaded_by ||
+              (doc.uploaded_by_role === "doctor"
+                ? "Dr. Sarah Chen"
+                : doc.category === "imaging"
+                  ? "Bayview Radiology"
+                  : "You"),
             category: doc.category?.toLowerCase().includes("lab")
               ? "Lab reports"
               : doc.category?.toLowerCase().includes("imaging")
@@ -194,10 +242,8 @@ export default function MedicalRecordsScreen({ onNavigate }) {
           : "other";
       if (!selectedFileObj) throw new Error("Choose a file before uploading.");
       await recordsApi.upload(selectedFileObj, cat);
-      setToastMessage(
-        `"${rawName}" uploaded securely to your medical records.`,
-      );
-      fetchRecords();
+      setToastMessage("Medical record uploaded successfully.");
+      await fetchRecords();
       setSelectedFileName("");
       setSelectedFileObj(null);
     } catch (err) {
@@ -229,6 +275,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+        setSelectedFileObj(null);
+        setSelectedFileName("");
+        setToastMessage("Invalid file type. Upload a PDF, JPG, or PNG.");
+        return;
+      }
       setSelectedFileObj(file);
       const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
       const nameWithMB = `${file.name} · ${sizeMB} MB`;
@@ -257,17 +309,39 @@ export default function MedicalRecordsScreen({ onNavigate }) {
     setTimeout(() => setToastMessage(""), 3500);
   };
 
-  const handleDeleteRecord = async (rec) => {
-    if (!window.confirm(`Delete ${rec.name}? This cannot be undone.`)) return;
-    try {
-      await recordsApi.remove(rec.id);
-      setDbRecords((current) => current.filter((item) => item.id !== rec.id));
-      setToastMessage(`Deleted ${rec.name}`);
-    } catch (err) {
-      setToastMessage(err.message);
-    }
-    setTimeout(() => setToastMessage(""), 3500);
+  const closeDeleteModal = () => {
+    if (isDeleting) return;
+    setDeletingRecord(null);
+    setDeleteError("");
   };
+
+  const confirmDeleteRecord = async () => {
+    if (!deletingRecord || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await recordsApi.remove(deletingRecord.id);
+      await fetchRecords();
+      setToastMessage("Medical record deleted successfully.");
+      setDeletingRecord(null);
+    } catch (err) {
+      setDeleteError(err.message || "Unable to delete medical record.");
+    } finally {
+      setIsDeleting(false);
+      setTimeout(() => setToastMessage(""), 3500);
+    }
+  };
+
+  // Keyboard accessibility: Escape key closes delete modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && deletingRecord && !isDeleting) {
+        closeDeleteModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deletingRecord, isDeleting]);
 
   return (
     <div className="space-y-6 font-sans text-[#162623]">
@@ -468,7 +542,10 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                           <span className="text-[#577877]">·</span>
                           <button
                             type="button"
-                            onClick={() => handleDeleteRecord(rec)}
+                            onClick={() => {
+                              setDeleteError("");
+                              setDeletingRecord(rec);
+                            }}
                             className="hover:underline cursor-pointer text-rose-700"
                           >
                             Delete
@@ -665,93 +742,222 @@ export default function MedicalRecordsScreen({ onNavigate }) {
         </div>
 
       {/* Record Preview Modal */}
-      {previewRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
-                  description
-                </span>
-                <h3 className="text-base font-bold text-[#162623]">
-                  {previewRecord.name}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewRecord(null)}
-                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7]"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
+      {previewRecord && (() => {
+        const isImage =
+          previewRecord.contentType?.startsWith("image/") ||
+          /\.(jpg|jpeg|png|gif|webp)$/i.test(previewRecord.name || "");
+        const isPdf =
+          previewRecord.contentType === "application/pdf" ||
+          /\.pdf$/i.test(previewRecord.name || "");
 
-            <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Date Uploaded:</span>
-                <span className="font-semibold text-[#162623]">
-                  {previewRecord.date}
-                </span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="material-symbols-outlined !text-[#25836F] text-2xl shrink-0">
+                    {isImage ? "image" : isPdf ? "picture_as_pdf" : "description"}
+                  </span>
+                  <h3 className="text-base font-bold text-[#162623] truncate" title={previewRecord.name}>
+                    {previewRecord.name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewRecord(null)}
+                  className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer shrink-0"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Added by:</span>
-                <span className="font-semibold text-[#162623]">
-                  {previewRecord.addedBy}
-                </span>
+
+              {/* Metadata Card */}
+              <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">Date Uploaded:</span>
+                  <span className="font-semibold text-[#162623]">
+                    {previewRecord.date}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">Added by:</span>
+                  <span className="font-semibold text-[#162623]">
+                    {previewRecord.addedBy}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">Category:</span>
+                  <span className="font-semibold text-[#25836F]">
+                    {previewRecord.categoryDisplay}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#577877]">File Size:</span>
+                  <span className="font-semibold text-[#162623]">
+                    {previewRecord.size}
+                  </span>
+                </div>
+                {(previewRecord.status === "available" || previewRecord.status === "released") && (
+                  <div className="flex justify-between pt-1 border-t border-[#577877]/15">
+                    <span className="text-[#577877]">Encryption:</span>
+                    <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">verified_user</span>
+                      <span>AES-256 Verified at rest</span>
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Category:</span>
-                <span className="font-semibold text-[#25836F]">
-                  {previewRecord.categoryDisplay}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">File Size:</span>
-                <span className="font-semibold text-[#162623]">
-                  {previewRecord.size}
-                </span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-[#577877]/15">
-                <span className="text-[#577877]">Encryption:</span>
-                <span className="font-semibold text-emerald-700">
-                  AES-256 Verified at rest
-                </span>
+
+              {/* Document / Image / PDF Preview Area */}
+              {previewLoading ? (
+                <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-[#F8FAFB] border border-[#577877]/20 text-[#577877] space-y-2">
+                  <span className="material-symbols-outlined animate-spin text-3xl text-[#25836F]">
+                    sync
+                  </span>
+                  <p className="text-xs font-semibold text-[#162623]">
+                    Decrypting &amp; loading document preview…
+                  </p>
+                </div>
+              ) : previewError ? (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base text-rose-600">error</span>
+                  <span>{previewError || "Unable to display preview. Use Download Original to view the file."}</span>
+                </div>
+              ) : previewUrl && isImage ? (
+                <div className="rounded-xl overflow-hidden border border-[#577877]/20 bg-black/5 flex items-center justify-center p-2 max-h-72 sm:max-h-80">
+                  <img
+                    src={previewUrl}
+                    alt={previewRecord.name}
+                    className="max-h-68 sm:max-h-76 w-auto object-contain rounded-lg shadow-xs"
+                  />
+                </div>
+              ) : previewUrl && isPdf ? (
+                <div className="rounded-xl overflow-hidden border border-[#577877]/20 bg-white">
+                  <iframe
+                    src={previewUrl}
+                    title={previewRecord.name}
+                    className="w-full h-72 sm:h-80 border-0 rounded-xl"
+                  />
+                </div>
+              ) : (
+                <div className="p-6 rounded-xl border border-dashed border-[#577877]/30 text-center space-y-2 bg-[#F8FAFB]">
+                  <span className="material-symbols-outlined !text-[#25836F] text-4xl">
+                    description
+                  </span>
+                  <p className="text-xs font-semibold text-[#162623]">
+                    Decrypted File Stream Ready
+                  </p>
+                  <p className="text-[11px] text-[#577877]">
+                    Use Download Original to inspect this health record.
+                  </p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewRecord(null)}
+                  className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadRecord(previewRecord);
+                    setPreviewRecord(null);
+                  }}
+                  className="btn-primary !py-2 !px-4 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">
+                    download
+                  </span>
+                  <span>Download Original</span>
+                </button>
               </div>
             </div>
+          </div>
+        );
+      })()}
 
-            <div className="p-6 rounded-xl border border-dashed border-[#577877]/30 text-center space-y-2 bg-[#F8FAFB]">
-              <span className="material-symbols-outlined !text-[#25836F] text-4xl">
-                picture_as_pdf
+      {/* Delete Confirmation Modal */}
+      {deletingRecord && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-5 text-center relative">
+            {/* Red Outlined Trash Icon */}
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto shrink-0 shadow-xs">
+              <span className="material-symbols-outlined text-2xl !text-rose-600">
+                delete_outline
               </span>
-              <p className="text-xs font-semibold text-[#162623]">
-                Decrypted In-Memory Stream Active
-              </p>
-              <p className="text-[11px] text-[#577877]">
-                Encrypted with your patient vault key for clinical
-                teleconsultation review.
+            </div>
+
+            {/* Heading & Message */}
+            <div className="space-y-1.5">
+              <h3 id="delete-modal-title" className="text-lg font-bold text-[#162623]">
+                Delete Medical Record?
+              </h3>
+              <p className="text-xs text-[#577877] leading-relaxed">
+                Are you sure you want to delete this medical record?
               </p>
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-2">
+            {/* Filename Container */}
+            <div
+              className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 text-xs font-semibold text-[#162623] truncate shadow-2xs"
+              title={deletingRecord.name}
+            >
+              {deletingRecord.name}
+            </div>
+
+            {/* Warning Message */}
+            <p className="text-[11px] font-semibold text-rose-600 flex items-center justify-center gap-1">
+              <span className="material-symbols-outlined text-xs">warning</span>
+              <span>This action cannot be undone.</span>
+            </p>
+
+            {/* Error Message Banner */}
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold text-left flex items-start gap-2">
+                <span className="material-symbols-outlined text-base text-rose-600 shrink-0 mt-0.5">
+                  error
+                </span>
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setPreviewRecord(null)}
-                className="btn-secondary !py-2 !px-4 text-xs font-semibold"
+                disabled={isDeleting}
+                onClick={closeDeleteModal}
+                className="w-1/2 py-2.5 rounded-xl border border-[#577877]/30 bg-white text-xs font-semibold text-[#577877] hover:bg-[#F0F5F7] transition cursor-pointer disabled:opacity-50"
               >
-                Close
+                Cancel
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  handleDownloadRecord(previewRecord);
-                  setPreviewRecord(null);
-                }}
-                className="btn-primary !py-2 !px-4 text-xs font-semibold flex items-center gap-1.5"
+                disabled={isDeleting}
+                onClick={confirmDeleteRecord}
+                className="w-1/2 py-2.5 rounded-xl bg-rose-600 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
-                <span className="material-symbols-outlined text-sm">
-                  download
-                </span>
-                <span>Download PDF</span>
+                {isDeleting ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin text-sm">
+                      sync
+                    </span>
+                    <span>Deleting…</span>
+                  </>
+                ) : (
+                  "Delete Record"
+                )}
               </button>
             </div>
           </div>

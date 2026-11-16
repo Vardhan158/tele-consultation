@@ -102,7 +102,7 @@ export default function NotificationsScreen({ onNavigate }) {
         if (Array.isArray(items) && items.length > 0) {
           setNotifications(
             items.map((n) => {
-              const isUnread = n.status !== "read";
+              const isUnread = !n.read_at && n.status !== "read";
               const cat = n.event_type?.includes("appointment")
                 ? "appointments"
                 : n.event_type?.includes("payment")
@@ -155,20 +155,28 @@ export default function NotificationsScreen({ onNavigate }) {
 
   const unreadCount = notifications.filter((n) => n.isUnread).length;
 
-  const handleMarkAllAsRead = () => {
-    notifications.forEach((n) => {
-      if (n.isUnread) notificationApi.markRead(n.id).catch(() => {});
-    });
-    setNotifications((prev) => prev.map((n) => ({ ...n, isUnread: false })));
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationApi.markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isUnread: false })));
+      window.dispatchEvent(new Event("notifications_updated"));
+    } catch {
+      notifications.forEach((n) => {
+        if (n.isUnread) notificationApi.markRead(n.id).catch(() => {});
+      });
+      setNotifications((prev) => prev.map((n) => ({ ...n, isUnread: false })));
+      window.dispatchEvent(new Event("notifications_updated"));
+    }
   };
 
   const handleNotificationClick = (item) => {
     if (item.isUnread) {
       notificationApi.markRead(item.id).catch(() => {});
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, isUnread: false } : n)),
+      );
+      window.dispatchEvent(new Event("notifications_updated"));
     }
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === item.id ? { ...n, isUnread: false } : n)),
-    );
     if (onNavigate && item.targetTab) {
       onNavigate(item.targetTab, item.targetParams);
     }

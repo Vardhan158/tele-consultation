@@ -7,7 +7,7 @@ const links = [
   ["Home", "/"],
   ["Find Doctors", "/find-doctors"],
   ["How It Works", "/how-it-works"],
-  ["About Us", "/about-us"],
+  ["About Us", "/about"],
   ["Contact", "/contact"],
 ];
 

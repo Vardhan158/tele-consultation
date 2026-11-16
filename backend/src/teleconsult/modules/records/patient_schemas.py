@@ -18,5 +18,7 @@ class DocumentResponse(BaseModel):
     content_type: str
     size_bytes: int
     status: str
+    uploaded_by: str | None = "You"
+    uploaded_by_role: str | None = "patient"
     created_at: datetime
     released_at: datetime | None

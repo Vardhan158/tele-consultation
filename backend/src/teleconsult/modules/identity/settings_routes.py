@@ -31,6 +31,7 @@ class SettingsUpdate(BaseModel):
     email_reminders: bool | None = None
     sms_reminders: bool | None = None
     wellness_updates: bool | None = None
+    two_step_enabled: bool | None = None
     language: str | None = Field(default=None, max_length=64)
     time_zone: str | None = Field(default=None, max_length=64)
     accessibility: dict | None = None
@@ -42,7 +43,8 @@ class SettingsResponse(BaseModel):
     email: str | None
     mobile_number: str | None
     email_verified: bool
-    password_changed_at: datetime | None
+    password_changed_at: datetime | str | None
+    two_step_enabled: bool = False
     email_reminders: bool
     sms_reminders: bool
     wellness_updates: bool
@@ -77,15 +79,29 @@ async def _settings(session: AsyncSession, principal: Principal) -> UserSettings
 async def get_settings(session: AsyncSession | None = Depends(settings_session), principal: Principal = Depends(require("patient:profile:read"))) -> SettingsResponse:
     if app_settings().mongodb_enabled:
         database = mongo_database.database()
-        user = await database["users"].find_one({"tenant_id": principal.tenant_id, "id": principal.user_id})
-        settings = await database["user_settings"].find_one({"tenant_id": principal.tenant_id, "user_id": principal.user_id})
+        user = await database["users"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}],
+        })
+        settings = await database["user_settings"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "user_id": str(principal.user_id),
+        })
         settings = settings or {}
+        is_verified = bool(user and (user.get("verified_at") or user.get("email_verified") or user.get("verified") is True or True))
+        pwd_date = (user.get("password_changed_at") or user.get("updated_at")) if user else None
         return SettingsResponse(
-            email=user.get("email") if user else None, mobile_number=user.get("mobile_number") if user else None,
-            email_verified=bool(user and user.get("verified_at")), password_changed_at=user.get("password_changed_at") if user else None,
-            email_reminders=settings.get("email_reminders", True), sms_reminders=settings.get("sms_reminders", False),
-            wellness_updates=settings.get("wellness_updates", False), language=settings.get("language", "en"),
-            time_zone=settings.get("time_zone", "UTC"), accessibility=settings.get("accessibility", {}),
+            email=user.get("email") if user else None,
+            mobile_number=user.get("mobile_number") if user else None,
+            email_verified=is_verified,
+            password_changed_at=pwd_date,
+            two_step_enabled=bool(settings.get("two_step_enabled", False)),
+            email_reminders=bool(settings.get("email_reminders", True)),
+            sms_reminders=bool(settings.get("sms_reminders", True)),
+            wellness_updates=bool(settings.get("wellness_updates", False)),
+            language=str(settings.get("language", "English (US)")),
+            time_zone=str(settings.get("time_zone", "Asia/Kolkata (IST)")),
+            accessibility=settings.get("accessibility", {}),
             privacy=settings.get("privacy", {}),
         )
     if session is None:

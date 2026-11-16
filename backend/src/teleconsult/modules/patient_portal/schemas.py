@@ -13,10 +13,14 @@ class PatientCreate(BaseModel):
 class PatientResponse(PatientCreate):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
-    date_of_birth: datetime | None = None
+    date_of_birth: datetime | str | None = None
     preferred_language: str | None = None
     address: str | None = None
     emergency_contact: str | None = None
+    preferred_pharmacy: str | None = None
+    pharmacy_address: str | None = None
+    pharmacy_phone: str | None = None
+    allergies: str | None = None
 
 
 class DoctorResponse(BaseModel):
@@ -57,9 +61,9 @@ class AppointmentCreate(BaseModel):
 
 class AppointmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    doctor_id: UUID
-    patient_id: UUID
+    id: UUID | str
+    doctor_id: UUID | str
+    patient_id: UUID | str
     starts_at: datetime
     ends_at: datetime
     status: str
@@ -69,6 +73,7 @@ class AppointmentResponse(BaseModel):
     total_payable_paise: int | None = None
     currency: str | None = None
     doctor: DoctorResponse | None = None
+    join_window_minutes: int = 30
 
 
 class AppointmentReschedule(BaseModel):
@@ -89,11 +94,15 @@ class ConsentResponse(ConsentCreate):
 
 class PatientProfileUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=160, pattern=r"^[A-Za-z\s.'-]+$")
-    date_of_birth: datetime | None = None
-    phone: str | None = Field(default=None, min_length=10, max_length=10, pattern=r"^[6-9]\d{9}$")
+    date_of_birth: datetime | str | None = None
+    phone: str | None = Field(default=None, min_length=8, max_length=32)
     preferred_language: str | None = Field(default=None, min_length=2, max_length=32)
     address: str | None = Field(default=None, max_length=500)
     emergency_contact: str | None = Field(default=None, max_length=160)
+    preferred_pharmacy: str | None = Field(default=None, max_length=160)
+    pharmacy_address: str | None = Field(default=None, max_length=500)
+    pharmacy_phone: str | None = Field(default=None, max_length=32)
+    allergies: str | None = Field(default=None, max_length=2000)
 
 
 class MedicalIntakeCreate(BaseModel):

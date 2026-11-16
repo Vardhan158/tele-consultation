@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { doctorApi } from "../../lib/api";
+import { CLINICAL_NOTE_FIELDS, parseAmendment, parseClinicalNote } from "../../lib/clinicalNotes";
 
 export default function DoctorPatientsScreen() {
   const [items, setItems] = useState(null);
@@ -73,10 +74,25 @@ export default function DoctorPatientsScreen() {
               ) : (
                 selected.notes.map((note) => (
                   <div key={note.id} className="border-t py-3 text-sm">
-                    <p className="font-semibold">{note.status}</p>
-                    <p className="whitespace-pre-wrap text-[#577877]">
-                      {note.content_reference}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold">{note.status}</p>
+                      {note.appointment_date && <p className="text-xs text-[#577877]">{new Date(note.appointment_date).toLocaleString()}</p>}
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {CLINICAL_NOTE_FIELDS.map(([key, label]) => {
+                        const value = parseClinicalNote(note.content_reference)[key];
+                        return value ? <div key={key}><p className="text-xs font-semibold">{label}</p><p className="whitespace-pre-wrap text-[#577877]">{value}</p></div> : null;
+                      })}
+                    </div>
+                    {note.amendments?.length > 0 && (
+                      <div className="mt-3 border-t pt-2 space-y-2">
+                        <p className="text-xs font-semibold">Amendment history</p>
+                        {note.amendments.map((amendment) => {
+                          const parsed = parseAmendment(amendment.content_reference);
+                          return <div key={amendment.id} className="text-xs text-[#577877]"><p>Version {amendment.version} · {new Date(amendment.created_at).toLocaleString()}</p>{parsed.reason && <p><strong>Reason:</strong> {parsed.reason}</p>}{Object.entries(parsed.fields).map(([label, value]) => <p key={label}><strong>{label}:</strong> {value}</p>)}</div>;
+                        })}
+                      </div>
+                    )}
                   </div>
                 ))
               )}

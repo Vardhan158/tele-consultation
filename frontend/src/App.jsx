@@ -17,9 +17,10 @@ import SupportScreen from "./components/screens/SupportScreen";
 import ConsentScreen from "./components/screens/ConsentScreen";
 import AuthScreen from "./components/auth/AuthScreen";
 import { authApi } from "./lib/api";
+import ServicesScreen from "./components/public/ServicesScreen";
 import LandingScreen from "./components/public/LandingScreen";
-import HowItWorksScreen from "./components/public/HowItWorksScreen";
 import AboutUsScreen from "./components/public/AboutUsScreen";
+import FaqsScreen from "./components/public/FaqsScreen";
 import ContactScreen from "./components/public/ContactScreen";
 import DoctorDashboardScreen from "./components/screens/DoctorDashboardScreen";
 import DoctorRegistrationScreen from "./components/auth/DoctorRegistrationScreen";
@@ -30,12 +31,12 @@ import DoctorPatientsScreen from "./components/screens/DoctorPatientsScreen";
 import DoctorAvailabilityScreen from "./components/screens/DoctorAvailabilityScreen";
 import DoctorSettingsScreen from "./components/screens/DoctorSettingsScreen";
 import DoctorConsultationScreen from "./components/screens/DoctorConsultationScreen";
+import DoctorNotificationsScreen from "./components/screens/DoctorNotificationsScreen";
 import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
 
 const PATH_TO_TAB = {
   "/dashboard": "dashboard",
   "/find-doctors": "find-doctors",
-  "/how-it-works": "how-it-works",
   "/about-us": "about-us",
   "/contact": "contact",
   "/appointments": "appointments",
@@ -139,8 +140,9 @@ export default function App() {
 
   if (authChecking) return null;
 
-  if (location.pathname === "/how-it-works") return <HowItWorksScreen />;
-  if (location.pathname === "/about-us") return <AboutUsScreen />;
+  if (location.pathname === "/services") return <ServicesScreen />;
+  if (location.pathname === "/about" || location.pathname === "/about-us") return <AboutUsScreen />;
+  if (location.pathname === "/faqs") return <FaqsScreen />;
   if (location.pathname === "/contact") return <ContactScreen />;
 
   if (!authenticated) {
@@ -243,6 +245,8 @@ export default function App() {
       switch (routedTab) {
         case "doctor-dashboard":
           return <DoctorDashboardScreen onNavigate={handleNavigate} />;
+        case "notifications":
+          return <DoctorNotificationsScreen onNavigate={handleNavigate} />;
         case "doctor-appointments":
           return <DoctorAppointmentsScreen onNavigate={handleNavigate} />;
         case "doctor-patients":
@@ -309,9 +313,7 @@ export default function App() {
 
   return (
     <Layout
-      activeTab={
-        patient?.role === "clinic_admin" ? routedTab : routedTab
-      }
+      activeTab={patient?.role === "clinic_admin" ? routedTab : routedTab}
       onSelectTab={handleNavigate}
       onSignOut={signOut}
       patient={patient}

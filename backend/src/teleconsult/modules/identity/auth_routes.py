@@ -335,8 +335,13 @@ async def login(payload: LoginRequest, response: Response, session: AsyncSession
             raise HTTPException(status_code=403, detail="Email verification is required before sign in")
         if user.get("role") == "doctor" and user.get("mfa_enabled"):
             secret = user.get("mfa_secret")
-            if not payload.mfa_code or not secret or not valid_totp(secret, payload.mfa_code):
+            totp_ok = bool(payload.mfa_code and secret and valid_totp(secret, payload.mfa_code))
+            recovery_hash = hashlib.sha256(payload.recovery_code.encode()).hexdigest() if payload.recovery_code else None
+            recovery_ok = bool(recovery_hash and recovery_hash in (user.get("mfa_recovery_code_hashes") or []))
+            if not totp_ok and not recovery_ok:
                 raise HTTPException(status_code=401, detail="MFA verification is required")
+            if recovery_ok:
+                await database["users"].update_one({"tenant_id": settings.default_tenant_id, "id": user["id"]}, {"$pull": {"mfa_recovery_code_hashes": recovery_hash}})
         now = datetime.now(UTC)
         raw_token = secrets.token_urlsafe(48)
         await database["user_sessions"].insert_one({
