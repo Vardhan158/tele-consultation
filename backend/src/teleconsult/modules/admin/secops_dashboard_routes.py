@@ -44,6 +44,22 @@ async def secops_user(request: Request) -> MongoPrincipal:
     return MongoPrincipal(user_id=user["id"], tenant_id=user["tenant_id"], role=user["role"], clinic_id=user.get("clinic_id"))
 
 
+async def secops_privileged_user(request: Request) -> MongoPrincipal:
+    principal = await secops_user(request)
+    settings = get_settings()
+    db = mongo_database.database()
+    raw = request.cookies.get("teleconsult_session")
+    if raw:
+        session = await db["user_sessions"].find_one({
+            "tenant_id": settings.default_tenant_id,
+            "token_hash": token_hash(raw),
+        })
+        user = await db["users"].find_one({"tenant_id": settings.default_tenant_id, "id": principal.user_id})
+        if user and user.get("mfa_enabled") and not (session and session.get("mfa_verified")):
+            raise HTTPException(403, "MFA verification is required to perform privileged operational actions.")
+    return principal
+
+
 SENSITIVE_FIELDS = {
     "password_hash", "mfa_secret", "mfa_recovery_codes", "mfa_recovery_code_hashes",
     "token_hash", "session_token", "verification_token_hash", "otp_code", "secret", "private_key"
