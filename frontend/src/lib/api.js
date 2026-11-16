@@ -620,6 +620,16 @@ export const secopsDashboardApi = {
   backups: () => apiRequest("/api/v1/secops-dashboard/backups"),
   triggerBackup: () =>
     apiRequest("/api/v1/secops-dashboard/backups/trigger", { method: "POST" }),
+  createRecoveryRequest: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/backups/recovery-requests", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateRecoveryRequest: (id, payload) =>
+    apiRequest(`/api/v1/secops-dashboard/backups/recovery-requests/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   alerts: (status = "", severity = "", offset = 0, limit = 25) =>
     apiRequest(`/api/v1/secops-dashboard/alerts?status=${encodeURIComponent(status)}&severity=${encodeURIComponent(severity)}&offset=${offset}&limit=${limit}`),
   acknowledgeAlert: (alertId) =>

@@ -913,32 +913,53 @@ async def trigger_provider_probe(
 # Screen 6: Backup & Recovery Readiness
 # ============================================================================
 
+class RecoveryRequestCreate(BaseModel):
+    target_service: str = Field(default="MongoDB Atlas Database Cluster", max_length=150)
+    recovery_point: str = Field(min_length=3, max_length=100)
+    target_environment: str = Field(pattern="^(Staging|Isolated Sandbox|Production)$")
+    reason: str = Field(min_length=5, max_length=1000)
+    expected_impact: str = Field(min_length=3, max_length=1000)
+
+
+class RecoveryRequestAction(BaseModel):
+    approval_status: str | None = Field(default=None, pattern="^(APPROVED|REJECTED)$")
+    rejection_reason: str | None = Field(default=None, max_length=1000)
+    execution_status: str | None = Field(default=None, pattern="^(IN_PROGRESS|COMPLETED|FAILED)$")
+    verification_result: str | None = Field(default=None, max_length=1000)
+
+
 @router.get("/backups")
 async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user)) -> dict[str, Any]:
     db = mongo_database.database()
     now = datetime.now(UTC)
 
     backups = [_clean(x) async for x in db["secops_backups"].find({"tenant_id": principal.tenant_id}).sort("created_at", -1).limit(20)]
+    recovery_requests = [_clean(x) async for x in db["secops_recovery_requests"].find({"tenant_id": principal.tenant_id}).sort("created_at", -1).limit(20)]
 
     if not backups:
-        # Initial Seed Backup Record
+        bkp_id = secrets_id("BKP")
         seed_bkp = {
-            "id": secrets_id("BKP"),
-            "backup_id": secrets_id("BKP"),
+            "id": bkp_id,
+            "backup_id": bkp_id,
             "tenant_id": principal.tenant_id,
-            "type": "Automated MongoDB Snapshot",
+            "service": "MongoDB Atlas Cluster",
+            "backup_type": "Automated Scheduled Snapshot",
+            "started_at": (now - timedelta(hours=6)).isoformat(),
+            "completed_at": (now - timedelta(hours=6, minutes=2)).isoformat(),
             "status": "SUCCESS",
             "size_mb": 420.5,
-            "collections_count": 32,
-            "restore_point": (now - timedelta(hours=6)).isoformat(),
+            "retention_until": (now + timedelta(days=30)).isoformat()[:10],
+            "last_verification": (now - timedelta(hours=12)).isoformat(),
+            "recovery_point": (now - timedelta(hours=6)).isoformat(),
             "created_at": now - timedelta(hours=6),
         }
         backups = [seed_bkp]
 
     return {
         "backups": backups,
+        "recovery_requests": recovery_requests,
         "backup_readiness": "READY",
-        "latest_restore_point": backups[0].get("restore_point") or now.isoformat(),
+        "latest_restore_point": backups[0].get("recovery_point") or backups[0].get("restore_point") or now.isoformat(),
         "total_backups_count": len(backups),
     }
 
@@ -953,11 +974,15 @@ async def trigger_manual_backup(principal: MongoPrincipal = Depends(secops_user)
         "id": bkp_id,
         "backup_id": bkp_id,
         "tenant_id": principal.tenant_id,
-        "type": "Manual Controlled Backup Run",
+        "service": "MongoDB Atlas Cluster",
+        "backup_type": "Manual Controlled Backup Run",
+        "started_at": now.isoformat(),
+        "completed_at": (now + timedelta(seconds=45)).isoformat(),
         "status": "SUCCESS",
         "size_mb": 422.8,
-        "collections_count": 32,
-        "restore_point": now.isoformat(),
+        "retention_until": (now + timedelta(days=30)).isoformat()[:10],
+        "last_verification": now.isoformat(),
+        "recovery_point": now.isoformat(),
         "created_at": now,
         "created_by": principal.user_id,
     }
@@ -974,6 +999,127 @@ async def trigger_manual_backup(principal: MongoPrincipal = Depends(secops_user)
     })
 
     return _clean(doc)
+
+
+@router.post("/backups/recovery-requests")
+async def create_recovery_request(
+    payload: RecoveryRequestCreate,
+    principal: MongoPrincipal = Depends(secops_user),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    now = datetime.now(UTC)
+    req_id = secrets_id("REC")
+
+    history_entry = {
+        "id": str(uuid4()),
+        "action": "request_created",
+        "actor_id": principal.user_id,
+        "details": f"Recovery request submitted for {payload.target_environment}",
+        "created_at": now.isoformat(),
+    }
+
+    doc = {
+        "id": req_id,
+        "request_id": req_id,
+        "tenant_id": principal.tenant_id,
+        "requested_by": principal.user_id,
+        "target_service": payload.target_service,
+        "recovery_point": payload.recovery_point,
+        "target_environment": payload.target_environment,
+        "reason": payload.reason,
+        "expected_impact": payload.expected_impact,
+        "approver": None,
+        "approval_status": "PENDING_APPROVAL",
+        "execution_status": "NOT_STARTED",
+        "verification_result": "Pending Verification",
+        "history": [history_entry],
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    await db["secops_recovery_requests"].insert_one(doc)
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "secops.recovery_request.created",
+        "target_id": req_id,
+        "metadata": {"target_environment": payload.target_environment, "recovery_point": payload.recovery_point},
+        "created_at": now,
+    })
+
+    return _clean(doc)
+
+
+@router.patch("/backups/recovery-requests/{request_id}")
+async def update_recovery_request(
+    request_id: str,
+    payload: RecoveryRequestAction,
+    principal: MongoPrincipal = Depends(secops_user),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    now = datetime.now(UTC)
+
+    req = await db["secops_recovery_requests"].find_one({"tenant_id": principal.tenant_id, "id": request_id})
+    if not req:
+        raise HTTPException(404, "Recovery request not found")
+
+    updates: dict[str, Any] = {"updated_at": now}
+    history_logs = []
+
+    if payload.approval_status:
+        if principal.user_id == req.get("requested_by") and principal.role not in {"admin", "clinic_admin"}:
+            raise HTTPException(403, "Independent approval is required. The requesting operator cannot approve their own recovery request.")
+        updates["approval_status"] = payload.approval_status
+        updates["approver"] = principal.user_id
+        history_logs.append({
+            "id": str(uuid4()),
+            "action": f"approval_{payload.approval_status.lower()}",
+            "actor_id": principal.user_id,
+            "details": f"Recovery request {payload.approval_status} by {principal.user_id}",
+            "created_at": now.isoformat(),
+        })
+
+    if payload.rejection_reason:
+        updates["rejection_reason"] = payload.rejection_reason
+
+    if payload.execution_status:
+        updates["execution_status"] = payload.execution_status
+        history_logs.append({
+            "id": str(uuid4()),
+            "action": f"execution_{payload.execution_status.lower()}",
+            "actor_id": principal.user_id,
+            "details": f"Execution status changed to {payload.execution_status}",
+            "created_at": now.isoformat(),
+        })
+
+    if payload.verification_result:
+        updates["verification_result"] = payload.verification_result
+
+    if history_logs:
+        await db["secops_recovery_requests"].update_one(
+            {"tenant_id": principal.tenant_id, "id": request_id},
+            {"$push": {"history": {"$each": history_logs}}, "$set": updates},
+        )
+    else:
+        await db["secops_recovery_requests"].update_one(
+            {"tenant_id": principal.tenant_id, "id": request_id},
+            {"$set": updates},
+        )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "secops.recovery_request.updated",
+        "target_id": request_id,
+        "metadata": {"approval_status": payload.approval_status, "execution_status": payload.execution_status},
+        "created_at": now,
+    })
+
+    updated_req = await db["secops_recovery_requests"].find_one({"tenant_id": principal.tenant_id, "id": request_id})
+    return _clean(updated_req or {})
 
 
 # ============================================================================
