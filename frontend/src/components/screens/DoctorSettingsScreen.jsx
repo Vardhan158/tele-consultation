@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { doctorApi } from "../../lib/api";
+import { doctorApi, supportDashboardApi } from "../../lib/api";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function DoctorSettingsScreen() {
@@ -9,6 +9,35 @@ export default function DoctorSettingsScreen() {
   const [showSetupKey, setShowSetupKey] = useState(false);
   const [showRecoveryCodes, setShowRecoveryCodes] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState([]);
+
+  // Support Ticket State for Doctor
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketDescription, setTicketDescription] = useState("");
+  const [ticketCategory, setTicketCategory] = useState("technical");
+  const [ticketSubmitting, setTicketSubmitting] = useState(false);
+  const [ticketMsg, setTicketMsg] = useState("");
+
+  const handleSupportTicketSubmit = async (e) => {
+    e.preventDefault();
+    if (!ticketSubject || !ticketDescription) return;
+    setTicketSubmitting(true);
+    setTicketMsg("");
+    try {
+      await supportDashboardApi.createTicket({
+        subject: ticketSubject,
+        description: ticketDescription,
+        category: ticketCategory,
+        user_type: "doctor",
+      });
+      setTicketMsg("Support ticket submitted successfully! A support agent will review your issue.");
+      setTicketSubject("");
+      setTicketDescription("");
+    } catch (err) {
+      setTicketMsg(err.message || "Failed to submit support request.");
+    } finally {
+      setTicketSubmitting(false);
+    }
+  };
   useEffect(() => {
     if (!enrollment) return undefined;
     const timer = window.setTimeout(() => {
@@ -89,6 +118,74 @@ export default function DoctorSettingsScreen() {
           </>
         )}
         {message && <p className="text-sm text-[#25836F]">{message}</p>}
+      </div>
+
+      {/* Support Request Card for Doctors */}
+      <div className="rounded-2xl bg-white border border-[#577877]/15 p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-[#25836F]">headset_mic</span>
+          <h2 className="font-bold text-lg text-[#162623]">Platform Support Request</h2>
+        </div>
+        <p className="text-sm text-[#577877]">
+          Experiencing video connection issues, schedule problems, or account questions? Submit a ticket directly to the Kaizen Care Support Desk.
+        </p>
+
+        <form onSubmit={handleSupportTicketSubmit} className="space-y-3 pt-1">
+          <div>
+            <label className="block text-xs font-semibold text-[#162623] mb-1">Issue Category</label>
+            <select
+              value={ticketCategory}
+              onChange={(e) => setTicketCategory(e.target.value)}
+              className="w-full rounded-xl border border-[#577877]/30 p-2.5 text-sm outline-none"
+            >
+              <option value="technical">Technical / Video Consultation</option>
+              <option value="appointment">Schedule / Appointment Problem</option>
+              <option value="clinical">Clinical Notes / Prescription Issue</option>
+              <option value="account_access">Account & Security</option>
+              <option value="general">General Support Query</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[#162623] mb-1">Subject</label>
+            <input
+              type="text"
+              required
+              value={ticketSubject}
+              onChange={(e) => setTicketSubject(e.target.value)}
+              placeholder="Brief title of the problem…"
+              className="w-full rounded-xl border border-[#577877]/30 p-2.5 text-sm outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[#162623] mb-1">Description</label>
+            <textarea
+              required
+              rows={3}
+              value={ticketDescription}
+              onChange={(e) => setTicketDescription(e.target.value)}
+              placeholder="Please provide relevant details so our support team can assist you quickly…"
+              className="w-full rounded-xl border border-[#577877]/30 p-2.5 text-sm outline-none"
+            />
+          </div>
+
+          {ticketMsg && (
+            <p className={`text-xs font-semibold ${ticketMsg.includes("successfully") ? "text-emerald-700 bg-emerald-50 p-2.5 rounded-lg" : "text-red-600 bg-red-50 p-2.5 rounded-lg"}`}>
+              {ticketMsg}
+            </p>
+          )}
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={ticketSubmitting}
+              className="btn-primary cursor-pointer disabled:opacity-50"
+            >
+              {ticketSubmitting ? "Submitting Ticket…" : "Submit Support Request"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

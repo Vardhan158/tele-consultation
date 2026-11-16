@@ -55,18 +55,42 @@ def _clean(doc: dict[str, Any]) -> dict[str, Any]:
 class TicketCreate(BaseModel):
     subject: str = Field(min_length=3, max_length=200)
     description: str = Field(min_length=5, max_length=2000)
-    category: str = Field(default="general", max_length=50)  # billing, technical, appointment, clinical
+    category: str = Field(default="general", max_length=50)  # billing, technical, appointment, account_access, clinical, general
     priority: str = Field(default="medium", max_length=20)   # low, medium, high, urgent
     patient_id: str | None = None
     doctor_id: str | None = None
     appointment_id: str | None = None
+    reporter_name: str | None = None
+    reporter_email: str | None = None
+    user_type: str | None = Field(default="patient", max_length=30)  # patient, doctor, clinic_admin
 
 
 class TicketUpdate(BaseModel):
-    status: str | None = Field(default=None, max_length=30)  # open, in_progress, resolved, closed
+    status: str | None = Field(default=None, max_length=30)  # open, in_progress, escalated, resolved, closed
     priority: str | None = Field(default=None, max_length=20)
     assigned_to: str | None = None
+    escalated_to: str | None = None                          # Engineering, Billing Operations, Clinical Lead, System Admin
     note: str | None = Field(default=None, max_length=1000)
+
+
+def auto_triage_ticket(category: str, subject: str, description: str, current_priority: str = "medium") -> tuple[str, str]:
+    text = f"{subject} {description}".lower()
+    cat = category
+    prio = current_priority
+
+    if any(k in text for k in ["payment", "refund", "charged", "receipt", "transaction", "billing", "money", "failed payment"]):
+        cat = "billing"
+        prio = "high" if prio != "urgent" else "urgent"
+    elif any(k in text for k in ["video", "webrtc", "camera", "microphone", "mic", "cannot join", "call dropped", "black screen", "audio"]):
+        cat = "technical"
+        prio = "urgent"
+    elif any(k in text for k in ["login", "password", "blocked", "account", "unauthorized", "verify", "access"]):
+        cat = "account_access"
+        prio = "high"
+    elif any(k in text for k in ["doctor", "prescription", "medicine", "dosage", "clinical", "summary"]):
+        cat = "clinical"
+
+    return cat, prio
 
 
 class AppointmentSupportAction(BaseModel):
@@ -396,20 +420,27 @@ async def create_support_ticket(
     db = mongo_database.database()
     ticket_id = f"TICK-{secrets_ticket_id()}"
     now = datetime.now(UTC)
+
+    cat, prio = auto_triage_ticket(payload.category, payload.subject, payload.description, payload.priority)
+
     ticket_doc = {
         "id": ticket_id,
         "tenant_id": principal.tenant_id,
         "clinic_id": principal.clinic_id,
         "subject": payload.subject,
         "description": payload.description,
-        "category": payload.category,
-        "priority": payload.priority,
+        "category": cat,
+        "priority": prio,
         "status": "open",
         "patient_id": payload.patient_id,
         "doctor_id": payload.doctor_id,
         "appointment_id": payload.appointment_id,
+        "reporter_name": payload.reporter_name,
+        "reporter_email": payload.reporter_email,
+        "user_type": payload.user_type or "patient",
         "created_by": principal.user_id,
         "assigned_to": principal.user_id,
+        "escalated_to": None,
         "notes": [],
         "created_at": now,
         "updated_at": now,
@@ -421,6 +452,7 @@ async def create_support_ticket(
         "actor_id": principal.user_id,
         "action": "support_ticket.created",
         "target_id": ticket_id,
+        "metadata": {"category": cat, "priority": prio},
         "created_at": now,
     })
     return _clean(ticket_doc)
@@ -445,6 +477,10 @@ async def update_support_ticket(
         updates["priority"] = payload.priority
     if payload.assigned_to:
         updates["assigned_to"] = payload.assigned_to
+    if payload.escalated_to:
+        updates["escalated_to"] = payload.escalated_to
+        if not payload.status:
+            updates["status"] = "escalated"
 
     if payload.note:
         note_entry = {
@@ -462,6 +498,31 @@ async def update_support_ticket(
             {"tenant_id": principal.tenant_id, "id": ticket_id},
             {"$set": updates},
         )
+
+    # Notify recipient (patient / doctor / reporter) of ticket status update
+    recipient_id = ticket.get("patient_id") or ticket.get("reporter_id") or ticket.get("created_by")
+    if recipient_id and (payload.status or payload.note or payload.escalated_to):
+        status_text = (payload.status or ticket.get("status", "updated")).replace("_", " ").title()
+        await db["notifications"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": principal.tenant_id,
+            "recipient_id": recipient_id,
+            "type": "support_ticket_update",
+            "title": f"Support Ticket #{ticket_id} {status_text}",
+            "message": f"Your support ticket '{ticket.get('subject')}' was updated to {status_text}.",
+            "read_at": None,
+            "created_at": now,
+        })
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "support_ticket.updated",
+        "target_id": ticket_id,
+        "metadata": {"status": payload.status, "priority": payload.priority, "escalated_to": payload.escalated_to},
+        "created_at": now,
+    })
 
     updated_ticket = await db["support_tickets"].find_one({"tenant_id": principal.tenant_id, "id": ticket_id})
     return _clean(updated_ticket or {})

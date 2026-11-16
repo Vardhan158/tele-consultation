@@ -975,14 +975,26 @@ function SupportDashboardContent({ user, onLogout }) {
                   <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-zinc-100">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <span className="font-mono text-xs font-bold text-[#1A7D67]">{selectedTicket.id}</span>
-                          <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-md font-semibold uppercase">{selectedTicket.category}</span>
+                          <span className="text-xs bg-zinc-100 text-zinc-700 px-2.5 py-0.5 rounded-full font-semibold uppercase">{selectedTicket.category?.replace("_", " ")}</span>
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-semibold uppercase">{selectedTicket.user_type || "patient"}</span>
+                          {selectedTicket.escalated_to && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                              <span className="material-symbols-outlined text-xs">warning</span>
+                              Escalated to {selectedTicket.escalated_to}
+                            </span>
+                          )}
                         </div>
-                        <h2 className="text-lg font-bold text-zinc-900 mt-1">{selectedTicket.subject}</h2>
+                        <h2 className="text-lg font-bold text-zinc-900">{selectedTicket.subject}</h2>
+                        {selectedTicket.reporter_name && (
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            Reporter: <span className="font-semibold text-zinc-800">{selectedTicket.reporter_name}</span> ({selectedTicket.reporter_email})
+                          </p>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <select
                           value={selectedTicket.status}
                           onChange={(e) => handleUpdateTicket({ status: e.target.value })}
@@ -990,6 +1002,7 @@ function SupportDashboardContent({ user, onLogout }) {
                         >
                           <option value="open">Open</option>
                           <option value="in_progress">In Progress</option>
+                          <option value="escalated">Escalated</option>
                           <option value="resolved">Resolved</option>
                           <option value="closed">Closed</option>
                         </select>
@@ -1002,6 +1015,17 @@ function SupportDashboardContent({ user, onLogout }) {
                           <option value="medium">Medium Priority</option>
                           <option value="high">High Priority</option>
                           <option value="urgent">Urgent</option>
+                        </select>
+                        <select
+                          value={selectedTicket.escalated_to || ""}
+                          onChange={(e) => handleUpdateTicket({ escalated_to: e.target.value })}
+                          className="px-3 py-1.5 text-xs font-bold rounded-lg border border-amber-300 bg-amber-50 text-amber-900 outline-none"
+                        >
+                          <option value="">Escalate To…</option>
+                          <option value="Engineering">Engineering Team</option>
+                          <option value="Billing Operations">Billing Operations</option>
+                          <option value="Clinical Lead">Clinical Lead</option>
+                          <option value="System Admin">System Admin</option>
                         </select>
                       </div>
                     </div>
