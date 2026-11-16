@@ -9,6 +9,7 @@ import OperationalReportsTab from "./tabs/OperationalReportsTab";
 import ClinicSettingsTab from "./tabs/ClinicSettingsTab";
 import SupportStaffManagementTab from "./tabs/SupportStaffManagementTab";
 import SupportScreen from "../screens/SupportScreen";
+import SecOpsDashboardScreen from "../secops/SecOpsDashboardScreen";
 
 export default function ClinicAdminDashboard({ activeTab = "overview", onSelectTab }) {
   const normalizeTab = (tab) => {
@@ -38,6 +39,9 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
       case "support-staff":
       case "clinic-support-staff":
         return "support-staff";
+      case "secops":
+      case "clinic-secops":
+        return "secops";
       case "support":
       case "clinic-support":
         return "support";
@@ -69,6 +73,8 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
         return <OperationalReportsTab />;
       case "support-staff":
         return <SupportStaffManagementTab />;
+      case "secops":
+        return <SecOpsDashboardScreen />;
       case "support":
         return <SupportScreen onNavigate={onSelectTab} />;
       case "settings":

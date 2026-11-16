@@ -38,6 +38,10 @@ COLLECTIONS = {
     "support_tickets": {"bsonType": "object", "required": ["tenant_id", "requester_id"]},
     "support_ticket_events": {"bsonType": "object", "required": ["tenant_id", "ticket_id", "action"]},
     "support_escalations": {"bsonType": "object", "required": ["tenant_id", "original_ticket_id", "destination_team"]},
+    "secops_incidents": {"bsonType": "object", "required": ["tenant_id", "severity"]},
+    "secops_alerts": {"bsonType": "object", "required": ["tenant_id", "severity"]},
+    "secops_backups": {"bsonType": "object", "required": ["tenant_id", "backup_id"]},
+    "secops_health_logs": {"bsonType": "object", "required": ["tenant_id", "status"]},
     "audit_logs": {"bsonType": "object", "required": ["tenant_id", "actor_id", "action"]},
     "blocked_dates": {"bsonType": "object", "required": ["tenant_id", "date"]},
     "user_sessions": {"bsonType": "object", "required": ["tenant_id", "user_id", "token_hash"]},
@@ -98,6 +102,22 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
     "support_escalations": [
         ([("tenant_id", ASCENDING), ("original_ticket_id", ASCENDING), ("status", ASCENDING)], {}),
         ([("tenant_id", ASCENDING), ("id", ASCENDING)], {"unique": True, "sparse": True}),
+    ],
+    "secops_incidents": [
+        ([("tenant_id", ASCENDING), ("incident_id", ASCENDING)], {"unique": True, "sparse": True}),
+        ([("tenant_id", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("severity", ASCENDING), ("status", ASCENDING)], {}),
+    ],
+    "secops_alerts": [
+        ([("tenant_id", ASCENDING), ("alert_id", ASCENDING)], {"unique": True, "sparse": True}),
+        ([("tenant_id", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)], {}),
+    ],
+    "secops_backups": [
+        ([("tenant_id", ASCENDING), ("backup_id", ASCENDING)], {"unique": True, "sparse": True}),
+        ([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {}),
+    ],
+    "secops_health_logs": [
+        ([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {}),
     ],
 }
 

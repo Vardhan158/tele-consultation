@@ -34,6 +34,7 @@ import DoctorConsultationScreen from "./components/screens/DoctorConsultationScr
 import DoctorNotificationsScreen from "./components/screens/DoctorNotificationsScreen";
 import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
 import SupportDashboardScreen from "./components/support/SupportDashboardScreen";
+import SecOpsDashboardScreen from "./components/secops/SecOpsDashboardScreen";
 
 const PATH_TO_TAB = {
   "/dashboard": "dashboard",
@@ -52,6 +53,7 @@ const PATH_TO_TAB = {
   "/profile": "profile",
   "/consent": "consent",
   "/support": "support",
+  "/secops": "secops",
   "/doctor/dashboard": "doctor-dashboard",
   "/doctor/appointments": "doctor-appointments",
   "/doctor/patients": "doctor-patients",
@@ -247,6 +249,9 @@ export default function App() {
   }
 
   const renderScreen = () => {
+    if (patient?.role === "secops" || patient?.role === "security_ops" || routedTab === "secops") {
+      return <SecOpsDashboardScreen user={patient} onLogout={signOut} />;
+    }
     if (patient?.role === "clinic_admin") {
       return (
         <ClinicAdminDashboard

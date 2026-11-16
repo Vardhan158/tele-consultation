@@ -45,6 +45,8 @@ from teleconsult.modules.support_access.patient_routes import router as support_
 from teleconsult.modules.support_access.routes import router as support_access_router
 from teleconsult.modules.tenancy.clinic_admin_routes import router as clinic_admin_router
 from teleconsult.modules.tenancy.routes import router as tenancy_router
+from teleconsult.modules.admin.support_dashboard_routes import router as support_dashboard_router
+from teleconsult.modules.admin.secops_dashboard_routes import router as secops_dashboard_router
 
 # Routes that are intentionally unauthenticated. Keep this list tiny and reviewed.
 PUBLIC_PATHS = frozenset({
@@ -174,6 +176,8 @@ def create_app() -> FastAPI:
     app.include_router(clinic_admin_router)
     app.include_router(support_dashboard_router)
     app.include_router(support_dashboard_router, prefix="/api/v1/support")
+    app.include_router(secops_dashboard_router)
+    app.include_router(secops_dashboard_router, prefix="/api/v1/secops")
     # TODO: register the audit sink, bind adapters to module ports, add rate limiting.
     return app
 app = create_app()

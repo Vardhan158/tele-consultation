@@ -577,6 +577,51 @@ export const supportDashboardApi = {
   },
 };
 
+export const secopsDashboardApi = {
+  healthOverview: () => apiRequest("/api/v1/secops-dashboard/health-overview"),
+  triggerHealthCheck: () =>
+    apiRequest("/api/v1/secops-dashboard/health/check", { method: "POST" }),
+  securityEvents: (severity = "", search = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/secops-dashboard/security/events?severity=${encodeURIComponent(severity)}&search=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`),
+  executeSecurityAction: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/security/action", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  auditLogs: (startDate = "", endDate = "", actorId = "", action = "", offset = 0, limit = 50) =>
+    apiRequest(`/api/v1/secops-dashboard/audit-logs?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&actor_id=${encodeURIComponent(actorId)}&action=${encodeURIComponent(action)}&offset=${offset}&limit=${limit}`),
+  exportAuditLogs: () =>
+    apiRequest("/api/v1/secops-dashboard/audit/export", { method: "POST" }),
+  incidents: (status = "", severity = "", category = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/secops-dashboard/incidents?status=${encodeURIComponent(status)}&severity=${encodeURIComponent(severity)}&category=${encodeURIComponent(category)}&offset=${offset}&limit=${limit}`),
+  createIncident: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/incidents", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateIncident: (id, payload) =>
+    apiRequest(`/api/v1/secops-dashboard/incidents/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  providers: () => apiRequest("/api/v1/secops-dashboard/providers"),
+  probeProvider: (providerKey) =>
+    apiRequest(`/api/v1/secops-dashboard/providers/${providerKey}/check`, { method: "POST" }),
+  backups: () => apiRequest("/api/v1/secops-dashboard/backups"),
+  triggerBackup: () =>
+    apiRequest("/api/v1/secops-dashboard/backups/trigger", { method: "POST" }),
+  alerts: (status = "", severity = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/secops-dashboard/alerts?status=${encodeURIComponent(status)}&severity=${encodeURIComponent(severity)}&offset=${offset}&limit=${limit}`),
+  acknowledgeAlert: (alertId) =>
+    apiRequest(`/api/v1/secops-dashboard/alerts/${alertId}/acknowledge`, { method: "POST" }),
+  alertRules: () => apiRequest("/api/v1/secops-dashboard/alerts/rules"),
+  updateAlertRules: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/alerts/rules", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+};
+
 export function loadRazorpayScript() {
   return new Promise((resolve) => {
     if (typeof window !== "undefined" && window.Razorpay) {

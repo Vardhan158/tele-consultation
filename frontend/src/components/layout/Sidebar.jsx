@@ -32,8 +32,18 @@ const roleNavigation = {
     { id: "clinic-payments", label: "Payments", icon: "payments" },
     { id: "clinic-reports", label: "Reports", icon: "analytics" },
     { id: "clinic-support-staff", label: "Support staff", icon: "support_agent" },
+    { id: "clinic-secops", label: "Security & Operations", icon: "shield_person" },
     { id: "clinic-settings", label: "Clinic settings", icon: "settings" },
     { id: "support", label: "Help & support", icon: "headset_mic" },
+  ],
+  secops: [
+    { id: "secops-health", label: "System Health", icon: "monitor_heart" },
+    { id: "secops-security", label: "Security Monitoring", icon: "shield_lock" },
+    { id: "secops-audit", label: "Audit Logs", icon: "policy" },
+    { id: "secops-incidents", label: "Incident Management", icon: "warning" },
+    { id: "secops-providers", label: "Provider Outages", icon: "cloud_sync" },
+    { id: "secops-backups", label: "Backup & Recovery", icon: "settings_backup_restore" },
+    { id: "secops-alerts", label: "Operational Alerts", icon: "notifications_active" },
   ],
   support: [
     { id: "support-overview", label: "Live Operations", icon: "grid_view" },
