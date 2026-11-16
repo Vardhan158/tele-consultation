@@ -57,6 +57,28 @@ function SupportDashboardContent({ user, onLogout }) {
   const [videoDiagData, setVideoDiagData] = useState(null);
   const [videoDiagLoading, setVideoDiagLoading] = useState(false);
 
+  // Escalations State (PRD Section 10)
+  const [escalations, setEscalations] = useState([]);
+  const [escalationStatus, setEscalationStatus] = useState("");
+  const [escalationTeam, setEscalationTeam] = useState("");
+  const [escalationPriority, setEscalationPriority] = useState("");
+  const [escalationsLoading, setEscalationsLoading] = useState(false);
+  const [selectedEscalation, setSelectedEscalation] = useState(null);
+  const [escalationNoteText, setEscalationNoteText] = useState("");
+
+  // Create Escalation Modal State
+  const [showCreateEscalationModal, setShowCreateEscalationModal] = useState(false);
+  const [newEscalationForm, setNewEscalationForm] = useState({
+    original_ticket_id: "",
+    escalation_category: "application_defect",
+    destination_team: "Engineering",
+    priority: "high",
+    reason: "",
+    impact_description: "",
+    expected_follow_up: "4 hours",
+    incident_id: "",
+  });
+
   // Tickets State
   const [tickets, setTickets] = useState([]);
   const [ticketStatus, setTicketStatus] = useState("");
@@ -253,6 +275,46 @@ function SupportDashboardContent({ user, onLogout }) {
     }
   };
 
+  const loadEscalations = async () => {
+    setEscalationsLoading(true);
+    try {
+      const res = await supportDashboardApi.escalations(escalationStatus, escalationTeam, escalationPriority);
+      setEscalations(res.items || []);
+    } catch (err) {
+      addToast(err.message || "Failed to load escalations", "error");
+    } finally {
+      setEscalationsLoading(false);
+    }
+  };
+
+  const handleCreateEscalation = async (e) => {
+    e.preventDefault();
+    if (!newEscalationForm.original_ticket_id || !newEscalationForm.reason || !newEscalationForm.impact_description) {
+      addToast("Please fill in required fields", "warning");
+      return;
+    }
+    try {
+      await supportDashboardApi.createEscalation(newEscalationForm);
+      addToast("Escalation record created successfully", "success");
+      setShowCreateEscalationModal(false);
+      setNewEscalationForm({ original_ticket_id: "", escalation_category: "application_defect", destination_team: "Engineering", priority: "high", reason: "", impact_description: "", expected_follow_up: "4 hours", incident_id: "" });
+      loadEscalations();
+    } catch (err) {
+      addToast(err.message || "Failed to create escalation", "error");
+    }
+  };
+
+  const handleUpdateEscalation = async (id, updates) => {
+    try {
+      const updated = await supportDashboardApi.updateEscalation(id, updates);
+      setSelectedEscalation(updated);
+      addToast("Escalation record updated", "success");
+      loadEscalations();
+    } catch (err) {
+      addToast(err.message || "Failed to update escalation", "error");
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "overview") loadOverview();
     else if (activeTab === "account_access") { if (accountQuery) loadAccountDiagnostics(); }
@@ -262,6 +324,7 @@ function SupportDashboardContent({ user, onLogout }) {
     else if (activeTab === "appointments") loadAppointments();
     else if (activeTab === "payments") loadPayments();
     else if (activeTab === "video") { loadVideoSessions(); if (videoQuery) loadVideoDiagnostics(); }
+    else if (activeTab === "escalations") loadEscalations();
     else if (activeTab === "tickets") loadTickets();
   }, [activeTab]);
 
@@ -367,6 +430,7 @@ function SupportDashboardContent({ user, onLogout }) {
     { id: "appointments", label: "Appointments", icon: "calendar_month" },
     { id: "payments", label: "Payments & Refunds", icon: "payments" },
     { id: "video", label: "Video Diagnostics", icon: "video_camera_front" },
+    { id: "escalations", label: "Inter-Team Escalations", icon: "published_with_changes" },
     { id: "tickets", label: "Support Desk", icon: "headset_mic" },
   ];
 
@@ -1563,6 +1627,224 @@ function SupportDashboardContent({ user, onLogout }) {
         )}
 
         {/* ========================================================================= */}
+        {/* SCREEN 6: INTER-TEAM ESCALATIONS MANAGEMENT (PRD SECTION 10)            */}
+        {/* ========================================================================= */}
+        {activeTab === "escalations" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header & Filter Controls */}
+            <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+                <select
+                  value={escalationStatus}
+                  onChange={(e) => { setEscalationStatus(e.target.value); loadEscalations(); }}
+                  className="px-3 py-2 text-sm rounded-xl border border-zinc-300 outline-none"
+                >
+                  <option value="">All Escalation Statuses</option>
+                  <option value="PENDING">Pending Acceptance</option>
+                  <option value="ACCEPTED">Accepted</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="REASSIGNED">Reassigned</option>
+                  <option value="RESOLVED">Resolved</option>
+                  <option value="CLOSED">Closed</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+
+                <select
+                  value={escalationTeam}
+                  onChange={(e) => { setEscalationTeam(e.target.value); loadEscalations(); }}
+                  className="px-3 py-2 text-sm rounded-xl border border-zinc-300 outline-none"
+                >
+                  <option value="">All Specialist Teams</option>
+                  <option value="Security & Operations">Security &amp; Operations</option>
+                  <option value="Technical Operations">Technical Operations</option>
+                  <option value="Authorized Finance">Authorized Finance</option>
+                  <option value="Clinic Administrator">Clinic Administrator</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Security / Privacy Officer">Security / Privacy Officer</option>
+                  <option value="Engineering">Engineering</option>
+                </select>
+
+                <select
+                  value={escalationPriority}
+                  onChange={(e) => { setEscalationPriority(e.target.value); loadEscalations(); }}
+                  className="px-3 py-2 text-sm rounded-xl border border-zinc-300 outline-none"
+                >
+                  <option value="">All Priorities</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCreateEscalationModal(true)}
+                className="px-4 py-2 bg-purple-700 text-white rounded-xl text-xs font-semibold hover:bg-purple-800 transition cursor-pointer shrink-0"
+              >
+                + New Inter-Team Escalation
+              </button>
+            </div>
+
+            {/* Escalation Table & Details Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Escalation Queue List */}
+              <div className="lg:col-span-1 bg-white rounded-2xl border border-zinc-200 shadow-xs p-4 space-y-2 max-h-[600px] overflow-y-auto">
+                {escalationsLoading ? (
+                  <p className="text-xs text-zinc-400 py-6 text-center">Loading escalations…</p>
+                ) : escalations.length === 0 ? (
+                  <p className="text-xs text-zinc-400 py-6 text-center">No escalation records found.</p>
+                ) : (
+                  escalations.map((esc) => (
+                    <div
+                      key={esc.id}
+                      onClick={() => setSelectedEscalation(esc)}
+                      className={`p-4 rounded-xl border transition cursor-pointer ${
+                        selectedEscalation?.id === esc.id
+                          ? "border-purple-600 bg-purple-50/60 shadow-xs"
+                          : "border-zinc-200 hover:border-purple-300 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-purple-700">{esc.id}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                          esc.status === "PENDING" ? "bg-amber-100 text-amber-800" :
+                          esc.status === "RESOLVED" ? "bg-green-100 text-green-800" :
+                          esc.status === "REJECTED" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"
+                        }`}>
+                          {esc.status}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm text-zinc-900 mt-1">{esc.ticket_subject || `Ref Ticket #${esc.original_ticket_id}`}</h4>
+                      <div className="flex items-center justify-between text-xs text-zinc-500 mt-2">
+                        <span className="font-semibold text-zinc-700">{esc.destination_team}</span>
+                        <span className="font-mono text-[11px] text-zinc-400">{esc.original_ticket_id}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Selected Escalation Details & Action Panel */}
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-xs p-6 space-y-6">
+                {!selectedEscalation ? (
+                  <div className="py-20 text-center text-zinc-400 flex flex-col items-center gap-2">
+                    <span className="material-symbols-outlined text-4xl text-purple-300">published_with_changes</span>
+                    <p className="text-sm font-medium">Select an escalation record to review details, update status, and manage team ownership</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-zinc-100">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="font-mono text-xs font-bold text-purple-700">{selectedEscalation.id}</span>
+                          <span className="text-xs bg-purple-100 text-purple-900 px-2.5 py-0.5 rounded-full font-bold uppercase">{selectedEscalation.destination_team}</span>
+                          <span className="text-xs bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-full font-semibold uppercase">{selectedEscalation.escalation_category?.replace("_", " ")}</span>
+                          {selectedEscalation.incident_id && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full font-mono font-bold">
+                              Inc: {selectedEscalation.incident_id}
+                            </span>
+                          )}
+                        </div>
+                        <h2 className="text-lg font-bold text-zinc-900">Original Ticket: {selectedEscalation.original_ticket_id}</h2>
+                        <p className="text-xs text-zinc-500 mt-0.5">SLA Target Follow-up: <span className="font-semibold text-zinc-800">{selectedEscalation.expected_follow_up || "4 hours"}</span></p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={selectedEscalation.status}
+                          onChange={(e) => handleUpdateEscalation(selectedEscalation.id, { status: e.target.value })}
+                          className="px-3 py-1.5 text-xs font-bold rounded-lg border border-purple-300 bg-purple-50 text-purple-900 outline-none"
+                        >
+                          <option value="PENDING">PENDING</option>
+                          <option value="ACCEPTED">ACCEPTED</option>
+                          <option value="IN_PROGRESS">IN_PROGRESS</option>
+                          <option value="REASSIGNED">REASSIGNED</option>
+                          <option value="RESOLVED">RESOLVED</option>
+                          <option value="CLOSED">CLOSED</option>
+                          <option value="REJECTED">REJECTED</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Escalation Details Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                        <p className="text-zinc-500 font-medium">Escalation Reason</p>
+                        <p className="font-semibold text-zinc-800">{selectedEscalation.reason}</p>
+                      </div>
+
+                      <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                        <p className="text-zinc-500 font-medium">Impact Description</p>
+                        <p className="font-semibold text-zinc-800">{selectedEscalation.impact_description}</p>
+                      </div>
+                    </div>
+
+                    {/* Action Toolbar for Destination Team / Lead */}
+                    <div className="space-y-3 pt-2 border-t border-zinc-100">
+                      <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Escalation Management Actions</h4>
+                      <div className="flex flex-wrap gap-2.5">
+                        {selectedEscalation.status === "PENDING" && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateEscalation(selectedEscalation.id, { status: "ACCEPTED", assigned_owner: user?.full_name || user?.user_id })}
+                            className="px-3.5 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 cursor-pointer"
+                          >
+                            Accept Escalation
+                          </button>
+                        )}
+                        {selectedEscalation.status !== "RESOLVED" && selectedEscalation.status !== "CLOSED" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const summary = window.prompt("Provide resolution summary for this escalation:");
+                              if (summary) handleUpdateEscalation(selectedEscalation.id, { status: "RESOLVED", resolution_summary: summary });
+                            }}
+                            className="px-3.5 py-2 bg-purple-700 text-white text-xs font-bold rounded-xl hover:bg-purple-800 cursor-pointer"
+                          >
+                            Mark Escalation Resolved
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const rejReason = window.prompt("Reason for rejecting escalation:");
+                            if (rejReason) handleUpdateEscalation(selectedEscalation.id, { status: "REJECTED", rejection_reason: rejReason });
+                          }}
+                          className="px-3.5 py-2 bg-red-50 text-red-700 text-xs font-semibold rounded-xl hover:bg-red-100 border border-red-200 cursor-pointer"
+                        >
+                          Reject Escalation
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Audit History Log */}
+                    <div className="space-y-3 pt-2 border-t border-zinc-100">
+                      <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Escalation Audit Timeline</h4>
+                      {!selectedEscalation.history?.length ? (
+                        <p className="text-xs text-zinc-400 italic">No timeline history recorded.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {selectedEscalation.history.map((h) => (
+                            <div key={h.id} className="p-2.5 bg-zinc-50 rounded-lg border border-zinc-100 text-xs flex justify-between gap-3">
+                              <div>
+                                <span className="font-semibold text-zinc-800">{h.details}</span>
+                                <p className="text-[10px] text-zinc-500">Actor: {h.actor_id}</p>
+                              </div>
+                              <span className="text-[10px] text-zinc-400 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
         {/* SCREEN 7: SUPPORT TICKET DESK                                             */}
         {/* ========================================================================= */}
         {activeTab === "tickets" && (
@@ -1990,6 +2272,169 @@ function SupportDashboardContent({ user, onLogout }) {
                   className="px-5 py-2 text-xs font-semibold text-white bg-[#1A7D67] hover:bg-[#156654] rounded-xl cursor-pointer"
                 >
                   Submit Ticket
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Inter-Team Escalation Modal (PRD Section 10.3) */}
+      {showCreateEscalationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-zinc-200 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-purple-700">published_with_changes</span>
+                New Inter-Team Escalation Form
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCreateEscalationModal(false)}
+                className="p-1 rounded-lg text-zinc-400 hover:bg-zinc-100 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEscalation} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                  Original Support Ticket ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newEscalationForm.original_ticket_id}
+                  onChange={(e) => setNewEscalationForm({ ...newEscalationForm, original_ticket_id: e.target.value })}
+                  placeholder="e.g. TICK-102938"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 font-mono text-sm outline-none focus:border-purple-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 mb-1">Escalation Category</label>
+                  <select
+                    value={newEscalationForm.escalation_category}
+                    onChange={(e) => {
+                      const cat = e.target.value;
+                      const teamMap = {
+                        account_security: "Security & Operations",
+                        video_infrastructure: "Technical Operations",
+                        refund_approval: "Authorized Finance",
+                        doctor_approval: "Clinic Administrator",
+                        platform_outage: "Operations",
+                        privacy_concern: "Security / Privacy Officer",
+                        application_defect: "Engineering",
+                      };
+                      setNewEscalationForm({
+                        ...newEscalationForm,
+                        escalation_category: cat,
+                        destination_team: teamMap[cat] || newEscalationForm.destination_team,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-300 text-sm outline-none"
+                  >
+                    <option value="application_defect">Application Defect</option>
+                    <option value="account_security">Suspicious Account Access</option>
+                    <option value="video_infrastructure">Video Infrastructure Failure</option>
+                    <option value="refund_approval">Refund Approval</option>
+                    <option value="doctor_approval">Doctor Approval Issue</option>
+                    <option value="platform_outage">Platform Outage</option>
+                    <option value="privacy_concern">Privacy Concern</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 mb-1">Destination Team</label>
+                  <select
+                    value={newEscalationForm.destination_team}
+                    onChange={(e) => setNewEscalationForm({ ...newEscalationForm, destination_team: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-300 text-sm outline-none"
+                  >
+                    <option value="Engineering">Engineering</option>
+                    <option value="Security & Operations">Security &amp; Operations</option>
+                    <option value="Technical Operations">Technical Operations</option>
+                    <option value="Authorized Finance">Authorized Finance</option>
+                    <option value="Clinic Administrator">Clinic Administrator</option>
+                    <option value="Operations">Operations</option>
+                    <option value="Security / Privacy Officer">Security / Privacy Officer</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 mb-1">Priority</label>
+                  <select
+                    value={newEscalationForm.priority}
+                    onChange={(e) => setNewEscalationForm({ ...newEscalationForm, priority: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-300 text-sm outline-none"
+                  >
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 mb-1">Expected Follow-up SLA</label>
+                  <select
+                    value={newEscalationForm.expected_follow_up}
+                    onChange={(e) => setNewEscalationForm({ ...newEscalationForm, expected_follow_up: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-300 text-sm outline-none"
+                  >
+                    <option value="1 hour">1 Hour (Urgent Outage)</option>
+                    <option value="4 hours">4 Hours (High Priority)</option>
+                    <option value="12 hours">12 Hours (Medium)</option>
+                    <option value="24 hours">24 Hours (Low)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                  Escalation Reason <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newEscalationForm.reason}
+                  onChange={(e) => setNewEscalationForm({ ...newEscalationForm, reason: e.target.value })}
+                  placeholder="Why Support cannot resolve independently…"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-sm outline-none focus:border-purple-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                  Impact Description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={newEscalationForm.impact_description}
+                  onChange={(e) => setNewEscalationForm({ ...newEscalationForm, impact_description: e.target.value })}
+                  placeholder="Describe impact on user, clinician, or system…"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-sm outline-none focus:border-purple-600"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateEscalationModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-600 border border-zinc-300 rounded-xl hover:bg-zinc-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-semibold text-white bg-purple-700 hover:bg-purple-800 rounded-xl cursor-pointer"
+                >
+                  Submit Escalation
                 </button>
               </div>
             </form>

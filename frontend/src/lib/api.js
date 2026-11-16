@@ -543,6 +543,18 @@ export const supportDashboardApi = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  escalations: (status = "", team = "", priority = "", ticketId = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/escalations?status=${encodeURIComponent(status)}&destination_team=${encodeURIComponent(team)}&priority=${encodeURIComponent(priority)}&ticket_id=${encodeURIComponent(ticketId)}&offset=${offset}&limit=${limit}`),
+  createEscalation: (payload) =>
+    apiRequest("/api/v1/support-dashboard/escalations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateEscalation: (id, payload) =>
+    apiRequest(`/api/v1/support-dashboard/escalations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export function loadRazorpayScript() {

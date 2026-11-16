@@ -1159,3 +1159,242 @@ async def update_support_ticket(
 def secrets_ticket_id() -> str:
     import secrets
     return f"{secrets.randbelow(899999) + 100000}"
+
+
+class EscalationCreate(BaseModel):
+    original_ticket_id: str = Field(min_length=3, max_length=100)
+    escalation_category: str = Field(min_length=3, max_length=50) # account_security, video_infrastructure, refund_approval, doctor_approval, platform_outage, privacy_concern, application_defect
+    destination_team: str = Field(min_length=3, max_length=100)  # Security & Operations, Technical Operations, Authorized Finance, Clinic Administrator, Operations, Security / Privacy Officer, Engineering
+    priority: str = Field(default="high", max_length=20)          # low, medium, high, urgent
+    reason: str = Field(min_length=3, max_length=1000)
+    impact_description: str = Field(min_length=3, max_length=1000)
+    supporting_references: dict[str, Any] | None = None
+    expected_follow_up: str | None = Field(default="4 hours", max_length=50)
+    incident_id: str | None = None                                # e.g. INC-8821
+
+
+class EscalationUpdate(BaseModel):
+    status: str | None = Field(default=None, pattern="^(PENDING|ACCEPTED|IN_PROGRESS|REASSIGNED|REJECTED|RESOLVED|CLOSED)$")
+    assigned_owner: str | None = None
+    destination_team: str | None = None
+    rejection_reason: str | None = Field(default=None, max_length=1000)
+    incident_id: str | None = None
+    resolution_summary: str | None = Field(default=None, max_length=1000)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+ESCALATION_TEAM_MAP = {
+    "account_security": "Security & Operations",
+    "video_infrastructure": "Technical Operations",
+    "refund_approval": "Authorized Finance",
+    "doctor_approval": "Clinic Administrator",
+    "platform_outage": "Operations",
+    "privacy_concern": "Security / Privacy Officer",
+    "application_defect": "Engineering",
+}
+
+
+# ============================================================================
+# Screen 6: Inter-Team Escalations Management (PRD Section 10)
+# ============================================================================
+
+@router.get("/escalations")
+async def list_escalations(
+    status: str = "",
+    destination_team: str = "",
+    priority: str = "",
+    ticket_id: str = "",
+    offset: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    query: dict[str, Any] = {"tenant_id": principal.tenant_id}
+    if status:
+        query["status"] = status
+    if destination_team:
+        query["destination_team"] = destination_team
+    if priority:
+        query["priority"] = priority
+    if ticket_id:
+        query["original_ticket_id"] = ticket_id
+
+    items = [_clean(x) async for x in db["escalations"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
+    total = await db["escalations"].count_documents(query)
+    return {"items": items, "total": total, "offset": offset, "limit": limit}
+
+
+@router.post("/escalations")
+async def create_escalation(
+    payload: EscalationCreate,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    ticket = await db["support_tickets"].find_one({"tenant_id": principal.tenant_id, "id": payload.original_ticket_id})
+    if not ticket:
+        raise HTTPException(404, "Original support ticket not found")
+
+    now = datetime.now(UTC)
+    escalation_id = f"ESC-{secrets_ticket_id()}"
+    team = payload.destination_team or ESCALATION_TEAM_MAP.get(payload.escalation_category, "Engineering")
+
+    history_entry = {
+        "id": str(uuid4()),
+        "action": "escalation_created",
+        "actor_id": principal.user_id,
+        "details": f"Escalated to {team} (Status: PENDING)",
+        "created_at": now.isoformat(),
+    }
+
+    doc = {
+        "id": escalation_id,
+        "tenant_id": principal.tenant_id,
+        "clinic_id": principal.clinic_id,
+        "original_ticket_id": payload.original_ticket_id,
+        "ticket_subject": ticket.get("subject", ""),
+        "escalation_category": payload.escalation_category,
+        "destination_team": team,
+        "priority": payload.priority,
+        "reason": payload.reason,
+        "impact_description": payload.impact_description,
+        "status": "PENDING",
+        "assigned_owner": None,
+        "rejection_reason": None,
+        "incident_id": payload.incident_id,
+        "supporting_references": payload.supporting_references or {
+            "patient_id": ticket.get("patient_id"),
+            "doctor_id": ticket.get("doctor_id"),
+            "appointment_id": ticket.get("appointment_id"),
+        },
+        "expected_follow_up": payload.expected_follow_up or "4 hours",
+        "notes": [],
+        "history": [history_entry],
+        "created_by": principal.user_id,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    await db["escalations"].insert_one(doc)
+
+    ticket_history_entry = {
+        "id": str(uuid4()),
+        "action": "escalated",
+        "actor_id": principal.user_id,
+        "details": f"Escalated via {escalation_id} to {team} ({payload.priority.upper()})",
+        "created_at": now.isoformat(),
+    }
+    await db["support_tickets"].update_one(
+        {"tenant_id": principal.tenant_id, "id": payload.original_ticket_id},
+        {"$set": {"status": "escalated", "escalated_to": team, "priority": payload.priority, "updated_at": now},
+         "$push": {"history": ticket_history_entry}},
+    )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "escalation.created",
+        "target_id": escalation_id,
+        "metadata": {"ticket_id": payload.original_ticket_id, "team": team, "priority": payload.priority},
+        "created_at": now,
+    })
+
+    return _clean(doc)
+
+
+@router.patch("/escalations/{escalation_id}")
+async def update_escalation(
+    escalation_id: str,
+    payload: EscalationUpdate,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    esc = await db["escalations"].find_one({"tenant_id": principal.tenant_id, "id": escalation_id})
+    if not esc:
+        raise HTTPException(404, "Escalation record not found")
+
+    now = datetime.now(UTC)
+    updates: dict[str, Any] = {"updated_at": now}
+    history_logs = []
+
+    if payload.status:
+        if payload.status == "REJECTED" and not payload.rejection_reason:
+            raise HTTPException(422, "A rejection_reason is required when status is REJECTED")
+        updates["status"] = payload.status
+        history_logs.append({
+            "id": str(uuid4()),
+            "action": f"status_{payload.status.lower()}",
+            "actor_id": principal.user_id,
+            "details": f"Escalation status changed to {payload.status}",
+            "created_at": now.isoformat(),
+        })
+        if payload.status == "RESOLVED":
+            updates["resolved_at"] = now
+            updates["resolved_by"] = principal.user_id
+
+    if payload.assigned_owner:
+        updates["assigned_owner"] = payload.assigned_owner
+        if not payload.status or payload.status == "PENDING":
+            updates["status"] = "ACCEPTED"
+
+    if payload.destination_team:
+        updates["destination_team"] = payload.destination_team
+        updates["status"] = "REASSIGNED"
+
+    if payload.rejection_reason:
+        updates["rejection_reason"] = payload.rejection_reason
+
+    if payload.incident_id:
+        updates["incident_id"] = payload.incident_id
+
+    if payload.resolution_summary:
+        updates["resolution_summary"] = payload.resolution_summary
+
+    if payload.note:
+        note_entry = {
+            "id": str(uuid4()),
+            "author_id": principal.user_id,
+            "text": payload.note,
+            "created_at": now.isoformat(),
+        }
+        await db["escalations"].update_one(
+            {"tenant_id": principal.tenant_id, "id": escalation_id},
+            {"$push": {"notes": note_entry, "history": {"$each": history_logs}}, "$set": updates},
+        )
+    elif history_logs:
+        await db["escalations"].update_one(
+            {"tenant_id": principal.tenant_id, "id": escalation_id},
+            {"$push": {"history": {"$each": history_logs}}, "$set": updates},
+        )
+    else:
+        await db["escalations"].update_one(
+            {"tenant_id": principal.tenant_id, "id": escalation_id},
+            {"$set": updates},
+        )
+
+    if payload.status == "RESOLVED":
+        ticket_history_entry = {
+            "id": str(uuid4()),
+            "action": "escalation_resolved",
+            "actor_id": principal.user_id,
+            "details": f"Escalation {escalation_id} resolved by {principal.user_id}",
+            "created_at": now.isoformat(),
+        }
+        await db["support_tickets"].update_one(
+            {"tenant_id": principal.tenant_id, "id": esc["original_ticket_id"]},
+            {"$set": {"status": "resolved", "resolved_at": now, "resolved_by": principal.user_id},
+             "$push": {"history": ticket_history_entry}},
+        )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "escalation.updated",
+        "target_id": escalation_id,
+        "metadata": {"status": payload.status, "owner": payload.assigned_owner},
+        "created_at": now,
+    })
+
+    updated_esc = await db["escalations"].find_one({"tenant_id": principal.tenant_id, "id": escalation_id})
+    return _clean(updated_esc or {})
