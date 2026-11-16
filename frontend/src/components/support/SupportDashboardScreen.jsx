@@ -503,7 +503,7 @@ function SupportDashboardContent({ user, onLogout }) {
 
     try {
       const reqRole = newTicketForm.requester_type.toUpperCase().replace(" ", "_");
-      await supportDashboardApi.createTicket({
+      const createdTicket = await supportDashboardApi.createTicket({
         subject: newTicketForm.subject.trim(),
         description: newTicketForm.description.trim(),
         category: newTicketForm.category,
@@ -521,7 +521,7 @@ function SupportDashboardContent({ user, onLogout }) {
         reporter_email: newTicketForm.requester_email,
       });
 
-      addToast("Support ticket created successfully", "success");
+      addToast(`Support ticket #${createdTicket.id || createdTicket.ticket_id || ""} created successfully`, "success");
       setShowCreateTicketModal(false);
       setNewTicketForm({
         subject: "",
@@ -536,7 +536,17 @@ function SupportDashboardContent({ user, onLogout }) {
         appointment_id: "",
       });
       setRequesterSearchResults([]);
-      if (activeTab === "tickets") loadTickets();
+
+      // Synchronize all backend data views: Overview KPIs, Tickets queue, and Audit Trail
+      await Promise.all([
+        loadOverview(),
+        loadTickets(),
+        loadAuditHistory(),
+      ]);
+
+      if (createdTicket && createdTicket.id) {
+        setSelectedTicket(createdTicket);
+      }
     } catch (err) {
       addToast(err.message || "Failed to create ticket", "error");
     }
@@ -549,6 +559,8 @@ function SupportDashboardContent({ user, onLogout }) {
       setSelectedTicket(updated);
       addToast("Ticket updated", "success");
       loadTickets();
+      loadOverview();
+      loadAuditHistory();
     } catch (err) {
       addToast(err.message || "Failed to update ticket", "error");
     }
@@ -562,6 +574,7 @@ function SupportDashboardContent({ user, onLogout }) {
       setSelectedTicket(updated);
       setNewNoteText("");
       addToast("Note added", "success");
+      loadOverview();
     } catch (err) {
       addToast(err.message || "Failed to add note", "error");
     }

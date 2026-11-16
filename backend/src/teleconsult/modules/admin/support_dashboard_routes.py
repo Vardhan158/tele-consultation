@@ -333,7 +333,7 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
     now_dt = datetime.now(UTC)
     today = now_dt.isoformat()[:10]
 
-    all_active_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "status": {"$nin": ["closed"]}})]
+    all_active_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "status": {"$nin": ["closed", "CLOSED"]}})]
 
     open_tickets = 0
     unassigned_tickets = 0
@@ -345,22 +345,22 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
     }
 
     for t in all_active_tickets:
-        status = t.get("status", "open")
-        priority = t.get("priority", "medium")
+        status = str(t.get("status") or "OPEN").upper()
+        priority = str(t.get("priority") or "MEDIUM").upper()
         created_at_val = t.get("created_at")
         assigned = t.get("assigned_to")
-        category = t.get("category", "general")
+        category = str(t.get("category") or "general").lower()
 
-        if status in {"open", "in_progress", "escalated"}:
+        if status in {"OPEN", "NEW", "IN_PROGRESS", "WAITING_FOR_USER", "ESCALATED", "REOPENED"}:
             open_tickets += 1
 
         if not assigned or assigned == "unassigned":
             unassigned_tickets += 1
 
-        if priority in {"urgent", "high"}:
+        if priority in {"URGENT", "HIGH", "CRITICAL"}:
             urgent_tickets += 1
 
-        if assigned == principal.user_id and status not in {"resolved", "closed"}:
+        if assigned == principal.user_id and status not in {"RESOLVED", "CLOSED"}:
             my_assigned_tickets += 1
 
         category_summary[category] = category_summary.get(category, 0) + 1
