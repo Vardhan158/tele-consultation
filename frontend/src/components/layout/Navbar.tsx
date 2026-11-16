@@ -171,7 +171,18 @@ export default function Navbar() {
         </nav>
 
         {/* Right Desktop Actions */}
-        <div className="hidden items-center gap-5 sm:flex">
+        <div className="hidden items-center gap-4 lg:gap-5 sm:flex">
+          <button
+            type="button"
+            onClick={() => go("/doctor/register")}
+            className={`text-sm sm:text-[15px] font-semibold transition-colors duration-200 cursor-pointer ${
+              useSolidWhiteHeader
+                ? "text-[#165849] hover:text-[#124b3e]"
+                : "text-white/90 hover:text-white"
+            }`}
+          >
+            Clinician Registration
+          </button>
           <button
             type="button"
             onClick={() => go("/login")}
