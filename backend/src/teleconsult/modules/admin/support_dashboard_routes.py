@@ -1677,3 +1677,122 @@ async def export_support_audit(
         csv_lines.append(f'"{x.get("id")}","{x.get("created_at")}","{x.get("actor_id")}","{x.get("action")}","{x.get("target_id")}","{x.get("result", "Success")}"')
 
     return {"csv_data": "\n".join(csv_lines), "filename": f"support_audit_export_{now.strftime('%Y%m%d_%H%M%S')}.csv"}
+
+
+# ============================================================================
+# Section 14: PRD Explicit Route Contracts & Helper Action Aliases
+# ============================================================================
+
+class TicketAssignRequest(BaseModel):
+    assigned_to: str = Field(min_length=1, max_length=100)
+
+class TicketNoteRequest(BaseModel):
+    note: str = Field(min_length=1, max_length=1000)
+
+class TicketResolveRequest(BaseModel):
+    resolution_summary: str = Field(min_length=3, max_length=1000)
+
+class TicketReopenRequest(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
+@router.get("/tickets/{ticket_id}")
+async def get_ticket_details(
+    ticket_id: str,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    ticket = await db["support_tickets"].find_one({"tenant_id": principal.tenant_id, "id": ticket_id})
+    if not ticket:
+        raise HTTPException(404, "Support ticket not found")
+    res = _clean(ticket)
+    res["sla"] = get_sla_info(res.get("created_at"), res.get("priority", "medium"), res.get("status", "open"))
+    return res
+
+
+@router.post("/tickets/{ticket_id}/assign")
+async def assign_ticket_action(
+    ticket_id: str,
+    payload: TicketAssignRequest,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    return await update_support_ticket(ticket_id, TicketUpdate(assigned_to=payload.assigned_to), principal)
+
+
+@router.post("/tickets/{ticket_id}/notes")
+async def add_ticket_note_action(
+    ticket_id: str,
+    payload: TicketNoteRequest,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    return await update_support_ticket(ticket_id, TicketUpdate(note=payload.note), principal)
+
+
+@router.post("/tickets/{ticket_id}/resolve")
+async def resolve_ticket_action(
+    ticket_id: str,
+    payload: TicketResolveRequest,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    return await update_support_ticket(ticket_id, TicketUpdate(status="RESOLVED", note=f"Resolution: {payload.resolution_summary}"), principal)
+
+
+@router.post("/tickets/{ticket_id}/reopen")
+async def reopen_ticket_action(
+    ticket_id: str,
+    payload: TicketReopenRequest,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    return await update_support_ticket(ticket_id, TicketUpdate(status="REOPENED", note=f"Reopened reason: {payload.reason}"), principal)
+
+
+@router.get("/accounts/{user_id}/diagnostics")
+async def account_diagnostics_by_id(
+    user_id: str,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    return await account_diagnostics(query=user_id, principal=principal)
+
+
+@router.get("/appointments/{appointment_id}/diagnostics")
+async def appointment_diagnostics_by_id(
+    appointment_id: str,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    return await booking_diagnostics(query=appointment_id, principal=principal)
+
+
+@router.get("/payments/{payment_id}/diagnostics")
+async def payment_diagnostics_by_id(
+    payment_id: str,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    payment = await db["payments"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": payment_id}, {"appointment_id": payment_id}]})
+    if not payment:
+        raise HTTPException(404, "Payment record not found for diagnostics")
+    return _clean(payment)
+
+
+@router.get("/consultations/{session_id}/diagnostics")
+async def consultation_diagnostics_by_id(
+    session_id: str,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    return await video_diagnostics(query=session_id, principal=principal)
+
+
+@router.get("/audit")
+async def audit_search_alias(
+    start_date: str = "",
+    end_date: str = "",
+    actor_id: str = "",
+    ticket_id: str = "",
+    action: str = "",
+    resource: str = "",
+    result_filter: str = "",
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    return await support_audit_history(start_date, end_date, actor_id, ticket_id, action, resource, result_filter, offset, limit, principal)

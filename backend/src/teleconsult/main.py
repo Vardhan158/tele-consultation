@@ -173,8 +173,7 @@ def create_app() -> FastAPI:
     app.include_router(audit_router)
     app.include_router(clinic_admin_router)
     app.include_router(support_dashboard_router)
+    app.include_router(support_dashboard_router, prefix="/api/v1/support")
     # TODO: register the audit sink, bind adapters to module ports, add rate limiting.
     return app
-
-
 app = create_app()
