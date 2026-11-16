@@ -19,6 +19,7 @@ function SupportDashboardContent({ user, onLogout }) {
   const { showToast } = useToast();
   const addToast = showToast;
   const [activeTab, setActiveTab] = useState("overview");
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Overview State
   const [overviewData, setOverviewData] = useState(null);
@@ -498,42 +499,94 @@ function SupportDashboardContent({ user, onLogout }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F0F5F7] text-[#162623] font-sans flex flex-col">
-      {/* Top Support Header */}
-      <header className="sticky top-0 z-30 bg-[#162623] text-white border-b border-zinc-800 shadow-md">
-        <div className="max-w-[1440px] mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-[#29E2B9] text-[#162623] flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-xl">support_agent</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold leading-none tracking-tight flex items-center gap-2">
-                Kaizen Care
-                <span className="bg-[#29E2B9]/20 text-[#29E2B9] text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">
-                  Support Portal
-                </span>
-              </h1>
-              <p className="text-xs text-zinc-400 mt-0.5">Platform Support Operations Dashboard</p>
-            </div>
+    <div className="min-h-screen bg-[#F0F5F7] text-[#172B2B] font-sans flex flex-col lg:flex-row">
+      {/* Mobile Top Navigation Header */}
+      <div className="lg:hidden sticky top-0 z-40 bg-[#123D35] text-white px-4 py-3 flex items-center justify-between border-b border-[#176354]">
+        <div className="flex items-center gap-2.5">
+          <div className="size-8 rounded-lg bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold">
+            <span className="material-symbols-outlined text-lg">support_agent</span>
           </div>
+          <span className="font-bold text-sm tracking-tight">Kaizen Support</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          className="p-2 rounded-lg text-white hover:bg-[#176354] cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-xl">{isMobileSidebarOpen ? "close" : "menu"}</span>
+        </button>
+      </div>
 
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setShowCreateTicketModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#29E2B9] px-3.5 py-2 text-xs font-bold text-[#162623] hover:bg-white transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-base">add_comment</span>
-              <span>Create Ticket</span>
-            </button>
-            <div className="h-6 w-px bg-zinc-700"></div>
-            <div className="flex items-center gap-2.5">
-              <div className="size-8 rounded-full bg-[#1e322e] text-[#29E2B9] font-bold flex items-center justify-center text-xs">
+      {/* Fixed Responsive Left Sidebar */}
+      <aside
+        className={`fixed lg:sticky top-0 left-0 z-30 h-screen w-64 bg-[#123D35] text-white flex flex-col border-r border-[#176354]/40 shadow-xl transition-transform duration-200 shrink-0 ${
+          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="p-5 border-b border-[#176354]/40 flex items-center gap-3">
+          <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+            <span className="material-symbols-outlined text-2xl">support_agent</span>
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight tracking-tight text-white flex items-center gap-1">
+              Kaizen Care
+            </h1>
+            <span className="text-[10px] font-bold text-[#20C7A7] uppercase tracking-wider block">
+              Support Portal
+            </span>
+          </div>
+        </div>
+
+        {/* Sidebar Nav Items (14px font, 20px icons) */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          <p className="px-3.5 text-[10px] font-bold uppercase tracking-wider text-[#20C7A7]/70 mb-2">
+            Operations Desk
+          </p>
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] font-medium transition text-left cursor-pointer ${
+                  isActive
+                    ? "bg-[#20C7A7] text-[#123D35] font-bold shadow-xs"
+                    : "text-white/80 hover:text-white hover:bg-[#176354]/50"
+                }`}
+              >
+                <span className={`material-symbols-outlined text-[20px] shrink-0 ${isActive ? "text-[#123D35]" : "text-[#20C7A7]"}`}>
+                  {tab.icon}
+                </span>
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sidebar Footer User Info & Ticket Button */}
+        <div className="p-4 border-t border-[#176354]/40 bg-[#0e3029] space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowCreateTicketModal(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-[#20C7A7] text-[#123D35] rounded-xl text-xs font-bold hover:bg-white transition cursor-pointer shadow-xs"
+          >
+            <span className="material-symbols-outlined text-base">add_comment</span>
+            <span>+ Create Ticket</span>
+          </button>
+
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="size-8 rounded-full bg-[#176354] text-[#20C7A7] font-bold flex items-center justify-center text-xs shrink-0">
                 {user?.full_name?.charAt(0) || "S"}
               </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-xs font-semibold text-white leading-none">{user?.full_name || "Support Agent"}</p>
-                <p className="text-[10px] text-zinc-400 mt-0.5">{user?.email}</p>
+              <div className="min-w-0 text-left">
+                <p className="text-xs font-semibold text-white truncate">{user?.full_name || "Support Agent"}</p>
+                <p className="text-[10px] text-[#577877] truncate">{user?.email}</p>
               </div>
             </div>
             {onLogout && (
@@ -541,38 +594,35 @@ function SupportDashboardContent({ user, onLogout }) {
                 type="button"
                 onClick={onLogout}
                 title="Sign out"
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
+                className="p-1.5 rounded-lg text-[#577877] hover:text-white hover:bg-[#176354] transition cursor-pointer shrink-0"
               >
                 <span className="material-symbols-outlined text-lg">logout</span>
               </button>
             )}
           </div>
         </div>
-
-        {/* Sub Navigation Bar */}
-        <div className="bg-[#101c1a] border-t border-zinc-800/80 px-6">
-          <div className="max-w-[1440px] mx-auto flex items-center gap-1 overflow-x-auto no-scrollbar">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
-                  activeTab === tab.id
-                    ? "border-[#29E2B9] text-[#29E2B9] bg-white/5"
-                    : "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
-                }`}
-              >
-                <span className="material-symbols-outlined text-base">{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
+      </aside>
 
       {/* Main Screen Content Area */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto p-6 space-y-6">
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Desktop Sticky Header */}
+        <header className="hidden lg:flex sticky top-0 z-20 bg-white border-b border-[#577877]/15 px-8 py-4 items-center justify-between shadow-xs">
+          <div>
+            <h2 className="text-xl font-bold text-[#172B2B]">
+              {tabs.find((t) => t.id === activeTab)?.label || "Dashboard"}
+            </h2>
+            <p className="text-xs text-[#577877] mt-0.5">Platform Support Operations &amp; Diagnostics</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#E8F3F3] text-[#176354] border border-[#176354]/20">
+              Agent Portal Active
+            </span>
+          </div>
+        </header>
+
+        {/* Content Body Container */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-full">
         {/* ========================================================================= */}
         {/* SCREEN 1: LIVE OPERATIONS OVERVIEW                                        */}
         {/* ========================================================================= */}
@@ -2339,7 +2389,8 @@ function SupportDashboardContent({ user, onLogout }) {
             </div>
           </div>
         )}
-      </main>
+        </main>
+      </div>
 
       {/* Appointment Action Modal (Reschedule / Cancel) */}
       {actionModalAppointment && (
