@@ -1,16 +1,38 @@
+export function sanitizeApiUrl(rawUrl) {
+  if (!rawUrl) return "";
+  let url = String(rawUrl).trim();
+  if (url.includes("=")) {
+    const parts = url.split("=");
+    url = parts[parts.length - 1].trim();
+  }
+  return url.replace(/\/+$/, "");
+}
+
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  sanitizeApiUrl(import.meta.env.VITE_API_BASE_URL) ||
+  sanitizeApiUrl(import.meta.env.VITE_API_URL) ||
+  "http://localhost:8000";
 
 export async function apiRequest(path, options = {}) {
   const headers =
     options.body instanceof FormData
       ? { ...(options.headers || {}) }
       : { "Content-Type": "application/json", ...(options.headers || {}) };
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${API_BASE_URL}${normalizedPath}`;
+  const response = await fetch(url, {
     ...options,
     credentials: "include",
     headers,
   });
+
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("text/html")) {
+    throw new Error(
+      `API returned HTML instead of JSON from ${url}. Check VITE_API_BASE_URL (currently "${API_BASE_URL}") and verify that your FastAPI backend service is running and accessible.`
+    );
+  }
+
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
     const raw = detail.detail ?? detail.message ?? detail.error;

@@ -140,7 +140,13 @@ export default function LandingScreen({
     setNewsletterState("loading");
     setNewsletterMessage("");
     try {
-      const newsletterApiBase = (import.meta.env.VITE_NEWSLETTER_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+      const rawApi = import.meta.env.VITE_NEWSLETTER_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000";
+      let newsletterApiBase = String(rawApi).trim();
+      if (newsletterApiBase.includes("=")) {
+        const parts = newsletterApiBase.split("=");
+        newsletterApiBase = parts[parts.length - 1].trim();
+      }
+      newsletterApiBase = newsletterApiBase.replace(/\/+$/, "");
       const response = await fetch(`${newsletterApiBase}/api/newsletter/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
