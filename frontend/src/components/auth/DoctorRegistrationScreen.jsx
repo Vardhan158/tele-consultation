@@ -182,7 +182,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
 
           <div className="space-y-1">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-              Clinician Registration
+              Doctor Registration
             </h2>
             <p className="text-xs sm:text-sm text-[#577877]">
               Provide your professional credentials to request telehealth clinic access.
@@ -369,7 +369,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
               disabled={state === "loading"}
               className="w-full rounded-xl bg-[#25836F] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
             >
-              {state === "loading" ? "Submitting Registration…" : "Submit Clinician Registration"}
+              {state === "loading" ? "Submitting Registration…" : "Submit Doctor Registration"}
             </button>
           </form>
 

@@ -16,6 +16,34 @@ const SORT_OPTIONS = [
   "Fee: High to Low",
 ];
 
+function TiltCard({ children, className = "", style = {}, ...props }) {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const threshold = 8; // Gentle, smooth tilt effect tailored for cards
+
+  const handleMove = (e) => {
+    const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - left) / width - 0.5;
+    const y = (e.clientY - top) / height - 0.5;
+    setTilt({ x: y * -threshold, y: x * threshold });
+  };
+
+  return (
+    <div
+      onMouseMove={handleMove}
+      onMouseLeave={() => setTilt({ x: 0, y: 0 })}
+      style={{
+        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+        transformStyle: "preserve-3d",
+        ...style,
+      }}
+      className={`transition-transform duration-200 ease-out will-change-transform ${className}`}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
 function slotTimeInZone(value, timeZone) {
   return new Intl.DateTimeFormat([], {
     timeZone,
@@ -784,8 +812,9 @@ export default function FindDoctorsScreen({
           </div>
         </div>
       ) : (
-        /* Redesigned Doctor Cards matching Landing Page & Our Services Cards */
-        <div className="space-y-4">
+        <>
+          {/* Redesigned Doctor Cards: Square / Grid layout with 3D Tilt */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {paginatedDoctors.map((doc) => {
             const hasSlots = Array.isArray(doc.availability) && doc.availability.length > 0;
             const initials = (doc.fullName || "MD")
@@ -797,191 +826,162 @@ export default function FindDoctorsScreen({
               .toUpperCase();
 
             return (
-              <div
+              <TiltCard
                 key={doc.id}
-                className="rounded-2xl bg-white hover:bg-[#EEF6F3]/40 border border-zinc-200 hover:border-[#1A7D67]/40 p-5 sm:p-6 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+                className="rounded-2xl bg-white hover:bg-[#EEF6F3]/30 border border-zinc-200 hover:border-[#1A7D67]/40 p-5 shadow-xs hover:shadow-xl transition-all duration-300 group flex flex-col justify-between"
               >
-                {/* Main Card Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
-                  {/* Left Column: Avatar & Doctor Details (md: col-span-7 lg: col-span-8) */}
-                  <div className="md:col-span-7 lg:col-span-8 flex items-start gap-4 min-w-0">
-                    {/* Avatar Pill Circle */}
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center text-lg sm:text-xl font-bold transition-colors duration-300 shadow-xs shrink-0 select-none">
-                      {initials}
-                    </div>
-
-                    {/* Details */}
-                    <div className="space-y-1.5 min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedProfileDoctor(doc)}
-                          className="text-base sm:text-lg font-bold text-zinc-800 group-hover:text-[#1A7D67] transition-colors truncate text-left cursor-pointer"
-                        >
-                          {doc.fullName}
-                        </button>
-                        {doc.isVerified && (
-                          <span
-                            className="material-symbols-outlined text-[#1A7D67] text-base shrink-0"
-                            title="Verified Credentials"
-                          >
-                            verified
-                          </span>
-                        )}
-                        <span className="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#EEF6F3] text-[#1A7D67]">
-                          {doc.specialty || "General Specialist"}
-                        </span>
-                        {doc.qualificationsDisplay && (
-                          <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/60">
-                            {doc.qualificationsDisplay}
-                          </span>
-                        )}
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
-                          {doc.experienceYears ? `${doc.experienceYears} Yrs Exp` : "5+ Yrs Exp"}
-                        </span>
+                {/* Top Section: Avatar & Header */}
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-14 h-14 rounded-2xl bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center text-lg font-bold transition-colors duration-300 shadow-xs shrink-0 select-none">
+                        {initials}
                       </div>
-
-                      {doc.clinic && (
-                        <p className="text-xs text-zinc-500 flex flex-wrap items-center gap-x-3 gap-y-1 truncate">
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span className="material-symbols-outlined text-sm text-zinc-400 shrink-0">
-                              apartment
-                            </span>
-                            <span className="truncate">{doc.clinic}</span>
-                          </span>
-                          {doc.registrationNumber && (
-                            <span className="text-[11px] text-zinc-500">
-                              Reg No: <strong className="font-semibold text-zinc-700">{doc.registrationNumber}</strong>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedProfileDoctor(doc)}
+                            className="text-base font-bold text-zinc-800 group-hover:text-[#1A7D67] transition-colors truncate text-left cursor-pointer"
+                          >
+                            {doc.fullName}
+                          </button>
+                          {doc.isVerified && (
+                            <span
+                              className="material-symbols-outlined text-[#1A7D67] text-base shrink-0"
+                              title="Verified Credentials"
+                            >
+                              verified
                             </span>
                           )}
+                        </div>
+                        <p className="text-xs text-[#1A7D67] font-semibold truncate mt-0.5">
+                          {doc.specialty || "General Specialist"}
                         </p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500 pt-0.5">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="material-symbols-outlined text-xs text-[#1A7D67]">translate</span>
-                          Languages:{" "}
-                          <strong className="font-semibold text-zinc-700">
-                            {(doc.languages && doc.languages.length > 0)
-                              ? doc.languages.join(", ")
-                              : "English"}
-                          </strong>
-                        </span>
-
-                        {doc.timezone && (
-                          <span className="inline-flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs text-zinc-400">schedule</span>
-                            {doc.timezone}
-                          </span>
-                        )}
                       </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-bold text-[#1A7D67]">
+                        {doc.feeDisplay || "—"}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Right Column: Fee, Availability & Booking Action (md: col-span-5 lg: col-span-4) */}
-                  <div className="md:col-span-5 lg:col-span-4 flex flex-col md:items-end justify-between gap-3 border-t md:border-t-0 md:border-l border-zinc-100 pt-4 md:pt-0 md:pl-5">
-                    {/* Fee & Next Available */}
-                    <div className="md:text-right space-y-0.5">
-                      <div className="flex md:block items-baseline justify-between gap-2">
-                        <span className="text-[11px] text-zinc-500 md:hidden">Consultation Fee</span>
-                        <div className="text-lg font-bold text-[#1A7D67]">
-                          {doc.feeDisplay || "Fee calculated at booking"}
-                        </div>
-                      </div>
+                  {/* Badges / Experience */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                    <span className="inline-block px-2.5 py-0.5 rounded-md font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                      {doc.experienceYears ? `${doc.experienceYears} Yrs Exp` : "5+ Yrs Exp"}
+                    </span>
+                    {doc.qualificationsDisplay && (
+                      <span className="inline-block px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-800 border border-amber-200/60 truncate max-w-[140px]" title={doc.qualificationsDisplay}>
+                        {doc.qualificationsDisplay}
+                      </span>
+                    )}
+                    {hasSlots ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-[#EEF6F3] text-[#25836F]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#25836F]" />
+                        {doc.availability.length} open
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2 py-0.5 rounded-md font-medium bg-zinc-100 text-zinc-500">
+                        No Slots
+                      </span>
+                    )}
+                  </div>
 
-                      <div className="text-[11px] text-zinc-500 pt-0.5">
-                        Next slot:{" "}
-                        <span
-                          className={`font-semibold ${
-                            hasSlots ? "text-zinc-800" : "text-amber-700"
-                          }`}
-                        >
-                          {doc.nextSlotLabel}
+                  {/* Clinic & Languages Meta */}
+                  <div className="space-y-1.5 text-xs text-zinc-500 border-t border-zinc-100 pt-3">
+                    {doc.clinic && (
+                      <p className="flex items-center gap-1.5 truncate">
+                        <span className="material-symbols-outlined text-sm text-zinc-400 shrink-0">
+                          apartment
                         </span>
-                      </div>
-                    </div>
-
-                    {/* Booking & Profile Actions */}
-                    <div className="w-full md:w-auto flex flex-col sm:flex-row md:flex-col items-stretch md:items-end gap-2 pt-1">
-                      <div className="flex items-center gap-2 w-full md:w-auto">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedProfileDoctor(doc)}
-                          className="px-3.5 py-2.5 rounded-xl border border-zinc-300 bg-white hover:bg-white/95 text-zinc-700 hover:text-[#1A7D67] hover:border-[#1A7D67]/30 text-xs font-semibold transition-all duration-300 shadow-2xs cursor-pointer flex items-center justify-center gap-1 shrink-0"
-                          title="View detailed doctor profile"
-                        >
-                          <span className="material-symbols-outlined text-sm text-[#1A7D67]">visibility</span>
-                          <span>View Profile</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={!hasSlots}
-                          onClick={() => startBooking(doc)}
-                          className={`flex-1 md:flex-none px-4.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 shadow-xs flex items-center justify-center gap-2 ${
-                            hasSlots
-                              ? "bg-[#1A7D67] hover:bg-[#156654] text-white hover:shadow-md cursor-pointer"
-                              : "bg-zinc-100 text-zinc-400 cursor-not-allowed opacity-75"
-                          }`}
-                          title={
-                            hasSlots
-                              ? "Book an appointment with this doctor"
-                              : "No appointment slots are currently available for this doctor"
-                          }
-                        >
-                          <span className="material-symbols-outlined text-sm">
-                            {hasSlots ? "calendar_add_on" : "event_busy"}
-                          </span>
-                          <span>{hasSlots ? "Book" : "No Slots"}</span>
-                        </button>
-                      </div>
-
-                      <div className="text-center md:text-right text-[11px] text-[#577877]">
-                        {hasSlots ? (
-                          <span className="inline-flex items-center gap-1 text-[#25836F] font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#25836F]" />
-                            {doc.availability.length} slot{doc.availability.length === 1 ? "" : "s"} open
-                          </span>
-                        ) : (
-                          <span className="text-[#577877]">Check back later</span>
-                        )}
-                      </div>
-                    </div>
+                        <span className="truncate">{doc.clinic}</span>
+                      </p>
+                    )}
+                    <p className="flex items-center gap-1.5 truncate">
+                      <span className="material-symbols-outlined text-sm text-zinc-400 shrink-0">
+                        translate
+                      </span>
+                      <span className="truncate">
+                        {(doc.languages && doc.languages.length > 0)
+                          ? doc.languages.join(", ")
+                          : "English"}
+                      </span>
+                    </p>
+                    <p className="flex items-center gap-1.5 text-[11px] text-zinc-500 truncate">
+                      <span className="material-symbols-outlined text-sm text-zinc-400 shrink-0">
+                        event_available
+                      </span>
+                      <span className="truncate">
+                        Next: <strong className={hasSlots ? "text-zinc-800 font-semibold" : "text-amber-700"}>{doc.nextSlotLabel}</strong>
+                      </span>
+                    </p>
                   </div>
                 </div>
-              </div>
+
+                {/* Bottom Card Actions */}
+                <div className="pt-4 mt-3 border-t border-zinc-100 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProfileDoctor(doc)}
+                    className="flex-1 py-2 px-3 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm text-[#1A7D67]">visibility</span>
+                    <span>Profile</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!hasSlots}
+                    onClick={() => startBooking(doc)}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs ${
+                      hasSlots
+                        ? "bg-[#1A7D67] hover:bg-[#156654] text-white hover:shadow cursor-pointer"
+                        : "bg-zinc-100 text-zinc-400 cursor-not-allowed opacity-75"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-sm">
+                      {hasSlots ? "calendar_add_on" : "event_busy"}
+                    </span>
+                    <span>{hasSlots ? "Book" : "No Slots"}</span>
+                  </button>
+                </div>
+              </TiltCard>
             );
           })}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-[#577877]/15 pt-4 text-xs">
-              <span className="text-[#577877]">
-                Page <strong className="text-[#162623]">{page}</strong> of{" "}
-                <strong className="text-[#162623]">{totalPages}</strong>
-              </span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="rounded-xl border border-[#577877]/25 px-3.5 py-1.5 font-semibold text-[#25836F] bg-white hover:bg-[#F0F5F7] disabled:opacity-40 transition cursor-pointer"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="rounded-xl border border-[#577877]/25 px-3.5 py-1.5 font-semibold text-[#25836F] bg-white hover:bg-[#F0F5F7] disabled:opacity-40 transition cursor-pointer"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
         </div>
-      )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-[#577877]/15 pt-4 text-xs">
+            <span className="text-[#577877]">
+              Page <strong className="text-[#162623]">{page}</strong> of{" "}
+              <strong className="text-[#162623]">{totalPages}</strong>
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-xl border border-[#577877]/25 px-3.5 py-1.5 font-semibold text-[#25836F] bg-white hover:bg-[#F0F5F7] disabled:opacity-40 transition cursor-pointer"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="rounded-xl border border-[#577877]/25 px-3.5 py-1.5 font-semibold text-[#25836F] bg-white hover:bg-[#F0F5F7] disabled:opacity-40 transition cursor-pointer"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    )}
           </main>
         </div>
 
