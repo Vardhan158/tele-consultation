@@ -520,6 +520,13 @@ export const supportDashboardApi = {
     }),
   videoSessions: (status = "") =>
     apiRequest(`/api/v1/support-dashboard/video-sessions?status=${encodeURIComponent(status)}`),
+  videoDiagnostics: (query) =>
+    apiRequest(`/api/v1/support-dashboard/video-diagnostics?query=${encodeURIComponent(query)}`),
+  videoAction: (sessionId, action, ticketId = null, note = null) =>
+    apiRequest("/api/v1/support-dashboard/video-action", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId, action, ticket_id: ticketId, note }),
+    }),
   endVideoSession: (id) =>
     apiRequest(`/api/v1/support-dashboard/video-sessions/${id}/end`, {
       method: "POST",

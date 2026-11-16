@@ -558,6 +558,156 @@ async def booking_support_action(
     return {"status": "success", "action": action_type}
 
 
+class VideoActionRequest(BaseModel):
+    session_id: str
+    action: str = Field(pattern="^(send_permission_guide|send_connectivity_guide|end_stalled_session|escalate_technical_ops)$")
+    ticket_id: str | None = None
+    note: str | None = None
+
+
+# ============================================================================
+# Screen 5: Video Consultation & WebRTC Diagnostics
+# ============================================================================
+
+@router.get("/video-diagnostics")
+async def video_diagnostics(
+    query: str = Query(..., min_length=2),
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    search_term = query.strip()
+
+    session = await db["consultation_sessions"].find_one({
+        "tenant_id": principal.tenant_id,
+        "$or": [
+            {"id": search_term},
+            {"appointment_id": search_term},
+            {"id": {"$regex": search_term, "$options": "i"}},
+            {"appointment_id": {"$regex": search_term, "$options": "i"}},
+        ],
+    })
+
+    if not session:
+        appointment = await db["appointments"].find_one({"tenant_id": principal.tenant_id, "id": search_term})
+        if appointment:
+            session = {
+                "id": f"SESS-{appointment['id']}",
+                "appointment_id": appointment["id"],
+                "status": "waiting" if appointment.get("status") == "booked" else appointment.get("status", "ended"),
+                "created_at": datetime.now(UTC),
+            }
+        else:
+            raise HTTPException(404, "Video consultation session not found for diagnostics")
+
+    session_id = session["id"]
+    appointment_id = session.get("appointment_id", "")
+    appointment = await db["appointments"].find_one({"tenant_id": principal.tenant_id, "id": appointment_id}) if appointment_id else None
+
+    connection_events = [_clean(x) async for x in db["audit_logs"].find({
+        "tenant_id": principal.tenant_id,
+        "$or": [{"target_id": session_id}, {"target_id": appointment_id}],
+        "action": {"$regex": r"^(video|consultation|webrtc|signal)"},
+    }).sort("created_at", -1)]
+
+    status_str = session.get("status", "waiting")
+    error_cat = session.get("error_category")
+    if not error_cat:
+        if status_str == "stalled":
+            error_cat = "Peer Connection Stalled"
+        elif status_str == "waiting" and appointment and appointment.get("status") == "booked":
+            error_cat = "Participant Not Connected / Waiting"
+        elif session.get("signaling_error"):
+            error_cat = "Signaling Connection Timeout"
+        else:
+            error_cat = "None"
+
+    # Important Privacy Restriction (PRD 9.3):
+    # Support MUST NOT join private consultations as a hidden participant or access clinical audio/video content!
+    return {
+        "consultation_id": session_id,
+        "appointment_id": appointment_id,
+        "participant": {
+            "patient_name": appointment.get("patient_name") if appointment else "Patient",
+            "doctor_name": appointment.get("doctor_name") if appointment else "Doctor",
+        },
+        "session_status": status_str,
+        "signaling_status": session.get("signaling_status", "Connected" if status_str == "active" else "Disconnected"),
+        "camera_permission": session.get("camera_permission", "Granted" if status_str == "active" else "Unknown"),
+        "microphone_permission": session.get("microphone_permission", "Granted" if status_str == "active" else "Unknown"),
+        "error_category": error_cat,
+        "disconnect_time": session.get("ended_at") or session.get("disconnect_time") or None,
+        "connection_events": connection_events,
+    }
+
+
+@router.post("/video-action")
+async def video_support_action(
+    payload: VideoActionRequest,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, str]:
+    db = mongo_database.database()
+    now = datetime.now(UTC)
+    action_type = payload.action
+
+    session = await db["consultation_sessions"].find_one({"tenant_id": principal.tenant_id, "id": payload.session_id})
+    appointment_id = session.get("appointment_id") if session else payload.session_id.replace("SESS-", "")
+    appointment = await db["appointments"].find_one({"tenant_id": principal.tenant_id, "id": appointment_id}) if appointment_id else None
+
+    if action_type == "send_permission_guide":
+        recipient_id = appointment.get("patient_id") if appointment else None
+        if recipient_id:
+            await db["notifications"].insert_one({
+                "id": str(uuid4()),
+                "tenant_id": principal.tenant_id,
+                "recipient_id": recipient_id,
+                "type": "video_permission_guide",
+                "title": "Camera & Microphone Permission Guide",
+                "message": "Click the lock icon near your browser address bar → ensure Camera & Microphone are set to 'Allow' → refresh your video page.",
+                "read_at": None,
+                "created_at": now,
+            })
+
+    elif action_type == "send_connectivity_guide":
+        recipient_id = appointment.get("patient_id") if appointment else None
+        if recipient_id:
+            await db["notifications"].insert_one({
+                "id": str(uuid4()),
+                "tenant_id": principal.tenant_id,
+                "recipient_id": recipient_id,
+                "type": "video_connectivity_guide",
+                "title": "WebRTC Network & Device Checklist",
+                "message": "Check your internet connection, switch to Chrome or Safari, disable VPN/adblockers, and ensure no other application is using your camera.",
+                "read_at": None,
+                "created_at": now,
+            })
+
+    elif action_type == "end_stalled_session":
+        if session:
+            await db["consultation_sessions"].update_one(
+                {"tenant_id": principal.tenant_id, "id": payload.session_id},
+                {"$set": {"status": "ended", "ended_by_support": True, "ended_at": now}},
+            )
+
+    elif action_type == "escalate_technical_ops":
+        if payload.ticket_id:
+            await db["support_tickets"].update_one(
+                {"tenant_id": principal.tenant_id, "id": payload.ticket_id},
+                {"$set": {"status": "escalated", "escalated_to": "Engineering", "priority": "urgent", "updated_at": now}},
+            )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": f"support.video.{action_type}",
+        "target_id": payload.session_id,
+        "metadata": {"ticket_id": payload.ticket_id, "note": payload.note},
+        "created_at": now,
+    })
+
+    return {"status": "success", "action": action_type}
+
+
 @router.get("/patients")
 async def support_patients(
     search: str = "",

@@ -50,9 +50,12 @@ function SupportDashboardContent({ user, onLogout }) {
   const [refundModalPayment, setRefundModalPayment] = useState(null);
   const [refundReason, setRefundReason] = useState("");
 
-  // Video Sessions State
+  // Video Sessions & Diagnostics State
   const [videoSessions, setVideoSessions] = useState([]);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [videoQuery, setVideoQuery] = useState("");
+  const [videoDiagData, setVideoDiagData] = useState(null);
+  const [videoDiagLoading, setVideoDiagLoading] = useState(false);
 
   // Tickets State
   const [tickets, setTickets] = useState([]);
@@ -220,6 +223,36 @@ function SupportDashboardContent({ user, onLogout }) {
     }
   };
 
+  const loadVideoDiagnostics = async () => {
+    if (!videoQuery || videoQuery.length < 2) {
+      addToast("Please enter at least 2 characters (Session ID or Appointment ID)", "warning");
+      return;
+    }
+    setVideoDiagLoading(true);
+    try {
+      const data = await supportDashboardApi.videoDiagnostics(videoQuery);
+      setVideoDiagData(data);
+    } catch (err) {
+      addToast(err.message || "Video session record not found", "error");
+      setVideoDiagData(null);
+    } finally {
+      setVideoDiagLoading(false);
+    }
+  };
+
+  const handleVideoAction = async (action, ticketId = null) => {
+    const targetId = videoDiagData?.consultation_id;
+    if (!targetId) return;
+    try {
+      await supportDashboardApi.videoAction(targetId, action, ticketId);
+      addToast(`Video support action '${action.replace(/_/g, " ")}' completed`, "success");
+      loadVideoDiagnostics();
+      loadVideoSessions();
+    } catch (err) {
+      addToast(err.message || "Failed to execute video action", "error");
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "overview") loadOverview();
     else if (activeTab === "account_access") { if (accountQuery) loadAccountDiagnostics(); }
@@ -228,7 +261,7 @@ function SupportDashboardContent({ user, onLogout }) {
     else if (activeTab === "doctors") loadDoctors();
     else if (activeTab === "appointments") loadAppointments();
     else if (activeTab === "payments") loadPayments();
-    else if (activeTab === "video") loadVideoSessions();
+    else if (activeTab === "video") { loadVideoSessions(); if (videoQuery) loadVideoDiagnostics(); }
     else if (activeTab === "tickets") loadTickets();
   }, [activeTab]);
 
@@ -1284,71 +1317,247 @@ function SupportDashboardContent({ user, onLogout }) {
         )}
 
         {/* ========================================================================= */}
-        {/* SCREEN 6: VIDEO CONSULTATION DIAGNOSTICS                                  */}
+        {/* SCREEN 5: VIDEO TROUBLESHOOTING & WEBRTC DIAGNOSTICS                       */}
         {/* ========================================================================= */}
         {activeTab === "video" && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs flex justify-between items-center">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900">Active Consultation Diagnostics</h3>
-                <p className="text-xs text-zinc-500">Monitor live WebRTC peer connections and force-end stalled rooms.</p>
+            {/* Search Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs flex flex-col sm:flex-row gap-3 justify-between items-center">
+              <div className="relative w-full sm:w-96">
+                <span className="material-symbols-outlined absolute left-3 top-2.5 text-zinc-400 text-lg">video_camera_front</span>
+                <input
+                  type="text"
+                  value={videoQuery}
+                  onChange={(e) => setVideoQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && loadVideoDiagnostics()}
+                  placeholder="Enter Consultation ID or Appointment ID…"
+                  className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-300 outline-none focus:border-[#1A7D67]"
+                />
               </div>
               <button
                 type="button"
-                onClick={loadVideoSessions}
-                className="px-4 py-2 bg-[#1A7D67] text-white rounded-xl text-xs font-semibold cursor-pointer"
+                onClick={loadVideoDiagnostics}
+                className="w-full sm:w-auto px-4 py-2 bg-[#1A7D67] text-white rounded-xl text-xs font-semibold hover:bg-[#156654] cursor-pointer"
               >
-                Refresh Sessions
+                Inspect Video Diagnostics
               </button>
             </div>
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden">
-              {videoLoading ? (
-                <div className="p-12 text-center text-zinc-400">Loading video sessions…</div>
-              ) : videoSessions.length === 0 ? (
-                <div className="p-12 text-center text-zinc-400">No active video sessions at present.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-[#F8FAF9] border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase">
-                      <tr>
-                        <th className="px-6 py-3.5">Session ID</th>
-                        <th className="px-6 py-3.5">Appointment</th>
-                        <th className="px-6 py-3.5">Status</th>
-                        <th className="px-6 py-3.5">Started At</th>
-                        <th className="px-6 py-3.5 text-right">Support Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {videoSessions.map((vs) => (
-                        <tr key={vs.id} className="hover:bg-[#F9FBFA]">
-                          <td className="px-6 py-4 font-mono text-xs font-bold text-[#1A7D67]">{vs.id}</td>
-                          <td className="px-6 py-4 font-mono text-xs text-zinc-600">{vs.appointment_id || "—"}</td>
-                          <td className="px-6 py-4">
-                            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full capitalize ${
-                              vs.status === "active" ? "bg-green-100 text-green-800" : "bg-zinc-100 text-zinc-700"
-                            }`}>
-                              {vs.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">{vs.created_at ? new Date(vs.created_at).toLocaleTimeString() : "—"}</td>
-                          <td className="px-6 py-4 text-right">
-                            {vs.status === "active" && (
-                              <button
-                                type="button"
-                                onClick={() => handleEndVideoSession(vs.id)}
-                                className="px-3 py-1.5 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 cursor-pointer"
-                              >
-                                Force End Session
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {/* Privacy Alert Banner (PRD Section 9.3) */}
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-900 flex items-start gap-3">
+              <span className="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">lock</span>
+              <div>
+                <p className="font-bold">Strict Consultation Privacy Policy (PRD Section 9.3)</p>
+                <p className="mt-0.5 text-amber-800">
+                  Support agents must not join private consultations as a hidden participant or access clinical audio/video content. All diagnostic inspection is performed on sanitized WebRTC signaling events.
+                </p>
+              </div>
+            </div>
+
+            {/* Video Diagnostics Card */}
+            {videoDiagLoading ? (
+              <div className="bg-white p-12 rounded-2xl border border-zinc-200 text-center text-zinc-400">
+                Retrieving WebRTC signaling diagnostics…
+              </div>
+            ) : videoDiagData && (
+              <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-zinc-100">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-[#1A7D67]">Consultation #{videoDiagData.consultation_id}</span>
+                      <span className="text-xs bg-zinc-100 text-zinc-700 px-2.5 py-0.5 rounded-full font-mono">Appt: {videoDiagData.appointment_id || "—"}</span>
+                    </div>
+                    <h2 className="text-xl font-bold text-zinc-900 mt-1">
+                      {videoDiagData.participant?.patient_name} ↔ {videoDiagData.participant?.doctor_name}
+                    </h2>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                      videoDiagData.session_status === "active" ? "bg-green-100 text-green-800" :
+                      videoDiagData.session_status === "stalled" ? "bg-red-100 text-red-800" : "bg-zinc-100 text-zinc-700"
+                    }`}>
+                      Session: {videoDiagData.session_status}
+                    </span>
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                      videoDiagData.signaling_status === "Connected" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                    }`}>
+                      Signaling: {videoDiagData.signaling_status}
+                    </span>
+                  </div>
                 </div>
-              )}
+
+                {/* Technical Diagnostic Fields (PRD 9.3) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                  <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                    <p className="text-zinc-500 font-medium">Camera Permission</p>
+                    <p className={`font-bold text-sm ${videoDiagData.camera_permission === "Granted" ? "text-green-700" : "text-amber-700"}`}>
+                      {videoDiagData.camera_permission}
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                    <p className="text-zinc-500 font-medium">Microphone Permission</p>
+                    <p className={`font-bold text-sm ${videoDiagData.microphone_permission === "Granted" ? "text-green-700" : "text-amber-700"}`}>
+                      {videoDiagData.microphone_permission}
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                    <p className="text-zinc-500 font-medium">Sanitized Error Category</p>
+                    <p className={`font-bold text-sm ${videoDiagData.error_category !== "None" ? "text-red-600" : "text-zinc-800"}`}>
+                      {videoDiagData.error_category}
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
+                    <p className="text-zinc-500 font-medium">Disconnect Time</p>
+                    <p className="font-bold text-zinc-900 text-sm">
+                      {videoDiagData.disconnect_time ? new Date(videoDiagData.disconnect_time).toLocaleTimeString() : "N/A (Active/Connected)"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Approved Video Support Actions Toolbar */}
+                <div className="space-y-3 pt-2 border-t border-zinc-100">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Permitted Video Support Actions (PRD Section 9.3)</h3>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleVideoAction("send_permission_guide")}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 text-[#1A7D67] text-xs font-semibold rounded-xl hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base">videocam</span>
+                      <span>Send Camera/Mic Permission Guide</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleVideoAction("send_connectivity_guide")}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 text-blue-700 text-xs font-semibold rounded-xl hover:bg-blue-100 border border-blue-200 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base">wifi</span>
+                      <span>Send WebRTC Connectivity Checklist</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleVideoAction("end_stalled_session")}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 text-amber-800 text-xs font-semibold rounded-xl hover:bg-amber-100 border border-amber-200 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base">call_end</span>
+                      <span>Force End Stalled Session</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleVideoAction("escalate_technical_ops")}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-50 text-red-700 text-xs font-semibold rounded-xl hover:bg-red-100 border border-red-200 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base">engineering</span>
+                      <span>Refer Infrastructure Failure to Technical Operations</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Connection Events Timeline */}
+                <div className="space-y-3 pt-2 border-t border-zinc-100">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Sanitized Connection Event History</h3>
+                  {!videoDiagData.connection_events?.length ? (
+                    <p className="text-xs text-zinc-400 italic">No connection error logs recorded for this session.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {videoDiagData.connection_events.map((evt) => (
+                        <div key={evt.id} className="p-2.5 bg-zinc-50 rounded-lg border border-zinc-100 text-xs flex justify-between gap-3">
+                          <div>
+                            <span className="font-semibold text-zinc-800">{evt.action}</span>
+                            <p className="text-[10px] text-zinc-500">Actor: {evt.actor_id}</p>
+                          </div>
+                          <span className="text-[10px] text-zinc-400 shrink-0">{new Date(evt.created_at).toLocaleTimeString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Live Active Sessions Monitoring List */}
+            <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-base font-bold text-zinc-900">Active Consultation Rooms</h3>
+                  <p className="text-xs text-zinc-500">Monitor live WebRTC peer connections across the platform.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadVideoSessions}
+                  className="px-4 py-2 bg-[#1A7D67] text-white rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Refresh Live Sessions
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                {videoLoading ? (
+                  <div className="p-8 text-center text-zinc-400">Loading live video rooms…</div>
+                ) : videoSessions.length === 0 ? (
+                  <div className="p-8 text-center text-zinc-400">No active consultation rooms at present.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-[#F8FAF9] border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase">
+                        <tr>
+                          <th className="px-6 py-3.5">Session ID</th>
+                          <th className="px-6 py-3.5">Appointment</th>
+                          <th className="px-6 py-3.5">Status</th>
+                          <th className="px-6 py-3.5">Started At</th>
+                          <th className="px-6 py-3.5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {videoSessions.map((vs) => (
+                          <tr key={vs.id} className="hover:bg-[#F9FBFA]">
+                            <td className="px-6 py-4 font-mono text-xs font-bold text-[#1A7D67]">{vs.id}</td>
+                            <td className="px-6 py-4 font-mono text-xs text-zinc-600">{vs.appointment_id || "—"}</td>
+                            <td className="px-6 py-4">
+                              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full capitalize ${
+                                vs.status === "active" ? "bg-green-100 text-green-800" : "bg-zinc-100 text-zinc-700"
+                              }`}>
+                                {vs.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-xs text-zinc-500">{vs.created_at ? new Date(vs.created_at).toLocaleTimeString() : "—"}</td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVideoQuery(vs.id);
+                                    loadVideoDiagnostics();
+                                  }}
+                                  className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg hover:bg-blue-100 cursor-pointer"
+                                >
+                                  Inspect Diagnostics
+                                </button>
+                                {vs.status === "active" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEndVideoSession(vs.id)}
+                                    className="px-3 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 cursor-pointer"
+                                  >
+                                    Force End
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
