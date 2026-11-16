@@ -581,8 +581,13 @@ export const secopsDashboardApi = {
   healthOverview: () => apiRequest("/api/v1/secops-dashboard/health-overview"),
   triggerHealthCheck: () =>
     apiRequest("/api/v1/secops-dashboard/health/check", { method: "POST" }),
-  securityEvents: (severity = "", search = "", offset = 0, limit = 25) =>
-    apiRequest(`/api/v1/secops-dashboard/security/events?severity=${encodeURIComponent(severity)}&search=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`),
+  securityEvents: (severity = "", search = "", eventType = "", status = "", startDate = "", endDate = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/secops-dashboard/security/events?severity=${encodeURIComponent(severity)}&search=${encodeURIComponent(search)}&event_type=${encodeURIComponent(eventType)}&status=${encodeURIComponent(status)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&offset=${offset}&limit=${limit}`),
+  updateSecurityEvent: (id, payload) =>
+    apiRequest(`/api/v1/secops-dashboard/security/events/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   executeSecurityAction: (payload) =>
     apiRequest("/api/v1/secops-dashboard/security/action", {
       method: "POST",

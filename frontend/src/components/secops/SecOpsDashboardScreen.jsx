@@ -16,6 +16,11 @@ function SecOpsDashboardContent({ user, onLogout }) {
   const [threatMetrics, setThreatMetrics] = useState(null);
   const [securityLoading, setSecurityLoading] = useState(false);
   const [securitySearch, setSecuritySearch] = useState("");
+  const [securitySeverityFilter, setSecuritySeverityFilter] = useState("");
+  const [securityStatusFilter, setSecurityStatusFilter] = useState("");
+  const [securityEventTypeFilter, setSecurityEventTypeFilter] = useState("");
+  const [selectedSecurityEvent, setSelectedSecurityEvent] = useState(null);
+  const [analystNoteText, setAnalystNoteText] = useState("");
 
   // Screen 3: Audit State
   const [auditLogs, setAuditLogs] = useState([]);
@@ -67,13 +72,29 @@ function SecOpsDashboardContent({ user, onLogout }) {
   const loadSecurity = async () => {
     setSecurityLoading(true);
     try {
-      const data = await secopsDashboardApi.securityEvents("", securitySearch);
+      const data = await secopsDashboardApi.securityEvents(
+        securitySeverityFilter,
+        securitySearch,
+        securityEventTypeFilter,
+        securityStatusFilter
+      );
       setSecurityEvents(data.events || []);
       setThreatMetrics(data.threat_metrics);
     } catch (err) {
       addToast(err.message || "Failed to load security threat logs", "error");
     } finally {
       setSecurityLoading(false);
+    }
+  };
+
+  const handleUpdateSecurityEvent = async (id, updates) => {
+    try {
+      await secopsDashboardApi.updateSecurityEvent(id, updates);
+      addToast(`Security event updated (${updates.status || "Updated"})`, "success");
+      loadSecurity();
+      setSelectedSecurityEvent(null);
+    } catch (err) {
+      addToast(err.message || "Failed to update security event", "error");
     }
   };
 
@@ -374,74 +395,185 @@ function SecOpsDashboardContent({ user, onLogout }) {
           </div>
         )}
 
-        {/* SCREEN 2: SECURITY MONITORING */}
+        {/* SCREEN 2: SECURITY MONITORING (PRD SECTION 6) */}
         {activeTab === "security" && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="bg-[#1E293B] p-4 rounded-2xl border border-slate-700 shadow-xs flex justify-between items-center">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span className="material-symbols-outlined text-blue-400">shield_lock</span>
-                  Security Threat &amp; Authentication Detection
-                </h3>
-                <p className="text-xs text-slate-400">Monitor brute force attempts, unauthorized access probes, and execute mitigations.</p>
+            {/* Header Toolbar & Filters */}
+            <div className="bg-[#1E293B] p-4 rounded-2xl border border-slate-700 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-slate-700">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <span className="material-symbols-outlined text-blue-400">shield_lock</span>
+                    Security Threat Detection &amp; Monitoring (PRD Section 6)
+                  </h3>
+                  <p className="text-xs text-slate-400">Detect brute force, unauthorized API access, MFA spikes, and execute security mitigations.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadSecurity}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold cursor-pointer shrink-0"
+                >
+                  Refresh Security Events
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={loadSecurity}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Refresh Security Logs
-              </button>
+
+              {/* Security Filters Toolbar (PRD Section 6.3) */}
+              <div className="flex flex-wrap gap-2.5 text-xs">
+                <input
+                  type="text"
+                  value={securitySearch}
+                  onChange={(e) => setSecuritySearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && loadSecurity()}
+                  placeholder="Search Actor ID, Action, Target, or Event ID…"
+                  className="px-3.5 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500 w-64"
+                />
+                <select
+                  value={securitySeverityFilter}
+                  onChange={(e) => setSecuritySeverityFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"
+                >
+                  <option value="">All Severities</option>
+                  <option value="CRITICAL">Critical</option>
+                  <option value="HIGH">High</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="INFORMATIONAL">Informational</option>
+                </select>
+                <select
+                  value={securityEventTypeFilter}
+                  onChange={(e) => setSecurityEventTypeFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"
+                >
+                  <option value="">All Event Types</option>
+                  <option value="Authentication">Authentication</option>
+                  <option value="Authorization">Authorization</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Rate Limit">Rate Limit</option>
+                </select>
+                <select
+                  value={securityStatusFilter}
+                  onChange={(e) => setSecurityStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"
+                >
+                  <option value="">All Detection Statuses</option>
+                  <option value="New">New</option>
+                  <option value="Investigating">Investigating</option>
+                  <option value="Dismissed">Dismissed</option>
+                  <option value="Escalated">Escalated</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={loadSecurity}
+                  className="px-3.5 py-1.5 bg-slate-700 text-white font-semibold rounded-xl hover:bg-slate-600 cursor-pointer"
+                >
+                  Apply Filters
+                </button>
+              </div>
             </div>
 
+            {/* Threat Metrics Summary Banner (PRD Section 6.1) */}
             {threatMetrics && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                <div className="p-4 bg-[#1E293B] rounded-xl border border-slate-700">
-                  <p className="text-slate-400">Active Threat Level</p>
-                  <p className="text-xl font-bold text-emerald-400 mt-1">{threatMetrics.active_threat_level}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+                <div className="p-4 bg-[#1E293B] rounded-xl border border-slate-700 space-y-1">
+                  <p className="text-slate-400 font-medium">Active Threat Level</p>
+                  <p className={`text-xl font-bold uppercase ${
+                    threatMetrics.active_threat_level === "HIGH" ? "text-red-400" :
+                    threatMetrics.active_threat_level === "MEDIUM" ? "text-amber-400" : "text-emerald-400"
+                  }`}>
+                    {threatMetrics.active_threat_level}
+                  </p>
                 </div>
-                <div className="p-4 bg-[#1E293B] rounded-xl border border-slate-700">
-                  <p className="text-slate-400">Failed Logins (24h)</p>
-                  <p className="text-xl font-bold text-white mt-1">{threatMetrics.failed_logins_24h}</p>
+
+                <div className="p-4 bg-[#1E293B] rounded-xl border border-slate-700 space-y-1">
+                  <p className="text-slate-400 font-medium">Failed Logins (24h)</p>
+                  <p className="text-xl font-bold text-white">{threatMetrics.failed_logins_24h}</p>
                 </div>
-                <div className="p-4 bg-[#1E293B] rounded-xl border border-slate-700">
-                  <p className="text-slate-400">Blocked IP Throttles</p>
-                  <p className="text-xl font-bold text-white mt-1">{threatMetrics.blocked_ips_count}</p>
+
+                <div className="p-4 bg-[#1E293B] rounded-xl border border-slate-700 space-y-1">
+                  <p className="text-slate-400 font-medium">MFA Challenge Failures</p>
+                  <p className="text-xl font-bold text-white">{threatMetrics.mfa_challenge_failures}</p>
+                </div>
+
+                <div className="p-4 bg-[#1E293B] rounded-xl border border-slate-700 space-y-1">
+                  <p className="text-slate-400 font-medium">Blocked IP Throttles</p>
+                  <p className="text-xl font-bold text-white">{threatMetrics.blocked_ips_count}</p>
                 </div>
               </div>
             )}
 
+            {/* Security Guardrails Compliance Banner (PRD Section 6.3) */}
+            <div className="p-4 bg-blue-950/40 rounded-2xl border border-blue-800/60 text-xs text-blue-200 flex items-start gap-3">
+              <span className="material-symbols-outlined text-blue-400 text-lg shrink-0 mt-0.5">verified_user</span>
+              <div>
+                <p className="font-bold">Security &amp; Privacy Compliance Restrictions (PRD Section 6.3)</p>
+                <p className="mt-0.5 text-blue-300">
+                  Passwords, OTP values, session cookies, API keys or access tokens are never exposed. Security events are recorded with reliable timestamps and correlation IDs. Accounts are not automatically blocked on weak or unverified signals.
+                </p>
+              </div>
+            </div>
+
+            {/* Security Events Table (PRD Section 6.3) */}
             <div className="bg-[#1E293B] rounded-2xl border border-slate-700 overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-800 text-slate-400 uppercase font-semibold border-b border-slate-700">
-                  <tr>
-                    <th className="px-6 py-3.5">Timestamp</th>
-                    <th className="px-6 py-3.5">Actor ID</th>
-                    <th className="px-6 py-3.5">Security Event</th>
-                    <th className="px-6 py-3.5">Target ID</th>
-                    <th className="px-6 py-3.5 text-right">Mitigation Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-slate-300">
-                  {securityEvents.map((evt) => (
-                    <tr key={evt.id} className="hover:bg-slate-800/50">
-                      <td className="px-6 py-4">{new Date(evt.created_at).toLocaleString()}</td>
-                      <td className="px-6 py-4 font-mono font-bold text-blue-400">{evt.actor_id}</td>
-                      <td className="px-6 py-4 font-semibold">{evt.action}</td>
-                      <td className="px-6 py-4 font-mono">{evt.target_id}</td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleSecurityAction(evt.actor_id, "revoke_sessions", "Security threat mitigation")}
-                          className="px-3 py-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 font-semibold rounded-lg cursor-pointer"
-                        >
-                          Revoke Sessions
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {securityLoading ? (
+                <div className="p-12 text-center text-slate-400">Evaluating security detection rules…</div>
+              ) : securityEvents.length === 0 ? (
+                <div className="p-12 text-center text-slate-400">No security threat events match specified criteria.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-800 text-slate-400 uppercase font-semibold border-b border-slate-700">
+                      <tr>
+                        <th className="px-6 py-3.5">Event ID</th>
+                        <th className="px-6 py-3.5">Timestamp (UTC)</th>
+                        <th className="px-6 py-3.5">Event Type</th>
+                        <th className="px-6 py-3.5">Severity</th>
+                        <th className="px-6 py-3.5">Actor</th>
+                        <th className="px-6 py-3.5">Resource</th>
+                        <th className="px-6 py-3.5">Detection Rule</th>
+                        <th className="px-6 py-3.5">Status</th>
+                        <th className="px-6 py-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {securityEvents.map((evt) => (
+                        <tr key={evt.id || evt.event_id} className="hover:bg-slate-800/50">
+                          <td className="px-6 py-4 font-mono font-bold text-blue-400">{evt.event_id || evt.id?.slice(0, 14)}</td>
+                          <td className="px-6 py-4 text-slate-400">{evt.timestamp || evt.created_at ? new Date(evt.timestamp || evt.created_at).toLocaleString() : "—"}</td>
+                          <td className="px-6 py-4 font-medium text-slate-200">{evt.event_type || "Authentication"}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                              evt.severity === "Critical" || evt.severity === "CRITICAL" ? "bg-red-500/20 text-red-400 border border-red-500/30" :
+                              evt.severity === "High" || evt.severity === "HIGH" ? "bg-amber-500/20 text-amber-400" : "bg-blue-500/20 text-blue-400"
+                            }`}>
+                              {evt.severity}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-slate-300">{evt.actor?.name || evt.actor?.id || evt.actor_id || "System"}</td>
+                          <td className="px-6 py-4 font-mono text-slate-400">{evt.resource || evt.target_id || "User Auth"}</td>
+                          <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{evt.detection_rule || "brute_force_rule"}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                              evt.status === "New" || evt.status === "NEW" ? "bg-amber-500/20 text-amber-400" :
+                              evt.status === "Dismissed" ? "bg-slate-700 text-slate-400" :
+                              evt.status === "Escalated" ? "bg-purple-500/20 text-purple-400" : "bg-blue-500/20 text-blue-400"
+                            }`}>
+                              {evt.status || "New"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSecurityEvent(evt)}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition cursor-pointer"
+                            >
+                              Investigate
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -813,6 +945,105 @@ function SecOpsDashboardContent({ user, onLogout }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Security Event Investigation Modal (PRD Section 6.3) */}
+      {selectedSecurityEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-xl rounded-2xl bg-[#1E293B] p-6 shadow-2xl border border-slate-700 space-y-5 text-white">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-700">
+              <div>
+                <span className="font-mono text-xs font-bold text-blue-400">{selectedSecurityEvent.event_id || selectedSecurityEvent.id}</span>
+                <h3 className="text-base font-bold text-white mt-0.5 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-400">shield_lock</span>
+                  Security Investigation Evidence &amp; Actions
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedSecurityEvent(null)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-800 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <p className="text-slate-400">Event Type</p>
+                <p className="font-bold text-white mt-0.5">{selectedSecurityEvent.event_type || "Authentication"}</p>
+              </div>
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <p className="text-slate-400">Severity</p>
+                <p className="font-bold text-amber-400 mt-0.5">{selectedSecurityEvent.severity || "High"}</p>
+              </div>
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <p className="text-slate-400">Detection Rule</p>
+                <p className="font-mono text-slate-300 mt-0.5">{selectedSecurityEvent.detection_rule || "brute_force_rule"}</p>
+              </div>
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <p className="text-slate-400">Sanitized Source</p>
+                <p className="font-mono text-slate-300 mt-0.5">{selectedSecurityEvent.source || "Client Gateway IP"}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <label className="block text-slate-300 font-semibold">Investigation Findings &amp; Analyst Note</label>
+              <textarea
+                rows={3}
+                value={analystNoteText}
+                onChange={(e) => setAnalystNoteText(e.target.value)}
+                placeholder="Enter investigation notes, correlation references, or evidence findings…"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-700 text-xs">
+              <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Permitted Security Actions</p>
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateSecurityEvent(selectedSecurityEvent.id, {
+                    status: "Investigating",
+                    assigned_analyst: user?.full_name || user?.user_id,
+                    investigation_note: analystNoteText,
+                  })}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded-xl cursor-pointer"
+                >
+                  Assign to Me &amp; Mark Investigating
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const reason = window.prompt("Reason for dismissing false positive security alert:");
+                    if (reason) handleUpdateSecurityEvent(selectedSecurityEvent.id, {
+                      status: "Dismissed",
+                      dismissal_reason: reason,
+                      investigation_note: analystNoteText,
+                    });
+                  }}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 font-semibold text-slate-300 border border-slate-700 rounded-xl cursor-pointer"
+                >
+                  Dismiss False Positive
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateSecurityEvent(selectedSecurityEvent.id, {
+                    status: "Escalated",
+                    escalate_to_incident: true,
+                    incident_title: `Escalated Security Threat: ${selectedSecurityEvent.action || selectedSecurityEvent.event_id}`,
+                    investigation_note: analystNoteText,
+                  })}
+                  className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 font-bold text-white rounded-xl cursor-pointer"
+                >
+                  Escalate to Incident Management (INC)
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

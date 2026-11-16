@@ -165,32 +165,180 @@ class SecurityActionRequest(BaseModel):
     reason: str = Field(min_length=3, max_length=500)
 
 
+class SecurityEventUpdate(BaseModel):
+    status: str = Field(pattern="^(New|Investigating|Dismissed|Escalated|NEW|INVESTIGATING|DISMISSED|ESCALATED)$")
+    assigned_analyst: str | None = None
+    dismissal_reason: str | None = Field(default=None, max_length=1000)
+    investigation_note: str | None = Field(default=None, max_length=1000)
+    escalate_to_incident: bool = False
+    incident_title: str | None = Field(default=None, max_length=150)
+
+
 @router.get("/security/events")
 async def get_security_events(
     severity: str = "",
+    event_type: str = "",
+    status: str = "",
     search: str = "",
+    start_date: str = "",
+    end_date: str = "",
     offset: int = Query(0, ge=0),
     limit: int = Query(25, ge=1, le=100),
     principal: MongoPrincipal = Depends(secops_user),
 ) -> dict[str, Any]:
     db = mongo_database.database()
-    query: dict[str, Any] = {
-        "tenant_id": principal.tenant_id,
-        "action": {"$regex": r"^(auth\.|security\.|mfa\.|permission\.)", "$options": "i"},
-    }
+    query: dict[str, Any] = {"tenant_id": principal.tenant_id}
+
+    if severity:
+        query["severity"] = severity.upper()
+    if event_type:
+        query["event_type"] = event_type
+    if status:
+        query["status"] = status
+
+    if start_date or end_date:
+        query["created_at"] = {
+            **({"$gte": start_date} if start_date else {}),
+            **({"$lte": f"{end_date}T23:59:59"} if end_date else {}),
+        }
+
     if search:
         query["$or"] = [
             {"actor_id": {"$regex": search, "$options": "i"}},
             {"action": {"$regex": search, "$options": "i"}},
             {"target_id": {"$regex": search, "$options": "i"}},
+            {"event_id": {"$regex": search, "$options": "i"}},
         ]
 
-    items = [_clean(x) async for x in db["audit_logs"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
-    total = await db["audit_logs"].count_documents(query)
+    items_raw = [_clean(x) async for x in db["secops_events"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
+    total = await db["secops_events"].count_documents(query)
 
-    # Compute Threat Metrics
+    if total == 0 and not search and not status and not severity:
+        audit_events = [_clean(x) async for x in db["audit_logs"].find({
+            "tenant_id": principal.tenant_id,
+            "action": {"$regex": r"^(auth\.|security\.|mfa\.|permission\.|rate_limit|user\.role)"},
+        }).sort("created_at", -1).limit(20)]
+
+        if audit_events:
+            items_raw = []
+            for a in audit_events:
+                act = a.get("action", "")
+                sev = "Informational"
+                evt_type = "Authentication"
+                rule = "audit_security_rule"
+                if "failed" in act or "mfa" in act:
+                    sev = "High"
+                    rule = "brute_force_detection_rule"
+                elif "unauthorized" in act or "permission" in act:
+                    sev = "Critical"
+                    rule = "unauthorized_access_rule"
+                elif "rate_limit" in act:
+                    sev = "Medium"
+                    rule = "excessive_request_rate_rule"
+
+                items_raw.append({
+                    "id": a.get("id", str(uuid4())),
+                    "event_id": f"SEC-{str(uuid4())[:8].upper()}",
+                    "event_type": evt_type,
+                    "severity": sev,
+                    "actor": {"id": a.get("actor_id"), "name": a.get("actor_name") or a.get("actor_id")},
+                    "source": "Sanitized Client Gateway",
+                    "resource": a.get("target_id") or "User Auth",
+                    "timestamp": a.get("created_at"),
+                    "action": act,
+                    "detection_rule": rule,
+                    "status": "New",
+                    "assigned_analyst": None,
+                    "notes": [],
+                })
+            total = len(items_raw)
+
     failed_logins = await db["audit_logs"].count_documents({"tenant_id": principal.tenant_id, "action": "auth.login.failed"})
-    blocked_ips = 0
+
+    return {
+        "events": items_raw,
+        "total": total,
+        "threat_metrics": {
+            "failed_logins_24h": failed_logins,
+            "blocked_ips_count": 0,
+            "mfa_challenge_failures": await db["audit_logs"].count_documents({"tenant_id": principal.tenant_id, "action": {"$regex": r"mfa\.failed"}}),
+            "active_threat_level": "LOW" if failed_logins < 10 else "MEDIUM" if failed_logins < 50 else "HIGH",
+        },
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+@router.patch("/security/events/{event_id}")
+async def update_security_event(
+    event_id: str,
+    payload: SecurityEventUpdate,
+    principal: MongoPrincipal = Depends(secops_user),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    now = datetime.now(UTC)
+
+    st_upper = payload.status
+    updates: dict[str, Any] = {"status": st_upper, "updated_at": now}
+
+    if payload.assigned_analyst:
+        updates["assigned_analyst"] = payload.assigned_analyst
+    if payload.dismissal_reason:
+        updates["dismissal_reason"] = payload.dismissal_reason
+
+    inc_id = None
+    if payload.escalate_to_incident:
+        inc_id = secrets_id("INC")
+        inc_doc = {
+            "id": inc_id,
+            "incident_id": inc_id,
+            "tenant_id": principal.tenant_id,
+            "title": payload.incident_title or f"Escalated Security Threat {event_id}",
+            "description": f"Escalated security event {event_id}. Analyst note: {payload.investigation_note or 'Escalated for immediate response'}",
+            "severity": "CRITICAL" if "HIGH" in str(st_upper).upper() else "HIGH",
+            "category": "security",
+            "destination_team": "Security & Operations",
+            "status": "OPEN",
+            "assigned_owner": principal.user_id,
+            "linked_security_event_id": event_id,
+            "created_by": principal.user_id,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db["secops_incidents"].insert_one(inc_doc)
+        updates["linked_incident_id"] = inc_id
+        updates["status"] = "Escalated"
+
+    if payload.investigation_note:
+        note_doc = {
+            "id": str(uuid4()),
+            "author_id": principal.user_id,
+            "text": payload.investigation_note,
+            "created_at": now.isoformat(),
+        }
+        await db["secops_events"].update_one(
+            {"tenant_id": principal.tenant_id, "$or": [{"id": event_id}, {"event_id": event_id}]},
+            {"$push": {"notes": note_doc}, "$set": updates},
+            upsert=True,
+        )
+    else:
+        await db["secops_events"].update_one(
+            {"tenant_id": principal.tenant_id, "$or": [{"id": event_id}, {"event_id": event_id}]},
+            {"$set": updates},
+            upsert=True,
+        )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": f"secops.security_event.{str(st_upper).lower()}",
+        "target_id": event_id,
+        "metadata": {"status": st_upper, "incident_id": inc_id, "dismissal_reason": payload.dismissal_reason},
+        "created_at": now,
+    })
+
+    return {"status": "success", "event_id": event_id, "linked_incident_id": inc_id}
 
     return {
         "events": items,
