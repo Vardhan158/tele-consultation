@@ -561,6 +561,20 @@ export const supportDashboardApi = {
     apiRequest("/api/v1/support-dashboard/audit-export", {
       method: "POST",
     }),
+  slaConfig: () => apiRequest("/api/v1/support-dashboard/sla-config"),
+  updateSlaConfig: (payload) =>
+    apiRequest("/api/v1/support-dashboard/sla-config", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  uploadAttachment: (ticketId, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiRequest(`/api/v1/support-dashboard/tickets/${ticketId}/attachments`, {
+      method: "POST",
+      body: formData,
+    });
+  },
 };
 
 export function loadRazorpayScript() {

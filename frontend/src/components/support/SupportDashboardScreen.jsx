@@ -2171,25 +2171,28 @@ function SupportDashboardContent({ user, onLogout }) {
 
                       <div className="flex flex-wrap items-center gap-2">
                         <select
-                          value={selectedTicket.status}
+                          value={selectedTicket.status?.toLowerCase() || "open"}
                           onChange={(e) => handleUpdateTicket({ status: e.target.value })}
-                          className="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-300 outline-none"
+                          className="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-300 outline-none uppercase"
                         >
-                          <option value="open">Open</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="escalated">Escalated</option>
-                          <option value="resolved">Resolved</option>
-                          <option value="closed">Closed</option>
+                          <option value="new">NEW</option>
+                          <option value="open">OPEN</option>
+                          <option value="in_progress">IN_PROGRESS</option>
+                          <option value="waiting_for_user">WAITING_FOR_USER</option>
+                          <option value="escalated">ESCALATED</option>
+                          <option value="resolved">RESOLVED</option>
+                          <option value="closed">CLOSED</option>
+                          <option value="reopened">REOPENED</option>
                         </select>
                         <select
-                          value={selectedTicket.priority}
+                          value={selectedTicket.priority?.toLowerCase() || "medium"}
                           onChange={(e) => handleUpdateTicket({ priority: e.target.value })}
-                          className="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-300 outline-none"
+                          className="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-300 outline-none uppercase"
                         >
-                          <option value="low">Low Priority</option>
-                          <option value="medium">Medium Priority</option>
-                          <option value="high">High Priority</option>
-                          <option value="urgent">Urgent</option>
+                          <option value="low">LOW</option>
+                          <option value="medium">MEDIUM</option>
+                          <option value="high">HIGH</option>
+                          <option value="urgent">CRITICAL / URGENT</option>
                         </select>
                         <select
                           value={selectedTicket.escalated_to || ""}
@@ -2208,6 +2211,58 @@ function SupportDashboardContent({ user, onLogout }) {
                     <div>
                       <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Issue Description</h4>
                       <p className="text-sm text-zinc-700 bg-zinc-50 p-4 rounded-xl border border-zinc-100 whitespace-pre-wrap">{selectedTicket.description}</p>
+                    </div>
+
+                    {/* Attachments Section (PRD Section 12.2) */}
+                    <div className="space-y-2 pt-1 border-t border-zinc-100">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">attach_file</span>
+                          Secure Attachments (PDF, Images, Logs ≤10MB)
+                        </h4>
+                        <label className="px-3 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold rounded-lg transition cursor-pointer">
+                          <span>+ Upload Attachment</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg,.txt,.log,.csv,.json"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              try {
+                                const att = await supportDashboardApi.uploadAttachment(selectedTicket.id, file);
+                                setSelectedTicket((prev) => ({
+                                  ...prev,
+                                  attachments: [...(prev.attachments || []), att],
+                                }));
+                                addToast(`Attachment '${file.name}' uploaded successfully`, "success");
+                              } catch (err) {
+                                addToast(err.message || "Failed to upload attachment", "error");
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {!selectedTicket.attachments?.length ? (
+                        <p className="text-xs text-zinc-400 italic">No file attachments associated with this ticket.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {selectedTicket.attachments.map((att) => (
+                            <a
+                              key={att.id}
+                              href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"}/api/v1/support-dashboard/tickets/${selectedTicket.id}/attachments/${att.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 bg-[#EEF6F3] text-[#1A7D67] rounded-xl border border-[#1A7D67]/20 text-xs font-semibold hover:underline flex items-center gap-1.5"
+                            >
+                              <span className="material-symbols-outlined text-sm">description</span>
+                              <span>{att.filename}</span>
+                              <span className="text-[10px] text-zinc-500 font-normal">({(att.size / 1024).toFixed(1)} KB)</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Support Notes Log */}

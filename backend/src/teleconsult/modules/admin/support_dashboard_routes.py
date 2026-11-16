@@ -9,11 +9,12 @@ Provides support agents and administrators with full operational oversight:
 6. Video Consultation Diagnostics & Control
 7. Support Ticket & Escalation Desk
 """
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
+import base64
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from teleconsult.config.settings import get_settings
@@ -70,24 +71,32 @@ def _support_scope(principal: MongoPrincipal) -> dict[str, Any]:
 
 
 class TicketCreate(BaseModel):
-    subject: str = Field(min_length=3, max_length=200)
-    description: str = Field(min_length=5, max_length=2000)
+    subject: str = Field(min_length=3, max_length=150)
+    description: str = Field(min_length=5, max_length=5000)
     category: str = Field(default="general", max_length=50)  # billing, technical, appointment, account_access, clinical, general
-    priority: str = Field(default="medium", max_length=20)   # low, medium, high, urgent
+    priority: str = Field(default="medium", max_length=20)   # low, medium, high, urgent, critical
     patient_id: str | None = None
     doctor_id: str | None = None
     appointment_id: str | None = None
+    related_record_id: str | None = None
     reporter_name: str | None = None
     reporter_email: str | None = None
     user_type: str | None = Field(default="patient", max_length=30)  # patient, doctor, clinic_admin
 
 
 class TicketUpdate(BaseModel):
-    status: str | None = Field(default=None, max_length=30)  # open, in_progress, escalated, resolved, closed
+    status: str | None = Field(default=None, pattern="^(NEW|OPEN|IN_PROGRESS|WAITING_FOR_USER|ESCALATED|RESOLVED|CLOSED|REOPENED|new|open|in_progress|waiting_for_user|escalated|resolved|closed|reopened)$")
     priority: str | None = Field(default=None, max_length=20)
     assigned_to: str | None = None
     escalated_to: str | None = None                          # Engineering, Billing Operations, Clinical Lead, System Admin
     note: str | None = Field(default=None, max_length=1000)
+
+
+class SLAConfigUpdate(BaseModel):
+    critical_hours: float = Field(default=2.0, ge=0.25, le=72.0)
+    high_hours: float = Field(default=4.0, ge=0.5, le=168.0)
+    medium_hours: float = Field(default=12.0, ge=1.0, le=336.0)
+    low_hours: float = Field(default=24.0, ge=2.0, le=720.0)
 
 
 def auto_triage_ticket(category: str, subject: str, description: str, current_priority: str = "medium") -> tuple[str, str]:
@@ -155,6 +164,154 @@ class AppointmentSupportAction(BaseModel):
 class PaymentRefundRequest(BaseModel):
     reason: str = Field(min_length=3, max_length=500)
     amount: float | None = None
+
+
+# Configurable SLA Endpoint (PRD Section 12.1)
+@router.get("/sla-config")
+async def get_sla_config(principal: MongoPrincipal = Depends(support_agent)) -> dict[str, Any]:
+    db = mongo_database.database()
+    config = await db["sla_config"].find_one({"tenant_id": principal.tenant_id})
+    return _clean(config or {
+        "tenant_id": principal.tenant_id,
+        "critical_hours": 2.0,
+        "high_hours": 4.0,
+        "medium_hours": 12.0,
+        "low_hours": 24.0,
+    })
+
+
+@router.patch("/sla-config")
+async def update_sla_config(
+    payload: SLAConfigUpdate,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    now = datetime.now(UTC)
+    doc = {
+        "tenant_id": principal.tenant_id,
+        "critical_hours": payload.critical_hours,
+        "high_hours": payload.high_hours,
+        "medium_hours": payload.medium_hours,
+        "low_hours": payload.low_hours,
+        "updated_at": now,
+        "updated_by": principal.user_id,
+    }
+    await db["sla_config"].update_one(
+        {"tenant_id": principal.tenant_id},
+        {"$set": doc},
+        upsert=True,
+    )
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "support.sla_config.updated",
+        "target_id": "sla_config",
+        "metadata": payload.model_dump(),
+        "created_at": now,
+    })
+    return _clean(doc)
+
+
+# Secure Attachment Upload & Download (PRD Section 12.2)
+ALLOWED_ATTACHMENT_TYPES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp",
+    "application/pdf", "text/plain", "text/log", "text/csv", "application/json"
+}
+
+
+@router.post("/tickets/{ticket_id}/attachments")
+async def upload_ticket_attachment(
+    ticket_id: str,
+    file: UploadFile = File(...),
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    ticket = await db["support_tickets"].find_one({"tenant_id": principal.tenant_id, "id": ticket_id})
+    if not ticket:
+        raise HTTPException(404, "Support ticket not found")
+
+    content_type = (file.content_type or "").lower()
+    if content_type not in ALLOWED_ATTACHMENT_TYPES and not file.filename.endswith((".pdf", ".png", ".jpg", ".jpeg", ".txt", ".log", ".csv")):
+        raise HTTPException(415, "Unsupported file format. Allowed: PDF, PNG, JPG, TXT, LOG, CSV, JSON.")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10MB limit (PRD 12.2)
+        raise HTTPException(413, "Attachment exceeds maximum size limit of 10 MB.")
+
+    encoded_b64 = base64.b64encode(content).decode("utf-8")
+    attachment_id = str(uuid4())
+    now = datetime.now(UTC)
+
+    attachment_doc = {
+        "id": attachment_id,
+        "tenant_id": principal.tenant_id,
+        "ticket_id": ticket_id,
+        "filename": file.filename,
+        "content_type": content_type or "application/octet-stream",
+        "size": len(content),
+        "data_b64": encoded_b64,
+        "uploaded_by": principal.user_id,
+        "created_at": now,
+    }
+
+    await db["ticket_attachments"].insert_one(attachment_doc)
+
+    attachment_summary = {
+        "id": attachment_id,
+        "filename": file.filename,
+        "size": len(content),
+        "content_type": content_type,
+        "created_at": now.isoformat(),
+    }
+
+    await db["support_tickets"].update_one(
+        {"tenant_id": principal.tenant_id, "id": ticket_id},
+        {"$push": {"attachments": attachment_summary}, "$set": {"updated_at": now}},
+    )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "support_ticket.attachment_uploaded",
+        "target_id": ticket_id,
+        "metadata": {"attachment_id": attachment_id, "filename": file.filename, "size": len(content)},
+        "created_at": now,
+    })
+
+    return attachment_summary
+
+
+@router.get("/tickets/{ticket_id}/attachments/{attachment_id}")
+async def download_ticket_attachment(
+    ticket_id: str,
+    attachment_id: str,
+    principal: MongoPrincipal = Depends(support_agent),
+):
+    from fastapi.responses import Response
+    db = mongo_database.database()
+    att = await db["ticket_attachments"].find_one({"tenant_id": principal.tenant_id, "ticket_id": ticket_id, "id": attachment_id})
+    if not att:
+        raise HTTPException(404, "Attachment file not found")
+
+    now = datetime.now(UTC)
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "support_ticket.attachment_downloaded",
+        "target_id": ticket_id,
+        "metadata": {"attachment_id": attachment_id, "filename": att.get("filename")},
+        "created_at": now,
+    })
+
+    binary_data = base64.b64decode(att.get("data_b64", ""))
+    return Response(
+        content=binary_data,
+        media_type=att.get("content_type", "application/octet-stream"),
+        headers={"Content-Disposition": f'attachment; filename="{att.get("filename", "attachment")}"'},
+    )
 
 
 # ============================================================================
