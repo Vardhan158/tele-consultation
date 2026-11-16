@@ -21,6 +21,7 @@ const roleNavigation = {
     { id: "doctor-patients", label: "Patients", icon: "groups" },
     { id: "doctor-availability", label: "Availability", icon: "schedule" },
     { id: "doctor-settings", label: "Settings", icon: "tune" },
+    { id: "support", label: "Help & support", icon: "headset_mic" },
   ],
   clinic_admin: [
     { id: "clinic-overview", label: "Overview", icon: "dashboard" },
@@ -32,6 +33,7 @@ const roleNavigation = {
     { id: "clinic-reports", label: "Reports", icon: "analytics" },
     { id: "clinic-support-staff", label: "Support staff", icon: "support_agent" },
     { id: "clinic-settings", label: "Clinic settings", icon: "settings" },
+    { id: "support", label: "Help & support", icon: "headset_mic" },
   ],
   support: [
     { id: "support-overview", label: "Live Operations", icon: "grid_view" },
