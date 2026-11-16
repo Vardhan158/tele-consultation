@@ -11,6 +11,11 @@ function SupportDashboardContent({ user, onLogout }) {
   const [overviewData, setOverviewData] = useState(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
 
+  // Account & Access State
+  const [accountQuery, setAccountQuery] = useState("");
+  const [accountDiagData, setAccountDiagData] = useState(null);
+  const [accountDiagLoading, setAccountDiagLoading] = useState(false);
+
   // Patients State
   const [patients, setPatients] = useState([]);
   const [patientSearch, setPatientSearch] = useState("");
@@ -154,8 +159,37 @@ function SupportDashboardContent({ user, onLogout }) {
     }
   };
 
+  const loadAccountDiagnostics = async () => {
+    if (!accountQuery || accountQuery.length < 2) {
+      addToast("Please enter at least 2 characters (email, user ID, or name)", "warning");
+      return;
+    }
+    setAccountDiagLoading(true);
+    try {
+      const data = await supportDashboardApi.accountDiagnostics(accountQuery);
+      setAccountDiagData(data);
+    } catch (err) {
+      addToast(err.message || "Account record not found", "error");
+      setAccountDiagData(null);
+    } finally {
+      setAccountDiagLoading(false);
+    }
+  };
+
+  const handleAccountAction = async (action, ticketId = null) => {
+    if (!accountDiagData) return;
+    try {
+      await supportDashboardApi.accountAction(accountDiagData.user_id, action, ticketId);
+      addToast(`Action '${action.replace(/_/g, " ")}' completed successfully`, "success");
+      loadAccountDiagnostics();
+    } catch (err) {
+      addToast(err.message || "Failed to execute account action", "error");
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "overview") loadOverview();
+    else if (activeTab === "account_access") { if (accountQuery) loadAccountDiagnostics(); }
     else if (activeTab === "patients") loadPatients();
     else if (activeTab === "doctors") loadDoctors();
     else if (activeTab === "appointments") loadAppointments();
@@ -259,6 +293,7 @@ function SupportDashboardContent({ user, onLogout }) {
 
   const tabs = [
     { id: "overview", label: "Live Operations", icon: "grid_view" },
+    { id: "account_access", label: "Account & Access", icon: "manage_accounts" },
     { id: "patients", label: "Patient Support", icon: "groups" },
     { id: "doctors", label: "Doctor Assistance", icon: "badge" },
     { id: "appointments", label: "Appointments", icon: "calendar_month" },
@@ -507,7 +542,179 @@ function SupportDashboardContent({ user, onLogout }) {
         )}
 
         {/* ========================================================================= */}
-        {/* SCREEN 2: PATIENT SUPPORT                                                 */}
+        {/* SCREEN 2: ACCOUNT & ACCESS ISSUES                                         */}
+        {/* ========================================================================= */}
+        {activeTab === "account_access" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Search Input */}
+            <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs flex flex-col sm:flex-row gap-3 justify-between items-center">
+              <div className="relative w-full sm:w-96">
+                <span className="material-symbols-outlined absolute left-3 top-2.5 text-zinc-400 text-lg">manage_accounts</span>
+                <input
+                  type="text"
+                  value={accountQuery}
+                  onChange={(e) => setAccountQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && loadAccountDiagnostics()}
+                  placeholder="Enter Email, User ID, or Name for account diagnostics…"
+                  className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-300 outline-none focus:border-[#1A7D67]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={loadAccountDiagnostics}
+                className="w-full sm:w-auto px-4 py-2 bg-[#1A7D67] text-white rounded-xl text-xs font-semibold hover:bg-[#156654] cursor-pointer"
+              >
+                Inspect Account Diagnostics
+              </button>
+            </div>
+
+            {/* Security Policy Alert Banner */}
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-900 flex items-start gap-3">
+              <span className="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">lock</span>
+              <div>
+                <p className="font-bold">Strict Security &amp; Privacy Restrictions (PRD Section 6.3)</p>
+                <p className="mt-0.5 text-amber-800">
+                  Support agents must not directly reveal OTPs, bypass MFA, change user passwords, or approve accounts without authorization. All privileged support actions are logged.
+                </p>
+              </div>
+            </div>
+
+            {/* Diagnostics View */}
+            {accountDiagLoading ? (
+              <div className="bg-white p-12 rounded-2xl border border-zinc-200 text-center text-zinc-400">
+                Running account diagnostics…
+              </div>
+            ) : !accountDiagData ? (
+              <div className="bg-white p-12 rounded-2xl border border-zinc-200 text-center text-zinc-400 space-y-2">
+                <span className="material-symbols-outlined text-4xl text-zinc-300">person_search</span>
+                <p className="text-sm font-medium">Enter an email, user ID, or name above to inspect authentication diagnostics.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Account Details Card */}
+                <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs space-y-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-zinc-100">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-zinc-500">User ID: {accountDiagData.user_id}</span>
+                        <span className="text-xs bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold uppercase">{accountDiagData.role}</span>
+                      </div>
+                      <h2 className="text-xl font-bold text-zinc-900 mt-1">{accountDiagData.full_name}</h2>
+                      <p className="text-xs text-zinc-500 font-mono mt-0.5">Masked Email: {accountDiagData.masked_email}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                        accountDiagData.account_status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      }`}>
+                        Account: {accountDiagData.account_status}
+                      </span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
+                        accountDiagData.email_verified ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                      }`}>
+                        Email: {accountDiagData.email_verified ? "Verified" : "Pending Verification"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Diagnostics Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
+                      <p className="text-xs text-zinc-500 font-medium">Recent Auth Error Category</p>
+                      <p className={`text-sm font-bold mt-1 ${accountDiagData.recent_login_error_category !== "None" ? "text-amber-600" : "text-zinc-800"}`}>
+                        {accountDiagData.recent_login_error_category}
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
+                      <p className="text-xs text-zinc-500 font-medium">Last Successful Login</p>
+                      <p className="text-sm font-bold text-zinc-800 mt-1">
+                        {accountDiagData.last_successful_login ? new Date(accountDiagData.last_successful_login).toLocaleString() : "Never / No record"}
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
+                      <p className="text-xs text-zinc-500 font-medium">Email Verification Date</p>
+                      <p className="text-sm font-bold text-zinc-800 mt-1">
+                        {accountDiagData.verified_at ? new Date(accountDiagData.verified_at).toLocaleDateString() : "Unverified"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Approved Actions Toolbar */}
+                  <div className="space-y-3 pt-4 border-t border-zinc-100">
+                    <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Approved Support Actions (PRD Section 6.3)</h3>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleAccountAction("resend_verification")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 text-[#1A7D67] text-xs font-semibold rounded-xl hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-base">mark_email_unread</span>
+                        <span>Resend Verification Email</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAccountAction("send_troubleshooting")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 text-blue-700 text-xs font-semibold rounded-xl hover:bg-blue-100 border border-blue-200 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-base">help_outline</span>
+                        <span>Send Troubleshooting Guide</span>
+                      </button>
+
+                      {accountDiagData.role === "doctor" && (
+                        <button
+                          type="button"
+                          onClick={() => handleAccountAction("refer_to_clinic_admin")}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 text-amber-800 text-xs font-semibold rounded-xl hover:bg-amber-100 border border-amber-200 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-base">admin_panel_settings</span>
+                          <span>Refer Doctor Approval to Clinic Admin</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleAccountAction("escalate_security")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-50 text-red-700 text-xs font-semibold rounded-xl hover:bg-red-100 border border-red-200 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-base">security</span>
+                        <span>Escalate to Security &amp; Operations</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Linked Support Tickets History */}
+                <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs space-y-4">
+                  <h3 className="text-base font-bold text-zinc-900">Linked Support Ticket History</h3>
+                  {!accountDiagData.linked_tickets?.length ? (
+                    <p className="text-xs text-zinc-400 py-4 italic">No prior support tickets associated with this account.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {accountDiagData.linked_tickets.map((tk) => (
+                        <div key={tk.id} className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-100 flex items-center justify-between gap-3 text-xs">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-[#1A7D67]">{tk.id}</span>
+                              <span className="bg-zinc-200 text-zinc-700 px-2 py-0.5 rounded-full font-semibold uppercase text-[10px]">{tk.category}</span>
+                            </div>
+                            <p className="font-semibold text-zinc-800 mt-1">{tk.subject}</p>
+                          </div>
+                          <span className="capitalize font-bold text-zinc-600">{tk.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* SCREEN 3: PATIENT SUPPORT                                                 */}
         {/* ========================================================================= */}
         {activeTab === "patients" && (
           <div className="space-y-6 animate-in fade-in duration-200">

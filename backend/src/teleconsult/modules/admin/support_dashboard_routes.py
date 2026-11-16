@@ -242,9 +242,160 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
     }
 
 
+def mask_email(email: str) -> str:
+    if not email or "@" not in email:
+        return "—"
+    name, domain = email.split("@", 1)
+    if len(name) <= 2:
+        masked_name = name[0] + "*"
+    else:
+        masked_name = name[0] + "*" * (len(name) - 2) + name[-1]
+    return f"{masked_name}@{domain}"
+
+
+class AccountActionRequest(BaseModel):
+    user_id: str
+    action: str = Field(pattern="^(resend_verification|send_troubleshooting|refer_to_clinic_admin|escalate_security)$")
+    ticket_id: str | None = None
+    note: str | None = None
+
+
 # ============================================================================
-# Screen 2: Patient Support & Identity
+# Screen 2: Account & Access Diagnostics & Support
 # ============================================================================
+
+@router.get("/account-diagnostics")
+async def account_diagnostics(
+    query: str = Query(..., min_length=2),
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    search_term = query.strip().lower()
+
+    user = await db["users"].find_one({
+        "tenant_id": principal.tenant_id,
+        "$or": [
+            {"id": search_term},
+            {"email": search_term},
+            {"full_name": {"$regex": search_term, "$options": "i"}},
+        ],
+    })
+
+    if not user:
+        raise HTTPException(404, "User account not found for diagnostics")
+
+    user_id = user["id"]
+    email = user.get("email", "")
+
+    last_login_audit = await db["audit_logs"].find_one(
+        {"tenant_id": principal.tenant_id, "actor_id": user_id, "action": "auth.login.success"},
+        sort=[("created_at", -1)],
+    )
+
+    last_error_audit = await db["audit_logs"].find_one(
+        {"tenant_id": principal.tenant_id, "$or": [{"actor_id": user_id}, {"target_id": email}], "action": {"$regex": r"^auth\.login\.failed"}},
+        sort=[("created_at", -1)],
+    )
+
+    recent_error_category = "None"
+    if last_error_audit:
+        action_name = last_error_audit.get("action", "")
+        if "unverified" in action_name or not user.get("verified_at"):
+            recent_error_category = "Email Verification Required"
+        elif "mfa" in action_name:
+            recent_error_category = "MFA / 2FA Code Required"
+        elif "restricted" in action_name:
+            recent_error_category = "Account Restricted / Locked"
+        else:
+            recent_error_category = "Invalid Password / Credentials"
+    elif not user.get("verified_at"):
+        recent_error_category = "Email Verification Pending"
+
+    linked_tickets = [_clean(x) async for x in db["support_tickets"].find({
+        "tenant_id": principal.tenant_id,
+        "$or": [{"patient_id": user_id}, {"doctor_id": user_id}, {"reporter_email": email}],
+    }).sort("created_at", -1)]
+
+    # Important security restriction: NEVER reveal password_hash, OTPs, MFA secret, or tokens
+    return {
+        "user_id": user_id,
+        "full_name": user.get("full_name", ""),
+        "role": user.get("role", "patient"),
+        "masked_email": mask_email(email),
+        "account_status": "restricted" if user.get("restricted_until") and user["restricted_until"] > datetime.now(UTC) else "active" if user.get("active", True) else "inactive",
+        "email_verified": bool(user.get("verified_at")),
+        "verified_at": user.get("verified_at").isoformat() if hasattr(user.get("verified_at"), "isoformat") else user.get("verified_at"),
+        "last_successful_login": _clean(last_login_audit).get("created_at") if last_login_audit else None,
+        "recent_login_error_category": recent_error_category,
+        "linked_tickets": linked_tickets,
+    }
+
+
+@router.post("/account-action")
+async def account_support_action(
+    payload: AccountActionRequest,
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, str]:
+    import secrets
+    db = mongo_database.database()
+    user = await db["users"].find_one({"tenant_id": principal.tenant_id, "id": payload.user_id})
+    if not user:
+        raise HTTPException(404, "User account not found")
+
+    now = datetime.now(UTC)
+    action_type = payload.action
+
+    if action_type == "resend_verification":
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        await db["recovery_tokens"].insert_one({
+            "id": str(uuid4()),
+            "user_id": payload.user_id,
+            "token_hash": token_hash(code),
+            "expires_at": now + timedelta(minutes=10),
+            "used_at": None,
+            "created_at": now,
+        })
+        from teleconsult.modules.identity.auth_routes import send_verification_email
+        await send_verification_email(user["email"], code)
+
+    elif action_type == "send_troubleshooting":
+        await db["notifications"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": principal.tenant_id,
+            "recipient_id": payload.user_id,
+            "type": "support_troubleshooting",
+            "title": "Account Access Troubleshooting Guide",
+            "message": "Please clear your browser cookies/cache, check your spam folder, or use the Forgot Password link to reset access.",
+            "read_at": None,
+            "created_at": now,
+        })
+
+    elif action_type == "refer_to_clinic_admin":
+        if payload.ticket_id:
+            await db["support_tickets"].update_one(
+                {"tenant_id": principal.tenant_id, "id": payload.ticket_id},
+                {"$set": {"status": "escalated", "escalated_to": "Clinic Admin", "updated_at": now}},
+            )
+
+    elif action_type == "escalate_security":
+        if payload.ticket_id:
+            await db["support_tickets"].update_one(
+                {"tenant_id": principal.tenant_id, "id": payload.ticket_id},
+                {"$set": {"status": "escalated", "escalated_to": "Security & Operations", "priority": "urgent", "updated_at": now}},
+            )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": f"support.account.{action_type}",
+        "target_id": payload.user_id,
+        "metadata": {"ticket_id": payload.ticket_id, "note": payload.note},
+        "created_at": now,
+    })
+
+    return {"status": "success", "action": action_type}
+
 
 @router.get("/patients")
 async def support_patients(

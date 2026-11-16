@@ -484,6 +484,13 @@ export const supportStaffApi = {
 
 export const supportDashboardApi = {
   overview: () => apiRequest("/api/v1/support-dashboard/overview"),
+  accountDiagnostics: (query) =>
+    apiRequest(`/api/v1/support-dashboard/account-diagnostics?query=${encodeURIComponent(query)}`),
+  accountAction: (userId, action, ticketId = null, note = null) =>
+    apiRequest("/api/v1/support-dashboard/account-action", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, action, ticket_id: ticketId, note }),
+    }),
   patients: (search = "", offset = 0, limit = 25) =>
     apiRequest(`/api/v1/support-dashboard/patients?search=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`),
   patientDetail: (id) => apiRequest(`/api/v1/support-dashboard/patients/${id}`),
