@@ -1398,3 +1398,125 @@ async def update_escalation(
 
     updated_esc = await db["escalations"].find_one({"tenant_id": principal.tenant_id, "id": escalation_id})
     return _clean(updated_esc or {})
+
+
+# ============================================================================
+# Screen 7: Support Audit History & Export (PRD Section 11)
+# ============================================================================
+
+@router.get("/audit-history")
+async def support_audit_history(
+    start_date: str = "",
+    end_date: str = "",
+    actor_id: str = "",
+    ticket_id: str = "",
+    action: str = "",
+    resource: str = "",
+    result_filter: str = "",
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    query: dict[str, Any] = {"tenant_id": principal.tenant_id}
+
+    if start_date or end_date:
+        query["created_at"] = {
+            **({"$gte": start_date} if start_date else {}),
+            **({"$lte": f"{end_date}T23:59:59"} if end_date else {}),
+        }
+
+    if actor_id:
+        query["$or"] = [
+            {"actor_id": {"$regex": actor_id, "$options": "i"}},
+            {"actor_name": {"$regex": actor_id, "$options": "i"}},
+        ]
+
+    if ticket_id:
+        query["$or"] = [
+            {"target_id": ticket_id},
+            {"metadata.ticket_id": ticket_id},
+        ]
+
+    if action:
+        query["action"] = {"$regex": action, "$options": "i"}
+
+    if resource:
+        query["$or"] = [
+            {"action": {"$regex": f"^{resource}", "$options": "i"}},
+            {"action": {"$regex": f"\\.{resource}\\.", "$options": "i"}},
+        ]
+
+    if result_filter:
+        query["result"] = result_filter
+
+    items_raw = [_clean(x) async for x in db["audit_logs"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
+    total = await db["audit_logs"].count_documents(query)
+
+    formatted_items = []
+    for log in items_raw:
+        act = log.get("action", "")
+        res_cat = "general"
+        if "ticket" in act:
+            res_cat = "ticket"
+        elif "account" in act or "auth" in act:
+            res_cat = "account"
+        elif "booking" in act or "appointment" in act:
+            res_cat = "booking"
+        elif "payment" in act or "refund" in act:
+            res_cat = "payment"
+        elif "video" in act or "consultation" in act:
+            res_cat = "video_session"
+        elif "escalation" in act:
+            res_cat = "escalation"
+
+        t_id = log.get("metadata", {}).get("ticket_id") or (log.get("target_id") if "TICK-" in str(log.get("target_id")) else "—")
+
+        formatted_items.append({
+            "event_id": log.get("id", str(uuid4())),
+            "timestamp": log.get("created_at"),
+            "agent": {
+                "id": log.get("actor_id", "system"),
+                "name": log.get("actor_name") or log.get("actor_id", "Support System"),
+            },
+            "action": act,
+            "ticket_id": t_id,
+            "resource": res_cat,
+            "result": log.get("result", "Success"),
+            "details": log.get("metadata") or {"target_id": log.get("target_id")},
+        })
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "support.audit_history.accessed",
+        "target_id": "audit_logs",
+        "created_at": datetime.now(UTC),
+    })
+
+    return {"items": formatted_items, "total": total, "offset": offset, "limit": limit}
+
+
+@router.post("/audit-export")
+async def export_support_audit(
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    now = datetime.now(UTC)
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "support.audit.exported",
+        "target_id": "audit_logs",
+        "created_at": now,
+    })
+
+    items = [_clean(x) async for x in db["audit_logs"].find({"tenant_id": principal.tenant_id}).sort("created_at", -1).limit(500)]
+    csv_lines = ["Event ID,Timestamp,Actor ID,Action,Target ID,Result"]
+    for x in items:
+        csv_lines.append(f'"{x.get("id")}","{x.get("created_at")}","{x.get("actor_id")}","{x.get("action")}","{x.get("target_id")}","{x.get("result", "Success")}"')
+
+    return {"csv_data": "\n".join(csv_lines), "filename": f"support_audit_export_{now.strftime('%Y%m%d_%H%M%S')}.csv"}

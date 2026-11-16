@@ -555,6 +555,12 @@ export const supportDashboardApi = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  auditHistory: (startDate = "", endDate = "", actorId = "", ticketId = "", action = "", resource = "", resultFilter = "", offset = 0, limit = 50) =>
+    apiRequest(`/api/v1/support-dashboard/audit-history?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&actor_id=${encodeURIComponent(actorId)}&ticket_id=${encodeURIComponent(ticketId)}&action=${encodeURIComponent(action)}&resource=${encodeURIComponent(resource)}&result_filter=${encodeURIComponent(resultFilter)}&offset=${offset}&limit=${limit}`),
+  auditExport: () =>
+    apiRequest("/api/v1/support-dashboard/audit-export", {
+      method: "POST",
+    }),
 };
 
 export function loadRazorpayScript() {

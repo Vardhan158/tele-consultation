@@ -79,6 +79,17 @@ function SupportDashboardContent({ user, onLogout }) {
     incident_id: "",
   });
 
+  // Audit History State (PRD Section 11)
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditStartDate, setAuditStartDate] = useState("");
+  const [auditEndDate, setAuditEndDate] = useState("");
+  const [auditActor, setAuditActor] = useState("");
+  const [auditTicketId, setAuditTicketId] = useState("");
+  const [auditActionFilter, setAuditActionFilter] = useState("");
+  const [auditResourceFilter, setAuditResourceFilter] = useState("");
+  const [auditResultFilter, setAuditResultFilter] = useState("");
+  const [auditLoading, setAuditLoading] = useState(false);
+
   // Tickets State
   const [tickets, setTickets] = useState([]);
   const [ticketStatus, setTicketStatus] = useState("");
@@ -315,6 +326,43 @@ function SupportDashboardContent({ user, onLogout }) {
     }
   };
 
+  const loadAuditHistory = async () => {
+    setAuditLoading(true);
+    try {
+      const res = await supportDashboardApi.auditHistory(
+        auditStartDate,
+        auditEndDate,
+        auditActor,
+        auditTicketId,
+        auditActionFilter,
+        auditResourceFilter,
+        auditResultFilter
+      );
+      setAuditLogs(res.items || []);
+    } catch (err) {
+      addToast(err.message || "Failed to load support audit history", "error");
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const handleExportAudit = async () => {
+    try {
+      const res = await supportDashboardApi.auditExport();
+      const blob = new Blob([res.csv_data], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", res.filename || "support_audit_export.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      addToast("Support audit log exported successfully", "success");
+    } catch (err) {
+      addToast(err.message || "Failed to export audit log", "error");
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "overview") loadOverview();
     else if (activeTab === "account_access") { if (accountQuery) loadAccountDiagnostics(); }
@@ -325,6 +373,7 @@ function SupportDashboardContent({ user, onLogout }) {
     else if (activeTab === "payments") loadPayments();
     else if (activeTab === "video") { loadVideoSessions(); if (videoQuery) loadVideoDiagnostics(); }
     else if (activeTab === "escalations") loadEscalations();
+    else if (activeTab === "audit_history") loadAuditHistory();
     else if (activeTab === "tickets") loadTickets();
   }, [activeTab]);
 
@@ -431,6 +480,7 @@ function SupportDashboardContent({ user, onLogout }) {
     { id: "payments", label: "Payments & Refunds", icon: "payments" },
     { id: "video", label: "Video Diagnostics", icon: "video_camera_front" },
     { id: "escalations", label: "Inter-Team Escalations", icon: "published_with_changes" },
+    { id: "audit_history", label: "Support Audit History", icon: "policy" },
     { id: "tickets", label: "Support Desk", icon: "headset_mic" },
   ];
 
@@ -1840,6 +1890,156 @@ function SupportDashboardContent({ user, onLogout }) {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* SCREEN 7: SUPPORT AUDIT HISTORY & EXPORT (PRD SECTION 11)                 */}
+        {/* ========================================================================= */}
+        {activeTab === "audit_history" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header & Filter Controls (PRD Section 11.2) */}
+            <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-zinc-100">
+                <div>
+                  <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#1A7D67]">policy</span>
+                    Support Audit Trail &amp; Event Logs
+                  </h3>
+                  <p className="text-xs text-zinc-500">Immutable, append-only history of support actions and privileged investigations.</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleExportAudit}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#1A7D67] text-white text-xs font-semibold rounded-xl hover:bg-[#156654] transition cursor-pointer shrink-0"
+                >
+                  <span className="material-symbols-outlined text-base">download</span>
+                  <span>Export Audit CSV</span>
+                </button>
+              </div>
+
+              {/* Filters Toolbar */}
+              <div className="flex flex-wrap gap-2.5">
+                <input
+                  type="date"
+                  value={auditStartDate}
+                  onChange={(e) => setAuditStartDate(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-zinc-300 outline-none"
+                  title="Start Date"
+                />
+                <input
+                  type="date"
+                  value={auditEndDate}
+                  onChange={(e) => setAuditEndDate(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-zinc-300 outline-none"
+                  title="End Date"
+                />
+                <input
+                  type="text"
+                  value={auditActor}
+                  onChange={(e) => setAuditActor(e.target.value)}
+                  placeholder="Agent / Actor ID…"
+                  className="px-3 py-1.5 text-xs rounded-xl border border-zinc-300 outline-none w-36"
+                />
+                <input
+                  type="text"
+                  value={auditTicketId}
+                  onChange={(e) => setAuditTicketId(e.target.value)}
+                  placeholder="Ticket ID…"
+                  className="px-3 py-1.5 text-xs rounded-xl border border-zinc-300 outline-none w-32 font-mono"
+                />
+                <select
+                  value={auditResourceFilter}
+                  onChange={(e) => setAuditResourceFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-zinc-300 outline-none"
+                >
+                  <option value="">All Resources</option>
+                  <option value="ticket">Ticket</option>
+                  <option value="account">Account</option>
+                  <option value="booking">Booking</option>
+                  <option value="payment">Payment</option>
+                  <option value="video">Video Session</option>
+                  <option value="escalation">Escalation</option>
+                </select>
+                <select
+                  value={auditResultFilter}
+                  onChange={(e) => setAuditResultFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-zinc-300 outline-none"
+                >
+                  <option value="">All Results</option>
+                  <option value="Success">Success</option>
+                  <option value="Denied">Denied</option>
+                  <option value="Failed">Failed</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={loadAuditHistory}
+                  className="px-3.5 py-1.5 bg-[#1A7D67] text-white text-xs font-semibold rounded-xl hover:bg-[#156654] cursor-pointer"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+
+            {/* Audit Rules Notice Banner */}
+            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200/80 text-xs text-emerald-900 flex items-start gap-3">
+              <span className="material-symbols-outlined text-emerald-700 text-lg shrink-0 mt-0.5">verified</span>
+              <div>
+                <p className="font-bold">Append-Only Compliance Guarantee (PRD Section 11.2)</p>
+                <p className="mt-0.5 text-emerald-800">
+                  Audit events are append-only. Support agents cannot delete or edit audit events. Sensitive information is masked and audit records survive ticket closure. All CSV exports are themselves audited.
+                </p>
+              </div>
+            </div>
+
+            {/* Audit Table */}
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden">
+              {auditLoading ? (
+                <div className="p-12 text-center text-zinc-400">Loading audit history logs…</div>
+              ) : auditLogs.length === 0 ? (
+                <div className="p-12 text-center text-zinc-400">No audit events match specified criteria.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#F8FAF9] border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase">
+                      <tr>
+                        <th className="px-6 py-3.5">Event ID</th>
+                        <th className="px-6 py-3.5">Timestamp (UTC)</th>
+                        <th className="px-6 py-3.5">Agent / Actor</th>
+                        <th className="px-6 py-3.5">Action</th>
+                        <th className="px-6 py-3.5">Ticket ID</th>
+                        <th className="px-6 py-3.5">Resource</th>
+                        <th className="px-6 py-3.5">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 text-xs">
+                      {auditLogs.map((log) => (
+                        <tr key={log.event_id} className="hover:bg-[#F9FBFA]">
+                          <td className="px-6 py-4 font-mono font-bold text-[#1A7D67]">{log.event_id?.slice(0, 18)}</td>
+                          <td className="px-6 py-4 text-zinc-600">{log.timestamp ? new Date(log.timestamp).toLocaleString() : "—"}</td>
+                          <td className="px-6 py-4 font-medium text-zinc-800">{log.agent?.name || log.agent?.id}</td>
+                          <td className="px-6 py-4 font-semibold text-zinc-900">{log.action}</td>
+                          <td className="px-6 py-4 font-mono text-zinc-600">{log.ticket_id}</td>
+                          <td className="px-6 py-4">
+                            <span className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-md font-semibold uppercase text-[10px]">
+                              {log.resource}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] uppercase ${
+                              log.result === "Success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                            }`}>
+                              {log.result}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
