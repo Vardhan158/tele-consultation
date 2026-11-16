@@ -33,6 +33,9 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
       case "reports":
       case "clinic-reports":
         return "reports";
+      case "support-staff":
+      case "clinic-support-staff":
+        return "support-staff";
       case "settings":
       case "clinic-settings":
         return "settings";
@@ -59,6 +62,8 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
         return <PaymentOversightTab />;
       case "reports":
         return <OperationalReportsTab />;
+      case "support-staff":
+        return <SupportStaffManagementTab />;
       case "settings":
         return <ClinicSettingsTab />;
       default:

@@ -225,3 +225,107 @@ async def update_clinic_settings(payload: ClinicSettings, principal: MongoPrinci
     await mongo_database.database()["clinics"].update_one(_scope(principal), {"$set": {**payload.model_dump(), "updated_at": now}, "$setOnInsert": {"id": str(uuid4()), **_scope(principal)}}, upsert=True)
     await mongo_database.database()["audit_logs"].insert_one({"id": str(uuid4()), **_scope(principal), "actor_id": principal.user_id, "action": "clinic.settings.updated", "metadata": {"fields": list(payload.model_dump())}, "created_at": now})
     return {"status": "updated"}
+
+
+class SupportStaffCreate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=100)
+    email: str = Field(max_length=254)
+    mobile_number: str = Field(default="", max_length=32)
+    password: str = Field(min_length=6, max_length=128)
+
+
+class SupportStaffStatusUpdate(BaseModel):
+    active: bool | None = None
+    password: str | None = Field(default=None, min_length=6, max_length=128)
+
+
+@router.get("/support-staff")
+async def list_support_staff(principal: MongoPrincipal = Depends(clinic_admin)) -> list[dict[str, Any]]:
+    db, scope = mongo_database.database(), _scope(principal)
+    query = {**scope, "role": "support"}
+    items = [_clean(x) async for x in db["users"].find(query).sort("created_at", -1)]
+    for item in items:
+        item.pop("password_hash", None)
+    return items
+
+
+@router.post("/support-staff")
+async def create_support_staff(payload: SupportStaffCreate, principal: MongoPrincipal = Depends(clinic_admin)) -> dict[str, Any]:
+    from teleconsult.modules.identity.auth_routes import password_hash
+    db, scope = mongo_database.database(), _scope(principal)
+    email = payload.email.strip().lower()
+    existing = await db["users"].find_one({"tenant_id": principal.tenant_id, "email": email})
+    if existing:
+        raise HTTPException(409, "An account with this email already exists.")
+    user_id = str(uuid4())
+    now = datetime.now(UTC)
+    user_doc = {
+        "id": user_id,
+        **scope,
+        "full_name": payload.full_name.strip(),
+        "email": email,
+        "mobile_number": payload.mobile_number,
+        "password_hash": password_hash(payload.password),
+        "terms_version": "v1.0",
+        "terms_accepted_at": now,
+        "verified_at": now,
+        "role": "support",
+        "active": True,
+        "mfa_enabled": False,
+        "created_by": principal.user_id,
+        "created_at": now,
+    }
+    await db["users"].insert_one(user_doc)
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        **scope,
+        "actor_id": principal.user_id,
+        "action": "support_staff.created",
+        "target_id": user_id,
+        "metadata": {"email": email, "full_name": payload.full_name},
+        "created_at": now,
+    })
+    return _clean(user_doc)
+
+
+@router.patch("/support-staff/{user_id}")
+async def update_support_staff(user_id: str, payload: SupportStaffStatusUpdate, principal: MongoPrincipal = Depends(clinic_admin)) -> dict[str, str]:
+    from teleconsult.modules.identity.auth_routes import password_hash
+    db, scope = mongo_database.database(), _scope(principal)
+    user = await db["users"].find_one({**scope, "id": user_id, "role": "support"})
+    if not user:
+        raise HTTPException(404, "Support staff member not found")
+    now = datetime.now(UTC)
+    updates: dict[str, Any] = {"updated_at": now}
+    if payload.active is not None:
+        updates["active"] = payload.active
+    if payload.password:
+        updates["password_hash"] = password_hash(payload.password)
+    await db["users"].update_one({**scope, "id": user_id}, {"$set": updates})
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        **scope,
+        "actor_id": principal.user_id,
+        "action": "support_staff.updated",
+        "target_id": user_id,
+        "created_at": now,
+    })
+    return {"status": "updated"}
+
+
+@router.delete("/support-staff/{user_id}")
+async def delete_support_staff(user_id: str, principal: MongoPrincipal = Depends(clinic_admin)) -> dict[str, str]:
+    db, scope = mongo_database.database(), _scope(principal)
+    result = await db["users"].delete_one({**scope, "id": user_id, "role": "support"})
+    if result.deleted_count != 1:
+        raise HTTPException(404, "Support staff member not found")
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        **scope,
+        "actor_id": principal.user_id,
+        "action": "support_staff.deleted",
+        "target_id": user_id,
+        "created_at": datetime.now(UTC),
+    })
+    return {"status": "deleted"}
+

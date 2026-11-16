@@ -30,7 +30,17 @@ const roleNavigation = {
     { id: "clinic-appointments", label: "Appointments", icon: "calendar_month" },
     { id: "clinic-payments", label: "Payments", icon: "payments" },
     { id: "clinic-reports", label: "Reports", icon: "analytics" },
+    { id: "clinic-support-staff", label: "Support staff", icon: "support_agent" },
     { id: "clinic-settings", label: "Clinic settings", icon: "settings" },
+  ],
+  support: [
+    { id: "support-overview", label: "Live Operations", icon: "grid_view" },
+    { id: "support-patients", label: "Patient Support", icon: "groups" },
+    { id: "support-doctors", label: "Doctor Roster", icon: "badge" },
+    { id: "support-appointments", label: "Appointments", icon: "calendar_month" },
+    { id: "support-payments", label: "Payments & Refunds", icon: "payments" },
+    { id: "support-video", label: "Video Diagnostics", icon: "video_camera_front" },
+    { id: "support-tickets", label: "Support Desk", icon: "headset_mic" },
   ],
 };
 
@@ -46,7 +56,7 @@ export default function Sidebar({
   onCloseMobile,
   patient,
 }) {
-  const role = patient?.role === "doctor" || patient?.role === "clinic_admin" ? patient.role : "patient";
+  const role = patient?.role === "doctor" || patient?.role === "clinic_admin" || patient?.role === "support" ? patient.role : "patient";
   const isDoctor = role === "doctor";
   const isAdmin = role === "clinic_admin";
   const navigation = roleNavigation[role];

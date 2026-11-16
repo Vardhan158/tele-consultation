@@ -15,6 +15,7 @@ from teleconsult.kernel.mongodb.schema import ensure_schema
 from teleconsult.kernel.observability.logging import configure_logging
 from teleconsult.kernel.tenancy.context import set_tenant
 from teleconsult.modules.admin.routes import router as admin_router
+from teleconsult.modules.admin.support_dashboard_routes import router as support_dashboard_router
 from teleconsult.modules.audit.routes import router as audit_router
 from teleconsult.modules.consent.routes import router as consent_router
 from teleconsult.modules.consultation.doctor_routes import router as doctor_portal_router
@@ -42,6 +43,7 @@ from teleconsult.modules.scheduling.admin_routes import router as scheduling_adm
 from teleconsult.modules.scheduling.routes import router as scheduling_router
 from teleconsult.modules.support_access.patient_routes import router as support_router
 from teleconsult.modules.support_access.routes import router as support_access_router
+from teleconsult.modules.tenancy.clinic_admin_routes import router as clinic_admin_router
 from teleconsult.modules.tenancy.routes import router as tenancy_router
 
 # Routes that are intentionally unauthenticated. Keep this list tiny and reviewed.
@@ -169,6 +171,8 @@ def create_app() -> FastAPI:
     app.include_router(reporting_router)
     app.include_router(support_access_router)
     app.include_router(audit_router)
+    app.include_router(clinic_admin_router)
+    app.include_router(support_dashboard_router)
     # TODO: register the audit sink, bind adapters to module ports, add rate limiting.
     return app
 

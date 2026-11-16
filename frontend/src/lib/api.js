@@ -464,6 +464,66 @@ export const adminApi = {
     }),
 };
 
+export const supportStaffApi = {
+  list: () => apiRequest("/clinic-admin/support-staff"),
+  create: (payload) =>
+    apiRequest("/clinic-admin/support-staff", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  update: (id, payload) =>
+    apiRequest(`/clinic-admin/support-staff/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  delete: (id) =>
+    apiRequest(`/clinic-admin/support-staff/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+export const supportDashboardApi = {
+  overview: () => apiRequest("/api/v1/support-dashboard/overview"),
+  patients: (search = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/patients?search=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`),
+  patientDetail: (id) => apiRequest(`/api/v1/support-dashboard/patients/${id}`),
+  doctors: (search = "", status = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/doctors?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&offset=${offset}&limit=${limit}`),
+  doctorDetail: (id) => apiRequest(`/api/v1/support-dashboard/doctors/${id}`),
+  appointments: (search = "", status = "", date = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/appointments?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&date=${encodeURIComponent(date)}&offset=${offset}&limit=${limit}`),
+  appointmentAction: (id, action, reason, startsAt = null) =>
+    apiRequest(`/api/v1/support-dashboard/appointments/${id}/action`, {
+      method: "POST",
+      body: JSON.stringify({ action, reason, ...(startsAt ? { starts_at: startsAt } : {}) }),
+    }),
+  payments: (search = "", status = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/payments?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&offset=${offset}&limit=${limit}`),
+  refundPayment: (id, reason, amount = null) =>
+    apiRequest(`/api/v1/support-dashboard/payments/${id}/refund`, {
+      method: "POST",
+      body: JSON.stringify({ reason, amount }),
+    }),
+  videoSessions: (status = "") =>
+    apiRequest(`/api/v1/support-dashboard/video-sessions?status=${encodeURIComponent(status)}`),
+  endVideoSession: (id) =>
+    apiRequest(`/api/v1/support-dashboard/video-sessions/${id}/end`, {
+      method: "POST",
+    }),
+  tickets: (status = "", priority = "", category = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/tickets?status=${encodeURIComponent(status)}&priority=${encodeURIComponent(priority)}&category=${encodeURIComponent(category)}&offset=${offset}&limit=${limit}`),
+  createTicket: (payload) =>
+    apiRequest("/api/v1/support-dashboard/tickets", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateTicket: (id, payload) =>
+    apiRequest(`/api/v1/support-dashboard/tickets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+};
+
 export function loadRazorpayScript() {
   return new Promise((resolve) => {
     if (typeof window !== "undefined" && window.Razorpay) {
