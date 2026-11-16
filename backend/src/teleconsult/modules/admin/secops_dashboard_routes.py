@@ -608,23 +608,28 @@ async def create_incident(
         "tenant_id": principal.tenant_id,
         "clinic_id": principal.clinic_id,
         "title": payload.title,
-        "category": payload.category,
+        "category": payload.category.upper(),
         "description": payload.description,
-        "severity": sev_str,
+        "severity": sev_str.replace("-", "_"),
         "status": "TRIAGED" if payload.assigned_owner else "DETECTED",
         "affected_services": payload.affected_services or ["FastAPI Backend"],
         "detection_source": payload.detection_source,
         "incident_start_time": now.isoformat(),
+        "started_at": now.isoformat(),
+        "detected_at": now.isoformat(),
         "assigned_team": payload.assigned_team,
         "assigned_owner": payload.assigned_owner or principal.user_id,
+        "owner_id": payload.assigned_owner or principal.user_id,
         "linked_alert_ids": payload.linked_alert_ids,
         "linked_support_tickets": linked_tickets,
+        "linked_ticket_ids": linked_tickets,
         "impact_description": payload.impact_description,
         "resolution_summary": None,
         "root_cause": None,
         "mitigation_actions": [],
         "notes": [],
         "history": [history_entry],
+        "version": 1,
         "created_by": principal.user_id,
         "created_at": now,
         "updated_at": now,
@@ -632,6 +637,15 @@ async def create_incident(
     }
 
     await db["secops_incidents"].insert_one(doc)
+    await db["secops_incident_events"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "incident_id": incident_id,
+        "action": "incident_created",
+        "actor_id": principal.user_id,
+        "details": f"Incident created with severity {sev_str} in category {payload.category}",
+        "created_at": now.isoformat(),
+    })
 
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
