@@ -726,7 +726,7 @@ function SupportDashboardContent({ user, onLogout }) {
                           <p className="font-semibold text-zinc-800">{log.action}</p>
                           <p className="text-zinc-500 text-[11px]">Actor: {log.actor_id}</p>
                         </div>
-                        <span className="text-[10px] text-zinc-400 shrink-0">{new Date(log.created_at).toLocaleTimeString()}</span>
+                        <span className="text-[10px] text-zinc-400 shrink-0">{safeFormatDate(log.created_at, "time")}</span>
                       </div>
                     ))}
                   </div>
@@ -959,7 +959,7 @@ function SupportDashboardContent({ user, onLogout }) {
                           <td className="px-6 py-4 font-semibold text-zinc-900">{p.full_name}</td>
                           <td className="px-6 py-4 text-xs text-zinc-600">{p.email} • {p.phone || "No Phone"}</td>
                           <td className="px-6 py-4 text-xs uppercase">{p.preferred_language || "EN"}</td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">{p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}</td>
+                          <td className="px-6 py-4 text-xs text-zinc-500">{safeFormatDate(p.created_at, "date")}</td>
                           <td className="px-6 py-4 text-right">
                             <button
                               type="button"
@@ -1108,7 +1108,7 @@ function SupportDashboardContent({ user, onLogout }) {
                             }}
                             className="px-2.5 py-1 bg-white hover:bg-blue-100 border border-blue-200 text-blue-800 text-xs font-semibold rounded-lg transition cursor-pointer"
                           >
-                            {new Date(slot.starts_at).toLocaleString()}
+                            {safeFormatDate(slot.starts_at)}
                           </button>
                         ))}
                       </div>
@@ -1325,7 +1325,7 @@ function SupportDashboardContent({ user, onLogout }) {
                           <td className="px-6 py-4 font-mono text-xs font-bold text-[#1A7D67]">{apt.id}</td>
                           <td className="px-6 py-4 font-medium text-zinc-800">{apt.patient_name || apt.patient_id}</td>
                           <td className="px-6 py-4 font-medium text-zinc-800">{apt.doctor_name || apt.doctor_id}</td>
-                          <td className="px-6 py-4 text-xs text-zinc-600">{apt.starts_at ? new Date(apt.starts_at).toLocaleString() : "—"}</td>
+                          <td className="px-6 py-4 text-xs text-zinc-600">{safeFormatDate(apt.starts_at)}</td>
                           <td className="px-6 py-4">
                             <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full capitalize ${
                               apt.status === "completed" ? "bg-green-100 text-green-800" : apt.status === "cancelled" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"
@@ -1540,7 +1540,7 @@ function SupportDashboardContent({ user, onLogout }) {
                   <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
                     <p className="text-zinc-500 font-medium">Disconnect Time</p>
                     <p className="font-bold text-zinc-900 text-sm">
-                      {videoDiagData.disconnect_time ? new Date(videoDiagData.disconnect_time).toLocaleTimeString() : "N/A (Active/Connected)"}
+                      {safeFormatDate(videoDiagData.disconnect_time, "time", "N/A (Active/Connected)")}
                     </p>
                   </div>
                 </div>
@@ -1600,7 +1600,7 @@ function SupportDashboardContent({ user, onLogout }) {
                             <span className="font-semibold text-zinc-800">{evt.action}</span>
                             <p className="text-[10px] text-zinc-500">Actor: {evt.actor_id}</p>
                           </div>
-                          <span className="text-[10px] text-zinc-400 shrink-0">{new Date(evt.created_at).toLocaleTimeString()}</span>
+                          <span className="text-[10px] text-zinc-400 shrink-0">{safeFormatDate(evt.created_at, "time")}</span>
                         </div>
                       ))}
                     </div>
@@ -1654,7 +1654,7 @@ function SupportDashboardContent({ user, onLogout }) {
                                 {vs.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-xs text-zinc-500">{vs.created_at ? new Date(vs.created_at).toLocaleTimeString() : "—"}</td>
+                            <td className="px-6 py-4 text-xs text-zinc-500">{safeFormatDate(vs.created_at, "time")}</td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-2">
                                 <button
@@ -1894,7 +1894,7 @@ function SupportDashboardContent({ user, onLogout }) {
                                 <span className="font-semibold text-zinc-800">{h.details}</span>
                                 <p className="text-[10px] text-zinc-500">Actor: {h.actor_id}</p>
                               </div>
-                              <span className="text-[10px] text-zinc-400 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
+                              <span className="text-[10px] text-zinc-400 shrink-0">{safeFormatDate(h.created_at, "time")}</span>
                             </div>
                           ))}
                         </div>
@@ -2031,7 +2031,7 @@ function SupportDashboardContent({ user, onLogout }) {
                       {auditLogs.map((log) => (
                         <tr key={log.event_id} className="hover:bg-[#F9FBFA]">
                           <td className="px-6 py-4 font-mono font-bold text-[#1A7D67]">{log.event_id?.slice(0, 18)}</td>
-                          <td className="px-6 py-4 text-zinc-600">{log.timestamp ? new Date(log.timestamp).toLocaleString() : "—"}</td>
+                          <td className="px-6 py-4 text-zinc-600">{safeFormatDate(log.timestamp || log.created_at, "datetime", "Date unavailable")}</td>
                           <td className="px-6 py-4 font-medium text-zinc-800">{log.agent?.name || log.agent?.id}</td>
                           <td className="px-6 py-4 font-semibold text-zinc-900">{log.action}</td>
                           <td className="px-6 py-4 font-mono text-zinc-600">{log.ticket_id}</td>
@@ -2136,7 +2136,7 @@ function SupportDashboardContent({ user, onLogout }) {
                       <h4 className="font-bold text-sm text-zinc-900 mt-1.5">{t.subject}</h4>
                       <div className="flex items-center justify-between text-xs text-zinc-500 mt-2">
                         <span className="capitalize font-semibold text-zinc-700">{t.status?.replace("_", " ")}</span>
-                        <span>{new Date(t.created_at).toLocaleDateString()}</span>
+                        <span>{safeFormatDate(t.created_at, "date")}</span>
                       </div>
                     </div>
                   ))
@@ -2288,7 +2288,7 @@ function SupportDashboardContent({ user, onLogout }) {
                           {selectedTicket.notes.map((note) => (
                             <div key={note.id} className="p-3 bg-[#EEF6F3]/50 rounded-xl border border-[#1A7D67]/20 text-xs space-y-1">
                               <p className="text-zinc-800">{note.text}</p>
-                              <p className="text-[10px] text-zinc-400 text-right">{new Date(note.created_at).toLocaleString()}</p>
+                              <p className="text-[10px] text-zinc-400 text-right">{safeFormatDate(note.created_at)}</p>
                             </div>
                           ))}
                         </div>
@@ -2327,7 +2327,7 @@ function SupportDashboardContent({ user, onLogout }) {
                                 <span className="font-semibold text-zinc-800">{h.details}</span>
                                 <p className="text-[10px] text-zinc-400">Actor: {h.actor_id}</p>
                               </div>
-                              <span className="text-[10px] text-zinc-400 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
+                              <span className="text-[10px] text-zinc-400 shrink-0">{safeFormatDate(h.created_at, "time")}</span>
                             </div>
                           ))}
                         </div>
