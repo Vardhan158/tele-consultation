@@ -192,7 +192,7 @@ export default function Navbar() {
                 : "bg-white hover:bg-[#f6f7f2] text-[#162623]"
             }`}
           >
-            <span>Clinician Registration</span>
+            <span>Doctor Registration</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -267,7 +267,7 @@ export default function Navbar() {
                     : "bg-white text-[#162623]"
                 }`}
               >
-                <span>Clinician Registration</span>
+                <span>Doctor Registration</span>
                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
               </button>
             </div>
