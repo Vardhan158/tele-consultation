@@ -66,6 +66,30 @@ def secrets_id(prefix: str = "INC") -> str:
     return f"{prefix}-{secrets.randbelow(899999) + 100000}"
 
 
+async def dispatch_secops_notification(
+    db: Any,
+    tenant_id: str,
+    recipient_id: str | None,
+    notif_type: str,
+    title: str,
+    message: str,
+) -> None:
+    if not recipient_id:
+        return
+    now = datetime.now(UTC)
+    clean_message = message.replace("password_hash", "***").replace("mfa_secret", "***")
+    await db["notifications"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": tenant_id,
+        "recipient_id": recipient_id,
+        "type": notif_type,
+        "title": title,
+        "message": clean_message,
+        "read_at": None,
+        "created_at": now,
+    })
+
+
 # ============================================================================
 # Screen 1: System Health (PRD Section 5)
 # ============================================================================
@@ -647,6 +671,15 @@ async def create_incident(
         "created_at": now.isoformat(),
     })
 
+    # PRD Trigger 3: New Incident Assigned -> Alert to assigned responder
+    if payload.assigned_owner or principal.user_id:
+        await dispatch_secops_notification(
+            db, principal.tenant_id, payload.assigned_owner or principal.user_id,
+            "secops_incident_assigned",
+            f"New Incident #{incident_id} Assigned",
+            f"You have been assigned as responder to operational incident #{incident_id} ('{payload.title}')."
+        )
+
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
         "tenant_id": principal.tenant_id,
@@ -691,11 +724,25 @@ async def update_incident(
             "created_at": now.isoformat(),
         })
 
-    if payload.severity:
+    if payload.severity and payload.severity.upper() != inc.get("severity"):
         updates["severity"] = payload.severity.upper()
+        # PRD Trigger 4: Incident severity increased -> Alert Operations Lead
+        await dispatch_secops_notification(
+            db, principal.tenant_id, principal.user_id,
+            "secops_incident_severity_increased",
+            f"Incident #{incident_id} Severity Escalated",
+            f"Incident #{incident_id} ('{inc.get('title')}') severity updated to {payload.severity.upper()}."
+        )
 
-    if payload.assigned_owner:
+    if payload.assigned_owner and payload.assigned_owner != inc.get("assigned_owner"):
         updates["assigned_owner"] = payload.assigned_owner
+        # PRD Trigger 3: New incident assigned -> Alert to assigned responder
+        await dispatch_secops_notification(
+            db, principal.tenant_id, payload.assigned_owner,
+            "secops_incident_assigned",
+            f"Incident #{incident_id} Assigned to You",
+            f"Incident #{incident_id} ('{inc.get('title')}') assigned to you for investigation."
+        )
 
     if payload.assigned_team:
         updates["assigned_team"] = payload.assigned_team
@@ -1085,6 +1132,14 @@ async def create_recovery_request(
 
     await db["secops_recovery_requests"].insert_one(doc)
 
+    # PRD Trigger 7: Recovery approval requested -> Authorized approver notification (PRD Section 16)
+    await dispatch_secops_notification(
+        db, principal.tenant_id, principal.user_id,
+        "secops_recovery_approval_requested",
+        f"Recovery Approval Requested #{req_id}",
+        f"Recovery request #{req_id} submitted for environment {payload.target_environment} (Point: {payload.recovery_point})."
+    )
+
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
         "tenant_id": principal.tenant_id,
@@ -1152,6 +1207,15 @@ async def update_recovery_request(
         await db["secops_recovery_requests"].update_one(
             {"tenant_id": principal.tenant_id, "id": request_id},
             {"$set": updates},
+        )
+
+    # PRD Trigger 8: Recovery request approved/rejected -> Requester notification (PRD Section 16)
+    if payload.approval_status:
+        await dispatch_secops_notification(
+            db, principal.tenant_id, req.get("requested_by"),
+            "secops_recovery_approval_updated",
+            f"Recovery Request #{request_id} {payload.approval_status}",
+            f"Your recovery request #{request_id} for environment {req.get('target_environment')} was {payload.approval_status} by {principal.user_id}."
         )
 
     await db["audit_logs"].insert_one({
