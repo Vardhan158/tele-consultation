@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 const PUBLIC_NAV_LINKS = [
   { label: "Home", path: "/" },
+  { label: "Find Doctors", path: "/find-doctors" },
   { label: "About", path: "/#about", sectionId: "about" },
   { label: "Services", path: "/#services", sectionId: "services" },
 ];
