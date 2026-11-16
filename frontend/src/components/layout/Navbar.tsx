@@ -171,18 +171,7 @@ export default function Navbar() {
         </nav>
 
         {/* Right Desktop Actions */}
-        <div className="hidden items-center gap-4 lg:gap-5 sm:flex">
-          <button
-            type="button"
-            onClick={() => go("/doctor/register")}
-            className={`text-sm sm:text-[15px] font-semibold transition-colors duration-200 cursor-pointer ${
-              useSolidWhiteHeader
-                ? "text-[#165849] hover:text-[#124b3e]"
-                : "text-white/90 hover:text-white"
-            }`}
-          >
-            Clinician Registration
-          </button>
+        <div className="hidden items-center gap-5 sm:flex">
           <button
             type="button"
             onClick={() => go("/login")}
@@ -196,14 +185,14 @@ export default function Navbar() {
           </button>
           <button
             type="button"
-            onClick={() => go("/find-doctors")}
+            onClick={() => go("/doctor/register")}
             className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 sm:px-6 sm:py-2.5 text-sm sm:text-[15px] font-semibold transition-all duration-200 cursor-pointer shadow-xs ${
               useSolidWhiteHeader
                 ? "bg-[#165849] hover:bg-[#124b3e] text-white"
                 : "bg-white hover:bg-[#f6f7f2] text-[#162623]"
             }`}
           >
-            <span>Book Appointment</span>
+            <span>Clinician Registration</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -253,17 +242,6 @@ export default function Navbar() {
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1.5">
             {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, true))}
-            <button
-              type="button"
-              onClick={() => go("/doctor/register")}
-              className={`rounded-lg px-3 py-2 text-left text-sm font-semibold cursor-pointer ${
-                useSolidWhiteHeader
-                  ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
-                  : "text-white/90 hover:bg-white/10"
-              }`}
-            >
-              Clinician Registration
-            </button>
             <div
               className={`mt-3 flex flex-col gap-2 border-t pt-4 ${
                 useSolidWhiteHeader ? "border-[#577877]/15" : "border-white/10"
@@ -282,14 +260,14 @@ export default function Navbar() {
               </button>
               <button
                 type="button"
-                onClick={() => go("/find-doctors")}
+                onClick={() => go("/doctor/register")}
                 className={`w-full inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold cursor-pointer ${
                   useSolidWhiteHeader
                     ? "bg-[#165849] text-white"
                     : "bg-white text-[#162623]"
                 }`}
               >
-                <span>Book Appointment</span>
+                <span>Clinician Registration</span>
                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
               </button>
             </div>
