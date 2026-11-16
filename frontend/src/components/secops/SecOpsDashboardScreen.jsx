@@ -27,6 +27,11 @@ function SecOpsDashboardContent({ user, onLogout }) {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditActor, setAuditActor] = useState("");
   const [auditAction, setAuditAction] = useState("");
+  const [auditStartDate, setAuditStartDate] = useState("");
+  const [auditEndDate, setAuditEndDate] = useState("");
+  const [auditResource, setAuditResource] = useState("");
+  const [auditResultFilter, setAuditResultFilter] = useState("");
+  const [auditCorrelationId, setAuditCorrelationId] = useState("");
 
   // Screen 4: Incidents State
   const [incidents, setIncidents] = useState([]);
@@ -101,7 +106,15 @@ function SecOpsDashboardContent({ user, onLogout }) {
   const loadAudit = async () => {
     setAuditLoading(true);
     try {
-      const data = await secopsDashboardApi.auditLogs("", "", auditActor, auditAction);
+      const data = await secopsDashboardApi.auditLogs(
+        auditStartDate,
+        auditEndDate,
+        auditActor,
+        auditAction,
+        auditResource,
+        auditResultFilter,
+        auditCorrelationId
+      );
       setAuditLogs(data.items || []);
     } catch (err) {
       addToast(err.message || "Failed to load audit logs", "error");
@@ -578,58 +591,186 @@ function SecOpsDashboardContent({ user, onLogout }) {
           </div>
         )}
 
-        {/* SCREEN 3: AUDIT LOGS */}
+        {/* SCREEN 3: ACCESS & AUDIT LOGS (PRD SECTION 7) */}
         {activeTab === "audit" && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="bg-[#1E293B] p-4 rounded-2xl border border-slate-700 shadow-xs flex justify-between items-center">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span className="material-symbols-outlined text-blue-400">policy</span>
-                  Access &amp; Audit Trail Search
-                </h3>
-                <p className="text-xs text-slate-400">Immutable, access-controlled audit logs of all privileged operations.</p>
+            {/* Header & Filter Controls (PRD Section 7.4) */}
+            <div className="bg-[#1E293B] p-4 rounded-2xl border border-slate-700 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-slate-700">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <span className="material-symbols-outlined text-blue-400">policy</span>
+                    Access &amp; Audit Trail Search (PRD Section 7)
+                  </h3>
+                  <p className="text-xs text-slate-400">Auditable record of who performed an action, what was affected, when it happened, and the outcome.</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await secopsDashboardApi.exportAuditLogs();
+                      const blob = new Blob([res.csv_data], { type: "text/csv;charset=utf-8;" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = res.filename;
+                      a.click();
+                      addToast("Audit log exported to CSV and recorded in audit trail", "success");
+                    } catch (err) {
+                      addToast(err.message || "Failed to export audit log", "error");
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold cursor-pointer shrink-0 transition"
+                >
+                  <span className="material-symbols-outlined text-base">download</span>
+                  <span>Export Authorized Audit CSV</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  const res = await secopsDashboardApi.exportAuditLogs();
-                  const blob = new Blob([res.csv_data], { type: "text/csv;charset=utf-8;" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = res.filename;
-                  a.click();
-                  addToast("Audit log exported to CSV", "success");
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Export Audit CSV
-              </button>
+
+              {/* Filters Toolbar (PRD Section 7.4) */}
+              <div className="flex flex-wrap gap-2.5 text-xs">
+                <input
+                  type="date"
+                  value={auditStartDate}
+                  onChange={(e) => setAuditStartDate(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"
+                  title="Start Date"
+                />
+                <input
+                  type="date"
+                  value={auditEndDate}
+                  onChange={(e) => setAuditEndDate(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"
+                  title="End Date"
+                />
+                <input
+                  type="text"
+                  value={auditActor}
+                  onChange={(e) => setAuditActor(e.target.value)}
+                  placeholder="Actor ID / Name…"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none w-36"
+                />
+                <input
+                  type="text"
+                  value={auditAction}
+                  onChange={(e) => setAuditAction(e.target.value)}
+                  placeholder="Action name…"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none w-36"
+                />
+                <select
+                  value={auditResource}
+                  onChange={(e) => setAuditResource(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"
+                >
+                  <option value="">All Resource Types</option>
+                  <option value="User">User</option>
+                  <option value="Appointment">Appointment</option>
+                  <option value="Payment">Payment</option>
+                  <option value="Doctor">Doctor</option>
+                  <option value="Ticket">Ticket</option>
+                  <option value="Incident">Incident</option>
+                </select>
+                <select
+                  value={auditResultFilter}
+                  onChange={(e) => setAuditResultFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none"
+                >
+                  <option value="">All Outcomes</option>
+                  <option value="Success">Success</option>
+                  <option value="Denied">Denied</option>
+                  <option value="Failed">Failed</option>
+                </select>
+                <input
+                  type="text"
+                  value={auditCorrelationId}
+                  onChange={(e) => setAuditCorrelationId(e.target.value)}
+                  placeholder="Correlation ID…"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none w-32 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={loadAudit}
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl cursor-pointer"
+                >
+                  Apply Filters
+                </button>
+              </div>
             </div>
 
+            {/* Audit Rules Notice Banner (PRD Section 7.4) */}
+            <div className="p-4 bg-emerald-950/40 rounded-2xl border border-emerald-800/60 text-xs text-emerald-200 flex items-start gap-3">
+              <span className="material-symbols-outlined text-emerald-400 text-lg shrink-0 mt-0.5">lock_clock</span>
+              <div>
+                <p className="font-bold">Append-Only Immutability Guarantee (PRD Section 7.4)</p>
+                <p className="mt-0.5 text-emerald-300">
+                  Audit records are append-only and cannot be edited or deleted by dashboard users. Sensitive fields are redacted. Every audit CSV export is itself recorded as an audit event.
+                </p>
+              </div>
+            </div>
+
+            {/* Audit Table (PRD Section 7.4) */}
             <div className="bg-[#1E293B] rounded-2xl border border-slate-700 overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-800 text-slate-400 uppercase font-semibold border-b border-slate-700">
-                  <tr>
-                    <th className="px-6 py-3.5">Event ID</th>
-                    <th className="px-6 py-3.5">Timestamp</th>
-                    <th className="px-6 py-3.5">Actor ID</th>
-                    <th className="px-6 py-3.5">Action</th>
-                    <th className="px-6 py-3.5">Target ID</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-slate-300">
-                  {auditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-800/50">
-                      <td className="px-6 py-4 font-mono font-bold text-blue-400">{log.id?.slice(0, 18)}</td>
-                      <td className="px-6 py-4">{new Date(log.created_at).toLocaleString()}</td>
-                      <td className="px-6 py-4 font-medium">{log.actor_id}</td>
-                      <td className="px-6 py-4 font-semibold text-white">{log.action}</td>
-                      <td className="px-6 py-4 font-mono text-slate-400">{log.target_id}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {auditLoading ? (
+                <div className="p-12 text-center text-slate-400">Querying access &amp; audit log records…</div>
+              ) : auditLogs.length === 0 ? (
+                <div className="p-12 text-center text-slate-400">No audit log records match specified criteria.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-800 text-slate-400 uppercase font-semibold border-b border-slate-700">
+                      <tr>
+                        <th className="px-6 py-3.5">Audit ID</th>
+                        <th className="px-6 py-3.5">Timestamp (UTC)</th>
+                        <th className="px-6 py-3.5">Actor &amp; Role</th>
+                        <th className="px-6 py-3.5">Action</th>
+                        <th className="px-6 py-3.5">Resource</th>
+                        <th className="px-6 py-3.5">Result</th>
+                        <th className="px-6 py-3.5">Correlation ID</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {auditLogs.map((log) => (
+                        <tr key={log.audit_id || log.id} className="hover:bg-slate-800/50">
+                          <td className="px-6 py-4 font-mono font-bold text-blue-400">{log.audit_id || log.id?.slice(0, 14)}</td>
+                          <td className="px-6 py-4 text-slate-400">{log.timestamp ? new Date(log.timestamp).toLocaleString() : "—"}</td>
+                          <td className="px-6 py-4">
+                            <p className="font-semibold text-white">{log.actor_name || log.actor_id}</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-mono">{log.actor_role || "user"}</p>
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-slate-200">{log.action}</td>
+                          <td className="px-6 py-4">
+                            <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-semibold uppercase text-[10px]">
+                              {log.resource_type || "Other"}
+                            </span>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">{log.resource_id || "—"}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                              log.result === "Success" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                            }`}>
+                              {log.result}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAuditCorrelationId(log.correlation_id);
+                                loadAudit();
+                              }}
+                              className="font-mono text-xs text-blue-400 hover:underline font-semibold cursor-pointer"
+                              title="Click to filter related request timeline"
+                            >
+                              {log.correlation_id}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

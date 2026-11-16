@@ -392,7 +392,7 @@ async def execute_security_action(
 
 
 # ============================================================================
-# Screen 3: Access & Audit Logs
+# Screen 3: Access & Audit Logs (PRD Section 7)
 # ============================================================================
 
 @router.get("/audit-logs")
@@ -404,6 +404,7 @@ async def get_audit_logs(
     action: str = "",
     resource: str = "",
     result_filter: str = "",
+    correlation_id: str = "",
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     principal: MongoPrincipal = Depends(secops_user),
@@ -418,15 +419,77 @@ async def get_audit_logs(
         }
 
     if actor_id:
-        query["actor_id"] = {"$regex": actor_id, "$options": "i"}
+        query["$or"] = [
+            {"actor_id": {"$regex": actor_id, "$options": "i"}},
+            {"actor_name": {"$regex": actor_id, "$options": "i"}},
+        ]
 
     if action:
         query["action"] = {"$regex": action, "$options": "i"}
 
+    if resource:
+        query["$or"] = [
+            {"target_id": {"$regex": resource, "$options": "i"}},
+            {"action": {"$regex": f"^{resource}", "$options": "i"}},
+        ]
+
+    if result_filter:
+        query["result"] = result_filter
+
+    if correlation_id:
+        query["$or"] = [
+            {"correlation_id": correlation_id},
+            {"id": correlation_id},
+        ]
+
     items_raw = [_clean(x) async for x in db["audit_logs"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
     total = await db["audit_logs"].count_documents(query)
 
-    return {"items": items_raw, "total": total, "offset": offset, "limit": limit}
+    formatted_items = []
+    for log in items_raw:
+        act = log.get("action", "")
+        res_type = "Other"
+        if "user" in act or "auth" in act or "account" in act:
+            res_type = "User"
+        elif "appointment" in act or "booking" in act:
+            res_type = "Appointment"
+        elif "payment" in act or "refund" in act:
+            res_type = "Payment"
+        elif "doctor" in act:
+            res_type = "Doctor"
+        elif "ticket" in act:
+            res_type = "Ticket"
+        elif "incident" in act or "secops" in act:
+            res_type = "Incident"
+
+        res_id = log.get("target_id") or log.get("metadata", {}).get("target_id") or "—"
+        corr_id = log.get("correlation_id") or f"CORR-{log.get('id', str(uuid4()))[:8].upper()}"
+
+        formatted_items.append({
+            "audit_id": f"AUD-{log.get('id', str(uuid4()))[:8].upper()}",
+            "id": log.get("id"),
+            "timestamp": log.get("created_at"),
+            "actor_id": log.get("actor_id", "system"),
+            "actor_name": log.get("actor_name") or log.get("actor_id", "System"),
+            "actor_role": log.get("actor_role") or "authorized_user",
+            "action": act,
+            "resource_type": res_type,
+            "resource_id": res_id,
+            "result": log.get("result", "Success" if "failed" not in act and "denied" not in act else "Failed"),
+            "correlation_id": corr_id,
+            "metadata": log.get("metadata") or {"target_id": res_id},
+        })
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "secops.audit_logs.accessed",
+        "target_id": "audit_logs",
+        "created_at": datetime.now(UTC),
+    })
+
+    return {"items": formatted_items, "total": total, "offset": offset, "limit": limit}
 
 
 @router.post("/audit/export")
@@ -444,9 +507,11 @@ async def export_audit_logs(principal: MongoPrincipal = Depends(secops_user)) ->
     })
 
     items = [_clean(x) async for x in db["audit_logs"].find({"tenant_id": principal.tenant_id}).sort("created_at", -1).limit(500)]
-    csv_lines = ["Event ID,Timestamp,Actor ID,Action,Target ID,Result"]
+    csv_lines = ["Audit ID,Timestamp,Actor ID,Actor Role,Action,Resource Type,Resource ID,Result,Correlation ID"]
     for x in items:
-        csv_lines.append(f'"{x.get("id")}","{x.get("created_at")}","{x.get("actor_id")}","{x.get("action")}","{x.get("target_id")}","{x.get("result", "Success")}"')
+        audit_id = f"AUD-{x.get('id', str(uuid4()))[:8].upper()}"
+        corr_id = x.get("correlation_id") or f"CORR-{x.get('id', str(uuid4()))[:8].upper()}"
+        csv_lines.append(f'"{audit_id}","{x.get("created_at")}","{x.get("actor_id")}","{x.get("actor_role", "authorized_user")}","{x.get("action")}","Other","{x.get("target_id")}","{x.get("result", "Success")}","{corr_id}"')
 
     return {"csv_data": "\n".join(csv_lines), "filename": f"secops_audit_export_{now.strftime('%Y%m%d_%H%M%S')}.csv"}
 

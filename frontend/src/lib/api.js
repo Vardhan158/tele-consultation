@@ -593,8 +593,8 @@ export const secopsDashboardApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  auditLogs: (startDate = "", endDate = "", actorId = "", action = "", offset = 0, limit = 50) =>
-    apiRequest(`/api/v1/secops-dashboard/audit-logs?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&actor_id=${encodeURIComponent(actorId)}&action=${encodeURIComponent(action)}&offset=${offset}&limit=${limit}`),
+  auditLogs: (startDate = "", endDate = "", actorId = "", action = "", resource = "", resultFilter = "", correlationId = "", offset = 0, limit = 50) =>
+    apiRequest(`/api/v1/secops-dashboard/audit-logs?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&actor_id=${encodeURIComponent(actorId)}&action=${encodeURIComponent(action)}&resource=${encodeURIComponent(resource)}&result_filter=${encodeURIComponent(resultFilter)}&correlation_id=${encodeURIComponent(correlationId)}&offset=${offset}&limit=${limit}`),
   exportAuditLogs: () =>
     apiRequest("/api/v1/secops-dashboard/audit/export", { method: "POST" }),
   incidents: (status = "", severity = "", category = "", offset = 0, limit = 25) =>
