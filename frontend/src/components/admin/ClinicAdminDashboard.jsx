@@ -7,6 +7,7 @@ import AppointmentManagementTab from "./tabs/AppointmentManagementTab";
 import PaymentOversightTab from "./tabs/PaymentOversightTab";
 import OperationalReportsTab from "./tabs/OperationalReportsTab";
 import ClinicSettingsTab from "./tabs/ClinicSettingsTab";
+import SupportStaffManagementTab from "./tabs/SupportStaffManagementTab";
 
 export default function ClinicAdminDashboard({ activeTab = "overview", onSelectTab }) {
   const normalizeTab = (tab) => {
