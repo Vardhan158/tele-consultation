@@ -2,6 +2,19 @@ import React, { useState, useEffect } from "react";
 import { secopsDashboardApi } from "../../lib/api";
 import { ToastProvider, useToast } from "../common/Toast";
 
+function safeFormatDate(value, mode = "datetime", fallback = "Date unavailable") {
+  if (!value) return fallback;
+  try {
+    const dt = new Date(value);
+    if (isNaN(dt.getTime())) return fallback;
+    if (mode === "time") return dt.toLocaleTimeString();
+    if (mode === "date") return dt.toLocaleDateString();
+    return dt.toLocaleString();
+  } catch (err) {
+    return fallback;
+  }
+}
+
 function SecOpsDashboardContent({ user, onLogout }) {
   const { showToast } = useToast();
   const addToast = showToast;
@@ -398,7 +411,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                     <p className={`text-xl font-bold uppercase ${healthData.overall_status === "Healthy" ? "text-emerald-400" : "text-amber-400"}`}>
                       {healthData.overall_status}
                     </p>
-                    <p className="text-[10px] text-slate-500">Last checked: {new Date(healthData.last_checked).toLocaleTimeString()}</p>
+                    <p className="text-[10px] text-slate-500">Last checked: {safeFormatDate(healthData.last_checked, "time")}</p>
                   </div>
 
                   <div className="p-5 bg-[#1E293B] rounded-2xl border border-slate-700 space-y-1">
@@ -593,7 +606,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                       {securityEvents.map((evt) => (
                         <tr key={evt.id || evt.event_id} className="hover:bg-slate-800/50">
                           <td className="px-6 py-4 font-mono font-bold text-blue-400">{evt.event_id || evt.id?.slice(0, 14)}</td>
-                          <td className="px-6 py-4 text-slate-400">{evt.timestamp || evt.created_at ? new Date(evt.timestamp || evt.created_at).toLocaleString() : "—"}</td>
+                          <td className="px-6 py-4 text-slate-400">{safeFormatDate(evt.timestamp || evt.created_at)}</td>
                           <td className="px-6 py-4 font-medium text-slate-200">{evt.event_type || "Authentication"}</td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
@@ -776,7 +789,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                       {auditLogs.map((log) => (
                         <tr key={log.audit_id || log.id} className="hover:bg-slate-800/50">
                           <td className="px-6 py-4 font-mono font-bold text-blue-400">{log.audit_id || log.id?.slice(0, 14)}</td>
-                          <td className="px-6 py-4 text-slate-400">{log.timestamp ? new Date(log.timestamp).toLocaleString() : "—"}</td>
+                          <td className="px-6 py-4 text-slate-400">{safeFormatDate(log.timestamp || log.created_at)}</td>
                           <td className="px-6 py-4">
                             <p className="font-semibold text-white">{log.actor_name || log.actor_id}</p>
                             <p className="text-[10px] text-slate-400 uppercase font-mono">{log.actor_role || "user"}</p>
@@ -1005,7 +1018,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                                 <span className="font-semibold text-white">{h.details}</span>
                                 <p className="text-[10px] text-slate-400">Actor: {h.actor_id}</p>
                               </div>
-                              <span className="text-[10px] text-slate-400 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
+                              <span className="text-[10px] text-slate-400 shrink-0">{safeFormatDate(h.created_at, "time")}</span>
                             </div>
                           ))}
                         </div>
@@ -1101,7 +1114,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                           </td>
                           <td className="px-6 py-4 font-mono font-bold text-white">{p.latency_ms} ms</td>
                           <td className="px-6 py-4 font-mono text-slate-300">{p.failure_rate_pct}%</td>
-                          <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{new Date(p.last_checked).toLocaleTimeString()}</td>
+                          <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{safeFormatDate(p.last_checked, "time")}</td>
                           <td className="px-6 py-4 font-mono text-blue-400 font-bold">{p.linked_incident}</td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex justify-end gap-2">
@@ -1229,7 +1242,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                             <td className="px-6 py-4 font-mono text-slate-300">{b.size_mb || 420.5} MB</td>
                             <td className="px-6 py-4 text-slate-400 font-mono">{b.retention_until || "30 Days"}</td>
                             <td className="px-6 py-4 font-mono font-bold text-emerald-400">
-                              {b.recovery_point || b.restore_point ? new Date(b.recovery_point || b.restore_point).toLocaleString() : "—"}
+                              {safeFormatDate(b.recovery_point || b.restore_point)}
                             </td>
                           </tr>
                         ))}

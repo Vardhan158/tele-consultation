@@ -2,6 +2,19 @@ import { useEffect, useState } from "react";
 import { supportDashboardApi } from "../../lib/api";
 import { ToastProvider, useToast } from "../common/Toast";
 
+function safeFormatDate(value, mode = "datetime", fallback = "Date unavailable") {
+  if (!value) return fallback;
+  try {
+    const dt = new Date(value);
+    if (isNaN(dt.getTime())) return fallback;
+    if (mode === "time") return dt.toLocaleTimeString();
+    if (mode === "date") return dt.toLocaleDateString();
+    return dt.toLocaleString();
+  } catch (err) {
+    return fallback;
+  }
+}
+
 function SupportDashboardContent({ user, onLogout }) {
   const { showToast } = useToast();
   const addToast = showToast;
@@ -811,14 +824,14 @@ function SupportDashboardContent({ user, onLogout }) {
                     <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
                       <p className="text-xs text-zinc-500 font-medium">Last Successful Login</p>
                       <p className="text-sm font-bold text-zinc-800 mt-1">
-                        {accountDiagData.last_successful_login ? new Date(accountDiagData.last_successful_login).toLocaleString() : "Never / No record"}
+                        {safeFormatDate(accountDiagData.last_successful_login, "datetime", "Never / No record")}
                       </p>
                     </div>
 
                     <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
                       <p className="text-xs text-zinc-500 font-medium">Email Verification Date</p>
                       <p className="text-sm font-bold text-zinc-800 mt-1">
-                        {accountDiagData.verified_at ? new Date(accountDiagData.verified_at).toLocaleDateString() : "Unverified"}
+                        {safeFormatDate(accountDiagData.verified_at, "date", "Unverified")}
                       </p>
                     </div>
                   </div>
@@ -1055,7 +1068,7 @@ function SupportDashboardContent({ user, onLogout }) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                     <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
                       <p className="text-zinc-500 font-medium">Scheduled Time</p>
-                      <p className="font-bold text-zinc-900 text-sm">{bookingDiagData.starts_at ? new Date(bookingDiagData.starts_at).toLocaleString() : "—"}</p>
+                      <p className="font-bold text-zinc-900 text-sm">{safeFormatDate(bookingDiagData.starts_at)}</p>
                     </div>
 
                     <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
