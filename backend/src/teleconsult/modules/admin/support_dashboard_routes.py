@@ -70,6 +70,17 @@ def _support_scope(principal: MongoPrincipal) -> dict[str, Any]:
     return scope
 
 
+def _build_tenant_query(principal: MongoPrincipal) -> dict[str, Any]:
+    settings = get_settings()
+    tenants = list({str(principal.tenant_id), str(settings.default_tenant_id), "1", "default"})
+    return {
+        "$or": [
+            {"tenant_id": {"$in": tenants}},
+            {"tenant_id": {"$exists": False}},
+        ]
+    }
+
+
 class TicketCreate(BaseModel):
     subject: str = Field(min_length=3, max_length=150)
     description: str = Field(min_length=5, max_length=5000)
@@ -330,7 +341,7 @@ async def download_ticket_attachment(
 async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -> dict[str, Any]:
     try:
         db = mongo_database.database()
-        tenant_scope = {"tenant_id": principal.tenant_id}
+        tenant_scope = _build_tenant_query(principal)
         now_dt = datetime.now(UTC)
         today = now_dt.isoformat()[:10]
         start_of_today = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1156,13 +1167,13 @@ async def support_tickets(
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
     db = mongo_database.database()
-    query: dict[str, Any] = {"tenant_id": principal.tenant_id}
+    query: dict[str, Any] = _build_tenant_query(principal)
     if status:
-        query["status"] = status
+        query["status"] = {"$regex": f"^{status}$", "$options": "i"}
     if priority:
-        query["priority"] = priority
+        query["priority"] = {"$regex": f"^{priority}$", "$options": "i"}
     if category:
-        query["category"] = category
+        query["category"] = {"$regex": f"^{category}$", "$options": "i"}
     items = [_clean(x) async for x in db["support_tickets"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
     for item in items:
         item["sla"] = get_sla_info(item.get("created_at"), item.get("priority", "medium"), item.get("status", "open"))
@@ -1756,7 +1767,7 @@ async def support_audit_history(
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
     db = mongo_database.database()
-    query: dict[str, Any] = {"tenant_id": principal.tenant_id}
+    query: dict[str, Any] = _build_tenant_query(principal)
 
     if start_date or end_date:
         query["created_at"] = {
