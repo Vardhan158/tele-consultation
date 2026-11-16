@@ -356,7 +356,7 @@ export default function LandingScreen({
                 verified_user
               </span>
               <span className="text-[#145A4A] font-semibold text-xs sm:text-sm tracking-tight">
-                Secure Video Consultations · Qualified Healthcare Professionals · Digital Prescriptions
+                Verified Clinicians · Secure Video Consultations · Digital Consultation Records
               </span>
             </div>
           </div>
