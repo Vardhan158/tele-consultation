@@ -522,19 +522,30 @@ async def export_audit_logs(principal: MongoPrincipal = Depends(secops_user)) ->
 
 class IncidentCreate(BaseModel):
     title: str = Field(min_length=3, max_length=150)
-    description: str = Field(min_length=5, max_length=2000)
-    severity: str = Field(pattern="^(low|medium|high|critical|LOW|MEDIUM|HIGH|CRITICAL)$")
-    category: str = Field(default="infrastructure", max_length=50) # infrastructure, security, database, payment, video, outage
-    destination_team: str = Field(default="Engineering", max_length=100)
+    category: str = Field(default="application_outage", max_length=50) # application_outage, database_failure, video_signaling_failure, payment_provider_outage, email_provider_failure, suspicious_unauthorized_access, data_integrity_problem, backup_failure, performance_degradation, privacy_security_concern
+    description: str = Field(min_length=5, max_length=5000)
+    severity: str = Field(default="SEV-2", pattern="^(SEV-1|SEV-2|SEV-3|SEV-4|LOW|MEDIUM|HIGH|CRITICAL|low|medium|high|critical)$")
+    affected_services: list[str] = Field(default_factory=lambda: ["FastAPI Backend"])
+    detection_source: str = Field(default="System Monitoring", max_length=100)
+    assigned_team: str = Field(default="Engineering", max_length=100)
+    assigned_owner: str | None = None
+    linked_alert_ids: list[str] = Field(default_factory=list)
     linked_support_ticket_id: str | None = None
+    linked_support_tickets: list[str] = Field(default_factory=list)
+    impact_description: str = Field(default="Operational disruption", min_length=3, max_length=2000)
 
 
 class IncidentUpdate(BaseModel):
-    status: str | None = Field(default=None, pattern="^(OPEN|INVESTIGATING|MITIGATED|RESOLVED|CLOSED|open|investigating|mitigated|resolved|closed)$")
+    status: str | None = Field(default=None, pattern="^(DETECTED|TRIAGED|ASSIGNED|INVESTIGATING|MITIGATING|MONITORING|RESOLVED|CLOSED|REOPENED|detected|triaged|assigned|investigating|mitigating|monitoring|resolved|closed|reopened)$")
     severity: str | None = Field(default=None, max_length=20)
+    assigned_team: str | None = None
     assigned_owner: str | None = None
-    resolution_summary: str | None = Field(default=None, max_length=1000)
-    note: str | None = Field(default=None, max_length=1000)
+    resolution_summary: str | None = Field(default=None, max_length=2000)
+    root_cause: str | None = Field(default=None, max_length=2000)
+    mitigation_action: str | None = Field(default=None, max_length=2000)
+    investigation_note: str | None = Field(default=None, max_length=1000)
+    link_alert_id: str | None = None
+    link_support_ticket_id: str | None = None
 
 
 @router.get("/incidents")
@@ -569,27 +580,50 @@ async def create_incident(
     now = datetime.now(UTC)
     incident_id = secrets_id("INC")
 
+    sev_str = payload.severity.upper()
+    if sev_str == "CRITICAL":
+        sev_str = "SEV-1"
+    elif sev_str == "HIGH":
+        sev_str = "SEV-2"
+    elif sev_str == "MEDIUM":
+        sev_str = "SEV-3"
+    elif sev_str == "LOW":
+        sev_str = "SEV-4"
+
     history_entry = {
         "id": str(uuid4()),
         "action": "incident_created",
         "actor_id": principal.user_id,
-        "details": f"Incident created with severity {payload.severity.upper()}",
+        "details": f"Incident created with severity {sev_str} in category {payload.category}",
         "created_at": now.isoformat(),
     }
+
+    linked_tickets = list(payload.linked_support_tickets)
+    if payload.linked_support_ticket_id and payload.linked_support_ticket_id not in linked_tickets:
+        linked_tickets.append(payload.linked_support_ticket_id)
 
     doc = {
         "id": incident_id,
         "incident_id": incident_id,
         "tenant_id": principal.tenant_id,
+        "clinic_id": principal.clinic_id,
         "title": payload.title,
-        "description": payload.description,
-        "severity": payload.severity.upper(),
         "category": payload.category,
-        "destination_team": payload.destination_team,
-        "status": "OPEN",
-        "assigned_owner": principal.user_id,
-        "linked_support_ticket_id": payload.linked_support_ticket_id,
+        "description": payload.description,
+        "severity": sev_str,
+        "status": "TRIAGED" if payload.assigned_owner else "DETECTED",
+        "affected_services": payload.affected_services or ["FastAPI Backend"],
+        "detection_source": payload.detection_source,
+        "incident_start_time": now.isoformat(),
+        "assigned_team": payload.assigned_team,
+        "assigned_owner": payload.assigned_owner or principal.user_id,
+        "linked_alert_ids": payload.linked_alert_ids,
+        "linked_support_tickets": linked_tickets,
+        "impact_description": payload.impact_description,
         "resolution_summary": None,
+        "root_cause": None,
+        "mitigation_actions": [],
+        "notes": [],
         "history": [history_entry],
         "created_by": principal.user_id,
         "created_at": now,
@@ -605,7 +639,7 @@ async def create_incident(
         "actor_id": principal.user_id,
         "action": "secops.incident.created",
         "target_id": incident_id,
-        "metadata": {"severity": payload.severity.upper(), "title": payload.title},
+        "metadata": {"severity": sev_str, "title": payload.title, "category": payload.category},
         "created_at": now,
     })
 
@@ -629,6 +663,9 @@ async def update_incident(
 
     if payload.status:
         st_upper = payload.status.upper()
+        if st_upper == "CLOSED" and not (payload.resolution_summary or inc.get("resolution_summary") or payload.root_cause or inc.get("root_cause")):
+            raise HTTPException(422, "Closing an incident requires documentation of resolution summary or root cause")
+
         updates["status"] = st_upper
         if st_upper in {"RESOLVED", "CLOSED"}:
             updates["resolved_at"] = now
@@ -640,13 +677,57 @@ async def update_incident(
             "created_at": now.isoformat(),
         })
 
+    if payload.severity:
+        updates["severity"] = payload.severity.upper()
+
     if payload.assigned_owner:
         updates["assigned_owner"] = payload.assigned_owner
+
+    if payload.assigned_team:
+        updates["assigned_team"] = payload.assigned_team
 
     if payload.resolution_summary:
         updates["resolution_summary"] = payload.resolution_summary
 
-    if history_logs:
+    if payload.root_cause:
+        updates["root_cause"] = payload.root_cause
+
+    if payload.mitigation_action:
+        mitigation_entry = {
+            "id": str(uuid4()),
+            "action": payload.mitigation_action,
+            "executed_by": principal.user_id,
+            "created_at": now.isoformat(),
+        }
+        await db["secops_incidents"].update_one(
+            {"tenant_id": principal.tenant_id, "id": incident_id},
+            {"$push": {"mitigation_actions": mitigation_entry}},
+        )
+
+    if payload.link_alert_id:
+        await db["secops_incidents"].update_one(
+            {"tenant_id": principal.tenant_id, "id": incident_id},
+            {"$addToSet": {"linked_alert_ids": payload.link_alert_id}},
+        )
+
+    if payload.link_support_ticket_id:
+        await db["secops_incidents"].update_one(
+            {"tenant_id": principal.tenant_id, "id": incident_id},
+            {"$addToSet": {"linked_support_tickets": payload.link_support_ticket_id}},
+        )
+
+    if payload.investigation_note:
+        note_entry = {
+            "id": str(uuid4()),
+            "author_id": principal.user_id,
+            "text": payload.investigation_note,
+            "created_at": now.isoformat(),
+        }
+        await db["secops_incidents"].update_one(
+            {"tenant_id": principal.tenant_id, "id": incident_id},
+            {"$push": {"notes": note_entry, "history": {"$each": history_logs}}, "$set": updates},
+        )
+    elif history_logs:
         await db["secops_incidents"].update_one(
             {"tenant_id": principal.tenant_id, "id": incident_id},
             {"$push": {"history": {"$each": history_logs}}, "$set": updates},
@@ -663,7 +744,7 @@ async def update_incident(
         "actor_id": principal.user_id,
         "action": "secops.incident.updated",
         "target_id": incident_id,
-        "metadata": {"status": payload.status, "owner": payload.assigned_owner},
+        "metadata": {"status": payload.status, "owner": payload.assigned_owner, "severity": payload.severity},
         "created_at": now,
     })
 

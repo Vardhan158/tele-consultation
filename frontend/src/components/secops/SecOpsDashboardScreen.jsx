@@ -775,21 +775,22 @@ function SecOpsDashboardContent({ user, onLogout }) {
           </div>
         )}
 
-        {/* SCREEN 4: INCIDENT MANAGEMENT */}
+        {/* SCREEN 4: INCIDENT MANAGEMENT (PRD SECTION 8) */}
         {activeTab === "incidents" && (
           <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header & Controls */}
             <div className="bg-[#1E293B] p-4 rounded-2xl border border-slate-700 shadow-xs flex justify-between items-center">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <span className="material-symbols-outlined text-blue-400">warning</span>
-                  Technical &amp; Security Incident Management
+                  Technical &amp; Security Incident Management (PRD Section 8)
                 </h3>
-                <p className="text-xs text-slate-400">Manage operational incident lifecycles and link with support escalations.</p>
+                <p className="text-xs text-slate-400">Manage incident lifecycle from detection through recovery and documented closure.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCreateIncidentModal(true)}
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold cursor-pointer shrink-0"
               >
                 + New Operational Incident
               </button>
@@ -797,8 +798,10 @@ function SecOpsDashboardContent({ user, onLogout }) {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Incident List */}
-              <div className="lg:col-span-1 bg-[#1E293B] rounded-2xl border border-slate-700 p-4 space-y-2 max-h-[600px] overflow-y-auto">
-                {incidents.length === 0 ? (
+              <div className="lg:col-span-1 bg-[#1E293B] rounded-2xl border border-slate-700 p-4 space-y-2 max-h-[650px] overflow-y-auto">
+                {incidentsLoading ? (
+                  <p className="text-xs text-slate-400 py-6 text-center">Loading incident records…</p>
+                ) : incidents.length === 0 ? (
                   <p className="text-xs text-slate-400 py-6 text-center">No active incident records found.</p>
                 ) : (
                   incidents.map((inc) => (
@@ -807,51 +810,163 @@ function SecOpsDashboardContent({ user, onLogout }) {
                       onClick={() => setSelectedIncident(inc)}
                       className={`p-4 rounded-xl border transition cursor-pointer ${
                         selectedIncident?.id === inc.id
-                          ? "border-blue-500 bg-blue-500/10"
+                          ? "border-blue-500 bg-blue-500/10 shadow-xs"
                           : "border-slate-700 hover:border-slate-600 bg-slate-800/40"
                       }`}
                     >
                       <div className="flex justify-between items-center">
                         <span className="font-mono text-xs font-bold text-blue-400">{inc.id}</span>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                          inc.severity === "CRITICAL" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"
+                          inc.severity === "SEV-1" || inc.severity === "CRITICAL" ? "bg-red-500/20 text-red-400 border border-red-500/30" :
+                          inc.severity === "SEV-2" || inc.severity === "HIGH" ? "bg-amber-500/20 text-amber-400" : "bg-blue-500/20 text-blue-400"
                         }`}>
                           {inc.severity}
                         </span>
                       </div>
                       <h4 className="font-bold text-sm text-white mt-1">{inc.title}</h4>
-                      <p className="text-xs text-slate-400 mt-1">{inc.status}</p>
+                      <div className="flex justify-between items-center text-xs text-slate-400 mt-2">
+                        <span className="capitalize font-semibold text-slate-300">{inc.status}</span>
+                        <span className="font-mono text-[10px]">{inc.category?.replace("_", " ")}</span>
+                      </div>
                     </div>
                   ))
                 )}
               </div>
 
-              {/* Incident Detail */}
+              {/* Incident Detail View (PRD Section 8.4) */}
               <div className="lg:col-span-2 bg-[#1E293B] rounded-2xl border border-slate-700 p-6 space-y-6">
                 {!selectedIncident ? (
-                  <div className="py-20 text-center text-slate-400">Select an incident record to review investigation and lifecycle</div>
+                  <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
+                    <span className="material-symbols-outlined text-4xl text-slate-500">warning</span>
+                    <p className="text-sm font-medium">Select an incident record to review investigation, recovery timeline &amp; actions</p>
+                  </div>
                 ) : (
-                  <div className="space-y-4 text-xs">
-                    <div className="flex justify-between items-start pb-3 border-b border-slate-700">
+                  <div className="space-y-6 text-xs">
+                    {/* Header Controls */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-slate-700">
                       <div>
-                        <span className="font-mono text-xs font-bold text-blue-400">{selectedIncident.id}</span>
-                        <h2 className="text-lg font-bold text-white mt-1">{selectedIncident.title}</h2>
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="font-mono text-xs font-bold text-blue-400">{selectedIncident.id}</span>
+                          <span className={`text-xs font-bold px-2.5 py-0.5 rounded uppercase ${
+                            selectedIncident.severity === "SEV-1" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"
+                          }`}>
+                            {selectedIncident.severity}
+                          </span>
+                          <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded font-mono uppercase">{selectedIncident.category?.replace("_", " ")}</span>
+                        </div>
+                        <h2 className="text-lg font-bold text-white">{selectedIncident.title}</h2>
+                        <p className="text-slate-400 mt-0.5">Assigned Team: <span className="font-semibold text-slate-200">{selectedIncident.assigned_team || "Engineering"}</span> • Owner: <span className="font-semibold text-slate-200">{selectedIncident.assigned_owner}</span></p>
                       </div>
-                      <select
-                        value={selectedIncident.status}
-                        onChange={(e) => handleUpdateIncident(selectedIncident.id, { status: e.target.value })}
-                        className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white font-bold"
-                      >
-                        <option value="OPEN">OPEN</option>
-                        <option value="INVESTIGATING">INVESTIGATING</option>
-                        <option value="MITIGATED">MITIGATED</option>
-                        <option value="RESOLVED">RESOLVED</option>
-                        <option value="CLOSED">CLOSED</option>
-                      </select>
+
+                      {/* Status Lifecycle Dropdown (PRD 8.2) */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={selectedIncident.status}
+                          onChange={(e) => {
+                            const newSt = e.target.value;
+                            if (newSt === "CLOSED") {
+                              const rc = window.prompt("Closing an incident requires root cause & resolution documentation:");
+                              if (rc) handleUpdateIncident(selectedIncident.id, { status: "CLOSED", root_cause: rc, resolution_summary: rc });
+                            } else {
+                              handleUpdateIncident(selectedIncident.id, { status: newSt });
+                            }
+                          }}
+                          className="px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold outline-none"
+                        >
+                          <option value="DETECTED">DETECTED</option>
+                          <option value="TRIAGED">TRIAGED</option>
+                          <option value="ASSIGNED">ASSIGNED</option>
+                          <option value="INVESTIGATING">INVESTIGATING</option>
+                          <option value="MITIGATING">MITIGATING</option>
+                          <option value="MONITORING">MONITORING</option>
+                          <option value="RESOLVED">RESOLVED</option>
+                          <option value="CLOSED">CLOSED</option>
+                          <option value="REOPENED">REOPENED</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="p-4 bg-slate-800/60 rounded-xl border border-slate-700">
-                      <p className="text-slate-400 font-medium">Description</p>
-                      <p className="text-slate-200 mt-1">{selectedIncident.description}</p>
+
+                    {/* Impact & Description Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 bg-slate-800/60 rounded-xl border border-slate-700 space-y-1">
+                        <p className="text-slate-400 font-medium">Incident Description</p>
+                        <p className="text-slate-200">{selectedIncident.description}</p>
+                      </div>
+                      <div className="p-4 bg-slate-800/60 rounded-xl border border-slate-700 space-y-1">
+                        <p className="text-slate-400 font-medium">Impact Description</p>
+                        <p className="text-slate-200">{selectedIncident.impact_description || "Operational disruption"}</p>
+                      </div>
+                    </div>
+
+                    {/* Linked Tickets & Alerts Toolbar */}
+                    <div className="space-y-3 pt-2 border-t border-slate-700">
+                      <h4 className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Linked Support Tickets &amp; Alerts</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedIncident.linked_support_tickets?.map((t) => (
+                          <span key={t} className="px-3 py-1 bg-purple-500/20 text-purple-300 font-mono rounded-lg border border-purple-500/30 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs">headset_mic</span>
+                            Ticket #{t}
+                          </span>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tickId = window.prompt("Enter Support Ticket ID to link (e.g. SUP-102938):");
+                            if (tickId) handleUpdateIncident(selectedIncident.id, { link_support_ticket_id: tickId });
+                          }}
+                          className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 font-semibold cursor-pointer"
+                        >
+                          + Link Support Ticket
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Mitigation & Investigation Toolbar */}
+                    <div className="space-y-3 pt-2 border-t border-slate-700">
+                      <h4 className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Mitigation &amp; Recovery Actions</h4>
+                      <div className="flex flex-wrap gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const mit = window.prompt("Record mitigation action taken:");
+                            if (mit) handleUpdateIncident(selectedIncident.id, { mitigation_action: mit, status: "MITIGATING" });
+                          }}
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl cursor-pointer"
+                        >
+                          Record Mitigation Action
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sum = window.prompt("Provide resolution summary for this incident:");
+                            if (sum) handleUpdateIncident(selectedIncident.id, { status: "RESOLVED", resolution_summary: sum });
+                          }}
+                          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl cursor-pointer"
+                        >
+                          Mark Incident Resolved
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Chronological Timeline History */}
+                    <div className="space-y-3 pt-2 border-t border-slate-700">
+                      <h4 className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Incident Audit Timeline History</h4>
+                      {!selectedIncident.history?.length ? (
+                        <p className="text-slate-400 italic">No timeline history recorded.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {selectedIncident.history.map((h) => (
+                            <div key={h.id} className="p-2.5 bg-slate-800/80 rounded-lg border border-slate-700 flex justify-between gap-3 text-slate-300">
+                              <div>
+                                <span className="font-semibold text-white">{h.details}</span>
+                                <p className="text-[10px] text-slate-400">Actor: {h.actor_id}</p>
+                              </div>
+                              <span className="text-[10px] text-slate-400 shrink-0">{new Date(h.created_at).toLocaleTimeString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
