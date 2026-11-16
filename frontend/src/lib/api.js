@@ -612,6 +612,11 @@ export const secopsDashboardApi = {
   providers: () => apiRequest("/api/v1/secops-dashboard/providers"),
   probeProvider: (providerKey) =>
     apiRequest(`/api/v1/secops-dashboard/providers/${providerKey}/check`, { method: "POST" }),
+  recordProviderMaintenance: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/providers/maintenance", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   backups: () => apiRequest("/api/v1/secops-dashboard/backups"),
   triggerBackup: () =>
     apiRequest("/api/v1/secops-dashboard/backups/trigger", { method: "POST" }),

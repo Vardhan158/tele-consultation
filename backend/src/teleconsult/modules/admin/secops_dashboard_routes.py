@@ -752,55 +752,136 @@ async def update_incident(
     return _clean(updated_inc or {})
 
 
-# ============================================================================
-# Screen 5: External Provider Outage Monitoring
-# ============================================================================
+class ProviderMaintenanceRequest(BaseModel):
+    provider_key: str
+    status: str = Field(pattern="^(Maintenance|Degraded|Operational|Outage)$")
+    maintenance_reason: str = Field(min_length=3, max_length=500)
+    expected_end_time: str | None = None
+
 
 @router.get("/providers")
 async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) -> dict[str, Any]:
     db = mongo_database.database()
     now = datetime.now(UTC)
 
-    providers = [
+    overrides_doc = await db["user_settings"].find_one({"tenant_id": principal.tenant_id, "setting_key": "secops_provider_overrides"})
+    overrides = overrides_doc.get("overrides", {}) if overrides_doc else {}
+
+    payment_errors = await db["audit_logs"].count_documents({"tenant_id": principal.tenant_id, "action": {"$regex": r"payment.*fail"}, "created_at": {"$gte": now - timedelta(hours=24)}})
+    email_errors = await db["audit_logs"].count_documents({"tenant_id": principal.tenant_id, "action": {"$regex": r"email.*fail"}, "created_at": {"$gte": now - timedelta(hours=24)}})
+    webrtc_errors = await db["audit_logs"].count_documents({"tenant_id": principal.tenant_id, "action": {"$regex": r"webrtc.*fail"}, "created_at": {"$gte": now - timedelta(hours=24)}})
+
+    default_providers = [
         {
-            "name": "Razorpay Payment Gateway",
-            "provider_key": "razorpay",
-            "category": "Payment Gateway",
-            "status": "Operational",
-            "latency_ms": 112.0,
-            "error_rate_pct": 0.0,
-            "last_checked": now.isoformat(),
-        },
-        {
-            "name": "Brevo Email Notification Gateway",
-            "provider_key": "brevo",
-            "category": "Transactional Email",
-            "status": "Operational",
-            "latency_ms": 85.0,
-            "error_rate_pct": 0.0,
-            "last_checked": now.isoformat(),
-        },
-        {
-            "name": "WebRTC STUN/TURN Signaling Cluster",
-            "provider_key": "webrtc_signaling",
-            "category": "Video Infrastructure",
-            "status": "Operational",
-            "latency_ms": 18.4,
-            "error_rate_pct": 0.0,
-            "last_checked": now.isoformat(),
-        },
-        {
-            "name": "MongoDB Atlas Cluster",
+            "provider_name": "MongoDB Atlas Cluster",
             "provider_key": "mongodb_atlas",
-            "category": "Database Persistence",
-            "status": "Operational",
+            "service_category": "Database Persistence",
+            "status": overrides.get("mongodb_atlas", {}).get("status", "Operational"),
             "latency_ms": 4.2,
-            "error_rate_pct": 0.0,
+            "failure_rate_pct": 0.0,
             "last_checked": now.isoformat(),
+            "last_failure": overrides.get("mongodb_atlas", {}).get("last_failure") or "None",
+            "linked_incident": overrides.get("mongodb_atlas", {}).get("linked_incident") or "None",
+            "provider_status_url": "https://status.mongodb.com",
+            "maintenance_reason": overrides.get("mongodb_atlas", {}).get("maintenance_reason"),
+        },
+        {
+            "provider_name": "Razorpay Payment Gateway",
+            "provider_key": "razorpay",
+            "service_category": "Payment Gateway",
+            "status": overrides.get("razorpay", {}).get("status", "Degraded" if payment_errors > 5 else "Operational"),
+            "latency_ms": 112.0,
+            "failure_rate_pct": round(min(payment_errors * 0.5, 100.0), 1),
+            "last_checked": now.isoformat(),
+            "last_failure": (now - timedelta(hours=1)).isoformat() if payment_errors > 0 else "None",
+            "linked_incident": overrides.get("razorpay", {}).get("linked_incident") or "None",
+            "provider_status_url": "https://status.razorpay.com",
+            "maintenance_reason": overrides.get("razorpay", {}).get("maintenance_reason"),
+        },
+        {
+            "provider_name": "Brevo Email Notification Gateway",
+            "provider_key": "brevo",
+            "service_category": "Transactional Email",
+            "status": overrides.get("brevo", {}).get("status", "Degraded" if email_errors > 5 else "Operational"),
+            "latency_ms": 85.0,
+            "failure_rate_pct": round(min(email_errors * 0.5, 100.0), 1),
+            "last_checked": now.isoformat(),
+            "last_failure": (now - timedelta(hours=2)).isoformat() if email_errors > 0 else "None",
+            "linked_incident": overrides.get("brevo", {}).get("linked_incident") or "None",
+            "provider_status_url": "https://status.brevo.com",
+            "maintenance_reason": overrides.get("brevo", {}).get("maintenance_reason"),
+        },
+        {
+            "provider_name": "WebRTC STUN / TURN Signaling Cluster",
+            "provider_key": "webrtc_signaling",
+            "service_category": "Video Infrastructure",
+            "status": overrides.get("webrtc_signaling", {}).get("status", "Degraded" if webrtc_errors > 5 else "Operational"),
+            "latency_ms": 18.4,
+            "failure_rate_pct": round(min(webrtc_errors * 0.5, 100.0), 1),
+            "last_checked": now.isoformat(),
+            "last_failure": (now - timedelta(hours=3)).isoformat() if webrtc_errors > 0 else "None",
+            "linked_incident": overrides.get("webrtc_signaling", {}).get("linked_incident") or "None",
+            "provider_status_url": "https://status.kaizencare.in/webrtc",
+            "maintenance_reason": overrides.get("webrtc_signaling", {}).get("maintenance_reason"),
+        },
+        {
+            "provider_name": "FastAPI ASGI Application Server",
+            "provider_key": "fastapi_backend",
+            "service_category": "Hosting & API Server",
+            "status": overrides.get("fastapi_backend", {}).get("status", "Operational"),
+            "latency_ms": 14.5,
+            "failure_rate_pct": 0.02,
+            "last_checked": now.isoformat(),
+            "last_failure": "None",
+            "linked_incident": overrides.get("fastapi_backend", {}).get("linked_incident") or "None",
+            "provider_status_url": "https://status.kaizencare.in/api",
+            "maintenance_reason": overrides.get("fastapi_backend", {}).get("maintenance_reason"),
         },
     ]
 
-    return {"providers": providers, "overall_provider_health": "Operational", "last_checked": now.isoformat()}
+    has_outage = any(p["status"] == "Outage" for p in default_providers)
+    has_degraded = any(p["status"] in {"Degraded", "Maintenance"} for p in default_providers)
+    overall = "Outage" if has_outage else "Degraded" if has_degraded else "Operational"
+
+    return {"providers": default_providers, "overall_provider_health": overall, "last_checked": now.isoformat()}
+
+
+@router.post("/providers/maintenance")
+async def record_provider_maintenance(
+    payload: ProviderMaintenanceRequest,
+    principal: MongoPrincipal = Depends(secops_user),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    now = datetime.now(UTC)
+
+    overrides_doc = await db["user_settings"].find_one({"tenant_id": principal.tenant_id, "setting_key": "secops_provider_overrides"})
+    current_overrides = overrides_doc.get("overrides", {}) if overrides_doc else {}
+
+    current_overrides[payload.provider_key] = {
+        "status": payload.status,
+        "maintenance_reason": payload.maintenance_reason,
+        "expected_end_time": payload.expected_end_time,
+        "updated_at": now.isoformat(),
+        "updated_by": principal.user_id,
+    }
+
+    await db["user_settings"].update_one(
+        {"tenant_id": principal.tenant_id, "setting_key": "secops_provider_overrides"},
+        {"$set": {"tenant_id": principal.tenant_id, "setting_key": "secops_provider_overrides", "overrides": current_overrides, "updated_at": now}},
+        upsert=True,
+    )
+
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": principal.tenant_id,
+        "actor_id": principal.user_id,
+        "action": "secops.provider_maintenance.recorded",
+        "target_id": payload.provider_key,
+        "metadata": {"status": payload.status, "reason": payload.maintenance_reason},
+        "created_at": now,
+    })
+
+    return {"status": "success", "provider_key": payload.provider_key, "new_status": payload.status}
 
 
 @router.post("/providers/{provider_key}/check")

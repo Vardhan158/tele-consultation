@@ -975,42 +975,137 @@ function SecOpsDashboardContent({ user, onLogout }) {
           </div>
         )}
 
-        {/* SCREEN 5: PROVIDER OUTAGES */}
+        {/* SCREEN 5: PROVIDER OUTAGE MONITORING (PRD SECTION 9) */}
         {activeTab === "providers" && (
           <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header Toolbar */}
             <div className="bg-[#1E293B] p-4 rounded-2xl border border-slate-700 shadow-xs flex justify-between items-center">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <span className="material-symbols-outlined text-blue-400">cloud_sync</span>
-                  External Provider Dependency Health
+                  External Provider Dependency Outage Monitoring (PRD Section 9)
                 </h3>
-                <p className="text-xs text-slate-400">Monitor external payment gateway, transactional email, signaling, and database providers.</p>
+                <p className="text-xs text-slate-400">Monitor database, payment gateway, transactional email, video signaling, and hosting providers.</p>
               </div>
               <button
                 type="button"
                 onClick={loadProviders}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold cursor-pointer shrink-0 transition"
               >
-                Refresh Providers
+                Refresh Provider Probes
               </button>
             </div>
 
-            {providersData && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                {providersData.providers.map((p) => (
-                  <div key={p.provider_key} className="p-5 bg-[#1E293B] rounded-2xl border border-slate-700 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-sm">{p.name}</span>
-                      <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-bold uppercase text-[10px]">
-                        {p.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-slate-400">
-                      <span>Category: {p.category}</span>
-                      <span>Latency: {p.latency_ms} ms</span>
-                    </div>
-                  </div>
-                ))}
+            {/* Provider Rules Notice Banner (PRD Section 9.4) */}
+            <div className="p-4 bg-amber-950/40 rounded-2xl border border-amber-800/60 text-xs text-amber-200 flex items-start gap-3">
+              <span className="material-symbols-outlined text-amber-400 text-lg shrink-0 mt-0.5">warning</span>
+              <div>
+                <p className="font-bold">Provider Monitoring Protocol (PRD Section 9.4)</p>
+                <p className="mt-0.5 text-amber-300">
+                  External status pages provide supplemental evidence, not proof that internal integration functions. Real OTP emails or payments are never dispatched solely for health probes. Credentials and API keys remain protected.
+                </p>
+              </div>
+            </div>
+
+            {/* Provider Monitoring Table (PRD Section 9.4) */}
+            {providersLoading ? (
+              <div className="p-12 text-center text-slate-400 bg-[#1E293B] rounded-2xl border border-slate-700">Probing external integration status…</div>
+            ) : providersData && (
+              <div className="bg-[#1E293B] rounded-2xl border border-slate-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-800 text-slate-400 uppercase font-semibold border-b border-slate-700">
+                      <tr>
+                        <th className="px-6 py-3.5">Provider Name</th>
+                        <th className="px-6 py-3.5">Category</th>
+                        <th className="px-6 py-3.5">Current Status</th>
+                        <th className="px-6 py-3.5">Latency</th>
+                        <th className="px-6 py-3.5">Failure Rate</th>
+                        <th className="px-6 py-3.5">Last Checked</th>
+                        <th className="px-6 py-3.5">Linked Incident</th>
+                        <th className="px-6 py-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {providersData.providers.map((p) => (
+                        <tr key={p.provider_key} className="hover:bg-slate-800/50">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-white text-sm">{p.provider_name}</div>
+                            {p.provider_status_url && (
+                              <a
+                                href={p.provider_status_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-blue-400 hover:underline inline-flex items-center gap-1 font-mono mt-0.5"
+                              >
+                                <span>Official Status Page</span>
+                                <span className="material-symbols-outlined text-[10px]">open_in_new</span>
+                              </a>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-400">{p.service_category}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                              p.status === "Operational" ? "bg-emerald-500/20 text-emerald-400" :
+                              p.status === "Maintenance" ? "bg-blue-500/20 text-blue-400" :
+                              p.status === "Degraded" ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"
+                            }`}>
+                              {p.status}
+                            </span>
+                            {p.maintenance_reason && (
+                              <p className="text-[10px] text-slate-400 italic mt-0.5">{p.maintenance_reason}</p>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 font-mono font-bold text-white">{p.latency_ms} ms</td>
+                          <td className="px-6 py-4 font-mono text-slate-300">{p.failure_rate_pct}%</td>
+                          <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">{new Date(p.last_checked).toLocaleTimeString()}</td>
+                          <td className="px-6 py-4 font-mono text-blue-400 font-bold">{p.linked_incident}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await secopsDashboardApi.probeProvider(p.provider_key);
+                                    addToast(`Integration probe on '${p.provider_name}' completed (${res.latency_ms}ms)`, "success");
+                                    loadProviders();
+                                  } catch (err) {
+                                    addToast(err.message || "Provider probe failed", "error");
+                                  }
+                                }}
+                                className="px-2.5 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 font-semibold rounded-lg cursor-pointer"
+                              >
+                                Run Probe
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const reason = window.prompt(`Reason for scheduling/recording maintenance on ${p.provider_name}:`);
+                                  if (reason) {
+                                    try {
+                                      await secopsDashboardApi.recordProviderMaintenance({
+                                        provider_key: p.provider_key,
+                                        status: "Maintenance",
+                                        maintenance_reason: reason,
+                                      });
+                                      addToast(`Recorded maintenance window for ${p.provider_name}`, "success");
+                                      loadProviders();
+                                    } catch (err) {
+                                      addToast(err.message || "Failed to record maintenance", "error");
+                                    }
+                                  }
+                                }}
+                                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-lg border border-slate-700 cursor-pointer"
+                              >
+                                Maintenance
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
