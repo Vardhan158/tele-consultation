@@ -68,6 +68,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertRules, setAlertRules] = useState(null);
   const [showAlertRulesModal, setShowAlertRulesModal] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState(null);
 
   // Data Loaders
   const loadHealth = async () => {
@@ -278,6 +279,17 @@ function SecOpsDashboardContent({ user, onLogout }) {
       loadAlerts();
     } catch (err) {
       addToast(err.message || "Failed to acknowledge alert", "error");
+    }
+  };
+
+  const handleUpdateAlertAction = async (alertId, updates) => {
+    try {
+      await secopsDashboardApi.updateAlertAction(alertId, updates);
+      addToast(`Alert updated (${updates.status || "Updated"})`, "success");
+      loadAlerts();
+      setSelectedAlert(null);
+    } catch (err) {
+      addToast(err.message || "Failed to update alert action", "error");
     }
   };
 
@@ -1298,28 +1310,126 @@ function SecOpsDashboardContent({ user, onLogout }) {
           </div>
         )}
 
-        {/* SCREEN 7: OPERATIONAL ALERTS */}
+        {/* SCREEN 7: OPERATIONAL ALERTS (PRD SECTION 11) */}
         {activeTab === "alerts" && (
           <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header Toolbar */}
             <div className="bg-[#1E293B] p-4 rounded-2xl border border-slate-700 shadow-xs flex justify-between items-center">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <span className="material-symbols-outlined text-blue-400">notifications_active</span>
-                  Operational Alerts Queue &amp; Threshold Rules
+                  Centralized Operational &amp; Security Alerts Queue (PRD Section 11)
                 </h3>
-                <p className="text-xs text-slate-400">Acknowledge active alerts and configure system health threshold rules.</p>
+                <p className="text-xs text-slate-400">Monitor deduplicated alerts, acknowledge occurrences, suppress false positives, and link incidents.</p>
               </div>
               <button
                 type="button"
                 onClick={loadAlerts}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold cursor-pointer shrink-0 transition"
               >
-                Refresh Queue
+                Refresh Alerts Queue
               </button>
             </div>
 
+            {/* Active Alerts Table (PRD Section 11.4) */}
+            <div className="bg-[#1E293B] rounded-2xl border border-slate-700 overflow-hidden">
+              {alertsLoading ? (
+                <div className="p-12 text-center text-slate-400">Loading active alerts queue…</div>
+              ) : alerts.length === 0 ? (
+                <div className="p-12 text-center text-slate-400">No active operational alerts in queue.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-800 text-slate-400 uppercase font-semibold border-b border-slate-700">
+                      <tr>
+                        <th className="px-6 py-3.5">Alert ID</th>
+                        <th className="px-6 py-3.5">Alert Rule</th>
+                        <th className="px-6 py-3.5">Severity</th>
+                        <th className="px-6 py-3.5">Source Service</th>
+                        <th className="px-6 py-3.5">Count</th>
+                        <th className="px-6 py-3.5">Assigned Owner</th>
+                        <th className="px-6 py-3.5">Status</th>
+                        <th className="px-6 py-3.5">Linked Incident</th>
+                        <th className="px-6 py-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {alerts.map((alt) => (
+                        <tr key={alt.id || alt.alert_id} className="hover:bg-slate-800/50">
+                          <td className="px-6 py-4 font-mono font-bold text-blue-400">{alt.alert_id || alt.id}</td>
+                          <td className="px-6 py-4 font-semibold text-slate-200">{alt.alert_rule}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                              alt.severity === "CRITICAL" ? "bg-red-500/20 text-red-400 border border-red-500/30" :
+                              alt.severity === "HIGH" ? "bg-amber-500/20 text-amber-400" : "bg-blue-500/20 text-blue-400"
+                            }`}>
+                              {alt.severity}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-300">{alt.source_service}</td>
+                          <td className="px-6 py-4 font-mono font-bold text-white">{alt.occurrence_count || 1}</td>
+                          <td className="px-6 py-4 font-mono text-slate-400">{alt.assigned_owner || "Unassigned"}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                              alt.status === "NEW" ? "bg-amber-500/20 text-amber-400" :
+                              alt.status === "ACKNOWLEDGED" ? "bg-blue-500/20 text-blue-400" :
+                              alt.status === "RESOLVED" ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-700 text-slate-400"
+                            }`}>
+                              {alt.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-purple-400 font-bold">{alt.linked_incident}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              {alt.status === "NEW" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAcknowledgeAlert(alt.id || alt.alert_id)}
+                                  className="px-2.5 py-1 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 font-semibold rounded-lg cursor-pointer"
+                                >
+                                  Acknowledge
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAlert(alt)}
+                                className="px-2.5 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 font-semibold rounded-lg cursor-pointer"
+                              >
+                                Evidence
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Threshold Rules Overview */}
             <div className="bg-[#1E293B] rounded-2xl border border-slate-700 p-6 text-xs space-y-4">
-              <h4 className="font-bold text-white text-sm">Configured Health Threshold Rules</h4>
+              <div className="flex justify-between items-center">
+                <h4 className="font-bold text-white text-sm">Configured Operational Health Threshold Rules</h4>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const lat = window.prompt("Latency Threshold (ms):", alertRules?.latency_threshold_ms || 500);
+                    if (lat) {
+                      await secopsDashboardApi.updateAlertRules({
+                        latency_threshold_ms: parseFloat(lat),
+                        error_rate_threshold_pct: alertRules?.error_rate_threshold_pct || 2.0,
+                        failed_logins_threshold: alertRules?.failed_logins_threshold || 10,
+                      });
+                      addToast("Alert threshold rules updated", "success");
+                      loadAlerts();
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 font-semibold cursor-pointer"
+                >
+                  Configure Rules
+                </button>
+              </div>
               {alertRules && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="p-4 bg-slate-800 rounded-xl border border-slate-700">
@@ -1630,6 +1740,104 @@ function SecOpsDashboardContent({ user, onLogout }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Evidence & Action Modal (PRD Section 11.4) */}
+      {selectedAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-xl rounded-2xl bg-[#1E293B] p-6 shadow-2xl border border-slate-700 space-y-4 text-white">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-700">
+              <div>
+                <span className="font-mono text-xs font-bold text-blue-400">{selectedAlert.alert_id || selectedAlert.id}</span>
+                <h3 className="text-base font-bold flex items-center gap-2 mt-0.5">
+                  <span className="material-symbols-outlined text-blue-400">notifications_active</span>
+                  Operational Alert Evidence &amp; Actions
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedAlert(null)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-800 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <p className="text-slate-400">Triggering Rule</p>
+                <p className="font-bold text-white font-mono mt-0.5">{selectedAlert.alert_rule}</p>
+              </div>
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <p className="text-slate-400">Source Service</p>
+                <p className="font-bold text-slate-200 mt-0.5">{selectedAlert.source_service}</p>
+              </div>
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <p className="text-slate-400">Occurrence Count</p>
+                <p className="font-bold text-emerald-400 font-mono mt-0.5">{selectedAlert.occurrence_count || 1} Deduplicated Events</p>
+              </div>
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700">
+                <p className="text-slate-400">Linked Incident</p>
+                <p className="font-mono font-bold text-purple-400 mt-0.5">{selectedAlert.linked_incident || "None"}</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-800/60 rounded-xl border border-slate-700 text-xs space-y-1">
+              <p className="text-slate-400 font-medium">Original Alert Evidence Description</p>
+              <p className="text-slate-200">{selectedAlert.description}</p>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-700 text-xs">
+              <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Permitted Alert Actions</p>
+              <div className="flex flex-wrap gap-2.5">
+                {selectedAlert.status !== "ACKNOWLEDGED" && (
+                  <button
+                    type="button"
+                    onClick={() => handleAcknowledgeAlert(selectedAlert.id || selectedAlert.alert_id)}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 font-bold text-white rounded-xl cursor-pointer"
+                  >
+                    Acknowledge Alert
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const reason = window.prompt("Document reason for suppressing this operational alert (PRD Section 11.4):");
+                    if (reason) handleUpdateAlertAction(selectedAlert.id || selectedAlert.alert_id, {
+                      status: "SUPPRESSED",
+                      suppression_reason: reason,
+                      suppression_hours: 24,
+                    });
+                  }}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 font-semibold text-slate-300 border border-slate-700 rounded-xl cursor-pointer"
+                >
+                  Suppress Alert
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateAlertAction(selectedAlert.id || selectedAlert.alert_id, {
+                    status: "INVESTIGATING",
+                    create_incident: true,
+                    incident_title: `Escalated Alert Incident: ${selectedAlert.alert_rule}`,
+                  })}
+                  className="px-3.5 py-2 bg-red-600 hover:bg-red-500 font-bold text-white rounded-xl cursor-pointer"
+                >
+                  Escalate to Incident (INC)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateAlertAction(selectedAlert.id || selectedAlert.alert_id, { status: "RESOLVED" })}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded-xl cursor-pointer"
+                >
+                  Mark Alert Resolved
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

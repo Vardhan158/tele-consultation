@@ -634,6 +634,11 @@ export const secopsDashboardApi = {
     apiRequest(`/api/v1/secops-dashboard/alerts?status=${encodeURIComponent(status)}&severity=${encodeURIComponent(severity)}&offset=${offset}&limit=${limit}`),
   acknowledgeAlert: (alertId) =>
     apiRequest(`/api/v1/secops-dashboard/alerts/${alertId}/acknowledge`, { method: "POST" }),
+  updateAlertAction: (alertId, payload) =>
+    apiRequest(`/api/v1/secops-dashboard/alerts/${alertId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   alertRules: () => apiRequest("/api/v1/secops-dashboard/alerts/rules"),
   updateAlertRules: (payload) =>
     apiRequest("/api/v1/secops-dashboard/alerts/rules", {
