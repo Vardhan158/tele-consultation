@@ -3,7 +3,8 @@ import { supportStaffApi } from "../../../lib/api";
 import { useToast } from "../../common/Toast";
 
 export default function SupportStaffManagementTab() {
-  const { addToast } = useToast();
+  const { showToast } = useToast();
+  const addToast = showToast;
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
 

@@ -3,7 +3,8 @@ import { supportDashboardApi } from "../../lib/api";
 import { ToastProvider, useToast } from "../common/Toast";
 
 function SupportDashboardContent({ user, onLogout }) {
-  const { addToast } = useToast();
+  const { showToast } = useToast();
+  const addToast = showToast;
   const [activeTab, setActiveTab] = useState("overview");
 
   // Overview State
