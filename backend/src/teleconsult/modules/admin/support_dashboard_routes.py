@@ -165,30 +165,80 @@ class PaymentRefundRequest(BaseModel):
 async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -> dict[str, Any]:
     db = mongo_database.database()
     tenant_scope = {"tenant_id": principal.tenant_id}
-    now = datetime.now(UTC).isoformat()
-    today = now[:10]
+    now_dt = datetime.now(UTC)
+    today = now_dt.isoformat()[:10]
 
-    open_tickets = await db["support_tickets"].count_documents({**tenant_scope, "status": {"$in": ["open", "in_progress"]}})
-    urgent_tickets = await db["support_tickets"].count_documents({**tenant_scope, "priority": "urgent", "status": {"$ne": "closed"}})
+    all_active_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "status": {"$nin": ["closed"]}})]
+
+    open_tickets = 0
+    unassigned_tickets = 0
+    urgent_tickets = 0
+    sla_breaches = 0
+    my_assigned_tickets = 0
+    category_summary: dict[str, int] = {
+        "technical": 0, "billing": 0, "appointment": 0, "account_access": 0, "clinical": 0, "general": 0
+    }
+
+    for t in all_active_tickets:
+        status = t.get("status", "open")
+        priority = t.get("priority", "medium")
+        created_at_val = t.get("created_at")
+        assigned = t.get("assigned_to")
+        category = t.get("category", "general")
+
+        if status in {"open", "in_progress", "escalated"}:
+            open_tickets += 1
+
+        if not assigned or assigned == "unassigned":
+            unassigned_tickets += 1
+
+        if priority in {"urgent", "high"}:
+            urgent_tickets += 1
+
+        if assigned == principal.user_id and status not in {"resolved", "closed"}:
+            my_assigned_tickets += 1
+
+        category_summary[category] = category_summary.get(category, 0) + 1
+
+        sla = get_sla_info(created_at_val, priority, status)
+        t["sla"] = sla
+        if sla["status"] == "breached":
+            sla_breaches += 1
+
+    resolved_today = await db["support_tickets"].count_documents({
+        **tenant_scope,
+        "status": {"$in": ["resolved", "closed"]},
+        "$or": [
+            {"resolved_at": {"$regex": f"^{today}"}},
+            {"updated_at": {"$regex": f"^{today}"}},
+        ],
+    })
+
+    recent_tickets = [_clean(x) async for x in db["support_tickets"].find(tenant_scope).sort("created_at", -1).limit(6)]
+    for t in recent_tickets:
+        t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
+
+    my_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "assigned_to": principal.user_id, "status": {"$ne": "closed"}}).sort("created_at", -1).limit(6)]
+    for t in my_tickets:
+        t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
+
+    recent_activity = [_clean(x) async for x in db["audit_logs"].find(tenant_scope).sort("created_at", -1).limit(8)]
     active_video_rooms = await db["consultation_sessions"].count_documents({**tenant_scope, "status": "active"})
-    today_appointments = await db["appointments"].count_documents({**tenant_scope, "starts_at": {"$regex": f"^{today}"}})
-    total_patients = await db["patients"].count_documents(tenant_scope)
-    total_doctors = await db["doctors"].count_documents(tenant_scope)
-
-    recent_activity = [_clean(x) async for x in db["audit_logs"].find(tenant_scope).sort("created_at", -1).limit(10)]
-    recent_tickets = [_clean(x) async for x in db["support_tickets"].find(tenant_scope).sort("created_at", -1).limit(5)]
 
     return {
         "kpis": {
             "open_tickets": open_tickets,
+            "unassigned_tickets": unassigned_tickets,
             "urgent_tickets": urgent_tickets,
+            "resolved_today": resolved_today,
+            "sla_breaches": sla_breaches,
+            "my_assigned_tickets": my_assigned_tickets,
             "active_video_rooms": active_video_rooms,
-            "today_appointments": today_appointments,
-            "total_patients": total_patients,
-            "total_doctors": total_doctors,
         },
-        "recent_activity": recent_activity,
+        "category_summary": category_summary,
         "recent_tickets": recent_tickets,
+        "my_tickets": my_tickets,
+        "recent_activity": recent_activity,
     }
 
 

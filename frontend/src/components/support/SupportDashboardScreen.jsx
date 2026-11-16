@@ -347,15 +347,25 @@ function SupportDashboardContent({ user, onLogout }) {
         {/* ========================================================================= */}
         {activeTab === "overview" && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            {/* KPI Cards Grid */}
+            {/* PRD 5.2 & 5.3 KPI Counters Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-xs flex items-center gap-4">
                 <div className="size-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-2xl">confirmation_number</span>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-zinc-500">Open Tickets</p>
+                  <p className="text-xs font-medium text-zinc-500">Total Open</p>
                   <p className="text-xl font-bold text-zinc-900">{overviewData?.kpis?.open_tickets ?? 0}</p>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-xs flex items-center gap-4">
+                <div className="size-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-2xl">person_search</span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-zinc-500">Unassigned</p>
+                  <p className="text-xl font-bold text-blue-600">{overviewData?.kpis?.unassigned_tickets ?? 0}</p>
                 </div>
               </div>
 
@@ -370,61 +380,66 @@ function SupportDashboardContent({ user, onLogout }) {
               </div>
 
               <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-xs flex items-center gap-4">
-                <div className="size-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-2xl">video_camera_front</span>
+                <div className="size-11 rounded-xl bg-green-50 text-green-700 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-2xl">task_alt</span>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-zinc-500">Active Video Calls</p>
-                  <p className="text-xl font-bold text-emerald-600">{overviewData?.kpis?.active_video_rooms ?? 0}</p>
+                  <p className="text-xs font-medium text-zinc-500">Resolved Today</p>
+                  <p className="text-xl font-bold text-green-700">{overviewData?.kpis?.resolved_today ?? 0}</p>
                 </div>
               </div>
 
               <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-xs flex items-center gap-4">
-                <div className="size-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-2xl">calendar_today</span>
+                <div className="size-11 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-2xl">timer_off</span>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-zinc-500">Today Appointments</p>
-                  <p className="text-xl font-bold text-zinc-900">{overviewData?.kpis?.today_appointments ?? 0}</p>
-                </div>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-xs flex items-center gap-4">
-                <div className="size-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-2xl">groups</span>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-zinc-500">Total Patients</p>
-                  <p className="text-xl font-bold text-zinc-900">{overviewData?.kpis?.total_patients ?? 0}</p>
+                  <p className="text-xs font-medium text-zinc-500">SLA Breaches</p>
+                  <p className="text-xl font-bold text-purple-700">{overviewData?.kpis?.sla_breaches ?? 0}</p>
                 </div>
               </div>
 
               <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-xs flex items-center gap-4">
                 <div className="size-11 rounded-xl bg-[#EEF6F3] text-[#1A7D67] flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-2xl">badge</span>
+                  <span className="material-symbols-outlined text-2xl">assignment_ind</span>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-zinc-500">Total Doctors</p>
-                  <p className="text-xl font-bold text-zinc-900">{overviewData?.kpis?.total_doctors ?? 0}</p>
+                  <p className="text-xs font-medium text-zinc-500">My Queue</p>
+                  <p className="text-xl font-bold text-[#1A7D67]">{overviewData?.kpis?.my_assigned_tickets ?? 0}</p>
                 </div>
               </div>
             </div>
 
-            {/* Overview Columns */}
+            {/* Ticket Category Summary Distribution */}
+            {overviewData?.category_summary && (
+              <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-xs space-y-3">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Active Ticket Distribution by Issue Category</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {Object.entries(overviewData.category_summary).map(([cat, count]) => (
+                    <div key={cat} className="p-3 bg-[#F8FAF9] rounded-xl border border-zinc-100 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-zinc-700 uppercase">{cat.replace("_", " ")}</span>
+                      <span className="text-xs font-bold text-[#1A7D67] bg-[#EEF6F3] px-2 py-0.5 rounded-full">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Overview Content Columns */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Support Tickets */}
+              {/* Recent Support Tickets Table */}
               <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
                     <span className="material-symbols-outlined text-[#1A7D67]">headset_mic</span>
-                    Recent Support Tickets
+                    Recent Support Requests
                   </h3>
                   <button
                     type="button"
                     onClick={() => setActiveTab("tickets")}
                     className="text-xs font-semibold text-[#1A7D67] hover:underline cursor-pointer"
                   >
-                    View All →
+                    Go to Support Desk →
                   </button>
                 </div>
 
