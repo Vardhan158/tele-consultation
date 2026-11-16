@@ -16,6 +16,34 @@ const SORT_OPTIONS = [
   "Fee: High to Low",
 ];
 
+function TiltCard({ children, className = "", style = {}, ...props }) {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const threshold = 8; // Gentle, smooth tilt effect tailored for cards
+
+  const handleMove = (e) => {
+    const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - left) / width - 0.5;
+    const y = (e.clientY - top) / height - 0.5;
+    setTilt({ x: y * -threshold, y: x * threshold });
+  };
+
+  return (
+    <div
+      onMouseMove={handleMove}
+      onMouseLeave={() => setTilt({ x: 0, y: 0 })}
+      style={{
+        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+        transformStyle: "preserve-3d",
+        ...style,
+      }}
+      className={`transition-transform duration-200 ease-out will-change-transform ${className}`}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
 function slotTimeInZone(value, timeZone) {
   return new Intl.DateTimeFormat([], {
     timeZone,
@@ -797,9 +825,9 @@ export default function FindDoctorsScreen({
               .toUpperCase();
 
             return (
-              <div
+              <TiltCard
                 key={doc.id}
-                className="rounded-2xl bg-white hover:bg-[#EEF6F3]/40 border border-zinc-200 hover:border-[#1A7D67]/40 p-5 sm:p-6 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+                className="rounded-2xl bg-white hover:bg-[#EEF6F3]/40 border border-zinc-200 hover:border-[#1A7D67]/40 p-5 sm:p-6 shadow-xs hover:shadow-xl transition-all duration-300 group"
               >
                 {/* Main Card Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
@@ -949,7 +977,7 @@ export default function FindDoctorsScreen({
                     </div>
                   </div>
                 </div>
-              </div>
+              </TiltCard>
             );
           })}
 
