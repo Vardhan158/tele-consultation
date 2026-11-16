@@ -5,7 +5,6 @@ const PUBLIC_NAV_LINKS = [
   { label: "Home", path: "/" },
   { label: "About", path: "/#about", sectionId: "about" },
   { label: "Services", path: "/#services", sectionId: "services" },
-  { label: "FAQs", path: "/#faqs", sectionId: "faqs" },
 ];
 
 export default function Navbar() {
@@ -242,6 +241,17 @@ export default function Navbar() {
         >
           <nav aria-label="Mobile navigation" className="flex flex-col gap-1.5">
             {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, true))}
+            <button
+              type="button"
+              onClick={() => go("/doctor/register")}
+              className={`rounded-lg px-3 py-2 text-left text-sm font-semibold cursor-pointer ${
+                useSolidWhiteHeader
+                  ? "text-[#1A7D67] hover:bg-[#EEF6F3]"
+                  : "text-white/90 hover:bg-white/10"
+              }`}
+            >
+              Clinician Registration
+            </button>
             <div
               className={`mt-3 flex flex-col gap-2 border-t pt-4 ${
                 useSolidWhiteHeader ? "border-[#577877]/15" : "border-white/10"
