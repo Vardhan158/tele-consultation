@@ -519,13 +519,13 @@ function SupportDashboardContent({ user, onLogout }) {
 
       {/* Fixed Responsive Left Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-30 h-screen w-64 bg-[#123D35] text-white flex flex-col border-r border-[#176354]/40 shadow-xl transition-transform duration-200 shrink-0 ${
+        className={`fixed lg:sticky top-0 left-0 z-30 h-screen w-64 lg:w-68 bg-[#123D35] text-white flex flex-col border-r border-[#176354]/40 shadow-xl transition-transform duration-200 shrink-0 ${
           isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         {/* Brand Header */}
         <div className="p-5 border-b border-[#176354]/40 flex items-center gap-3">
-          <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+          <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs shrink-0">
             <span className="material-symbols-outlined text-2xl">support_agent</span>
           </div>
           <div>
@@ -538,7 +538,7 @@ function SupportDashboardContent({ user, onLogout }) {
           </div>
         </div>
 
-        {/* Sidebar Nav Items (14px font, 20px icons) */}
+        {/* Sidebar Nav Items (14px font, 20px icons, no truncation) */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           <p className="px-3.5 text-[10px] font-bold uppercase tracking-wider text-[#20C7A7]/70 mb-2">
             Operations Desk
@@ -553,7 +553,7 @@ function SupportDashboardContent({ user, onLogout }) {
                   setActiveTab(tab.id);
                   setIsMobileSidebarOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] font-medium transition text-left cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] leading-snug font-medium transition text-left cursor-pointer ${
                   isActive
                     ? "bg-[#20C7A7] text-[#123D35] font-bold shadow-xs"
                     : "text-white/80 hover:text-white hover:bg-[#176354]/50"
@@ -562,7 +562,7 @@ function SupportDashboardContent({ user, onLogout }) {
                 <span className={`material-symbols-outlined text-[20px] shrink-0 ${isActive ? "text-[#123D35]" : "text-[#20C7A7]"}`}>
                   {tab.icon}
                 </span>
-                <span className="truncate">{tab.label}</span>
+                <span className="break-words whitespace-normal leading-tight font-medium">{tab.label}</span>
               </button>
             );
           })}
