@@ -328,83 +328,109 @@ async def download_ticket_attachment(
 
 @router.get("/overview")
 async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -> dict[str, Any]:
-    db = mongo_database.database()
-    tenant_scope = {"tenant_id": principal.tenant_id}
-    now_dt = datetime.now(UTC)
-    today = now_dt.isoformat()[:10]
+    try:
+        db = mongo_database.database()
+        tenant_scope = {"tenant_id": principal.tenant_id}
+        now_dt = datetime.now(UTC)
+        today = now_dt.isoformat()[:10]
+        start_of_today = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    all_active_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "status": {"$nin": ["closed", "CLOSED"]}})]
+        all_active_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "status": {"$nin": ["closed", "CLOSED"]}})]
 
-    open_tickets = 0
-    unassigned_tickets = 0
-    urgent_tickets = 0
-    sla_breaches = 0
-    my_assigned_tickets = 0
-    category_summary: dict[str, int] = {
-        "technical": 0, "billing": 0, "appointment": 0, "account_access": 0, "clinical": 0, "general": 0
-    }
+        open_tickets = 0
+        unassigned_tickets = 0
+        urgent_tickets = 0
+        sla_breaches = 0
+        my_assigned_tickets = 0
+        category_summary: dict[str, int] = {
+            "technical": 0, "billing": 0, "appointment": 0, "account_access": 0, "clinical": 0, "general": 0
+        }
 
-    for t in all_active_tickets:
-        status = str(t.get("status") or "OPEN").upper()
-        priority = str(t.get("priority") or "MEDIUM").upper()
-        created_at_val = t.get("created_at")
-        assigned = t.get("assigned_to")
-        category = str(t.get("category") or "general").lower()
+        for t in all_active_tickets:
+            status = str(t.get("status") or "OPEN").upper()
+            priority = str(t.get("priority") or "MEDIUM").upper()
+            created_at_val = t.get("created_at")
+            assigned = t.get("assigned_to")
+            category = str(t.get("category") or "general").lower()
 
-        if status in {"OPEN", "NEW", "IN_PROGRESS", "WAITING_FOR_USER", "ESCALATED", "REOPENED"}:
-            open_tickets += 1
+            if status in {"OPEN", "NEW", "IN_PROGRESS", "WAITING_FOR_USER", "ESCALATED", "REOPENED"}:
+                open_tickets += 1
 
-        if not assigned or assigned == "unassigned":
-            unassigned_tickets += 1
+            if not assigned or assigned == "unassigned":
+                unassigned_tickets += 1
 
-        if priority in {"URGENT", "HIGH", "CRITICAL"}:
-            urgent_tickets += 1
+            if priority in {"URGENT", "HIGH", "CRITICAL"}:
+                urgent_tickets += 1
 
-        if assigned == principal.user_id and status not in {"RESOLVED", "CLOSED"}:
-            my_assigned_tickets += 1
+            if assigned == principal.user_id and status not in {"RESOLVED", "CLOSED"}:
+                my_assigned_tickets += 1
 
-        category_summary[category] = category_summary.get(category, 0) + 1
+            category_summary[category] = category_summary.get(category, 0) + 1
 
-        sla = get_sla_info(created_at_val, priority, status)
-        t["sla"] = sla
-        if sla["status"] == "breached":
-            sla_breaches += 1
+            sla = get_sla_info(created_at_val, priority, status)
+            t["sla"] = sla
+            if sla.get("status") == "breached":
+                sla_breaches += 1
 
-    resolved_today = await db["support_tickets"].count_documents({
-        **tenant_scope,
-        "status": {"$in": ["resolved", "closed"]},
-        "$or": [
-            {"resolved_at": {"$regex": f"^{today}"}},
-            {"updated_at": {"$regex": f"^{today}"}},
-        ],
-    })
+        try:
+            resolved_today = await db["support_tickets"].count_documents({
+                **tenant_scope,
+                "status": {"$in": ["resolved", "closed", "RESOLVED", "CLOSED"]},
+                "$or": [
+                    {"resolved_at": {"$gte": start_of_today}},
+                    {"updated_at": {"$gte": start_of_today}},
+                    {"resolved_at": {"$gte": today}},
+                    {"updated_at": {"$gte": today}},
+                ],
+            })
+        except Exception:
+            resolved_today = 0
 
-    recent_tickets = [_clean(x) async for x in db["support_tickets"].find(tenant_scope).sort("created_at", -1).limit(6)]
-    for t in recent_tickets:
-        t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
+        recent_tickets = [_clean(x) async for x in db["support_tickets"].find(tenant_scope).sort("created_at", -1).limit(6)]
+        for t in recent_tickets:
+            t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
 
-    my_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "assigned_to": principal.user_id, "status": {"$ne": "closed"}}).sort("created_at", -1).limit(6)]
-    for t in my_tickets:
-        t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
+        my_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "assigned_to": principal.user_id, "status": {"$ne": "closed"}}).sort("created_at", -1).limit(6)]
+        for t in my_tickets:
+            t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
 
-    recent_activity = [_clean(x) async for x in db["audit_logs"].find(tenant_scope).sort("created_at", -1).limit(8)]
-    active_video_rooms = await db["consultation_sessions"].count_documents({**tenant_scope, "status": "active"})
+        recent_activity = [_clean(x) async for x in db["audit_logs"].find(tenant_scope).sort("created_at", -1).limit(8)]
+        active_video_rooms = await db["consultation_sessions"].count_documents({**tenant_scope, "status": "active"})
 
-    return {
-        "kpis": {
-            "open_tickets": open_tickets,
-            "unassigned_tickets": unassigned_tickets,
-            "urgent_tickets": urgent_tickets,
-            "resolved_today": resolved_today,
-            "sla_breaches": sla_breaches,
-            "my_assigned_tickets": my_assigned_tickets,
-            "active_video_rooms": active_video_rooms,
-        },
-        "category_summary": category_summary,
-        "recent_tickets": recent_tickets,
-        "my_tickets": my_tickets,
-        "recent_activity": recent_activity,
-    }
+        return {
+            "kpis": {
+                "open_tickets": open_tickets,
+                "unassigned_tickets": unassigned_tickets,
+                "urgent_tickets": urgent_tickets,
+                "resolved_today": resolved_today,
+                "sla_breaches": sla_breaches,
+                "my_assigned_tickets": my_assigned_tickets,
+                "active_video_rooms": active_video_rooms,
+            },
+            "category_summary": category_summary,
+            "recent_tickets": recent_tickets,
+            "my_tickets": my_tickets,
+            "recent_activity": recent_activity,
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger("uvicorn").error(f"Error in support_overview: {e}")
+        return {
+            "kpis": {
+                "open_tickets": 0,
+                "unassigned_tickets": 0,
+                "urgent_tickets": 0,
+                "resolved_today": 0,
+                "sla_breaches": 0,
+                "my_assigned_tickets": 0,
+                "active_video_rooms": 0,
+            },
+            "category_summary": {"technical": 0, "billing": 0, "appointment": 0, "account_access": 0, "clinical": 0, "general": 0},
+            "recent_tickets": [],
+            "my_tickets": [],
+            "recent_activity": [],
+            "error": str(e),
+        }
 
 
 def mask_email(email: str) -> str:
