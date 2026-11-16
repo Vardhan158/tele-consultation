@@ -304,38 +304,38 @@ function SecOpsDashboardContent({ user, onLogout }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans flex flex-col">
+    <div className="min-h-screen bg-[#F0F5F7] text-[#162623] font-sans flex flex-col">
       {/* Top Header */}
-      <header className="sticky top-0 z-30 bg-[#1E293B] text-white border-b border-slate-700 shadow-md">
+      <header className="sticky top-0 z-30 bg-[#162623] text-white border-b border-zinc-800 shadow-md">
         <div className="max-w-[1440px] mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-blue-500 text-slate-900 flex items-center justify-center font-bold">
+            <div className="size-9 rounded-xl bg-[#29E2B9] text-[#162623] flex items-center justify-center font-bold">
               <span className="material-symbols-outlined text-xl">shield_person</span>
             </div>
             <div>
               <h1 className="text-lg font-bold leading-none tracking-tight flex items-center gap-2">
                 Kaizen Care
-                <span className="bg-blue-500/20 text-blue-400 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">
+                <span className="bg-[#29E2B9]/20 text-[#29E2B9] text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">
                   Security &amp; Operations
                 </span>
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">Centralized Platform Reliability &amp; Threat Defense</p>
+              <p className="text-xs text-zinc-400 mt-0.5">Centralized Platform Reliability &amp; Threat Defense</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700">
-              <span className="material-symbols-outlined text-base text-blue-400">admin_panel_settings</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-800 border border-zinc-700">
+              <span className="material-symbols-outlined text-base text-[#29E2B9]">admin_panel_settings</span>
               <div>
-                <p className="font-bold text-slate-200">{user?.full_name || user?.user_id || "Security Analyst"}</p>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider">{user?.role || "secops"}</p>
+                <p className="font-bold text-zinc-200">{user?.full_name || user?.user_id || "Security Analyst"}</p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-wider">{user?.role || "secops"}</p>
               </div>
             </div>
             {onLogout && (
               <button
                 type="button"
                 onClick={onLogout}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition font-medium cursor-pointer"
+                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition font-medium cursor-pointer"
               >
                 Sign Out
               </button>
@@ -344,7 +344,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
         </div>
 
         {/* Tab Strip */}
-        <div className="max-w-[1440px] mx-auto px-6 flex gap-1 overflow-x-auto border-t border-slate-800">
+        <div className="max-w-[1440px] mx-auto px-6 flex gap-1 overflow-x-auto border-t border-zinc-800">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -352,8 +352,8 @@ function SecOpsDashboardContent({ user, onLogout }) {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
                 activeTab === tab.id
-                  ? "border-blue-500 text-blue-400 bg-blue-500/10"
-                  : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  ? "border-[#29E2B9] text-[#29E2B9] bg-[#29E2B9]/10"
+                  : "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
               }`}
             >
               <span className="material-symbols-outlined text-base">{tab.icon}</span>
@@ -370,13 +370,13 @@ function SecOpsDashboardContent({ user, onLogout }) {
         {activeTab === "health" && (
           <div className="space-y-6 animate-in fade-in duration-200">
             {/* Header Toolbar */}
-            <div className="bg-[#1E293B] p-4 rounded-2xl border border-slate-700 shadow-xs flex justify-between items-center">
+            <div className="bg-white p-4 rounded-2xl border border-[#577877]/15 shadow-xs flex justify-between items-center">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span className="material-symbols-outlined text-blue-400">monitor_heart</span>
+                <h3 className="text-base font-bold text-[#162623] flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#295255]">monitor_heart</span>
                   Platform System Health Observability
                 </h3>
-                <p className="text-xs text-slate-400">Real-time liveness and readiness monitoring across Kaizen Care infrastructure.</p>
+                <p className="text-xs text-[#577877]">Real-time liveness and readiness monitoring across Kaizen Care infrastructure.</p>
               </div>
               <button
                 type="button"
