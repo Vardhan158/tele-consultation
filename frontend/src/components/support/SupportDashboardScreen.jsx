@@ -132,6 +132,11 @@ function SupportDashboardContent({ user, onLogout }) {
   const [supportAgents, setSupportAgents] = useState([]);
   const [supportAgentsLoading, setSupportAgentsLoading] = useState(false);
 
+  // Ticket Resolution Modal State
+  const [ticketToResolve, setTicketToResolve] = useState(null);
+  const [ticketResolutionSummary, setTicketResolutionSummary] = useState("");
+  const [isResolvingTicket, setIsResolvingTicket] = useState(false);
+
   // Create Ticket Modal State
   const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
   const [newTicketForm, setNewTicketForm] = useState({
@@ -573,6 +578,39 @@ function SupportDashboardContent({ user, onLogout }) {
       loadVideoSessions();
     } catch (err) {
       addToast(err.message || "Failed to end video session", "error");
+    }
+  };
+
+  // Confirm Ticket Resolution Modal Submit
+  const handleConfirmTicketResolution = async (e) => {
+    e.preventDefault();
+    const summary = ticketResolutionSummary.trim();
+    if (!summary) {
+      addToast("A resolution summary is required to resolve this ticket", "warning");
+      return;
+    }
+    if (!ticketToResolve) return;
+
+    setIsResolvingTicket(true);
+    try {
+      const targetId = ticketToResolve.id || ticketToResolve.ticket_id;
+      const updated = await supportDashboardApi.updateTicket(targetId, {
+        status: "RESOLVED",
+        note: summary,
+      });
+      setSelectedTicket(updated);
+      setTicketToResolve(null);
+      setTicketResolutionSummary("");
+      addToast("Support ticket resolved successfully.", "success");
+      await Promise.all([
+        loadTickets({ notifyOnError: false }),
+        loadOverview({ notifyOnError: false }),
+        loadAuditHistory({ notifyOnError: false }),
+      ]);
+    } catch (err) {
+      addToast(err.message || "Failed to resolve support ticket", "error");
+    } finally {
+      setIsResolvingTicket(false);
     }
   };
 
@@ -2468,10 +2506,8 @@ function SupportDashboardContent({ user, onLogout }) {
                           onChange={(e) => {
                             const newSt = e.target.value;
                             if (["resolved", "closed"].includes(newSt.toLowerCase())) {
-                              const summary = window.prompt(`Please enter resolution summary to mark ticket as ${newSt.toUpperCase()}:`);
-                              if (summary) {
-                                handleUpdateTicket({ status: newSt, note: summary });
-                              }
+                              setTicketToResolve(selectedTicket);
+                              setTicketResolutionSummary("");
                             } else {
                               handleUpdateTicket({ status: newSt });
                             }
@@ -2738,6 +2774,110 @@ function SupportDashboardContent({ user, onLogout }) {
                   className="px-5 py-2 text-xs font-semibold text-white bg-purple-700 hover:bg-purple-800 rounded-xl cursor-pointer"
                 >
                   Confirm Refund
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Resolve Support Ticket Modal (Custom Centered React Popup) */}
+      {ticketToResolve && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onKeyDown={(e) => e.key === "Escape" && !isResolvingTicket && setTicketToResolve(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resolve-ticket-modal-title"
+            className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl border border-zinc-200 animate-in zoom-in-95 duration-200"
+          >
+            {/* Dark Emerald Header */}
+            <div className="bg-[#123D35] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-2xl">check_circle</span>
+                </div>
+                <div>
+                  <h3 id="resolve-ticket-modal-title" className="text-base font-bold text-white leading-tight">
+                    Resolve Support Ticket
+                  </h3>
+                  <p className="text-xs text-[#20C7A7] mt-0.5">Provide a resolution summary before closing this ticket.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isResolvingTicket}
+                onClick={() => setTicketToResolve(null)}
+                aria-label="Close modal"
+                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleConfirmTicketResolution} className="p-5 sm:p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Ticket ID</p>
+                  <p className="font-mono font-bold text-[#176354] text-sm">{ticketToResolve.id || ticketToResolve.ticket_id}</p>
+                </div>
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Category</p>
+                  <p className="font-bold text-zinc-800 capitalize">{ticketToResolve.category?.replace("_", " ") || "General"}</p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Ticket Title</p>
+                <p className="font-bold text-zinc-900 text-sm truncate">{ticketToResolve.subject || "No Subject"}</p>
+              </div>
+
+              <div>
+                <label htmlFor="resolve-ticket-summary" className="block text-xs font-bold text-zinc-700 mb-1.5">
+                  Resolution Summary <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  id="resolve-ticket-summary"
+                  required
+                  rows={4}
+                  autoFocus
+                  disabled={isResolvingTicket}
+                  value={ticketResolutionSummary}
+                  onChange={(e) => setTicketResolutionSummary(e.target.value)}
+                  placeholder="Describe how the issue was resolved..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-xs text-zinc-800 outline-none focus:border-[#176354] focus:ring-2 focus:ring-[#176354]/10 transition disabled:opacity-60"
+                />
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  disabled={isResolvingTicket}
+                  onClick={() => setTicketToResolve(null)}
+                  className="px-4 py-2.5 text-xs font-semibold text-zinc-700 border border-zinc-300 rounded-xl hover:bg-zinc-50 transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isResolvingTicket || !ticketResolutionSummary.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-[#176354] hover:bg-[#123D35] rounded-xl transition cursor-pointer disabled:opacity-50 shadow-sm"
+                >
+                  {isResolvingTicket ? (
+                    <>
+                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      <span>Resolving Ticket…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">check</span>
+                      <span>Confirm Resolution</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
