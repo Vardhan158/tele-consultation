@@ -137,6 +137,9 @@ function SupportDashboardContent({ user, onLogout }) {
   const [ticketResolutionSummary, setTicketResolutionSummary] = useState("");
   const [isResolvingTicket, setIsResolvingTicket] = useState(false);
 
+  // Selected Appointment Details Modal State
+  const [selectedAppointmentDetails, setSelectedAppointmentDetails] = useState(null);
+
   // Create Ticket Modal State
   const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
   const [newTicketForm, setNewTicketForm] = useState({
@@ -1597,30 +1600,40 @@ function SupportDashboardContent({ user, onLogout }) {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            {apt.status !== "completed" && apt.status !== "cancelled" && (
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActionModalAppointment(apt);
-                                    setActionType("reschedule");
-                                  }}
-                                  className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 cursor-pointer"
-                                >
-                                  Reschedule
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActionModalAppointment(apt);
-                                    setActionType("cancel");
-                                  }}
-                                  className="px-2.5 py-1 text-xs font-semibold text-red-700 bg-red-50 rounded-lg hover:bg-red-100 cursor-pointer"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            )}
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAppointmentDetails(apt)}
+                                className="px-2.5 py-1 text-xs font-semibold text-[#176354] bg-[#EEF6F3] rounded-lg hover:bg-[#176354] hover:text-white transition cursor-pointer"
+                              >
+                                View Details
+                              </button>
+
+                              {apt.status !== "completed" && apt.status !== "cancelled" && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionModalAppointment(apt);
+                                      setActionType("reschedule");
+                                    }}
+                                    className="px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 cursor-pointer"
+                                  >
+                                    Reschedule
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionModalAppointment(apt);
+                                      setActionType("cancel");
+                                    }}
+                                    className="px-2.5 py-1 text-xs font-semibold text-red-700 bg-red-50 rounded-lg hover:bg-red-100 cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -2753,6 +2766,116 @@ function SupportDashboardContent({ user, onLogout }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Read-Only Appointment Details Modal */}
+      {selectedAppointmentDetails && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onKeyDown={(e) => e.key === "Escape" && setSelectedAppointmentDetails(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="appointment-modal-title"
+            className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-zinc-200 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
+          >
+            {/* Dark Emerald Header */}
+            <div className="bg-[#123D35] text-white p-5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-2xl">calendar_month</span>
+                </div>
+                <div>
+                  <h3 id="appointment-modal-title" className="text-base font-bold text-white leading-tight">
+                    Appointment Details
+                  </h3>
+                  <p className="text-xs text-[#20C7A7] mt-0.5">
+                    Read-Only Booking &amp; Participant Information
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedAppointmentDetails(null)}
+                aria-label="Close modal"
+                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Appointment ID</p>
+                  <p className="font-mono font-bold text-[#176354] text-sm">{selectedAppointmentDetails.id}</p>
+                </div>
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Status</p>
+                  <span className={`inline-block font-bold text-xs uppercase px-2.5 py-0.5 rounded-full mt-0.5 ${
+                    selectedAppointmentDetails.status === "completed" ? "bg-green-100 text-green-800" :
+                    selectedAppointmentDetails.status === "cancelled" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"
+                  }`}>
+                    {selectedAppointmentDetails.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Participant Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 bg-[#EEF6F3]/50 rounded-xl border border-[#176354]/20 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#176354] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">person</span> Patient Name
+                  </p>
+                  <p className="font-bold text-zinc-900 text-sm">{selectedAppointmentDetails.patient_name || selectedAppointmentDetails.patient_id}</p>
+                  <p className="font-mono text-[10px] text-zinc-500">ID: {selectedAppointmentDetails.patient_id}</p>
+                </div>
+
+                <div className="p-3.5 bg-[#EEF6F3]/50 rounded-xl border border-[#176354]/20 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#176354] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">stethoscope</span> Clinician / Doctor
+                  </p>
+                  <p className="font-bold text-zinc-900 text-sm">{selectedAppointmentDetails.doctor_name || selectedAppointmentDetails.doctor_id}</p>
+                  <p className="font-mono text-[10px] text-zinc-500">ID: {selectedAppointmentDetails.doctor_id}</p>
+                </div>
+              </div>
+
+              {/* Schedule & Visit Type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Scheduled Start Time</p>
+                  <p className="font-semibold text-zinc-900 text-xs">{safeFormatDate(selectedAppointmentDetails.starts_at)}</p>
+                </div>
+
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Consultation Type</p>
+                  <p className="font-semibold text-zinc-900 text-xs capitalize">{selectedAppointmentDetails.appointment_type || selectedAppointmentDetails.visit_type || "Video Visit"}</p>
+                </div>
+              </div>
+
+              {/* Cancellation or Reschedule Reasons */}
+              {(selectedAppointmentDetails.cancellation_reason || selectedAppointmentDetails.reschedule_reason) && (
+                <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Audit Notes / Reason</p>
+                  <p className="text-xs">{selectedAppointmentDetails.cancellation_reason || selectedAppointmentDetails.reschedule_reason}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedAppointmentDetails(null)}
+                className="px-5 py-2 text-xs font-bold text-white bg-[#176354] hover:bg-[#123D35] rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
