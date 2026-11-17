@@ -1237,8 +1237,22 @@ function SecOpsDashboardContent({ user, onLogout }) {
                             }`}>
                               {p.status}
                             </span>
-                            {p.maintenance_reason && (
-                              <p className="text-[10px] text-[#577877] italic mt-0.5">{p.maintenance_reason}</p>
+                            {p.status === "Maintenance" ? (
+                              <div className="text-[10px] text-[#577877] font-mono mt-1 space-y-0.5">
+                                {p.scheduled_start_time && (
+                                  <p>Start: <span className="font-semibold text-[#162623]">{safeFormatDate(p.scheduled_start_time, "time")}</span></p>
+                                )}
+                                {p.expected_end_time && (
+                                  <p>End: <span className="font-semibold text-[#162623]">{safeFormatDate(p.expected_end_time, "time")}</span></p>
+                                )}
+                                {p.maintenance_reason && (
+                                  <p className="italic text-zinc-500 font-sans mt-0.5">{p.maintenance_reason}</p>
+                                )}
+                              </div>
+                            ) : (
+                              p.maintenance_reason && (
+                                <p className="text-[10px] text-[#577877] italic mt-0.5">{p.maintenance_reason}</p>
+                              )
                             )}
                           </td>
                           <td className="px-6 py-4 font-mono font-bold text-[#162623]">{p.latency_ms} ms</td>

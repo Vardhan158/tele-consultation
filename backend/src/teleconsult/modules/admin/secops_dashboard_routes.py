@@ -907,6 +907,8 @@ async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) 
             "linked_incident": overrides.get("mongodb_atlas", {}).get("linked_incident") or "None",
             "provider_status_url": "https://status.mongodb.com",
             "maintenance_reason": overrides.get("mongodb_atlas", {}).get("maintenance_reason"),
+            "scheduled_start_time": overrides.get("mongodb_atlas", {}).get("scheduled_start_time"),
+            "expected_end_time": overrides.get("mongodb_atlas", {}).get("expected_end_time"),
         },
         {
             "provider_name": "Razorpay Payment Gateway",
@@ -920,6 +922,8 @@ async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) 
             "linked_incident": overrides.get("razorpay", {}).get("linked_incident") or "None",
             "provider_status_url": "https://status.razorpay.com",
             "maintenance_reason": overrides.get("razorpay", {}).get("maintenance_reason"),
+            "scheduled_start_time": overrides.get("razorpay", {}).get("scheduled_start_time"),
+            "expected_end_time": overrides.get("razorpay", {}).get("expected_end_time"),
         },
         {
             "provider_name": "Brevo Email Notification Gateway",
@@ -933,6 +937,8 @@ async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) 
             "linked_incident": overrides.get("brevo", {}).get("linked_incident") or "None",
             "provider_status_url": "https://status.brevo.com",
             "maintenance_reason": overrides.get("brevo", {}).get("maintenance_reason"),
+            "scheduled_start_time": overrides.get("brevo", {}).get("scheduled_start_time"),
+            "expected_end_time": overrides.get("brevo", {}).get("expected_end_time"),
         },
         {
             "provider_name": "WebRTC STUN / TURN Signaling Cluster",
@@ -946,6 +952,8 @@ async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) 
             "linked_incident": overrides.get("webrtc_signaling", {}).get("linked_incident") or "None",
             "provider_status_url": "https://status.kaizencare.in/webrtc",
             "maintenance_reason": overrides.get("webrtc_signaling", {}).get("maintenance_reason"),
+            "scheduled_start_time": overrides.get("webrtc_signaling", {}).get("scheduled_start_time"),
+            "expected_end_time": overrides.get("webrtc_signaling", {}).get("expected_end_time"),
         },
         {
             "provider_name": "FastAPI ASGI Application Server",
@@ -959,6 +967,8 @@ async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) 
             "linked_incident": overrides.get("fastapi_backend", {}).get("linked_incident") or "None",
             "provider_status_url": "https://status.kaizencare.in/api",
             "maintenance_reason": overrides.get("fastapi_backend", {}).get("maintenance_reason"),
+            "scheduled_start_time": overrides.get("fastapi_backend", {}).get("scheduled_start_time"),
+            "expected_end_time": overrides.get("fastapi_backend", {}).get("expected_end_time"),
         },
     ]
 
