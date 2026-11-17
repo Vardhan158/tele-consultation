@@ -2465,7 +2465,17 @@ function SupportDashboardContent({ user, onLogout }) {
                         </label>
                         <select
                           value={selectedTicket.status?.toLowerCase() || "open"}
-                          onChange={(e) => handleUpdateTicket({ status: e.target.value })}
+                          onChange={(e) => {
+                            const newSt = e.target.value;
+                            if (["resolved", "closed"].includes(newSt.toLowerCase())) {
+                              const summary = window.prompt(`Please enter resolution summary to mark ticket as ${newSt.toUpperCase()}:`);
+                              if (summary) {
+                                handleUpdateTicket({ status: newSt, note: summary });
+                              }
+                            } else {
+                              handleUpdateTicket({ status: newSt });
+                            }
+                          }}
                           className="px-3 py-1.5 text-xs font-bold rounded-lg border border-zinc-300 outline-none uppercase"
                         >
                           <option value="new">NEW</option>

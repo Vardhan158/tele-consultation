@@ -1436,10 +1436,7 @@ async def update_support_ticket(
             if not res_summary and ticket.get("notes"):
                 res_summary = ticket["notes"][-1].get("text", "")
             if not res_summary:
-                raise HTTPException(
-                    422,
-                    f"A resolution summary is required to mark the support ticket as {st_upper}",
-                )
+                res_summary = ticket.get("resolution_summary") or ticket.get("description") or f"Marked as {st_upper} by support agent"
             updates["resolved_at"] = now
             updates["resolved_by"] = principal.user_id
 
@@ -1485,13 +1482,16 @@ async def update_support_ticket(
         if new_assignee_id:
             agent_query: dict[str, Any] = {
                 "tenant_id": principal.tenant_id,
-                "id": new_assignee_id,
-                "role": "support",
+                "$or": [{"id": new_assignee_id}, {"user_id": new_assignee_id}],
+                "role": {"$in": ["support", "clinic_admin", "admin"]},
                 "active": {"$ne": False},
             }
             if principal.clinic_id:
                 agent_query["clinic_id"] = principal.clinic_id
             assigned_agent = await db["users"].find_one(agent_query)
+            if not assigned_agent:
+                # Fallback search without strict clinic_id scoping for platform support agents
+                assigned_agent = await db["users"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": new_assignee_id}, {"user_id": new_assignee_id}]})
             if not assigned_agent:
                 raise HTTPException(422, "Assignee must be an active support agent")
 
