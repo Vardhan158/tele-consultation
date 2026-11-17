@@ -1403,6 +1403,7 @@ async def update_support_ticket(
         original_created_at = _as_utc_datetime(ticket.get("created_at"), fallback=now)
         updates["sla_priority"] = original_priority
         updates["sla_due_at"] = calculate_sla_due_at(original_created_at, original_priority)
+    actor_name = await resolve_actor_name(db, principal.tenant_id, principal.user_id)
     history_logs = []
     assignment_changed = False
     assigned_agent: dict[str, Any] | None = None
@@ -1427,13 +1428,15 @@ async def update_support_ticket(
                 "id": str(uuid4()),
                 "action": "ticket_resolution_verified",
                 "actor_id": principal.user_id,
-                "details": "Ticket Resolution Verified by Support Agent",
+                "actor_name": actor_name,
+                "details": f"Ticket Resolution Verified by Support Agent ({actor_name})",
                 "created_at": now.isoformat(),
             })
             history_logs.append({
                 "id": str(uuid4()),
                 "action": "status_changed",
                 "actor_id": principal.user_id,
+                "actor_name": actor_name,
                 "details": f"Support Ticket Status Changed to Resolved. Resolution: {res_summary}",
                 "created_at": (now + timedelta(milliseconds=10)).isoformat(),
             })
@@ -1442,6 +1445,7 @@ async def update_support_ticket(
                 "id": str(uuid4()),
                 "action": "status_changed",
                 "actor_id": principal.user_id,
+                "actor_name": actor_name,
                 "details": f"Status updated to {st_upper.replace('_', ' ').title()}",
                 "created_at": now.isoformat(),
             })
@@ -2059,12 +2063,24 @@ async def update_escalation(
             "created_at": (now + timedelta(milliseconds=10)).isoformat(),
         }
 
-        # Requirement 6: Return original support ticket to IN_PROGRESS for support-agent verification before final resolution
+        orig_ticket = await db["support_tickets"].find_one({
+            "tenant_id": principal.tenant_id,
+            "id": esc["original_ticket_id"],
+        })
+        orig_status = str(orig_ticket.get("status") or "open").lower() if orig_ticket else "open"
+
+        ticket_set_dict: dict[str, Any] = {"updated_at": now, "escalation_resolved": True}
+        history_push = [ticket_resolved_entry]
+
+        if orig_status in {"escalated", "open", "new"}:
+            ticket_set_dict["status"] = "in_progress"
+            history_push.append(ticket_status_entry)
+
         await db["support_tickets"].update_one(
             {"tenant_id": principal.tenant_id, "id": esc["original_ticket_id"]},
             {
-                "$set": {"status": "in_progress", "updated_at": now},
-                "$push": {"history": {"$each": [ticket_resolved_entry, ticket_status_entry]}},
+                "$set": ticket_set_dict,
+                "$push": {"history": {"$each": history_push}},
             },
         )
 
@@ -2077,15 +2093,17 @@ async def update_escalation(
             "details": esc_resolved_details,
             "created_at": now.isoformat(),
         })
-        await db["support_ticket_events"].insert_one({
-            "id": ticket_status_entry["id"],
-            "tenant_id": principal.tenant_id,
-            "ticket_id": esc["original_ticket_id"],
-            "action": "status_changed",
-            "actor_id": principal.user_id,
-            "details": "Support ticket returned to IN_PROGRESS for agent verification",
-            "created_at": (now + timedelta(milliseconds=10)).isoformat(),
-        })
+
+        if orig_status in {"escalated", "open", "new"}:
+            await db["support_ticket_events"].insert_one({
+                "id": ticket_status_entry["id"],
+                "tenant_id": principal.tenant_id,
+                "ticket_id": esc["original_ticket_id"],
+                "action": "status_changed",
+                "actor_id": principal.user_id,
+                "details": "Support ticket returned to IN_PROGRESS for agent verification",
+                "created_at": (now + timedelta(milliseconds=10)).isoformat(),
+            })
 
     # Trigger 5: Escalation updated -> Update to relevant support owner (PRD Section 16)
     owner_id = esc.get("created_by") or esc.get("assigned_owner") or principal.user_id
@@ -2282,6 +2300,21 @@ async def get_ticket_details(
     if not ticket:
         raise HTTPException(404, "Support ticket not found")
     res = _clean(ticket)
+
+    esc = await db["escalations"].find_one({"tenant_id": principal.tenant_id, "original_ticket_id": ticket_id})
+    if esc:
+        res["escalation_id"] = esc.get("id")
+        res["escalation_status"] = esc.get("status")
+        if esc.get("status") == "RESOLVED":
+            res["escalation_resolved"] = True
+            res["escalation_resolved_team"] = esc.get("destination_team") or "Engineering"
+            res["escalation_resolution_summary"] = esc.get("resolution_summary")
+
+    history_logs = res.get("history") or []
+    for h in history_logs:
+        if h.get("actor_id") and not h.get("actor_name"):
+            h["actor_name"] = await resolve_actor_name(db, principal.tenant_id, h["actor_id"])
+
     res["sla"] = ticket_sla_info(res)
     return res
 

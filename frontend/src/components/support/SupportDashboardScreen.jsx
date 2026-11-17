@@ -2419,15 +2419,15 @@ function SupportDashboardContent({ user, onLogout }) {
                           )}
                           {selectedTicket.escalated_to && (
                             <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${
-                              ["resolved", "closed"].includes(selectedTicket.status?.toLowerCase())
-                                ? "bg-green-100 text-green-800 border border-green-200"
-                                : "bg-red-100 text-red-800"
+                              selectedTicket.escalation_resolved || selectedTicket.escalation_status === "RESOLVED" || ["resolved", "closed"].includes(selectedTicket.status?.toLowerCase())
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                : "bg-amber-100 text-amber-800 border border-amber-300"
                             }`}>
                               <span className="material-symbols-outlined text-xs">
-                                {["resolved", "closed"].includes(selectedTicket.status?.toLowerCase()) ? "task_alt" : "warning"}
+                                {selectedTicket.escalation_resolved || selectedTicket.escalation_status === "RESOLVED" || ["resolved", "closed"].includes(selectedTicket.status?.toLowerCase()) ? "check_circle" : "warning"}
                               </span>
-                              {["resolved", "closed"].includes(selectedTicket.status?.toLowerCase())
-                                ? `${selectedTicket.escalated_to} Escalation Resolved`
+                              {selectedTicket.escalation_resolved || selectedTicket.escalation_status === "RESOLVED"
+                                ? `${selectedTicket.escalation_resolved_team || selectedTicket.escalated_to} Escalation Resolved`
                                 : `Escalated to ${selectedTicket.escalated_to}`}
                             </span>
                           )}
@@ -2605,7 +2605,7 @@ function SupportDashboardContent({ user, onLogout }) {
                             <div key={h.id} className="p-2.5 bg-zinc-50 rounded-lg border border-zinc-100 text-xs flex justify-between gap-3">
                               <div>
                                 <span className="font-semibold text-zinc-800">{h.details}</span>
-                                <p className="text-[10px] text-zinc-400">Actor: {h.actor_id}</p>
+                                <p className="text-[10px] text-zinc-400 font-medium">By: {h.actor_name || h.actor_id}</p>
                               </div>
                               <span className="text-[10px] text-zinc-400 shrink-0">{safeFormatDate(h.created_at, "time")}</span>
                             </div>
