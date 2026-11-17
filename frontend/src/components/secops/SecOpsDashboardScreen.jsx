@@ -1413,11 +1413,12 @@ function SecOpsDashboardContent({ user, onLogout }) {
                         <thead className="bg-[#F8FAF9] text-[#577877] uppercase font-semibold border-b border-[#577877]/15">
                           <tr>
                             <th className="px-6 py-3.5">Request ID</th>
-                            <th className="px-6 py-3.5">Requested By</th>
+                            <th className="px-6 py-3.5">Target Service</th>
                             <th className="px-6 py-3.5">Target Env</th>
                             <th className="px-6 py-3.5">Recovery Point</th>
+                            <th className="px-6 py-3.5">Reason</th>
                             <th className="px-6 py-3.5">Approval Status</th>
-                            <th className="px-6 py-3.5">Execution Status</th>
+                            <th className="px-6 py-3.5">Created At</th>
                             <th className="px-6 py-3.5 text-right">Actions</th>
                           </tr>
                         </thead>
@@ -1425,18 +1426,19 @@ function SecOpsDashboardContent({ user, onLogout }) {
                           {backupsData.recovery_requests.map((req) => (
                             <tr key={req.id || req.request_id} className="hover:bg-[#F9FBFA]">
                               <td className="px-6 py-4 font-mono font-bold text-purple-700">{req.request_id || req.id}</td>
-                              <td className="px-6 py-4 font-mono text-[#577877]">{req.requested_by}</td>
+                              <td className="px-6 py-4 font-medium text-[#162623]">{req.target_service || "MongoDB Atlas Cluster"}</td>
                               <td className="px-6 py-4 font-bold text-[#162623]">{req.target_environment}</td>
                               <td className="px-6 py-4 font-mono text-[#577877]">{req.recovery_point}</td>
+                              <td className="px-6 py-4 text-[#577877] max-w-xs truncate" title={req.reason}>{req.reason || "—"}</td>
                               <td className="px-6 py-4">
                                 <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
                                   req.approval_status === "APPROVED" ? "bg-emerald-100 text-emerald-800" :
                                   req.approval_status === "REJECTED" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"
                                 }`}>
-                                  {req.approval_status}
+                                  {req.approval_status || "PENDING_APPROVAL"}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 font-semibold text-[#162623]">{req.execution_status}</td>
+                              <td className="px-6 py-4 text-[#577877] font-mono">{safeFormatDate(req.created_at)}</td>
                               <td className="px-6 py-4 text-right">
                                 <div className="flex justify-end gap-2">
                                   {req.approval_status === "PENDING_APPROVAL" && (

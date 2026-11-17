@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from teleconsult.kernel.authz.mongodb_policy import MongoPrincipal
 from teleconsult.modules.admin import secops_dashboard_routes
 from teleconsult.modules.admin.secops_dashboard_routes import (
+    create_recovery_request,
     get_backup_readiness,
     verify_backup_artifact,
 )
@@ -238,3 +239,69 @@ async def test_end_to_end_creation_verification_and_refresh_listing() -> None:
         assert found is not None
         assert found["verification_status"] == "VERIFIED"
         assert found["artifact_verified"] is True
+
+
+@pytest.mark.asyncio
+async def test_recovery_request_creation_persistence_listing_and_refresh() -> None:
+    principal = MongoPrincipal(
+        user_id="secops_agent_1",
+        tenant_id="default",
+        role="secops",
+    )
+
+    requests_storage = {}
+    mock_db = MagicMock()
+    mock_collection = MagicMock()
+
+    async def mock_insert_one(doc):
+        doc_id = doc.get("id") or doc.get("request_id") or doc.get("backup_id")
+        requests_storage[doc_id] = dict(doc)
+        return MagicMock(acknowledged=True)
+
+    class InMemoryCursor:
+        def __init__(self, items):
+            self.items = list(items)
+
+        def sort(self, *args, **kwargs):
+            return self
+
+        def limit(self, *args, **kwargs):
+            return self
+
+        def __aiter__(self):
+            self.iter = iter(self.items)
+            return self
+
+        async def __anext__(self):
+            try:
+                return next(self.iter)
+            except StopIteration:
+                raise StopAsyncIteration
+
+    mock_collection.insert_one = AsyncMock(side_effect=mock_insert_one)
+    mock_collection.find.side_effect = lambda *args, **kwargs: InMemoryCursor(requests_storage.values())
+    mock_db.__getitem__.side_effect = lambda name: mock_collection
+
+    payload = secops_dashboard_routes.RecoveryRequestCreate(
+        target_service="MongoDB Atlas Cluster",
+        recovery_point="2026-11-16T12:00:00Z",
+        target_environment="Staging",
+        reason="Disaster recovery exercise testing",
+        expected_impact="Temporary staging data overwrite",
+    )
+
+    with patch("teleconsult.kernel.mongodb.client.mongo_database.database", return_value=mock_db):
+        created = await create_recovery_request(payload, principal)
+        req_id = created["id"]
+        assert req_id in requests_storage
+        assert created["approval_status"] == "PENDING_APPROVAL"
+        assert created["target_environment"] == "Staging"
+        assert created["reason"] == "Disaster recovery exercise testing"
+
+        refreshed = await get_backup_readiness(principal)
+        assert len(refreshed["recovery_requests"]) >= 1
+        found = next((r for r in refreshed["recovery_requests"] if r["id"] == req_id), None)
+        assert found is not None
+        assert found["approval_status"] == "PENDING_APPROVAL"
+        assert found["target_service"] == "MongoDB Atlas Cluster"
+        assert found["reason"] == "Disaster recovery exercise testing"

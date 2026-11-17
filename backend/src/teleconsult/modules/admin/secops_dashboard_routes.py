@@ -1111,7 +1111,7 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
             reverse=True,
         )[:50]
 
-        recovery_requests = [_clean(x) async for x in db["secops_recovery_requests"].find({
+        raw_requests = [_clean(x) async for x in db["secops_recovery_requests"].find({
             "$or": [
                 tenant_q,
                 {"tenant_id": {"$exists": False}},
@@ -1121,7 +1121,13 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
                 {"tenant_id": "1"},
                 {"tenant_id": str(principal.tenant_id)},
             ]
-        }).sort("created_at", -1).limit(50)]
+        })]
+
+        recovery_requests = sorted(
+            raw_requests,
+            key=lambda x: _as_utc_datetime(x.get("created_at"), fallback=now),
+            reverse=True,
+        )[:50]
 
         if not backups:
             bkp_id = secrets_id("BKP")
@@ -1329,10 +1335,13 @@ async def create_recovery_request(
     now = datetime.now(UTC)
     req_id = secrets_id("REC")
 
+    tenant_id_val = str(principal.tenant_id or "default")
+    user_id_val = str(principal.user_id or "system_secops")
+
     history_entry = {
         "id": str(uuid4()),
         "action": "request_created",
-        "actor_id": principal.user_id,
+        "actor_id": user_id_val,
         "details": f"Recovery request submitted for {payload.target_environment}",
         "created_at": now.isoformat(),
     }
@@ -1340,8 +1349,8 @@ async def create_recovery_request(
     doc = {
         "id": req_id,
         "request_id": req_id,
-        "tenant_id": principal.tenant_id,
-        "requested_by": principal.user_id,
+        "tenant_id": tenant_id_val,
+        "requested_by": user_id_val,
         "target_service": payload.target_service,
         "recovery_point": payload.recovery_point,
         "target_environment": payload.target_environment,
@@ -1356,11 +1365,13 @@ async def create_recovery_request(
         "updated_at": now,
     }
 
-    await db["secops_recovery_requests"].insert_one(doc)
+    insert_res = await db["secops_recovery_requests"].insert_one(doc)
+    if not insert_res.acknowledged:
+        raise HTTPException(503, "Recovery request could not be persisted")
 
     # PRD Trigger 7: Recovery approval requested -> Authorized approver notification (PRD Section 16)
     await dispatch_secops_notification(
-        db, principal.tenant_id, principal.user_id,
+        db, tenant_id_val, user_id_val,
         "secops_recovery_approval_requested",
         f"Recovery Approval Requested #{req_id}",
         f"Recovery request #{req_id} submitted for environment {payload.target_environment} (Point: {payload.recovery_point})."
@@ -1368,8 +1379,8 @@ async def create_recovery_request(
 
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
-        "tenant_id": principal.tenant_id,
-        "actor_id": principal.user_id,
+        "tenant_id": tenant_id_val,
+        "actor_id": user_id_val,
         "action": "secops.recovery_request.created",
         "target_id": req_id,
         "metadata": {"target_environment": payload.target_environment, "recovery_point": payload.recovery_point},
