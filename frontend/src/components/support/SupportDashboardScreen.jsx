@@ -1283,17 +1283,6 @@ function SupportDashboardContent({ user, onLogout }) {
               </button>
             </div>
 
-            {/* Compliance Restrictions Alert */}
-            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-900 flex items-start gap-3">
-              <span className="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">verified_user</span>
-              <div>
-                <p className="font-bold">Booking Policy Restrictions (PRD Section 7.3)</p>
-                <p className="mt-0.5 text-amber-800">
-                  Support must not create duplicate bookings, override cancellation policies, bypass payment requirements, or manually modify appointment statuses in MongoDB without policy checks.
-                </p>
-              </div>
-            </div>
-
             {/* Diagnostics View */}
             {bookingDiagLoading ? (
               <div className="bg-white p-12 rounded-2xl border border-zinc-200 text-center text-zinc-400">
