@@ -2292,17 +2292,6 @@ function SupportDashboardContent({ user, onLogout }) {
               </div>
             </div>
 
-            {/* Audit Rules Notice Banner */}
-            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200/80 text-xs text-emerald-900 flex items-start gap-3">
-              <span className="material-symbols-outlined text-emerald-700 text-lg shrink-0 mt-0.5">verified</span>
-              <div>
-                <p className="font-bold">Append-Only Compliance Guarantee (PRD Section 11.2)</p>
-                <p className="mt-0.5 text-emerald-800">
-                  Audit events are append-only. Support agents cannot delete or edit audit events. Sensitive information is masked and audit records survive ticket closure. All CSV exports are themselves audited.
-                </p>
-              </div>
-            </div>
-
             {/* Audit Table */}
             <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden">
               {auditLoading ? (
