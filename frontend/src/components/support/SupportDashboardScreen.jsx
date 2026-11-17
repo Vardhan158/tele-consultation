@@ -2932,7 +2932,7 @@ function SupportDashboardContent({ user, onLogout }) {
                     {escalationAction.type === "resolve" ? "task_alt" : "cancel"}
                   </span>
                   <div>
-                    <h3 id="escalation-action-title" className="text-lg font-bold">
+                    <h3 id="escalation-action-title" className="text-lg font-bold" style={{ color: "#FFFFFF" }}>
                       {escalationAction.type === "resolve" ? "Resolve Escalation" : "Reject Escalation"}
                     </h3>
                     <p className="mt-0.5 text-xs text-white/75">
