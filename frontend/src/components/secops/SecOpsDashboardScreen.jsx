@@ -647,7 +647,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                 <div>
                   <h3 className="text-base font-bold text-[#162623] flex items-center gap-2">
                     <span className="material-symbols-outlined text-[#295255]">policy</span>
-                    Access &amp; Audit Trail Search (PRD Section 7)
+                    Access &amp; Audit Trail Search
                   </h3>
                   <p className="text-xs text-[#577877]">Auditable record of who performed an action, what was affected, when it happened, and the outcome.</p>
                 </div>
@@ -742,17 +742,6 @@ function SecOpsDashboardContent({ user, onLogout }) {
                 >
                   Apply Filters
                 </button>
-              </div>
-            </div>
-
-            {/* Audit Rules Notice Banner (PRD Section 7.4) */}
-            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 flex items-start gap-3">
-              <span className="material-symbols-outlined text-emerald-700 text-lg shrink-0 mt-0.5">lock_clock</span>
-              <div>
-                <p className="font-bold">Append-Only Immutability Guarantee (PRD Section 7.4)</p>
-                <p className="mt-0.5 text-emerald-800">
-                  Audit records are append-only and cannot be edited or deleted by dashboard users. Sensitive fields are redacted. Every audit CSV export is itself recorded as an audit event.
-                </p>
               </div>
             </div>
 
