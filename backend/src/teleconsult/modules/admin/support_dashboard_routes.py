@@ -81,6 +81,23 @@ def _build_tenant_query(principal: MongoPrincipal) -> dict[str, Any]:
     }
 
 
+def compute_resource_category(action: str) -> str:
+    act = str(action or "").lower()
+    if "escalation" in act:
+        return "escalation"
+    if "ticket" in act:
+        return "ticket"
+    if "account" in act or "auth" in act:
+        return "account"
+    if "booking" in act or "appointment" in act:
+        return "booking"
+    if "payment" in act or "refund" in act:
+        return "payment"
+    if "video" in act or "consultation" in act:
+        return "video_session"
+    return "general"
+
+
 async def resolve_actor_name(db: Any, tenant_id: str, actor_id: str | None) -> str:
     if not actor_id or actor_id in {"system", "Unassigned", "—"}:
         return actor_id or "System"
@@ -2250,13 +2267,17 @@ async def support_audit_history(
             reverse=True,
         )
 
+        if resource:
+            target_res = str(resource).strip().lower()
+            all_events = [x for x in all_events if compute_resource_category(x.get("action", "")) == target_res]
+
         paginated_events = all_events[offset : offset + limit]
         total = len(all_events)
 
         formatted_items = []
         for log in paginated_events:
             act = log.get("action", "")
-            res_cat = "ticket" if "ticket" in act else "escalation" if "escalation" in act else "account" if ("account" in act or "auth" in act) else "booking" if ("booking" in act or "appointment" in act) else "payment" if ("payment" in act or "refund" in act) else "video_session" if ("video" in act or "consultation" in act) else "general"
+            res_cat = compute_resource_category(act)
 
             meta = log.get("metadata")
             meta_dict = meta if isinstance(meta, dict) else {}
@@ -2402,6 +2423,10 @@ async def export_support_audit(
             key=lambda x: _as_utc_datetime(x.get("created_at") or x.get("occurred_at")),
             reverse=True,
         )
+
+        if res_filter:
+            target_res = str(res_filter).strip().lower()
+            all_events = [x for x in all_events if compute_resource_category(x.get("action", "")) == target_res]
 
         await db["audit_logs"].insert_one({
             "id": str(uuid4()),
