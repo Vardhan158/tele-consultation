@@ -356,22 +356,22 @@ function SecOpsDashboardContent({ user, onLogout }) {
           </div>
         </div>
 
-        {/* Tab Strip */}
-        <div className="bg-[#0d2d27] border-t border-[#176354]/40 px-6">
-          <div className="max-w-[1440px] mx-auto flex items-center gap-1 overflow-x-auto whitespace-nowrap no-scrollbar">
+        {/* Tab Strip with responsive smooth horizontal scrolling */}
+        <div className="bg-[#0d2d27] border-t border-[#176354]/40 px-4 sm:px-6">
+          <div className="max-w-[1440px] mx-auto flex items-center gap-1.5 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth py-0.5">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
                   activeTab === tab.id
-                    ? "border-[#20C7A7] text-[#20C7A7] bg-white/5"
-                    : "border-transparent text-white/70 hover:text-white hover:bg-white/5"
+                    ? "border-[#20C7A7] text-[#20C7A7] bg-white/10"
+                    : "border-transparent text-white/80 hover:text-white hover:bg-white/5"
                 }`}
               >
-                <span className="material-symbols-outlined text-base">{tab.icon}</span>
-                <span className="whitespace-nowrap">{tab.label}</span>
+                <span className="material-symbols-outlined text-base shrink-0">{tab.icon}</span>
+                <span className="whitespace-nowrap leading-none">{tab.label}</span>
               </button>
             ))}
           </div>
@@ -380,13 +380,6 @@ function SecOpsDashboardContent({ user, onLogout }) {
 
       {/* Main View Area */}
       <main className="flex-1 max-w-[1440px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-
-        {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-xs text-[#577877] font-medium">
-          <span>Clinic Admin Workspace</span>
-          <span>/</span>
-          <span className="text-[#295255] font-bold">Security &amp; Operations</span>
-        </div>
 
         {/* SCREEN 1: SYSTEM HEALTH */}
         {activeTab === "health" && (

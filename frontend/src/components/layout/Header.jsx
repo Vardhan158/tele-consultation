@@ -85,6 +85,9 @@ export default function Header({
       case "clinic-reports":
       case "reports":
         return "Operational Reports";
+      case "clinic-secops":
+      case "secops":
+        return "Security & Operations";
       case "clinic-settings":
         return "Clinic Settings";
       case "dashboard":
