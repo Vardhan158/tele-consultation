@@ -1302,7 +1302,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
               <div>
                 <h3 className="text-base font-bold text-[#162623] flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#295255]">settings_backup_restore</span>
-                  Database Backup Readiness &amp; Controlled Recovery (PRD Section 10)
+                  Database Backup Readiness &amp; Controlled Recovery
                 </h3>
                 <p className="text-xs text-[#577877]">Monitor automated database snapshots, track recovery points, and submit controlled recovery requests.</p>
               </div>
@@ -1321,17 +1321,6 @@ function SecOpsDashboardContent({ user, onLogout }) {
                 >
                   + New Controlled Recovery Request
                 </button>
-              </div>
-            </div>
-
-            {/* Security Compliance Banner (PRD Section 10) */}
-            <div className="p-4 bg-purple-50 rounded-2xl border border-purple-200 text-xs text-purple-900 flex items-start gap-3">
-              <span className="material-symbols-outlined text-purple-700 text-lg shrink-0 mt-0.5">lock</span>
-              <div>
-                <p className="font-bold">Healthcare Data Protection &amp; Controlled Restore Restrictions (PRD Section 10)</p>
-                <p className="mt-0.5 text-purple-800">
-                  Backup credentials are never exposed. Support agents cannot restore databases. Unrestricted one-click production restores are disabled. Independent approval is strictly required before executing recovery runbooks.
-                </p>
               </div>
             </div>
 
@@ -1380,7 +1369,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
 
                 {/* Controlled Recovery Requests Table (PRD Section 10.4) */}
                 <div className="bg-white rounded-2xl border border-[#577877]/15 p-4 space-y-3 shadow-xs">
-                  <h4 className="font-bold text-[#162623] text-sm">Controlled Recovery Requests (PRD Section 10.4)</h4>
+                  <h4 className="font-bold text-[#162623] text-sm">Controlled Recovery Requests</h4>
                   {!backupsData.recovery_requests?.length ? (
                     <p className="text-xs text-[#577877] italic py-4">No active or historical recovery requests submitted.</p>
                   ) : (
