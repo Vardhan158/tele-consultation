@@ -98,6 +98,18 @@ def compute_resource_category(action: str) -> str:
     return "general"
 
 
+def compute_event_result(log: dict[str, Any]) -> str:
+    res = str(log.get("result") or "").strip().upper()
+    act = str(log.get("action") or "").lower()
+    if res in {"FAILED", "DENIED", "FAIL", "ERROR"}:
+        return "Failed"
+    if "failed" in act or "denied" in act or "error" in act or "rejected" in act:
+        return "Failed"
+    if res in {"SUCCESS", "OK", "PASSED"}:
+        return "Success"
+    return log.get("result") or "Success"
+
+
 async def resolve_actor_name(db: Any, tenant_id: str, actor_id: str | None) -> str:
     if not actor_id or actor_id in {"system", "Unassigned", "—"}:
         return actor_id or "System"
@@ -2219,9 +2231,6 @@ async def support_audit_history(
         if action:
             clauses.append({"action": {"$regex": action, "$options": "i"}})
 
-        if result_filter:
-            clauses.append({"result": result_filter})
-
         query: dict[str, Any] = clauses[0] if len(clauses) == 1 else {"$and": clauses}
 
         audit_raw = [_clean(x) async for x in db["audit_logs"].find(query).sort("created_at", -1).limit(300)]
@@ -2266,6 +2275,15 @@ async def support_audit_history(
                 target_res = "video_session"
             all_events = [x for x in all_events if compute_resource_category(x.get("action", "")) == target_res]
 
+        if result_filter:
+            target_res_filter = str(result_filter).strip().upper()
+            if target_res_filter in {"FAILED", "FAIL", "DENIED"}:
+                all_events = [x for x in all_events if compute_event_result(x).upper() in {"FAILED", "DENIED", "FAIL"}]
+            elif target_res_filter in {"SUCCESS", "OK", "PASSED"}:
+                all_events = [x for x in all_events if compute_event_result(x).upper() in {"SUCCESS", "OK", "PASSED"}]
+            else:
+                all_events = [x for x in all_events if compute_event_result(x).upper() == target_res_filter]
+
         paginated_events = all_events[offset : offset + limit]
         total = len(all_events)
 
@@ -2294,7 +2312,7 @@ async def support_audit_history(
                 "action": act,
                 "ticket_id": t_id,
                 "resource": res_cat,
-                "result": log.get("result", "Success"),
+                "result": compute_event_result(log),
                 "details": meta_dict if meta_dict else {"target_id": target_id},
             })
 
@@ -2371,9 +2389,6 @@ async def export_support_audit(
         if act_filter:
             clauses.append({"action": {"$regex": act_filter, "$options": "i"}})
 
-        if res_result:
-            clauses.append({"result": res_result})
-
         query: dict[str, Any] = clauses[0] if len(clauses) == 1 else {"$and": clauses}
 
         audit_raw = [_clean(x) async for x in db["audit_logs"].find(query).sort("created_at", -1).limit(500)]
@@ -2418,6 +2433,15 @@ async def export_support_audit(
                 target_res = "video_session"
             all_events = [x for x in all_events if compute_resource_category(x.get("action", "")) == target_res]
 
+        if res_result:
+            target_res_filter = str(res_result).strip().upper()
+            if target_res_filter in {"FAILED", "FAIL", "DENIED"}:
+                all_events = [x for x in all_events if compute_event_result(x).upper() in {"FAILED", "DENIED", "FAIL"}]
+            elif target_res_filter in {"SUCCESS", "OK", "PASSED"}:
+                all_events = [x for x in all_events if compute_event_result(x).upper() in {"SUCCESS", "OK", "PASSED"}]
+            else:
+                all_events = [x for x in all_events if compute_event_result(x).upper() == target_res_filter]
+
         await db["audit_logs"].insert_one({
             "id": str(uuid4()),
             "tenant_id": principal.tenant_id,
@@ -2436,7 +2460,7 @@ async def export_support_audit(
             act_name = x.get("action") or "event"
             meta_dict = x.get("metadata") if isinstance(x.get("metadata"), dict) else {}
             target = meta_dict.get("ticket_id") or x.get("target_id") or "—"
-            result_val = x.get("result") or "Success"
+            result_val = compute_event_result(x)
             csv_lines.append(f'"{eid}","{ts}","{act_id}","{act_name}","{target}","{result_val}"')
 
         return {"csv_data": "\n".join(csv_lines), "filename": f"support_audit_export_{now.strftime('%Y%m%d_%H%M%S')}.csv"}
