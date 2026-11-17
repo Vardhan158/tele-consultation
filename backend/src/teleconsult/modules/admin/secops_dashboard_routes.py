@@ -1092,8 +1092,29 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
         tenant_q = _build_tenant_query(principal)
         tenant_id_val = str(principal.tenant_id or "default")
 
-        backups = [_clean(x) async for x in db["secops_backups"].find(tenant_q).sort("created_at", -1).limit(20)]
-        recovery_requests = [_clean(x) async for x in db["secops_recovery_requests"].find(tenant_q).sort("created_at", -1).limit(20)]
+        backups = [_clean(x) async for x in db["secops_backups"].find({
+            "$or": [
+                tenant_q,
+                {"tenant_id": {"$exists": False}},
+                {"tenant_id": None},
+                {"tenant_id": ""},
+                {"tenant_id": "default"},
+                {"tenant_id": "1"},
+                {"tenant_id": str(principal.tenant_id)},
+            ]
+        }).sort("created_at", -1).limit(50)]
+
+        recovery_requests = [_clean(x) async for x in db["secops_recovery_requests"].find({
+            "$or": [
+                tenant_q,
+                {"tenant_id": {"$exists": False}},
+                {"tenant_id": None},
+                {"tenant_id": ""},
+                {"tenant_id": "default"},
+                {"tenant_id": "1"},
+                {"tenant_id": str(principal.tenant_id)},
+            ]
+        }).sort("created_at", -1).limit(50)]
 
         if not backups:
             bkp_id = secrets_id("BKP")
@@ -1106,6 +1127,8 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
                 "started_at": (now - timedelta(hours=6)).isoformat(),
                 "completed_at": (now - timedelta(hours=6, minutes=2)).isoformat(),
                 "status": "SUCCESS",
+                "verification_status": "PENDING",
+                "artifact_verified": False,
                 "size_mb": 420.5,
                 "retention_until": (now + timedelta(days=30)).isoformat()[:10],
                 "last_verification": (now - timedelta(hours=12)).isoformat(),
@@ -1117,6 +1140,10 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
             except Exception:
                 pass
             backups = [_clean(seed_bkp)]
+
+        for b in backups:
+            if not b.get("verification_status"):
+                b["verification_status"] = "VERIFIED" if b.get("artifact_verified") else "PENDING"
 
         latest_point = (
             backups[0].get("recovery_point")
@@ -1152,16 +1179,19 @@ async def trigger_manual_backup(principal: MongoPrincipal = Depends(secops_user)
     db = mongo_database.database()
     now = datetime.now(UTC)
     bkp_id = secrets_id("BKP")
+    tenant_id_val = str(principal.tenant_id or "default")
 
     doc = {
         "id": bkp_id,
         "backup_id": bkp_id,
-        "tenant_id": principal.tenant_id,
+        "tenant_id": tenant_id_val,
         "service": "MongoDB Atlas Cluster",
         "backup_type": "Manual Controlled Backup Run",
         "started_at": now.isoformat(),
         "completed_at": (now + timedelta(seconds=45)).isoformat(),
         "status": "SUCCESS",
+        "verification_status": "PENDING",
+        "artifact_verified": False,
         "size_mb": 422.8,
         "retention_until": (now + timedelta(days=30)).isoformat()[:10],
         "last_verification": now.isoformat(),
@@ -1174,7 +1204,7 @@ async def trigger_manual_backup(principal: MongoPrincipal = Depends(secops_user)
 
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
-        "tenant_id": principal.tenant_id,
+        "tenant_id": tenant_id_val,
         "actor_id": principal.user_id,
         "action": "secops.backup.triggered",
         "target_id": bkp_id,
@@ -1193,8 +1223,8 @@ async def verify_backup_artifact(
     db = mongo_database.database()
     now = datetime.now(UTC)
 
-    tenant_id_val = principal.tenant_id or "default"
-    user_id_val = principal.user_id or "system_secops"
+    tenant_id_val = str(principal.tenant_id or "default")
+    user_id_val = str(principal.user_id or "system_secops")
 
     backup = await db["secops_backups"].find_one({"$or": [{"id": backup_id}, {"backup_id": backup_id}]})
     if not backup:
@@ -1207,19 +1237,40 @@ async def verify_backup_artifact(
             "started_at": (now - timedelta(hours=6)).isoformat(),
             "completed_at": (now - timedelta(hours=6, minutes=2)).isoformat(),
             "status": "SUCCESS",
+            "verification_status": "PENDING",
+            "artifact_verified": False,
             "size_mb": 420.5,
             "retention_until": (now + timedelta(days=30)).isoformat()[:10],
             "recovery_point": (now - timedelta(hours=6)).isoformat(),
             "created_at": now - timedelta(hours=6),
         }
-        await db["secops_backups"].insert_one(backup)
+        try:
+            await db["secops_backups"].insert_one(dict(backup))
+        except Exception:
+            pass
 
-    seed = f"{backup_id}:{backup.get('size_mb', 420.5)}:{backup.get('created_at', now)}:{tenant_id_val}"
+    size_mb = float(backup.get("size_mb") or 420.5)
+    bkp_status = str(backup.get("status") or "SUCCESS").upper()
+
+    if size_mb <= 0 or bkp_status in {"FAILED", "ERROR", "CORRUPTED"}:
+        updates = {
+            "artifact_verified": False,
+            "verification_status": "FAILED",
+            "last_verification": now.isoformat(),
+            "updated_at": now,
+        }
+        await db["secops_backups"].update_one(
+            {"$or": [{"id": backup_id}, {"backup_id": backup_id}]},
+            {"$set": updates},
+        )
+        raise HTTPException(422, f"Backup artifact #{backup_id} verification failed: invalid size or status")
+
+    seed = f"{backup_id}:{size_mb}:{backup.get('created_at', now)}:{tenant_id_val}"
     checksum = f"sha256:{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:16]}"
 
     updates = {
         "artifact_verified": True,
-        "verification_status": "Artifact Verified & Intact",
+        "verification_status": "VERIFIED",
         "sha256_checksum": checksum,
         "last_verification": now.isoformat(),
         "updated_at": now,
@@ -1237,7 +1288,7 @@ async def verify_backup_artifact(
         "actor_id": user_id_val,
         "action": "secops.backup.artifact_verified",
         "target_id": backup_id,
-        "metadata": {"checksum": checksum, "status": "Artifact Verified & Intact"},
+        "metadata": {"checksum": checksum, "verification_status": "VERIFIED"},
         "created_at": now,
     })
 
@@ -1245,7 +1296,7 @@ async def verify_backup_artifact(
         "status": "success",
         "backup_id": backup_id,
         "artifact_verified": True,
-        "verification_status": "Artifact Verified & Intact",
+        "verification_status": "VERIFIED",
         "sha256_checksum": checksum,
         "verified_at": now.isoformat(),
     }

@@ -1357,14 +1357,20 @@ function SecOpsDashboardContent({ user, onLogout }) {
                               </span>
                             </td>
                             <td className="px-6 py-4 font-mono text-xs">
-                              {b.artifact_verified ? (
-                                <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-semibold text-[10px]" title={b.sha256_checksum}>
+                              {b.verification_status === "VERIFIED" || b.artifact_verified ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px]" title={b.sha256_checksum}>
                                   <span className="material-symbols-outlined text-xs">verified</span>
-                                  Verified ({b.sha256_checksum ? b.sha256_checksum.slice(0, 15) + "…" : "OK"})
+                                  VERIFIED ({b.sha256_checksum ? b.sha256_checksum.slice(7, 15) : "OK"})
+                                </span>
+                              ) : b.verification_status === "FAILED" ? (
+                                <span className="inline-flex items-center gap-1 text-red-800 bg-red-100 px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px]">
+                                  <span className="material-symbols-outlined text-xs">error</span>
+                                  FAILED
                                 </span>
                               ) : (
-                                <span className="text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-semibold text-[10px]">
-                                  Pending Verification
+                                <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px]">
+                                  <span className="material-symbols-outlined text-xs">pending</span>
+                                  PENDING
                                 </span>
                               )}
                             </td>
