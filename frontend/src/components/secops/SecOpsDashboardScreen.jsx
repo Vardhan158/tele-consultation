@@ -2246,7 +2246,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
               <h3 className="text-base font-bold flex items-center gap-2 text-[#162623]">
                 <span className="material-symbols-outlined text-[#295255]">settings_backup_restore</span>
-                Submit Controlled Recovery Request (PRD 10.4)
+                Submit Controlled Recovery Request
               </h3>
               <button
                 type="button"
