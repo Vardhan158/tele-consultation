@@ -27,12 +27,16 @@ export function validateProfileField(field, value) {
       if (/[A-Za-z#*^%$@!~`_=+{}|;<>?]/.test(val)) {
         return "Mobile number must not contain letters or special symbols.";
       }
-      const digitsOnly = val.replace(/\D/g, "");
-      if (digitsOnly.length < 7 || digitsOnly.length > 15) {
-        return "Mobile number must have between 7 and 15 digits (e.g. +91 98765 43210).";
-      }
-      if (!/^\+?[0-9\s().-]{7,25}$/.test(val)) {
-        return "Please enter a valid phone number format.";
+      const clean = val.replace(/[\s()-]/g, "");
+      const digitsOnly = clean.startsWith("+91")
+        ? clean.slice(3)
+        : clean.startsWith("0")
+        ? clean.slice(1)
+        : clean.startsWith("+")
+        ? clean.slice(1)
+        : clean;
+      if (!/^\d{10}$/.test(digitsOnly)) {
+        return "Mobile number must be exactly 10 digits (e.g. 9876543210 or +91 9876543210).";
       }
       return "";
     }
@@ -110,7 +114,7 @@ export default function ProfileScreen({
                 ? `KC-${p.id.toString().slice(0, 5).toUpperCase()}`
                 : prev.patient_id || "KC-20481"),
             email: p.email || prev.email || "emma.mitchell@example.com",
-            phone: p.phone || prev.phone || "+1 (415) 555-0142",
+            phone: p.phone || prev.phone || "+91 98765 43210",
             date_of_birth:
               p.date_of_birth || prev.date_of_birth || "1992-03-14",
             age_display:

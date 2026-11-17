@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, field_validator
 
 
 class RegisterRequest(BaseModel):
@@ -9,6 +10,18 @@ class RegisterRequest(BaseModel):
     confirm_password: str = Field(min_length=8, max_length=128)
     terms_version: str = Field(min_length=1, max_length=32)
     terms_accepted: bool
+
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile_number(cls, v: str) -> str:
+        clean = re.sub(r"[\s()\-]", "", v)
+        if clean.startswith("+91"):
+            clean = clean[3:]
+        elif clean.startswith("0") or clean.startswith("+"):
+            clean = clean[1:]
+        if not (len(clean) == 10 and clean.isdigit()):
+            raise ValueError("Mobile number must be exactly 10 digits")
+        return v
 
 
 class LoginRequest(BaseModel):

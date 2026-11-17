@@ -1,13 +1,26 @@
+import re
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PatientCreate(BaseModel):
     full_name: str = Field(min_length=2, max_length=160)
     email: str = Field(min_length=3, max_length=320)
     phone: str = Field(min_length=8, max_length=32)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        clean = re.sub(r"[\s()\-]", "", v)
+        if clean.startswith("+91"):
+            clean = clean[3:]
+        elif clean.startswith("0") or clean.startswith("+"):
+            clean = clean[1:]
+        if not (len(clean) == 10 and clean.isdigit()):
+            raise ValueError("Mobile number must be exactly 10 digits")
+        return v
 
 
 class PatientResponse(PatientCreate):
@@ -103,6 +116,34 @@ class PatientProfileUpdate(BaseModel):
     pharmacy_address: str | None = Field(default=None, max_length=500)
     pharmacy_phone: str | None = Field(default=None, max_length=32)
     allergies: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str | None) -> str | None:
+        if not v:
+            return v
+        clean = re.sub(r"[\s()\-]", "", v)
+        if clean.startswith("+91"):
+            clean = clean[3:]
+        elif clean.startswith("0") or clean.startswith("+"):
+            clean = clean[1:]
+        if not (len(clean) == 10 and clean.isdigit()):
+            raise ValueError("Mobile number must be exactly 10 digits")
+        return v
+
+    @field_validator("pharmacy_phone")
+    @classmethod
+    def validate_pharmacy_phone(cls, v: str | None) -> str | None:
+        if not v:
+            return v
+        clean = re.sub(r"[\s()\-]", "", v)
+        if clean.startswith("+91"):
+            clean = clean[3:]
+        elif clean.startswith("0") or clean.startswith("+"):
+            clean = clean[1:]
+        if not (len(clean) == 10 and clean.isdigit()):
+            raise ValueError("Pharmacy phone number must be exactly 10 digits")
+        return v
 
 
 class MedicalIntakeCreate(BaseModel):
