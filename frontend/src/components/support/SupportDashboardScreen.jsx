@@ -1805,7 +1805,9 @@ function SupportDashboardContent({ user, onLogout }) {
                   <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1">
                     <p className="text-zinc-500 font-medium">Disconnect Time</p>
                     <p className="font-bold text-zinc-900 text-sm">
-                      {safeFormatDate(videoDiagData.disconnect_time, "time", "N/A (Active/Connected)")}
+                      {videoDiagData.session_status === "active"
+                        ? (videoDiagData.disconnect_time ? safeFormatDate(videoDiagData.disconnect_time, "time") : "Active / Connected")
+                        : (videoDiagData.disconnect_time ? safeFormatDate(videoDiagData.disconnect_time) : "Not recorded")}
                     </p>
                   </div>
                 </div>

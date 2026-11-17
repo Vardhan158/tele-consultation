@@ -967,7 +967,7 @@ async def video_diagnostics(
         "camera_permission": session.get("camera_permission", "Granted" if status_str == "active" else "Unknown"),
         "microphone_permission": session.get("microphone_permission", "Granted" if status_str == "active" else "Unknown"),
         "error_category": error_cat,
-        "disconnect_time": session.get("ended_at") or session.get("disconnect_time") or None,
+        "disconnect_time": session.get("ended_at") or session.get("disconnect_time") or (session.get("updated_at") if status_str in {"ended", "completed", "cancelled"} else None),
         "connection_events": connection_events,
     }
 
