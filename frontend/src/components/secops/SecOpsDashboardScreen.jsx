@@ -293,6 +293,42 @@ function SecOpsDashboardContent({ user, onLogout }) {
     }
   };
 
+  // Mitigation Action Modal State
+  const [showMitigationModal, setShowMitigationModal] = useState(false);
+  const [mitigationActionInput, setMitigationActionInput] = useState("");
+  const [mitigationError, setMitigationError] = useState("");
+  const [isSavingMitigation, setIsSavingMitigation] = useState(false);
+
+  const handleConfirmSaveMitigation = async (e) => {
+    e.preventDefault();
+    setMitigationError("");
+    const desc = mitigationActionInput.trim();
+    if (!desc) {
+      setMitigationError("Mitigation Action Description is required.");
+      return;
+    }
+
+    if (!selectedIncident) return;
+
+    setIsSavingMitigation(true);
+    try {
+      const updated = await secopsDashboardApi.updateIncident(selectedIncident.id, {
+        mitigation_action: desc,
+        status: "MITIGATING",
+      });
+      setSelectedIncident(updated);
+      setShowMitigationModal(false);
+      setMitigationActionInput("");
+      setMitigationError("");
+      addToast("Mitigation action recorded successfully.", "success");
+      loadIncidents();
+    } catch (err) {
+      setMitigationError(err.message || "Failed to record mitigation action.");
+    } finally {
+      setIsSavingMitigation(false);
+    }
+  };
+
   const handleTriggerBackup = async () => {
     try {
       await secopsDashboardApi.triggerBackup();
@@ -1006,8 +1042,9 @@ function SecOpsDashboardContent({ user, onLogout }) {
                         <button
                           type="button"
                           onClick={() => {
-                            const mit = window.prompt("Record mitigation action taken:");
-                            if (mit) handleUpdateIncident(selectedIncident.id, { mitigation_action: mit, status: "MITIGATING" });
+                            setMitigationActionInput("");
+                            setMitigationError("");
+                            setShowMitigationModal(true);
                           }}
                           className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl cursor-pointer shadow-xs"
                         >
@@ -1486,6 +1523,115 @@ function SecOpsDashboardContent({ user, onLogout }) {
         )}
 
       </main>
+
+      {/* Record Mitigation Action Modal */}
+      {showMitigationModal && selectedIncident && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onKeyDown={(e) => e.key === "Escape" && !isSavingMitigation && setShowMitigationModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mitigation-modal-title"
+            className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl border border-zinc-200 animate-in zoom-in-95 duration-200"
+          >
+            {/* Header */}
+            <div className="bg-[#123D35] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-2xl">build</span>
+                </div>
+                <div>
+                  <h3 id="mitigation-modal-title" className="text-base font-bold text-white leading-tight">
+                    Record Mitigation Action
+                  </h3>
+                  <p className="text-xs text-[#20C7A7] mt-0.5">
+                    Document the actions taken to investigate or mitigate this incident.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isSavingMitigation}
+                onClick={() => setShowMitigationModal(false)}
+                aria-label="Close modal"
+                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleConfirmSaveMitigation} className="p-6 space-y-4 text-xs">
+              <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Incident ID</p>
+                <p className="font-mono font-bold text-[#176354] text-sm">{selectedIncident.id}</p>
+                <p className="text-[11px] text-zinc-600 truncate font-semibold">{selectedIncident.title}</p>
+              </div>
+
+              <div>
+                <label htmlFor="mitigation-action-textarea" className="block text-xs font-bold text-zinc-700 mb-1.5">
+                  Mitigation Action Description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  id="mitigation-action-textarea"
+                  required
+                  rows={4}
+                  autoFocus
+                  disabled={isSavingMitigation}
+                  value={mitigationActionInput}
+                  onChange={(e) => {
+                    setMitigationActionInput(e.target.value);
+                    if (mitigationError) setMitigationError("");
+                  }}
+                  placeholder="Describe the steps, workarounds, or configuration changes executed to mitigate this incident…"
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs text-zinc-900 outline-none transition ${
+                    mitigationError
+                      ? "border-red-400 bg-red-50/30 focus:border-red-500"
+                      : "border-zinc-300 focus:border-[#176354] focus:ring-2 focus:ring-[#176354]/10"
+                  }`}
+                />
+                {mitigationError && (
+                  <p role="alert" className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-red-600">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {mitigationError}
+                  </p>
+                )}
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  disabled={isSavingMitigation}
+                  onClick={() => setShowMitigationModal(false)}
+                  className="px-4 py-2.5 text-xs font-semibold text-zinc-700 border border-zinc-300 rounded-xl hover:bg-zinc-50 transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingMitigation || !mitigationActionInput.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl transition cursor-pointer disabled:opacity-50 shadow-sm"
+                >
+                  {isSavingMitigation ? (
+                    <>
+                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      <span>Saving Action…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">save</span>
+                      <span>Save Mitigation Action</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Link Support Ticket Modal */}
       {showLinkTicketModal && selectedIncident && (
