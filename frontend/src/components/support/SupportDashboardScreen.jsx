@@ -2087,6 +2087,7 @@ function SupportDashboardContent({ user, onLogout }) {
                     </div>
 
                     {/* Action Toolbar for Destination Team / Lead */}
+                    {selectedEscalation.status !== "RESOLVED" && (
                     <div className="space-y-3 pt-2 border-t border-zinc-100">
                       <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Escalation Management Actions</h4>
                       <div className="flex flex-wrap gap-2.5">
@@ -2119,6 +2120,7 @@ function SupportDashboardContent({ user, onLogout }) {
                         )}
                       </div>
                     </div>
+                    )}
 
                     {/* Audit History Log */}
                     <div className="space-y-3 pt-2 border-t border-zinc-100">
