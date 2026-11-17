@@ -1048,17 +1048,6 @@ function SupportDashboardContent({ user, onLogout }) {
               </button>
             </div>
 
-            {/* Security Policy Alert Banner */}
-            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-900 flex items-start gap-3">
-              <span className="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">lock</span>
-              <div>
-                <p className="font-bold">Strict Security &amp; Privacy Restrictions (PRD Section 6.3)</p>
-                <p className="mt-0.5 text-amber-800">
-                  Support agents must not directly reveal OTPs, bypass MFA, change user passwords, or approve accounts without authorization. All privileged support actions are logged.
-                </p>
-              </div>
-            </div>
-
             {/* Diagnostics View */}
             {accountDiagLoading ? (
               <div className="bg-white p-12 rounded-2xl border border-zinc-200 text-center text-zinc-400">
