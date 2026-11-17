@@ -788,9 +788,22 @@ async def update_incident(
         )
 
     if payload.link_support_ticket_id:
+        tick_id_clean = payload.link_support_ticket_id.strip()
+        ticket = await db["support_tickets"].find_one({
+            "$or": [
+                {"id": tick_id_clean},
+                {"ticket_id": tick_id_clean},
+            ]
+        })
+        if not ticket:
+            raise HTTPException(404, f"Support ticket #{tick_id_clean} not found")
+
+        if tick_id_clean in (inc.get("linked_support_tickets") or []):
+            raise HTTPException(409, f"Support ticket #{tick_id_clean} is already linked to this incident")
+
         await db["secops_incidents"].update_one(
             {"tenant_id": principal.tenant_id, "id": incident_id},
-            {"$addToSet": {"linked_support_tickets": payload.link_support_ticket_id}},
+            {"$addToSet": {"linked_support_tickets": tick_id_clean}},
         )
 
     if payload.investigation_note:

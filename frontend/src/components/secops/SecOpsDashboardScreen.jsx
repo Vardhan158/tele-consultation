@@ -252,6 +252,47 @@ function SecOpsDashboardContent({ user, onLogout }) {
     }
   };
 
+  // Link Support Ticket Modal State
+  const [showLinkTicketModal, setShowLinkTicketModal] = useState(false);
+  const [linkTicketIdInput, setLinkTicketIdInput] = useState("");
+  const [linkTicketError, setLinkTicketError] = useState("");
+  const [isLinkingTicket, setIsLinkingTicket] = useState(false);
+
+  const handleConfirmLinkTicket = async (e) => {
+    e.preventDefault();
+    setLinkTicketError("");
+    const ticketId = linkTicketIdInput.trim();
+    if (!ticketId) {
+      setLinkTicketError("Support Ticket ID is required.");
+      return;
+    }
+
+    if (!selectedIncident) return;
+
+    const existingLinks = selectedIncident.linked_support_tickets || [];
+    if (existingLinks.includes(ticketId)) {
+      setLinkTicketError(`Support Ticket #${ticketId} is already linked to this incident.`);
+      return;
+    }
+
+    setIsLinkingTicket(true);
+    try {
+      const updated = await secopsDashboardApi.updateIncident(selectedIncident.id, {
+        link_support_ticket_id: ticketId,
+      });
+      setSelectedIncident(updated);
+      setShowLinkTicketModal(false);
+      setLinkTicketIdInput("");
+      setLinkTicketError("");
+      addToast(`Support ticket #${ticketId} linked successfully.`, "success");
+      loadIncidents();
+    } catch (err) {
+      setLinkTicketError(err.message || "Failed to link support ticket.");
+    } finally {
+      setIsLinkingTicket(false);
+    }
+  };
+
   const handleTriggerBackup = async () => {
     try {
       await secopsDashboardApi.triggerBackup();
@@ -947,8 +988,9 @@ function SecOpsDashboardContent({ user, onLogout }) {
                         <button
                           type="button"
                           onClick={() => {
-                            const tickId = window.prompt("Enter Support Ticket ID to link (e.g. SUP-102938):");
-                            if (tickId) handleUpdateIncident(selectedIncident.id, { link_support_ticket_id: tickId });
+                            setLinkTicketIdInput("");
+                            setLinkTicketError("");
+                            setShowLinkTicketModal(true);
                           }}
                           className="px-3 py-1 bg-[#EEF6F3] hover:bg-[#295255] hover:text-white text-[#295255] rounded-lg border border-[#295255]/20 font-semibold cursor-pointer transition"
                         >
@@ -1444,6 +1486,113 @@ function SecOpsDashboardContent({ user, onLogout }) {
         )}
 
       </main>
+
+      {/* Link Support Ticket Modal */}
+      {showLinkTicketModal && selectedIncident && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onKeyDown={(e) => e.key === "Escape" && !isLinkingTicket && setShowLinkTicketModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="link-ticket-modal-title"
+            className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl border border-zinc-200 animate-in zoom-in-95 duration-200"
+          >
+            {/* Header */}
+            <div className="bg-[#123D35] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-2xl">headset_mic</span>
+                </div>
+                <div>
+                  <h3 id="link-ticket-modal-title" className="text-base font-bold text-white leading-tight">
+                    Link Support Ticket
+                  </h3>
+                  <p className="text-xs text-[#20C7A7] mt-0.5">Link an existing support ticket to this operational incident.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isLinkingTicket}
+                onClick={() => setShowLinkTicketModal(false)}
+                aria-label="Close modal"
+                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleConfirmLinkTicket} className="p-6 space-y-4 text-xs">
+              <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Incident ID</p>
+                <p className="font-mono font-bold text-[#176354] text-sm">{selectedIncident.id}</p>
+                <p className="text-[11px] text-zinc-600 truncate font-semibold">{selectedIncident.title}</p>
+              </div>
+
+              <div>
+                <label htmlFor="support-ticket-id-input" className="block text-xs font-bold text-zinc-700 mb-1.5">
+                  Support Ticket ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="support-ticket-id-input"
+                  type="text"
+                  required
+                  autoFocus
+                  disabled={isLinkingTicket}
+                  value={linkTicketIdInput}
+                  onChange={(e) => {
+                    setLinkTicketIdInput(e.target.value);
+                    if (linkTicketError) setLinkTicketError("");
+                  }}
+                  placeholder="e.g. SUP-414362"
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-mono text-xs text-zinc-900 outline-none transition ${
+                    linkTicketError
+                      ? "border-red-400 bg-red-50/30 focus:border-red-500"
+                      : "border-zinc-300 focus:border-[#176354] focus:ring-2 focus:ring-[#176354]/10"
+                  }`}
+                />
+                {linkTicketError && (
+                  <p role="alert" className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-red-600">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {linkTicketError}
+                  </p>
+                )}
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  disabled={isLinkingTicket}
+                  onClick={() => setShowLinkTicketModal(false)}
+                  className="px-4 py-2.5 text-xs font-semibold text-zinc-700 border border-zinc-300 rounded-xl hover:bg-zinc-50 transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLinkingTicket || !linkTicketIdInput.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-[#176354] hover:bg-[#123D35] rounded-xl transition cursor-pointer disabled:opacity-50 shadow-sm"
+                >
+                  {isLinkingTicket ? (
+                    <>
+                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      <span>Linking Ticket…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">link</span>
+                      <span>Link Ticket</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* New Incident Modal */}
       {showCreateIncidentModal && (
