@@ -894,6 +894,12 @@ async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) 
     email_errors = await db["audit_logs"].count_documents({"tenant_id": principal.tenant_id, "action": {"$regex": r"email.*fail"}, "created_at": {"$gte": now - timedelta(hours=24)}})
     webrtc_errors = await db["audit_logs"].count_documents({"tenant_id": principal.tenant_id, "action": {"$regex": r"webrtc.*fail"}, "created_at": {"$gte": now - timedelta(hours=24)}})
 
+    def clean_reason(r_val):
+        s = str(r_val or "").strip()
+        if not s or "select a valid end time" in s.lower() or "maintenance reason" in s.lower():
+            return None
+        return s
+
     default_providers = [
         {
             "provider_name": "MongoDB Atlas Cluster",
@@ -906,7 +912,7 @@ async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) 
             "last_failure": overrides.get("mongodb_atlas", {}).get("last_failure") or "None",
             "linked_incident": overrides.get("mongodb_atlas", {}).get("linked_incident") or "None",
             "provider_status_url": "https://status.mongodb.com",
-            "maintenance_reason": overrides.get("mongodb_atlas", {}).get("maintenance_reason"),
+            "maintenance_reason": clean_reason(overrides.get("mongodb_atlas", {}).get("maintenance_reason")),
             "scheduled_start_time": overrides.get("mongodb_atlas", {}).get("scheduled_start_time"),
             "expected_end_time": overrides.get("mongodb_atlas", {}).get("expected_end_time"),
         },
