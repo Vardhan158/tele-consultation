@@ -113,7 +113,7 @@ def compute_event_result(log: dict[str, Any]) -> str:
 async def resolve_actor_name(db: Any, tenant_id: str, actor_id: str | None) -> str:
     if not actor_id or actor_id in {"system", "Unassigned", "—"}:
         return actor_id or "System"
-    if len(actor_id) < 20 and not actor_id.startswith("0000"):
+    if len(actor_id) < 20 and not actor_id.startswith("0000") and "-" not in actor_id:
         return actor_id
     try:
         user = await db["users"].find_one({"$or": [{"id": actor_id}, {"user_id": actor_id}]})
@@ -122,6 +122,46 @@ async def resolve_actor_name(db: Any, tenant_id: str, actor_id: str | None) -> s
     except Exception:
         pass
     return actor_id
+
+
+async def resolve_patient_name(db: Any, tenant_id: str, patient_id: str | None) -> str:
+    if not patient_id:
+        return "Patient"
+    if len(patient_id) < 20 and not patient_id.startswith(("0000", "usr-", "pat-")) and "-" not in patient_id:
+        return patient_id
+    try:
+        patient_doc = await db["patients"].find_one({"$or": [{"id": patient_id}, {"user_id": patient_id}]})
+        if patient_doc and patient_doc.get("full_name"):
+            return patient_doc["full_name"]
+        user_doc = await db["users"].find_one({"$or": [{"id": patient_id}, {"user_id": patient_id}]})
+        if user_doc and user_doc.get("full_name"):
+            return user_doc["full_name"]
+        if user_doc and user_doc.get("email"):
+            return user_doc["email"]
+    except Exception:
+        pass
+    return f"Patient ({patient_id[:8]})"
+
+
+async def resolve_doctor_name(db: Any, tenant_id: str, doctor_id: str | None) -> str:
+    if not doctor_id:
+        return "Doctor"
+    if len(doctor_id) < 20 and not doctor_id.startswith(("0000", "usr-", "doc-")) and "-" not in doctor_id:
+        return doctor_id
+    try:
+        doctor_doc = await db["doctors"].find_one({"$or": [{"id": doctor_id}, {"user_id": doctor_id}]})
+        if doctor_doc and doctor_doc.get("full_name"):
+            name = doctor_doc["full_name"]
+            return name if name.startswith("Dr.") else f"Dr. {name}"
+        user_doc = await db["users"].find_one({"$or": [{"id": doctor_id}, {"user_id": doctor_id}]})
+        if user_doc and user_doc.get("full_name"):
+            name = user_doc["full_name"]
+            return name if name.startswith("Dr.") else f"Dr. {name}"
+        if user_doc and user_doc.get("email"):
+            return user_doc["email"]
+    except Exception:
+        pass
+    return f"Doctor ({doctor_id[:8]})"
 
 
 class TicketCreate(BaseModel):
@@ -1124,9 +1164,10 @@ async def support_appointments(
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
     db = mongo_database.database()
-    query: dict[str, Any] = {"tenant_id": principal.tenant_id}
+    tenant_q = _build_tenant_query(principal)
+    query: dict[str, Any] = {**tenant_q}
     if status:
-        query["status"] = status
+        query["status"] = {"$regex": f"^{status}$", "$options": "i"}
     if date:
         query["starts_at"] = {"$regex": f"^{date}"}
     if search:
@@ -1136,6 +1177,19 @@ async def support_appointments(
             {"id": {"$regex": search, "$options": "i"}},
         ]
     items = [_clean(x) async for x in db["appointments"].find(query).sort("starts_at", -1).skip(offset).limit(limit)]
+
+    for item in items:
+        pid = item.get("patient_id")
+        did = item.get("doctor_id")
+        pname = item.get("patient_name")
+        dname = item.get("doctor_name")
+
+        if not pname or pname.startswith(("0000", "usr-", "pat-")) or len(pname) > 28 or "-" in pname:
+            item["patient_name"] = await resolve_patient_name(db, principal.tenant_id, pid)
+
+        if not dname or dname.startswith(("0000", "usr-", "doc-")) or len(dname) > 28 or "-" in dname:
+            item["doctor_name"] = await resolve_doctor_name(db, principal.tenant_id, did)
+
     total = await db["appointments"].count_documents(query)
     return {"items": items, "total": total, "offset": offset, "limit": limit}
 
