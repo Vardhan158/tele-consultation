@@ -161,16 +161,29 @@ def _as_utc_datetime(value: Any, *, fallback: datetime | None = None) -> datetim
     return parsed.astimezone(UTC)
 
 
-def get_sla_info(created_at_val: Any, priority: str, status: str) -> dict[str, Any]:
+def get_sla_info(
+    created_at_val: Any,
+    priority: str,
+    status: str,
+    *,
+    resolved_at_val: Any = None,
+    due_at_val: Any = None,
+    sla_priority: str | None = None,
+) -> dict[str, Any]:
     created_dt = _as_utc_datetime(created_at_val)
 
-    normalized_priority = str(priority or "medium").lower()
+    normalized_priority = str(sla_priority or priority or "medium").lower()
     normalized_status = str(status or "open").lower()
-    due_at = calculate_sla_due_at(created_dt, normalized_priority)
+    due_at = (
+        _as_utc_datetime(due_at_val)
+        if due_at_val
+        else calculate_sla_due_at(created_dt, normalized_priority)
+    )
     now = datetime.now(UTC)
 
     if normalized_status in {"resolved", "closed"}:
-        sla_state = "met"
+        resolved_at = _as_utc_datetime(resolved_at_val, fallback=now)
+        sla_state = "met" if resolved_at <= due_at else "breached"
     elif now > due_at:
         sla_state = "breached"
     elif (due_at - now).total_seconds() <= 3600:
@@ -183,6 +196,45 @@ def get_sla_info(created_at_val: Any, priority: str, status: str) -> dict[str, A
         "status": sla_state,
         "hours_target": 2 if normalized_priority == "urgent" else 4 if normalized_priority == "high" else 12 if normalized_priority == "medium" else 24,
     }
+
+
+def ticket_sla_info(ticket: dict[str, Any]) -> dict[str, Any]:
+    return get_sla_info(
+        ticket.get("created_at"),
+        ticket.get("priority", "medium"),
+        ticket.get("status", "open"),
+        resolved_at_val=ticket.get("resolved_at"),
+        due_at_val=ticket.get("sla_due_at"),
+        sla_priority=ticket.get("sla_priority"),
+    )
+
+
+async def preserve_ticket_sla_deadline(db: Any, ticket: dict[str, Any]) -> None:
+    """Backfill legacy tickets once so later status/priority changes cannot move the SLA."""
+    if ticket.get("sla_due_at"):
+        return
+    ticket_id = ticket.get("id") or ticket.get("ticket_id")
+    tenant_id = ticket.get("tenant_id")
+    if not ticket_id or not tenant_id:
+        return
+
+    original_priority = str(ticket.get("sla_priority") or ticket.get("priority") or "medium").lower()
+    created_at = _as_utc_datetime(ticket.get("created_at"))
+    due_at = calculate_sla_due_at(created_at, original_priority)
+    await db["support_tickets"].update_one(
+        {
+            "tenant_id": tenant_id,
+            "id": ticket_id,
+            "$or": [
+                {"sla_due_at": {"$exists": False}},
+                {"sla_due_at": None},
+                {"sla_due_at": ""},
+            ],
+        },
+        {"$set": {"sla_due_at": due_at, "sla_priority": original_priority}},
+    )
+    ticket["sla_due_at"] = due_at
+    ticket["sla_priority"] = original_priority
 
 
 class AppointmentSupportAction(BaseModel):
@@ -370,11 +422,11 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
 
         active_statuses = {"OPEN", "NEW", "IN_PROGRESS", "WAITING_FOR_USER", "ESCALATED", "REOPENED"}
         for t in scoped_tickets:
+            await preserve_ticket_sla_deadline(db, t)
             status = str(t.get("status") or "OPEN").upper()
             if status not in active_statuses:
                 continue
             priority = str(t.get("priority") or "MEDIUM").upper()
-            created_at_val = t.get("created_at")
             assigned = t.get("assigned_to")
             category = str(t.get("category") or "general").lower()
 
@@ -391,7 +443,7 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
 
             category_summary[category] = category_summary.get(category, 0) + 1
 
-            sla = get_sla_info(created_at_val, priority, status)
+            sla = ticket_sla_info(t)
             t["sla"] = sla
             if sla.get("status") == "breached":
                 sla_breaches += 1
@@ -412,12 +464,12 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
 
         recent_tickets = [_clean(x) async for x in db["support_tickets"].find(tenant_scope).sort("created_at", -1).limit(6)]
         for t in recent_tickets:
-            t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
+            t["sla"] = ticket_sla_info(t)
 
         queue_statuses = sorted(active_statuses | {status.lower() for status in active_statuses})
         my_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "assigned_to": principal.user_id, "status": {"$in": queue_statuses}}).sort("created_at", -1).limit(6)]
         for t in my_tickets:
-            t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
+            t["sla"] = ticket_sla_info(t)
 
         recent_activity = [_clean(x) async for x in db["audit_logs"].find(tenant_scope).sort("created_at", -1).limit(8)]
         active_video_rooms = await db["consultation_sessions"].count_documents({**tenant_scope, "status": "active"})
@@ -1198,7 +1250,8 @@ async def support_tickets(
         query["category"] = {"$regex": f"^{category}$", "$options": "i"}
     items = [_clean(x) async for x in db["support_tickets"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
     for item in items:
-        item["sla"] = get_sla_info(item.get("created_at"), item.get("priority", "medium"), item.get("status", "open"))
+        await preserve_ticket_sla_deadline(db, item)
+        item["sla"] = ticket_sla_info(item)
     total = await db["support_tickets"].count_documents(query)
     return {"items": items, "total": total, "offset": offset, "limit": limit}
 
@@ -1269,6 +1322,8 @@ async def create_support_ticket(
         "description": payload.description,
         "category": cat.upper(),
         "priority": prio.upper(),
+        "sla_priority": prio.lower(),
+        "sla_due_at": calculate_sla_due_at(now, prio),
         "status": "OPEN",
         "created_by": principal.user_id,          # Logged-in support agent ID
         "created_by_agent_id": principal.user_id, # Explicit support agent reference
@@ -1325,7 +1380,7 @@ async def create_support_ticket(
         raise HTTPException(503, "Support ticket persistence could not be confirmed")
 
     res = _clean(persisted_ticket)
-    res["sla"] = get_sla_info(now, prio, "OPEN")
+    res["sla"] = ticket_sla_info(res)
     res["persistence_confirmed"] = True
     return res
 
@@ -1343,22 +1398,53 @@ async def update_support_ticket(
 
     now = datetime.now(UTC)
     updates: dict[str, Any] = {"updated_at": now}
+    if not ticket.get("sla_due_at"):
+        original_priority = str(ticket.get("sla_priority") or ticket.get("priority") or "medium").lower()
+        original_created_at = _as_utc_datetime(ticket.get("created_at"), fallback=now)
+        updates["sla_priority"] = original_priority
+        updates["sla_due_at"] = calculate_sla_due_at(original_created_at, original_priority)
     history_logs = []
     assignment_changed = False
     assigned_agent: dict[str, Any] | None = None
 
     if payload.status:
-        updates["status"] = payload.status
-        if payload.status in {"resolved", "closed"}:
+        st_lower = payload.status.lower()
+        st_upper = payload.status.upper()
+        updates["status"] = st_lower
+        if st_lower in {"resolved", "closed"}:
+            res_summary = (payload.note or "").strip()
+            if not res_summary and ticket.get("notes"):
+                res_summary = ticket["notes"][-1].get("text", "")
+            if not res_summary:
+                raise HTTPException(
+                    422,
+                    f"A resolution summary is required to mark the support ticket as {st_upper}",
+                )
             updates["resolved_at"] = now
             updates["resolved_by"] = principal.user_id
-        history_logs.append({
-            "id": str(uuid4()),
-            "action": "status_changed",
-            "actor_id": principal.user_id,
-            "details": f"Status updated to {payload.status.replace('_', ' ').title()}",
-            "created_at": now.isoformat(),
-        })
+
+            history_logs.append({
+                "id": str(uuid4()),
+                "action": "ticket_resolution_verified",
+                "actor_id": principal.user_id,
+                "details": "Ticket Resolution Verified by Support Agent",
+                "created_at": now.isoformat(),
+            })
+            history_logs.append({
+                "id": str(uuid4()),
+                "action": "status_changed",
+                "actor_id": principal.user_id,
+                "details": f"Support Ticket Status Changed to Resolved. Resolution: {res_summary}",
+                "created_at": (now + timedelta(milliseconds=10)).isoformat(),
+            })
+        else:
+            history_logs.append({
+                "id": str(uuid4()),
+                "action": "status_changed",
+                "actor_id": principal.user_id,
+                "details": f"Status updated to {st_upper.replace('_', ' ').title()}",
+                "created_at": now.isoformat(),
+            })
 
     if payload.priority:
         updates["priority"] = payload.priority
@@ -1560,7 +1646,7 @@ async def update_support_ticket(
 
     updated_ticket = await db["support_tickets"].find_one({"tenant_id": principal.tenant_id, "id": ticket_id})
     res = _clean(updated_ticket or {})
-    res["sla"] = get_sla_info(res.get("created_at"), res.get("priority", "medium"), res.get("status", "open"))
+    res["sla"] = ticket_sla_info(res)
     return res
 
 
@@ -1929,19 +2015,77 @@ async def update_escalation(
             {"$set": updates},
         )
 
-    if payload.status == "RESOLVED":
-        ticket_history_entry = {
+    if requested_status == "ACCEPTED":
+        team_name = esc.get("destination_team") or "Specialist Team"
+        acc_details = f"{team_name} Escalation Accepted"
+        ticket_accepted_entry = {
             "id": str(uuid4()),
-            "action": "escalation_resolved",
+            "action": "escalation_accepted",
             "actor_id": principal.user_id,
-            "details": f"Escalation {escalation_id} resolved by {principal.user_id}",
+            "details": acc_details,
             "created_at": now.isoformat(),
         }
         await db["support_tickets"].update_one(
             {"tenant_id": principal.tenant_id, "id": esc["original_ticket_id"]},
-            {"$set": {"status": "resolved", "resolved_at": now, "resolved_by": principal.user_id},
-             "$push": {"history": ticket_history_entry}},
+            {"$push": {"history": ticket_accepted_entry}},
         )
+        await db["support_ticket_events"].insert_one({
+            "id": ticket_accepted_entry["id"],
+            "tenant_id": principal.tenant_id,
+            "ticket_id": esc["original_ticket_id"],
+            "action": "escalation_accepted",
+            "actor_id": principal.user_id,
+            "details": acc_details,
+            "created_at": now.isoformat(),
+        })
+
+    if payload.status == "RESOLVED":
+        team_name = esc.get("destination_team") or "Specialist Team"
+        res_summary = (payload.resolution_summary or "").strip()
+        esc_resolved_details = f"{team_name} Escalation Resolved: {res_summary}" if res_summary else f"{team_name} Escalation Resolved"
+
+        ticket_resolved_entry = {
+            "id": str(uuid4()),
+            "action": "escalation_resolved",
+            "actor_id": principal.user_id,
+            "details": esc_resolved_details,
+            "created_at": now.isoformat(),
+        }
+        ticket_status_entry = {
+            "id": str(uuid4()),
+            "action": "status_changed",
+            "actor_id": principal.user_id,
+            "details": "Support ticket returned to IN_PROGRESS for agent verification",
+            "created_at": (now + timedelta(milliseconds=10)).isoformat(),
+        }
+
+        # Requirement 6: Return original support ticket to IN_PROGRESS for support-agent verification before final resolution
+        await db["support_tickets"].update_one(
+            {"tenant_id": principal.tenant_id, "id": esc["original_ticket_id"]},
+            {
+                "$set": {"status": "in_progress", "updated_at": now},
+                "$push": {"history": {"$each": [ticket_resolved_entry, ticket_status_entry]}},
+            },
+        )
+
+        await db["support_ticket_events"].insert_one({
+            "id": ticket_resolved_entry["id"],
+            "tenant_id": principal.tenant_id,
+            "ticket_id": esc["original_ticket_id"],
+            "action": "escalation_resolved",
+            "actor_id": principal.user_id,
+            "details": esc_resolved_details,
+            "created_at": now.isoformat(),
+        })
+        await db["support_ticket_events"].insert_one({
+            "id": ticket_status_entry["id"],
+            "tenant_id": principal.tenant_id,
+            "ticket_id": esc["original_ticket_id"],
+            "action": "status_changed",
+            "actor_id": principal.user_id,
+            "details": "Support ticket returned to IN_PROGRESS for agent verification",
+            "created_at": (now + timedelta(milliseconds=10)).isoformat(),
+        })
 
     # Trigger 5: Escalation updated -> Update to relevant support owner (PRD Section 16)
     owner_id = esc.get("created_by") or esc.get("assigned_owner") or principal.user_id
@@ -2138,7 +2282,7 @@ async def get_ticket_details(
     if not ticket:
         raise HTTPException(404, "Support ticket not found")
     res = _clean(ticket)
-    res["sla"] = get_sla_info(res.get("created_at"), res.get("priority", "medium"), res.get("status", "open"))
+    res["sla"] = ticket_sla_info(res)
     return res
 
 

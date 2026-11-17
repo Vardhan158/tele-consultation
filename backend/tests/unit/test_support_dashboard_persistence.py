@@ -26,12 +26,47 @@ def test_sla_accepts_naive_mongodb_datetime() -> None:
     assert datetime.fromisoformat(result["due_at"]).tzinfo == UTC
 
 
-def test_sla_status_matching_is_case_insensitive() -> None:
+def test_resolved_ticket_remains_breached_when_resolved_after_deadline() -> None:
     old_mongo_timestamp = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=2)
 
     result = get_sla_info(old_mongo_timestamp, "HIGH", "RESOLVED")
 
     assert result["hours_target"] == 4
+    assert result["status"] == "breached"
+
+
+def test_resolved_ticket_uses_persisted_original_sla_deadline() -> None:
+    created_at = datetime.now(UTC) - timedelta(hours=3)
+    original_due_at = created_at + timedelta(hours=2)
+    resolved_at = created_at + timedelta(hours=2, minutes=5)
+
+    result = get_sla_info(
+        created_at,
+        "low",
+        "resolved",
+        resolved_at_val=resolved_at,
+        due_at_val=original_due_at,
+        sla_priority="urgent",
+    )
+
+    assert result["due_at"] == original_due_at.isoformat()
+    assert result["hours_target"] == 2
+    assert result["status"] == "breached"
+
+
+def test_resolved_ticket_is_met_when_resolved_before_original_deadline() -> None:
+    created_at = datetime.now(UTC) - timedelta(hours=1)
+    due_at = created_at + timedelta(hours=2)
+
+    result = get_sla_info(
+        created_at,
+        "urgent",
+        "RESOLVED",
+        resolved_at_val=created_at + timedelta(minutes=45),
+        due_at_val=due_at,
+        sla_priority="urgent",
+    )
+
     assert result["status"] == "met"
 
 

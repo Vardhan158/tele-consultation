@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends
@@ -11,7 +11,6 @@ from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.notifications.models import Notification
 from teleconsult.modules.notifications.service import queue_patient_notification
 from teleconsult.modules.support_access.patient_models import FollowUpAction, SupportTicket
 
@@ -237,6 +236,9 @@ async def create_ticket(
             "subject": payload.subject,
             "description": payload.description,
             "status": "open",
+            "priority": "medium",
+            "sla_priority": "medium",
+            "sla_due_at": now + timedelta(hours=12),
             "created_at": now.isoformat(),
         }
         await db["support_tickets"].insert_one(dict(doc))

@@ -406,7 +406,16 @@ function SupportDashboardContent({ user, onLogout }) {
       const updated = await supportDashboardApi.updateEscalation(id, updates);
       setSelectedEscalation(updated);
       addToast("Escalation record updated", "success");
-      void loadEscalations({ notifyOnError: false });
+      await Promise.all([
+        loadEscalations({ notifyOnError: false }),
+        loadTickets({ notifyOnError: false }),
+        loadOverview({ notifyOnError: false }),
+        loadAuditHistory({ notifyOnError: false }),
+      ]);
+      if (selectedTicket && (selectedTicket.id === updated.original_ticket_id || selectedTicket.ticket_id === updated.original_ticket_id)) {
+        const refreshedTicket = await supportDashboardApi.ticketDetails(selectedTicket.id || selectedTicket.ticket_id);
+        setSelectedTicket(refreshedTicket);
+      }
     } catch (err) {
       addToast(err.message || "Failed to update escalation", "error");
     }
@@ -2409,9 +2418,17 @@ function SupportDashboardContent({ user, onLogout }) {
                             </span>
                           )}
                           {selectedTicket.escalated_to && (
-                            <span className="text-xs bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                              <span className="material-symbols-outlined text-xs">warning</span>
-                              Escalated to {selectedTicket.escalated_to}
+                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${
+                              ["resolved", "closed"].includes(selectedTicket.status?.toLowerCase())
+                                ? "bg-green-100 text-green-800 border border-green-200"
+                                : "bg-red-100 text-red-800"
+                            }`}>
+                              <span className="material-symbols-outlined text-xs">
+                                {["resolved", "closed"].includes(selectedTicket.status?.toLowerCase()) ? "task_alt" : "warning"}
+                              </span>
+                              {["resolved", "closed"].includes(selectedTicket.status?.toLowerCase())
+                                ? `${selectedTicket.escalated_to} Escalation Resolved`
+                                : `Escalated to ${selectedTicket.escalated_to}`}
                             </span>
                           )}
                         </div>

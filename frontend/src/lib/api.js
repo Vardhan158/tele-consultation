@@ -544,6 +544,7 @@ export const supportDashboardApi = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  ticketDetails: (id) => apiRequest(`/api/v1/support-dashboard/tickets/${id}`),
   escalations: (status = "", team = "", priority = "", ticketId = "", offset = 0, limit = 25) =>
     apiRequest(`/api/v1/support-dashboard/escalations?status=${encodeURIComponent(status)}&destination_team=${encodeURIComponent(team)}&priority=${encodeURIComponent(priority)}&ticket_id=${encodeURIComponent(ticketId)}&offset=${offset}&limit=${limit}`),
   createEscalation: (payload) =>
