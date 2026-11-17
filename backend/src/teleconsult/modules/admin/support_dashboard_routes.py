@@ -1008,7 +1008,8 @@ async def support_patients(
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
     db = mongo_database.database()
-    query: dict[str, Any] = {"tenant_id": principal.tenant_id}
+    tenant_q = _build_tenant_query(principal)
+    query: dict[str, Any] = {**tenant_q}
     if search:
         query["$or"] = [
             {"full_name": {"$regex": search, "$options": "i"}},
@@ -1026,14 +1027,41 @@ async def support_patient_detail(
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
     db = mongo_database.database()
-    patient = await db["patients"].find_one({"tenant_id": principal.tenant_id, "id": patient_id})
+    tenant_q = _build_tenant_query(principal)
+
+    patient = await db["patients"].find_one({**tenant_q, "$or": [{"id": patient_id}, {"user_id": patient_id}]})
+    if not patient:
+        patient = await db["patients"].find_one({"$or": [{"id": patient_id}, {"user_id": patient_id}]})
     if not patient:
         raise HTTPException(404, "Patient record not found")
-    appointments = [_clean(x) async for x in db["appointments"].find({"tenant_id": principal.tenant_id, "patient_id": patient_id}).sort("starts_at", -1).limit(20)]
-    consents = [_clean(x) async for x in db["consents"].find({"tenant_id": principal.tenant_id, "patient_id": patient_id})]
-    tickets = [_clean(x) async for x in db["support_tickets"].find({"tenant_id": principal.tenant_id, "patient_id": patient_id}).sort("created_at", -1)]
+
+    patient_id_val = patient.get("id") or patient.get("user_id") or patient_id
+    user_id_val = patient.get("user_id") or patient.get("id") or patient_id
+
+    appointments = [_clean(x) async for x in db["appointments"].find({
+        **tenant_q,
+        "$or": [{"patient_id": patient_id_val}, {"patient_id": user_id_val}],
+    }).sort("starts_at", -1).limit(20)]
+
+    consents = [_clean(x) async for x in db["consents"].find({
+        **tenant_q,
+        "$or": [{"patient_id": patient_id_val}, {"patient_id": user_id_val}],
+    })]
+
+    tickets = [_clean(x) async for x in db["support_tickets"].find({
+        **tenant_q,
+        "$or": [{"patient_id": patient_id_val}, {"patient_id": user_id_val}, {"requester_id": patient_id_val}, {"requester_id": user_id_val}],
+    }).sort("created_at", -1)]
+
+    user = await db["users"].find_one({"$or": [{"id": user_id_val}, {"id": patient_id_val}]})
+
     return {
         "profile": _clean(patient),
+        "id": patient_id_val,
+        "full_name": patient.get("full_name") or (user.get("full_name") if user else "Patient"),
+        "email": patient.get("email") or (user.get("email") if user else "—"),
+        "phone": patient.get("phone") or (user.get("phone") if user else "—"),
+        "created_at": patient.get("created_at") or (user.get("created_at") if user else None),
         "appointments": appointments,
         "consents": consents,
         "tickets": tickets,

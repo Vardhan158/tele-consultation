@@ -2757,6 +2757,120 @@ function SupportDashboardContent({ user, onLogout }) {
         </div>
       )}
 
+      {/* Inspect Patient Details Modal */}
+      {selectedPatient && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onKeyDown={(e) => e.key === "Escape" && setSelectedPatient(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="patient-details-modal-title"
+            className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-zinc-200 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
+          >
+            {/* Dark Emerald Header */}
+            <div className="bg-[#123D35] text-white p-5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-2xl">person</span>
+                </div>
+                <div>
+                  <h3 id="patient-details-modal-title" className="text-base font-bold text-white leading-tight">
+                    {selectedPatient.full_name || selectedPatient.profile?.full_name || "Patient Details"}
+                  </h3>
+                  <p className="text-xs text-[#20C7A7] mt-0.5">
+                    Patient Profile &amp; Linked Support Tickets
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPatient(null)}
+                aria-label="Close modal"
+                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 space-y-6 text-xs overflow-y-auto flex-1">
+              {/* Profile Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Patient Name</p>
+                  <p className="font-bold text-zinc-900 text-sm">{selectedPatient.full_name || selectedPatient.profile?.full_name || "—"}</p>
+                </div>
+
+                <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Email Address</p>
+                  <p className="font-semibold text-zinc-800 text-xs">{selectedPatient.email || selectedPatient.profile?.email || "—"}</p>
+                </div>
+
+                <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Phone Number</p>
+                  <p className="font-semibold text-zinc-800 text-xs">{selectedPatient.phone || selectedPatient.profile?.phone || "No Phone"}</p>
+                </div>
+
+                <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Registration Date</p>
+                  <p className="font-mono font-semibold text-zinc-800 text-xs">
+                    {safeFormatDate(selectedPatient.created_at || selectedPatient.profile?.created_at, "date")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Linked Support Tickets Section */}
+              <div className="space-y-3 pt-2 border-t border-zinc-100">
+                <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-[#176354]">headset_mic</span>
+                  Linked Support Tickets ({selectedPatient.tickets?.length || 0})
+                </h4>
+
+                {!selectedPatient.tickets?.length ? (
+                  <p className="text-xs text-zinc-400 italic py-3">No support tickets associated with this patient.</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {selectedPatient.tickets.map((tk) => (
+                      <div
+                        key={tk.id || tk.ticket_id}
+                        onClick={() => {
+                          setSelectedPatient(null);
+                          setSelectedTicket(tk);
+                          setActiveTab("tickets");
+                        }}
+                        className="p-3.5 bg-[#EEF6F3]/60 hover:bg-[#EEF6F3] rounded-xl border border-[#176354]/20 transition cursor-pointer flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-[#176354]">{tk.id || tk.ticket_id}</span>
+                            <span className="bg-zinc-200 text-zinc-700 px-2 py-0.5 rounded-full font-bold uppercase text-[10px]">{tk.category}</span>
+                          </div>
+                          <p className="font-bold text-zinc-900 mt-1">{tk.subject}</p>
+                        </div>
+                        <span className="capitalize font-bold text-zinc-600 text-xs">{tk.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedPatient(null)}
+                className="px-5 py-2 text-xs font-bold text-white bg-[#176354] hover:bg-[#123D35] rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Resolve Support Ticket Modal (Custom Centered React Popup) */}
       {ticketToResolve && (
         <div
