@@ -1251,6 +1251,15 @@ async def support_tickets(
     items = [_clean(x) async for x in db["support_tickets"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
     for item in items:
         await preserve_ticket_sla_deadline(db, item)
+        t_id = item.get("id") or item.get("ticket_id")
+        if t_id:
+            esc = await db["escalations"].find_one({"tenant_id": principal.tenant_id, "original_ticket_id": t_id})
+            if esc:
+                item["escalation_id"] = esc.get("id")
+                item["escalation_status"] = esc.get("status")
+                if esc.get("status") == "RESOLVED":
+                    item["escalation_resolved"] = True
+                    item["escalation_resolved_team"] = esc.get("destination_team") or "Engineering"
         item["sla"] = ticket_sla_info(item)
     total = await db["support_tickets"].count_documents(query)
     return {"items": items, "total": total, "offset": offset, "limit": limit}
