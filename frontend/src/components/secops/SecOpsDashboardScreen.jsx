@@ -475,7 +475,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                 <div>
                   <h3 className="text-base font-bold text-[#162623] flex items-center gap-2">
                     <span className="material-symbols-outlined text-[#295255]">shield_lock</span>
-                    Security Threat Detection &amp; Monitoring (PRD Section 6)
+                    Security Threat Detection &amp; Monitoring
                   </h3>
                   <p className="text-xs text-[#577877]">Detect brute force, unauthorized API access, MFA spikes, and execute security mitigations.</p>
                 </div>
@@ -1809,7 +1809,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const reason = window.prompt("Document reason for suppressing this operational alert (PRD Section 11.4):");
+                    const reason = window.prompt("Document reason for suppressing this operational alert:");
                     if (reason) handleUpdateAlertAction(selectedAlert.id || selectedAlert.alert_id, {
                       status: "SUPPRESSED",
                       suppression_reason: reason,
