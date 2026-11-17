@@ -2722,12 +2722,16 @@ function SupportDashboardContent({ user, onLogout }) {
         </div>
       )}
 
-      {/* Payment Refund Modal */}
+      {/* Payment Refund Confirmation Modal */}
       {refundModalPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-zinc-200 space-y-4">
+            {/* Modal Header */}
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
-              <h3 className="text-base font-bold text-zinc-900">Issue Refund for Payment #{refundModalPayment.id}</h3>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-purple-700 text-xl">currency_rupee</span>
+                <h3 className="text-base font-bold text-zinc-900">Confirm Payment Refund</h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setRefundModalPayment(null)}
@@ -2737,30 +2741,61 @@ function SupportDashboardContent({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleRefundSubmit} className="space-y-4">
+            {/* Financial Transaction Warning Banner */}
+            <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-amber-700 text-lg shrink-0 mt-0.5">warning</span>
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">Refund Reason</label>
+                <p className="font-bold text-amber-900">Financial Transaction Warning</p>
+                <p className="mt-0.5 text-amber-800 text-[11px] leading-tight">
+                  Refund authorization initiates an immediate payment gateway reversal. Once confirmed, this financial transaction cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Payment Details Grid */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Payment ID</p>
+                <p className="font-mono font-bold text-[#176354] text-xs truncate">{refundModalPayment.id}</p>
+              </div>
+
+              <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-0.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Refund Amount</p>
+                <p className="font-bold text-purple-700 text-sm">
+                  ₹{(refundModalPayment.amount || 55000).toLocaleString("en-IN")}
+                </p>
+              </div>
+            </div>
+
+            {/* Refund Reason Form */}
+            <form onSubmit={handleRefundSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-1">
+                  Mandatory Refund Reason <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   required
                   rows={3}
                   value={refundReason}
                   onChange={(e) => setRefundReason(e.target.value)}
-                  placeholder="Specify refund authorization reason…"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-sm outline-none focus:border-[#1A7D67]"
+                  placeholder="Specify mandatory refund authorization reason…"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-xs text-zinc-800 outline-none focus:border-purple-700 focus:ring-2 focus:ring-purple-100 transition"
                 />
               </div>
 
+              {/* Modal Actions */}
               <div className="flex justify-end gap-3 pt-2 border-t border-zinc-100">
                 <button
                   type="button"
                   onClick={() => setRefundModalPayment(null)}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-600 border border-zinc-300 rounded-xl hover:bg-zinc-50 cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-zinc-600 border border-zinc-300 rounded-xl hover:bg-zinc-50 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold text-white bg-purple-700 hover:bg-purple-800 rounded-xl cursor-pointer"
+                  disabled={!refundReason.trim()}
+                  className="px-5 py-2 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
                 >
                   Confirm Refund
                 </button>
