@@ -622,6 +622,8 @@ export const secopsDashboardApi = {
   backups: () => apiRequest("/api/v1/secops-dashboard/backups"),
   triggerBackup: () =>
     apiRequest("/api/v1/secops-dashboard/backups/trigger", { method: "POST" }),
+  verifyBackupArtifact: (id) =>
+    apiRequest(`/api/v1/secops-dashboard/backups/${id}/verify`, { method: "POST" }),
   createRecoveryRequest: (payload) =>
     apiRequest("/api/v1/secops-dashboard/backups/recovery-requests", {
       method: "POST",

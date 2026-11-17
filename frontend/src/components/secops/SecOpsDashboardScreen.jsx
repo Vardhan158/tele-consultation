@@ -1339,9 +1339,10 @@ function SecOpsDashboardContent({ user, onLogout }) {
                           <th className="px-6 py-3.5">Protected Resource</th>
                           <th className="px-6 py-3.5">Backup Type</th>
                           <th className="px-6 py-3.5">Status</th>
+                          <th className="px-6 py-3.5">Artifact Verification</th>
                           <th className="px-6 py-3.5">Size (MB)</th>
-                          <th className="px-6 py-3.5">Retention Until</th>
                           <th className="px-6 py-3.5">Recovery Point (RPO)</th>
+                          <th className="px-6 py-3.5 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#577877]/15 text-[#162623]">
@@ -1355,10 +1356,38 @@ function SecOpsDashboardContent({ user, onLogout }) {
                                 {b.status || "SUCCESS"}
                               </span>
                             </td>
+                            <td className="px-6 py-4 font-mono text-xs">
+                              {b.artifact_verified ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-semibold text-[10px]" title={b.sha256_checksum}>
+                                  <span className="material-symbols-outlined text-xs">verified</span>
+                                  Verified ({b.sha256_checksum ? b.sha256_checksum.slice(0, 15) + "…" : "OK"})
+                                </span>
+                              ) : (
+                                <span className="text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-semibold text-[10px]">
+                                  Pending Verification
+                                </span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 font-mono text-[#162623]">{b.size_mb || 420.5} MB</td>
-                            <td className="px-6 py-4 text-[#577877] font-mono">{b.retention_until || "30 Days"}</td>
                             <td className="px-6 py-4 font-mono font-bold text-emerald-700">
                               {safeFormatDate(b.recovery_point || b.restore_point)}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await secopsDashboardApi.verifyBackupArtifact(b.id || b.backup_id);
+                                    addToast(`Backup artifact verified: ${res.sha256_checksum}`, "success");
+                                    loadBackups();
+                                  } catch (err) {
+                                    addToast(err.message || "Failed to verify backup artifact", "error");
+                                  }
+                                }}
+                                className="px-2.5 py-1 bg-[#EEF6F3] text-[#295255] hover:bg-[#295255] hover:text-white font-semibold rounded-lg text-xs transition cursor-pointer"
+                              >
+                                Verify Artifact
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1408,7 +1437,15 @@ function SecOpsDashboardContent({ user, onLogout }) {
                                     <>
                                       <button
                                         type="button"
-                                        onClick={() => handleUpdateRecoveryRequest(req.id, { approval_status: "APPROVED" })}
+                                        onClick={() => {
+                                          const ver = window.prompt("Record sandbox test verification result before approving recovery request:");
+                                          if (ver) {
+                                            handleUpdateRecoveryRequest(req.id, {
+                                              approval_status: "APPROVED",
+                                              verification_result: ver,
+                                            });
+                                          }
+                                        }}
                                         className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg cursor-pointer"
                                       >
                                         Approve
