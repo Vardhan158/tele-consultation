@@ -329,6 +329,42 @@ function SecOpsDashboardContent({ user, onLogout }) {
     }
   };
 
+  // Resolve Incident Modal State
+  const [showResolveIncidentModal, setShowResolveIncidentModal] = useState(false);
+  const [incidentResolutionSummary, setIncidentResolutionSummary] = useState("");
+  const [resolveIncidentError, setResolveIncidentError] = useState("");
+  const [isResolvingIncident, setIsResolvingIncident] = useState(false);
+
+  const handleConfirmResolveIncident = async (e) => {
+    e.preventDefault();
+    setResolveIncidentError("");
+    const summary = incidentResolutionSummary.trim();
+    if (!summary) {
+      setResolveIncidentError("Resolution Summary is required to resolve this incident.");
+      return;
+    }
+
+    if (!selectedIncident) return;
+
+    setIsResolvingIncident(true);
+    try {
+      const updated = await secopsDashboardApi.updateIncident(selectedIncident.id, {
+        status: "RESOLVED",
+        resolution_summary: summary,
+      });
+      setSelectedIncident(updated);
+      setShowResolveIncidentModal(false);
+      setIncidentResolutionSummary("");
+      setResolveIncidentError("");
+      addToast("Operational incident resolved successfully.", "success");
+      loadIncidents();
+    } catch (err) {
+      setResolveIncidentError(err.message || "Failed to resolve operational incident.");
+    } finally {
+      setIsResolvingIncident(false);
+    }
+  };
+
   const handleTriggerBackup = async () => {
     try {
       await secopsDashboardApi.triggerBackup();
@@ -1054,8 +1090,9 @@ function SecOpsDashboardContent({ user, onLogout }) {
                         <button
                           type="button"
                           onClick={() => {
-                            const sum = window.prompt("Provide resolution summary for this incident:");
-                            if (sum) handleUpdateIncident(selectedIncident.id, { status: "RESOLVED", resolution_summary: sum });
+                            setIncidentResolutionSummary("");
+                            setResolveIncidentError("");
+                            setShowResolveIncidentModal(true);
                           }}
                           className="px-3.5 py-2 bg-[#295255] hover:bg-[#1f3d3f] text-white font-bold rounded-xl cursor-pointer shadow-xs"
                         >
@@ -1523,6 +1560,115 @@ function SecOpsDashboardContent({ user, onLogout }) {
         )}
 
       </main>
+
+      {/* Resolve Operational Incident Modal */}
+      {showResolveIncidentModal && selectedIncident && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onKeyDown={(e) => e.key === "Escape" && !isResolvingIncident && setShowResolveIncidentModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resolve-incident-modal-title"
+            className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl border border-zinc-200 animate-in zoom-in-95 duration-200"
+          >
+            {/* Dark Emerald Header */}
+            <div className="bg-[#123D35] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-2xl">check_circle</span>
+                </div>
+                <div>
+                  <h3 id="resolve-incident-modal-title" className="text-base font-bold text-white leading-tight">
+                    Resolve Operational Incident
+                  </h3>
+                  <p className="text-xs text-[#20C7A7] mt-0.5">
+                    Provide a resolution summary before marking this incident as resolved.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isResolvingIncident}
+                onClick={() => setShowResolveIncidentModal(false)}
+                aria-label="Close modal"
+                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleConfirmResolveIncident} className="p-6 space-y-4 text-xs">
+              <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Incident ID</p>
+                <p className="font-mono font-bold text-[#176354] text-sm">{selectedIncident.id}</p>
+                <p className="text-[11px] text-zinc-600 truncate font-semibold">{selectedIncident.title}</p>
+              </div>
+
+              <div>
+                <label htmlFor="incident-resolution-textarea" className="block text-xs font-bold text-zinc-700 mb-1.5">
+                  Resolution Summary <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  id="incident-resolution-textarea"
+                  required
+                  rows={4}
+                  autoFocus
+                  disabled={isResolvingIncident}
+                  value={incidentResolutionSummary}
+                  onChange={(e) => {
+                    setIncidentResolutionSummary(e.target.value);
+                    if (resolveIncidentError) setResolveIncidentError("");
+                  }}
+                  placeholder="Describe the root cause, recovery steps, and final resolution outcome for this incident…"
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs text-zinc-900 outline-none transition ${
+                    resolveIncidentError
+                      ? "border-red-400 bg-red-50/30 focus:border-red-500"
+                      : "border-zinc-300 focus:border-[#176354] focus:ring-2 focus:ring-[#176354]/10"
+                  }`}
+                />
+                {resolveIncidentError && (
+                  <p role="alert" className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-red-600">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {resolveIncidentError}
+                  </p>
+                )}
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  disabled={isResolvingIncident}
+                  onClick={() => setShowResolveIncidentModal(false)}
+                  className="px-4 py-2.5 text-xs font-semibold text-zinc-700 border border-zinc-300 rounded-xl hover:bg-zinc-50 transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isResolvingIncident || !incidentResolutionSummary.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-[#176354] hover:bg-[#123D35] rounded-xl transition cursor-pointer disabled:opacity-50 shadow-sm"
+                >
+                  {isResolvingIncident ? (
+                    <>
+                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      <span>Resolving Incident…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">check</span>
+                      <span>Confirm Resolution</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Record Mitigation Action Modal */}
       {showMitigationModal && selectedIncident && (
