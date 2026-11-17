@@ -7,6 +7,7 @@ from teleconsult.kernel.authz.mongodb_policy import MongoPrincipal
 from teleconsult.modules.admin import support_dashboard_routes
 from teleconsult.modules.admin.support_dashboard_routes import (
     TicketUpdate,
+    ensure_ticket_escalation,
     get_sla_info,
     update_support_ticket,
 )
@@ -89,3 +90,49 @@ async def test_reassignment_persists_and_records_ticket_and_audit_history(monkey
     assert audit["metadata"]["previous_assigned_to"] == "agent-1"
     assert audit["metadata"]["assigned_to"] == "agent-2"
     assert result["assigned_to"] == "agent-2"
+
+
+@pytest.mark.asyncio
+async def test_ticket_escalation_is_persisted_once_and_linked_to_ticket() -> None:
+    ticket = {
+        "id": "SUP-950477",
+        "tenant_id": "tenant-1",
+        "subject": "Video consultation disconnects",
+        "description": "The consultation disconnects after joining.",
+        "category": "technical",
+        "priority": "urgent",
+        "escalated_to": "Engineering",
+    }
+    existing = {
+        "id": "ESC-123456",
+        "tenant_id": "tenant-1",
+        "original_ticket_id": "SUP-950477",
+    }
+    escalations = MagicMock()
+    escalations.find_one = AsyncMock(side_effect=[None, existing])
+    insert_result = MagicMock()
+    insert_result.acknowledged = True
+    escalations.insert_one = AsyncMock(return_value=insert_result)
+    tickets = MagicMock()
+    tickets.update_one = AsyncMock()
+    audit_logs = MagicMock()
+    audit_logs.insert_one = AsyncMock()
+    database = {
+        "escalations": escalations,
+        "support_tickets": tickets,
+        "audit_logs": audit_logs,
+    }
+
+    created = await ensure_ticket_escalation(database, ticket, actor_id="agent-1")
+    duplicate = await ensure_ticket_escalation(database, ticket, actor_id="agent-1")
+
+    escalations.insert_one.assert_awaited_once()
+    inserted = escalations.insert_one.await_args.args[0]
+    assert inserted["original_ticket_id"] == "SUP-950477"
+    assert inserted["ticket_subject"] == "Video consultation disconnects"
+    assert inserted["destination_team"] == "Engineering"
+    assert inserted["priority"] == "urgent"
+    assert inserted["status"] == "PENDING"
+    assert inserted["escalation_timestamp"] == inserted["created_at"]
+    assert created == inserted
+    assert duplicate == existing

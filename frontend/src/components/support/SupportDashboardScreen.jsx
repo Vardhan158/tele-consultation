@@ -1948,6 +1948,10 @@ function SupportDashboardContent({ user, onLogout }) {
                         <span className="font-semibold text-zinc-700">{esc.destination_team}</span>
                         <span className="font-mono text-[11px] text-zinc-400">{esc.original_ticket_id}</span>
                       </div>
+                      <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-2 pt-2 border-t border-zinc-100">
+                        <span className="font-bold uppercase">Priority: {esc.priority || "high"}</span>
+                        <span>{safeFormatDate(esc.escalation_timestamp || esc.created_at, "datetime")}</span>
+                      </div>
                     </div>
                   ))
                 )}
@@ -1979,28 +1983,6 @@ function SupportDashboardContent({ user, onLogout }) {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#1A7D67]/30 bg-[#EEF6F3] text-xs font-bold text-[#155f50]">
-                          <span>Assigned To</span>
-                          <select
-                            aria-label="Assigned To"
-                            value={selectedTicket.assigned_to || ""}
-                            disabled={supportAgentsLoading}
-                            onChange={(e) => handleUpdateTicket({ assigned_to: e.target.value })}
-                            className="bg-transparent outline-none font-semibold text-zinc-800 disabled:opacity-60"
-                          >
-                            <option value="">Unassigned</option>
-                            {selectedTicket.assigned_to && !supportAgents.some((agent) => agent.id === selectedTicket.assigned_to) && (
-                              <option value={selectedTicket.assigned_to} disabled>
-                                {selectedTicket.assigned_to_name || "Inactive support agent"}
-                              </option>
-                            )}
-                            {supportAgents.map((agent) => (
-                              <option key={agent.id} value={agent.id}>
-                                {agent.full_name}{agent.email ? ` (${agent.email})` : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
                         <select
                           value={selectedEscalation.status}
                           onChange={(e) => handleUpdateEscalation(selectedEscalation.id, { status: e.target.value })}
@@ -2370,6 +2352,28 @@ function SupportDashboardContent({ user, onLogout }) {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
+                        <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#1A7D67]/30 bg-[#EEF6F3] text-xs font-bold text-[#155f50]">
+                          <span>Assigned To</span>
+                          <select
+                            aria-label="Assigned To"
+                            value={selectedTicket.assigned_to || ""}
+                            disabled={supportAgentsLoading}
+                            onChange={(e) => handleUpdateTicket({ assigned_to: e.target.value })}
+                            className="bg-transparent outline-none font-semibold text-zinc-800 disabled:opacity-60"
+                          >
+                            <option value="">Unassigned</option>
+                            {selectedTicket.assigned_to && !supportAgents.some((agent) => agent.id === selectedTicket.assigned_to) && (
+                              <option value={selectedTicket.assigned_to} disabled>
+                                {selectedTicket.assigned_to_name || "Inactive support agent"}
+                              </option>
+                            )}
+                            {supportAgents.map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.full_name}{agent.email ? ` (${agent.email})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                         <select
                           value={selectedTicket.status?.toLowerCase() || "open"}
                           onChange={(e) => handleUpdateTicket({ status: e.target.value })}

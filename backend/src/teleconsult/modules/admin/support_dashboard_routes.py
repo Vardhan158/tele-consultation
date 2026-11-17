@@ -1468,6 +1468,15 @@ async def update_support_ticket(
             {"$set": updates},
         )
 
+    if payload.escalated_to:
+        await ensure_ticket_escalation(
+            db,
+            {**ticket, **updates, "escalated_to": payload.escalated_to},
+            actor_id=principal.user_id,
+            clinic_id=principal.clinic_id,
+            now=now,
+        )
+
     # PRD Section 16 Specific Notification Dispatch Triggers
     req_id = ticket.get("requester_id") or ticket.get("patient_id") or ticket.get("created_by")
     notification_assignee = payload.assigned_to or ticket.get("assigned_to")
@@ -1593,6 +1602,95 @@ ESCALATION_TEAM_MAP = {
 }
 
 
+async def ensure_ticket_escalation(
+    db: Any,
+    ticket: dict[str, Any],
+    *,
+    actor_id: str,
+    clinic_id: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """Persist one escalation record for an escalated support ticket."""
+    ticket_id = str(ticket.get("id") or ticket.get("ticket_id") or "")
+    tenant_id = str(ticket.get("tenant_id") or "")
+    destination_team = str(ticket.get("escalated_to") or "").strip()
+    if not ticket_id or not tenant_id or not destination_team:
+        return None
+
+    existing = await db["escalations"].find_one({
+        "tenant_id": tenant_id,
+        "original_ticket_id": ticket_id,
+    })
+    if existing:
+        return existing
+
+    timestamp = now or datetime.now(UTC)
+    escalation_id = f"ESC-{secrets_ticket_id()}"
+    priority = str(ticket.get("priority") or "high").lower()
+    category = str(ticket.get("category") or "general").lower()
+    issue = str(ticket.get("description") or ticket.get("subject") or "Escalated support issue")
+    history_entry = {
+        "id": str(uuid4()),
+        "action": "escalation_created",
+        "actor_id": actor_id,
+        "details": f"Escalated to {destination_team} (Status: PENDING)",
+        "created_at": timestamp.isoformat(),
+    }
+    doc = {
+        "id": escalation_id,
+        "tenant_id": tenant_id,
+        "clinic_id": ticket.get("clinic_id") or clinic_id,
+        "original_ticket_id": ticket_id,
+        "ticket_subject": ticket.get("subject", ""),
+        "issue": issue,
+        "escalation_category": category,
+        "destination_team": destination_team,
+        "priority": priority,
+        "reason": issue,
+        "impact_description": issue,
+        "status": "PENDING",
+        "assigned_owner": None,
+        "rejection_reason": None,
+        "incident_id": None,
+        "supporting_references": {
+            "patient_id": ticket.get("patient_id"),
+            "doctor_id": ticket.get("doctor_id"),
+            "appointment_id": ticket.get("appointment_id"),
+        },
+        "expected_follow_up": "4 hours",
+        "notes": [],
+        "history": [history_entry],
+        "created_by": actor_id,
+        "created_at": timestamp,
+        "escalation_timestamp": timestamp,
+        "updated_at": timestamp,
+        "source": "ticket_escalation",
+    }
+    result = await db["escalations"].insert_one(doc)
+    if not result.acknowledged:
+        raise HTTPException(503, "Escalation record could not be persisted")
+
+    await db["support_tickets"].update_one(
+        {"tenant_id": tenant_id, "id": ticket_id},
+        {"$set": {"escalation_id": escalation_id, "updated_at": timestamp}},
+    )
+    await db["audit_logs"].insert_one({
+        "id": str(uuid4()),
+        "tenant_id": tenant_id,
+        "actor_id": actor_id,
+        "action": "escalation.created",
+        "target_id": escalation_id,
+        "metadata": {
+            "ticket_id": ticket_id,
+            "team": destination_team,
+            "priority": priority,
+            "source": "ticket_escalation",
+        },
+        "created_at": timestamp,
+    })
+    return doc
+
+
 # ============================================================================
 # Screen 6: Inter-Team Escalations Management (PRD Section 10)
 # ============================================================================
@@ -1608,6 +1706,18 @@ async def list_escalations(
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
     db = mongo_database.database()
+    escalated_tickets = db["support_tickets"].find({
+        "tenant_id": principal.tenant_id,
+        "escalated_to": {"$nin": [None, ""]},
+    })
+    async for ticket in escalated_tickets:
+        await ensure_ticket_escalation(
+            db,
+            ticket,
+            actor_id=principal.user_id,
+            clinic_id=principal.clinic_id,
+        )
+
     query: dict[str, Any] = {"tenant_id": principal.tenant_id}
     if status:
         query["status"] = status
@@ -1632,6 +1742,12 @@ async def create_escalation(
     ticket = await db["support_tickets"].find_one({"tenant_id": principal.tenant_id, "id": payload.original_ticket_id})
     if not ticket:
         raise HTTPException(404, "Original support ticket not found")
+    existing = await db["escalations"].find_one({
+        "tenant_id": principal.tenant_id,
+        "original_ticket_id": payload.original_ticket_id,
+    })
+    if existing:
+        return _clean(existing)
 
     now = datetime.now(UTC)
     escalation_id = f"ESC-{secrets_ticket_id()}"
@@ -1651,6 +1767,7 @@ async def create_escalation(
         "clinic_id": principal.clinic_id,
         "original_ticket_id": payload.original_ticket_id,
         "ticket_subject": ticket.get("subject", ""),
+        "issue": ticket.get("description") or payload.reason,
         "escalation_category": payload.escalation_category,
         "destination_team": team,
         "priority": payload.priority,
@@ -1670,6 +1787,7 @@ async def create_escalation(
         "history": [history_entry],
         "created_by": principal.user_id,
         "created_at": now,
+        "escalation_timestamp": now,
         "updated_at": now,
     }
 
