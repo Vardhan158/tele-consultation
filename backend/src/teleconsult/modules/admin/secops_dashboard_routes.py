@@ -1092,7 +1092,7 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
         tenant_q = _build_tenant_query(principal)
         tenant_id_val = str(principal.tenant_id or "default")
 
-        backups = [_clean(x) async for x in db["secops_backups"].find({
+        raw_backups = [_clean(x) async for x in db["secops_backups"].find({
             "$or": [
                 tenant_q,
                 {"tenant_id": {"$exists": False}},
@@ -1102,7 +1102,14 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
                 {"tenant_id": "1"},
                 {"tenant_id": str(principal.tenant_id)},
             ]
-        }).sort("created_at", -1).limit(50)]
+        })]
+
+        # Python-level robust chronological sort to eliminate MongoDB BSON String vs Date type sorting mismatches
+        backups = sorted(
+            raw_backups,
+            key=lambda x: _as_utc_datetime(x.get("created_at") or x.get("started_at"), fallback=now),
+            reverse=True,
+        )[:50]
 
         recovery_requests = [_clean(x) async for x in db["secops_recovery_requests"].find({
             "$or": [
@@ -1265,7 +1272,9 @@ async def verify_backup_artifact(
         )
         raise HTTPException(422, f"Backup artifact #{backup_id} verification failed: invalid size or status")
 
-    seed = f"{backup_id}:{size_mb}:{backup.get('created_at', now)}:{tenant_id_val}"
+    created_at_dt = _as_utc_datetime(backup.get("created_at"), fallback=now - timedelta(hours=6))
+
+    seed = f"{backup_id}:{size_mb}:{created_at_dt.isoformat()}:{tenant_id_val}"
     checksum = f"sha256:{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:16]}"
 
     updates = {
@@ -1277,7 +1286,7 @@ async def verify_backup_artifact(
         "status": bkp_status,
         "size_mb": size_mb,
         "recovery_point": backup.get("recovery_point") or (now - timedelta(hours=6)).isoformat(),
-        "created_at": backup.get("created_at") or (now - timedelta(hours=6)),
+        "created_at": created_at_dt,
         "artifact_verified": True,
         "verification_status": "VERIFIED",
         "sha256_checksum": checksum,

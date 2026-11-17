@@ -148,3 +148,93 @@ async def test_corrupted_backup_artifact_fails_verification() -> None:
 
     assert exc_info.value.status_code == 422
     assert "verification failed" in str(exc_info.value.detail).lower()
+
+
+@pytest.mark.asyncio
+async def test_end_to_end_creation_verification_and_refresh_listing() -> None:
+    principal = MongoPrincipal(
+        user_id="secops_agent_1",
+        tenant_id="default",
+        role="secops",
+    )
+
+    storage = {}
+    mock_db = MagicMock()
+    mock_collection = MagicMock()
+
+    async def mock_find_one(query):
+        req_id = query.get("id") or query.get("backup_id")
+        if not req_id and "$or" in query:
+            for item in query["$or"]:
+                if "id" in item:
+                    req_id = item["id"]
+                    break
+                if "backup_id" in item:
+                    req_id = item["backup_id"]
+                    break
+        return storage.get(req_id)
+
+    async def mock_insert_one(doc):
+        doc_id = doc.get("id") or doc.get("backup_id")
+        storage[doc_id] = dict(doc)
+        return MagicMock(acknowledged=True)
+
+    async def mock_update_one(filter_q, update_q, upsert=False):
+        req_id = filter_q.get("id") or filter_q.get("backup_id")
+        if not req_id and "$or" in filter_q:
+            for item in filter_q["$or"]:
+                if "id" in item:
+                    req_id = item["id"]
+                    break
+                if "backup_id" in item:
+                    req_id = item["backup_id"]
+                    break
+        if req_id in storage:
+            storage[req_id].update(update_q.get("$set", {}))
+        elif upsert and req_id:
+            storage[req_id] = update_q.get("$set", {})
+        return MagicMock(acknowledged=True)
+
+    class InMemoryCursor:
+        def __init__(self, items):
+            self.items = list(items)
+
+        def sort(self, *args, **kwargs):
+            return self
+
+        def limit(self, *args, **kwargs):
+            return self
+
+        def __aiter__(self):
+            self.iter = iter(self.items)
+            return self
+
+        async def __anext__(self):
+            try:
+                return next(self.iter)
+            except StopIteration:
+                raise StopAsyncIteration
+
+    mock_collection.find_one = AsyncMock(side_effect=mock_find_one)
+    mock_collection.insert_one = AsyncMock(side_effect=mock_insert_one)
+    mock_collection.update_one = AsyncMock(side_effect=mock_update_one)
+    mock_collection.find.side_effect = lambda *args, **kwargs: InMemoryCursor(storage.values())
+    mock_db.__getitem__.side_effect = lambda name: mock_collection
+
+    with patch("teleconsult.kernel.mongodb.client.mongo_database.database", return_value=mock_db):
+        created = await secops_dashboard_routes.trigger_manual_backup(principal)
+        bkp_id = created["id"]
+        assert bkp_id in storage
+        assert storage[bkp_id]["verification_status"] == "PENDING"
+
+        verified_res = await verify_backup_artifact(bkp_id, principal)
+        assert verified_res["verification_status"] == "VERIFIED"
+        assert storage[bkp_id]["verification_status"] == "VERIFIED"
+        assert storage[bkp_id]["artifact_verified"] is True
+
+        refreshed = await get_backup_readiness(principal)
+        assert len(refreshed["backups"]) >= 1
+        found = next((b for b in refreshed["backups"] if b["id"] == bkp_id), None)
+        assert found is not None
+        assert found["verification_status"] == "VERIFIED"
+        assert found["artifact_verified"] is True
