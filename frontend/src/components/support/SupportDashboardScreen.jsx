@@ -1746,17 +1746,6 @@ function SupportDashboardContent({ user, onLogout }) {
               </button>
             </div>
 
-            {/* Privacy Alert Banner (PRD Section 9.3) */}
-            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-900 flex items-start gap-3">
-              <span className="material-symbols-outlined text-amber-600 text-lg shrink-0 mt-0.5">lock</span>
-              <div>
-                <p className="font-bold">Strict Consultation Privacy Policy (PRD Section 9.3)</p>
-                <p className="mt-0.5 text-amber-800">
-                  Support agents must not join private consultations as a hidden participant or access clinical audio/video content. All diagnostic inspection is performed on sanitized WebRTC signaling events.
-                </p>
-              </div>
-            </div>
-
             {/* Video Diagnostics Card */}
             {videoDiagLoading ? (
               <div className="bg-white p-12 rounded-2xl border border-zinc-200 text-center text-zinc-400">
