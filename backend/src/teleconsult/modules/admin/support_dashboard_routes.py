@@ -81,6 +81,20 @@ def _build_tenant_query(principal: MongoPrincipal) -> dict[str, Any]:
     }
 
 
+async def resolve_actor_name(db: Any, tenant_id: str, actor_id: str | None) -> str:
+    if not actor_id or actor_id in {"system", "Unassigned", "—"}:
+        return actor_id or "System"
+    if len(actor_id) < 20 and not actor_id.startswith("0000"):
+        return actor_id
+    try:
+        user = await db["users"].find_one({"$or": [{"id": actor_id}, {"user_id": actor_id}]})
+        if user:
+            return user.get("full_name") or user.get("name") or user.get("email") or actor_id
+    except Exception:
+        pass
+    return actor_id
+
+
 class TicketCreate(BaseModel):
     subject: str = Field(min_length=3, max_length=150)
     description: str = Field(min_length=5, max_length=5000)
@@ -97,10 +111,6 @@ class TicketCreate(BaseModel):
     reporter_name: str | None = None
     reporter_email: str | None = None
     user_type: str | None = Field(default="patient", max_length=30)  # patient, doctor, clinic_admin, other
-    related_record_id: str | None = None
-    reporter_name: str | None = None
-    reporter_email: str | None = None
-    user_type: str | None = Field(default="patient", max_length=30)  # patient, doctor, clinic_admin
 
 
 class TicketUpdate(BaseModel):
