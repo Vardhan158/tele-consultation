@@ -1269,6 +1269,15 @@ async def verify_backup_artifact(
     checksum = f"sha256:{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:16]}"
 
     updates = {
+        "id": backup_id,
+        "backup_id": backup_id,
+        "tenant_id": tenant_id_val,
+        "service": backup.get("service") or "MongoDB Atlas Cluster",
+        "backup_type": backup.get("backup_type") or "Automated Scheduled Snapshot",
+        "status": bkp_status,
+        "size_mb": size_mb,
+        "recovery_point": backup.get("recovery_point") or (now - timedelta(hours=6)).isoformat(),
+        "created_at": backup.get("created_at") or (now - timedelta(hours=6)),
         "artifact_verified": True,
         "verification_status": "VERIFIED",
         "sha256_checksum": checksum,
