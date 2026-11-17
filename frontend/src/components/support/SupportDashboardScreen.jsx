@@ -111,6 +111,8 @@ function SupportDashboardContent({ user, onLogout }) {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [newNoteText, setNewNoteText] = useState("");
+  const [supportAgents, setSupportAgents] = useState([]);
+  const [supportAgentsLoading, setSupportAgentsLoading] = useState(false);
 
   // Create Ticket Modal State
   const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
@@ -251,6 +253,18 @@ function SupportDashboardContent({ user, onLogout }) {
       addToast(err.message || "Failed to load tickets", "error");
     } finally {
       setTicketsLoading(false);
+    }
+  };
+
+  const loadSupportAgents = async () => {
+    setSupportAgentsLoading(true);
+    try {
+      const res = await supportDashboardApi.agents();
+      setSupportAgents(res.items || []);
+    } catch (err) {
+      addToast(err.message || "Failed to load active support agents", "error");
+    } finally {
+      setSupportAgentsLoading(false);
     }
   };
 
@@ -428,7 +442,10 @@ function SupportDashboardContent({ user, onLogout }) {
     else if (activeTab === "video") { loadVideoSessions(); if (videoQuery) loadVideoDiagnostics(); }
     else if (activeTab === "escalations") loadEscalations();
     else if (activeTab === "audit_history") loadAuditHistory();
-    else if (activeTab === "tickets") loadTickets();
+    else if (activeTab === "tickets") {
+      loadTickets();
+      loadSupportAgents();
+    }
   }, [activeTab]);
 
   // Appointment Action Submit
@@ -561,10 +578,8 @@ function SupportDashboardContent({ user, onLogout }) {
     try {
       const updated = await supportDashboardApi.updateTicket(selectedTicket.id, updates);
       setSelectedTicket(updated);
-      addToast("Ticket updated", "success");
-      loadTickets();
-      loadOverview();
-      loadAuditHistory();
+      addToast(Object.hasOwn(updates, "assigned_to") ? "Ticket assignment updated" : "Ticket updated", "success");
+      await Promise.all([loadTickets(), loadOverview(), loadAuditHistory()]);
     } catch (err) {
       addToast(err.message || "Failed to update ticket", "error");
     }
@@ -1964,6 +1979,28 @@ function SupportDashboardContent({ user, onLogout }) {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
+                        <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#1A7D67]/30 bg-[#EEF6F3] text-xs font-bold text-[#155f50]">
+                          <span>Assigned To</span>
+                          <select
+                            aria-label="Assigned To"
+                            value={selectedTicket.assigned_to || ""}
+                            disabled={supportAgentsLoading}
+                            onChange={(e) => handleUpdateTicket({ assigned_to: e.target.value })}
+                            className="bg-transparent outline-none font-semibold text-zinc-800 disabled:opacity-60"
+                          >
+                            <option value="">Unassigned</option>
+                            {selectedTicket.assigned_to && !supportAgents.some((agent) => agent.id === selectedTicket.assigned_to) && (
+                              <option value={selectedTicket.assigned_to} disabled>
+                                {selectedTicket.assigned_to_name || "Inactive support agent"}
+                              </option>
+                            )}
+                            {supportAgents.map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.full_name}{agent.email ? ` (${agent.email})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                         <select
                           value={selectedEscalation.status}
                           onChange={(e) => handleUpdateEscalation(selectedEscalation.id, { status: e.target.value })}

@@ -357,7 +357,7 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
         today = now_dt.isoformat()[:10]
         start_of_today = now_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        all_active_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "status": {"$nin": ["closed", "CLOSED"]}})]
+        scoped_tickets = [_clean(x) async for x in db["support_tickets"].find(tenant_scope)]
 
         open_tickets = 0
         unassigned_tickets = 0
@@ -368,15 +368,17 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
             "technical": 0, "billing": 0, "appointment": 0, "account_access": 0, "clinical": 0, "general": 0
         }
 
-        for t in all_active_tickets:
+        active_statuses = {"OPEN", "NEW", "IN_PROGRESS", "WAITING_FOR_USER", "ESCALATED", "REOPENED"}
+        for t in scoped_tickets:
             status = str(t.get("status") or "OPEN").upper()
+            if status not in active_statuses:
+                continue
             priority = str(t.get("priority") or "MEDIUM").upper()
             created_at_val = t.get("created_at")
             assigned = t.get("assigned_to")
             category = str(t.get("category") or "general").lower()
 
-            if status in {"OPEN", "NEW", "IN_PROGRESS", "WAITING_FOR_USER", "ESCALATED", "REOPENED"}:
-                open_tickets += 1
+            open_tickets += 1
 
             if not assigned or assigned == "unassigned":
                 unassigned_tickets += 1
@@ -395,16 +397,16 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
                 sla_breaches += 1
 
         try:
-            resolved_today = await db["support_tickets"].count_documents({
-                **tenant_scope,
-                "status": {"$in": ["resolved", "closed", "RESOLVED", "CLOSED"]},
-                "$or": [
+            resolved_today = await db["support_tickets"].count_documents({"$and": [
+                tenant_scope,
+                {"status": {"$in": ["resolved", "closed", "RESOLVED", "CLOSED"]}},
+                {"$or": [
                     {"resolved_at": {"$gte": start_of_today}},
                     {"updated_at": {"$gte": start_of_today}},
                     {"resolved_at": {"$gte": today}},
                     {"updated_at": {"$gte": today}},
-                ],
-            })
+                ]},
+            ]})
         except Exception:
             resolved_today = 0
 
@@ -412,7 +414,8 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
         for t in recent_tickets:
             t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
 
-        my_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "assigned_to": principal.user_id, "status": {"$ne": "closed"}}).sort("created_at", -1).limit(6)]
+        queue_statuses = sorted(active_statuses | {status.lower() for status in active_statuses})
+        my_tickets = [_clean(x) async for x in db["support_tickets"].find({**tenant_scope, "assigned_to": principal.user_id, "status": {"$in": queue_statuses}}).sort("created_at", -1).limit(6)]
         for t in my_tickets:
             t["sla"] = get_sla_info(t.get("created_at"), t.get("priority", "medium"), t.get("status", "open"))
 
@@ -1153,6 +1156,29 @@ async def support_end_video_session(
 # Screen 7: Support Ticket & Escalation Desk
 # ============================================================================
 
+@router.get("/agents")
+async def active_support_agents(
+    principal: MongoPrincipal = Depends(support_agent),
+) -> dict[str, Any]:
+    db = mongo_database.database()
+    query: dict[str, Any] = {
+        "tenant_id": principal.tenant_id,
+        "role": "support",
+        "active": {"$ne": False},
+    }
+    if principal.clinic_id:
+        query["clinic_id"] = principal.clinic_id
+
+    agents = []
+    async for user in db["users"].find(query).sort("full_name", 1):
+        agents.append({
+            "id": str(user["id"]),
+            "full_name": user.get("full_name") or user.get("name") or user.get("email") or "Support Agent",
+            "email": user.get("email", ""),
+        })
+    return {"items": agents, "total": len(agents)}
+
+
 @router.get("/tickets")
 async def support_tickets(
     status: str = "",
@@ -1318,6 +1344,8 @@ async def update_support_ticket(
     now = datetime.now(UTC)
     updates: dict[str, Any] = {"updated_at": now}
     history_logs = []
+    assignment_changed = False
+    assigned_agent: dict[str, Any] | None = None
 
     if payload.status:
         updates["status"] = payload.status
@@ -1342,15 +1370,42 @@ async def update_support_ticket(
             "created_at": now.isoformat(),
         })
 
-    if payload.assigned_to:
-        updates["assigned_to"] = payload.assigned_to
-        history_logs.append({
-            "id": str(uuid4()),
-            "action": "assigned",
-            "actor_id": principal.user_id,
-            "details": f"Assigned to support agent {payload.assigned_to}",
-            "created_at": now.isoformat(),
-        })
+    if "assigned_to" in payload.model_fields_set:
+        new_assignee_id = (payload.assigned_to or "").strip() or None
+        previous_assignee_id = ticket.get("assigned_to") or None
+        if new_assignee_id:
+            agent_query: dict[str, Any] = {
+                "tenant_id": principal.tenant_id,
+                "id": new_assignee_id,
+                "role": "support",
+                "active": {"$ne": False},
+            }
+            if principal.clinic_id:
+                agent_query["clinic_id"] = principal.clinic_id
+            assigned_agent = await db["users"].find_one(agent_query)
+            if not assigned_agent:
+                raise HTTPException(422, "Assignee must be an active support agent")
+
+        assignment_changed = new_assignee_id != previous_assignee_id
+        updates["assigned_to"] = new_assignee_id
+        previous_name = ticket.get("assigned_to_name") or previous_assignee_id or "Unassigned"
+        new_name = (
+            assigned_agent.get("full_name") or assigned_agent.get("email") or new_assignee_id
+            if assigned_agent
+            else "Unassigned"
+        )
+        updates["assigned_to_name"] = new_name if new_assignee_id else None
+        if assignment_changed:
+            action = "unassigned" if not new_assignee_id else (
+                "reassigned" if previous_assignee_id else "assigned"
+            )
+            history_logs.append({
+                "id": str(uuid4()),
+                "action": action,
+                "actor_id": principal.user_id,
+                "details": f"Assignment changed from {previous_name} to {new_name}",
+                "created_at": now.isoformat(),
+            })
 
     if payload.escalated_to:
         updates["escalated_to"] = payload.escalated_to
@@ -1415,9 +1470,9 @@ async def update_support_ticket(
 
     # PRD Section 16 Specific Notification Dispatch Triggers
     req_id = ticket.get("requester_id") or ticket.get("patient_id") or ticket.get("created_by")
-    assigned_agent = payload.assigned_to or ticket.get("assigned_to")
+    notification_assignee = payload.assigned_to or ticket.get("assigned_to")
 
-    if payload.assigned_to:
+    if assignment_changed and payload.assigned_to:
         # Trigger 2: Ticket assigned -> Alert to support agent
         await dispatch_support_notification(
             db, principal.tenant_id, payload.assigned_to,
@@ -1447,7 +1502,7 @@ async def update_support_ticket(
         elif st_upper == "REOPENED":
             # Trigger 7: Ticket reopened -> Alert to assigned agent
             await dispatch_support_notification(
-                db, principal.tenant_id, assigned_agent,
+                db, principal.tenant_id, notification_assignee,
                 "support_ticket_reopened",
                 f"Support Ticket #{ticket_id} Reopened",
                 f"Ticket #{ticket_id} ('{ticket.get('subject')}') was reopened."
@@ -1470,13 +1525,27 @@ async def update_support_ticket(
             f"Ticket #{ticket_id} ('{ticket.get('subject')}') has been escalated to {payload.escalated_to}."
         )
 
+    audit_metadata = {
+        "status": payload.status,
+        "priority": payload.priority,
+        "escalated_to": payload.escalated_to,
+    }
+    audit_action = "support_ticket.updated"
+    if assignment_changed:
+        audit_action = "support_ticket.assignment_changed"
+        audit_metadata.update({
+            "previous_assigned_to": ticket.get("assigned_to"),
+            "assigned_to": updates.get("assigned_to"),
+            "assigned_to_name": updates.get("assigned_to_name"),
+        })
+
     await db["audit_logs"].insert_one({
         "id": str(uuid4()),
         "tenant_id": principal.tenant_id,
         "actor_id": principal.user_id,
-        "action": "support_ticket.updated",
+        "action": audit_action,
         "target_id": ticket_id,
-        "metadata": {"status": payload.status, "priority": payload.priority, "escalated_to": payload.escalated_to},
+        "metadata": audit_metadata,
         "created_at": now,
     })
 

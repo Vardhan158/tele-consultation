@@ -484,6 +484,7 @@ export const supportStaffApi = {
 
 export const supportDashboardApi = {
   overview: () => apiRequest("/api/v1/support-dashboard/overview"),
+  agents: () => apiRequest("/api/v1/support-dashboard/agents"),
   accountDiagnostics: (query) =>
     apiRequest(`/api/v1/support-dashboard/account-diagnostics?query=${encodeURIComponent(query)}`),
   accountAction: (userId, action, ticketId = null, note = null) =>
