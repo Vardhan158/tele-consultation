@@ -1137,7 +1137,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
               <div>
                 <h3 className="text-base font-bold text-[#162623] flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#295255]">cloud_sync</span>
-                  External Provider Dependency Outage Monitoring (PRD Section 9)
+                  External Provider Dependency Outage Monitoring
                 </h3>
                 <p className="text-xs text-[#577877]">Monitor database, payment gateway, transactional email, video signaling, and hosting providers.</p>
               </div>
@@ -1148,17 +1148,6 @@ function SecOpsDashboardContent({ user, onLogout }) {
               >
                 Refresh Provider Probes
               </button>
-            </div>
-
-            {/* Provider Rules Notice Banner (PRD Section 9.4) */}
-            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
-              <span className="material-symbols-outlined text-amber-700 text-lg shrink-0 mt-0.5">warning</span>
-              <div>
-                <p className="font-bold">Provider Monitoring Protocol (PRD Section 9.4)</p>
-                <p className="mt-0.5 text-amber-800">
-                  External status pages provide supplemental evidence, not proof that internal integration functions. Real OTP emails or payments are never dispatched solely for health probes. Credentials and API keys remain protected.
-                </p>
-              </div>
             </div>
 
             {/* Provider Monitoring Table (PRD Section 9.4) */}
