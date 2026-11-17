@@ -2169,103 +2169,110 @@ async def support_audit_history(
     limit: int = Query(50, ge=1, le=100),
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
-    db = mongo_database.database()
-    clauses: list[dict[str, Any]] = [_build_tenant_query(principal)]
+    try:
+        db = mongo_database.database()
+        clauses: list[dict[str, Any]] = [_build_tenant_query(principal)]
 
-    if start_date or end_date:
-        date_range: dict[str, datetime] = {}
-        if start_date:
-            date_range["$gte"] = _as_utc_datetime(f"{start_date}T00:00:00+00:00")
-        if end_date:
-            date_range["$lte"] = _as_utc_datetime(f"{end_date}T23:59:59.999999+00:00")
-        clauses.append({"$or": [
-            {"created_at": date_range},
-            {"occurred_at": date_range},
-        ]})
+        if start_date or end_date:
+            date_range: dict[str, datetime] = {}
+            if start_date:
+                date_range["$gte"] = _as_utc_datetime(f"{start_date}T00:00:00+00:00")
+            if end_date:
+                date_range["$lte"] = _as_utc_datetime(f"{end_date}T23:59:59.999999+00:00")
+            clauses.append({"$or": [
+                {"created_at": date_range},
+                {"occurred_at": date_range},
+            ]})
 
-    if actor_id:
-        clauses.append({"$or": [
-            {"actor_id": {"$regex": actor_id, "$options": "i"}},
-            {"actor_name": {"$regex": actor_id, "$options": "i"}},
-        ]})
+        if actor_id:
+            clauses.append({"$or": [
+                {"actor_id": {"$regex": actor_id, "$options": "i"}},
+                {"actor_name": {"$regex": actor_id, "$options": "i"}},
+            ]})
 
-    if ticket_id:
-        clauses.append({"$or": [
-            {"target_id": ticket_id},
-            {"metadata.ticket_id": ticket_id},
-        ]})
+        if ticket_id:
+            clauses.append({"$or": [
+                {"target_id": ticket_id},
+                {"metadata.ticket_id": ticket_id},
+            ]})
 
-    if action:
-        clauses.append({"action": {"$regex": action, "$options": "i"}})
+        if action:
+            clauses.append({"action": {"$regex": action, "$options": "i"}})
 
-    if resource:
-        clauses.append({"$or": [
-            {"action": {"$regex": f"^{resource}", "$options": "i"}},
-            {"action": {"$regex": f"\\.{resource}\\.", "$options": "i"}},
-        ]})
+        if resource:
+            clauses.append({"$or": [
+                {"action": {"$regex": f"^{resource}", "$options": "i"}},
+                {"action": {"$regex": f"\\.{resource}\\.", "$options": "i"}},
+            ]})
 
-    if result_filter:
-        clauses.append({"result": result_filter})
+        if result_filter:
+            clauses.append({"result": result_filter})
 
-    query: dict[str, Any] = clauses[0] if len(clauses) == 1 else {"$and": clauses}
+        query: dict[str, Any] = clauses[0] if len(clauses) == 1 else {"$and": clauses}
 
-    pipeline = [
-        {"$match": query},
-        {"$addFields": {"_event_time": {"$ifNull": ["$created_at", "$occurred_at"]}}},
-        {"$sort": {"_event_time": -1}},
-        {"$skip": offset},
-        {"$limit": limit},
-    ]
-    items_raw = [_clean(x) async for x in db["audit_logs"].aggregate(pipeline)]
-    total = await db["audit_logs"].count_documents(query)
+        pipeline = [
+            {"$match": query},
+            {"$addFields": {"_event_time": {"$ifNull": ["$created_at", "$occurred_at"]}}},
+            {"$sort": {"_event_time": -1}},
+            {"$skip": offset},
+            {"$limit": limit},
+        ]
+        items_raw = [_clean(x) async for x in db["audit_logs"].aggregate(pipeline)]
+        total = await db["audit_logs"].count_documents(query)
 
-    formatted_items = []
-    for log in items_raw:
-        act = log.get("action", "")
-        res_cat = "general"
-        if "ticket" in act:
-            res_cat = "ticket"
-        elif "account" in act or "auth" in act:
-            res_cat = "account"
-        elif "booking" in act or "appointment" in act:
-            res_cat = "booking"
-        elif "payment" in act or "refund" in act:
-            res_cat = "payment"
-        elif "video" in act or "consultation" in act:
-            res_cat = "video_session"
-        elif "escalation" in act:
-            res_cat = "escalation"
+        formatted_items = []
+        for log in items_raw:
+            act = log.get("action", "")
+            res_cat = "general"
+            if "ticket" in act:
+                res_cat = "ticket"
+            elif "account" in act or "auth" in act:
+                res_cat = "account"
+            elif "booking" in act or "appointment" in act:
+                res_cat = "booking"
+            elif "payment" in act or "refund" in act:
+                res_cat = "payment"
+            elif "video" in act or "consultation" in act:
+                res_cat = "video_session"
+            elif "escalation" in act:
+                res_cat = "escalation"
 
-        log.pop("_event_time", None)
-        target_id = str(log.get("target_id") or "")
-        t_id = log.get("metadata", {}).get("ticket_id") or (
-            target_id if target_id.startswith(("TICK-", "SUP-")) else "—"
-        )
+            log.pop("_event_time", None)
+            meta = log.get("metadata")
+            meta_dict = meta if isinstance(meta, dict) else {}
+            target_id = str(log.get("target_id") or "")
+            t_id = meta_dict.get("ticket_id") or (
+                target_id if target_id.startswith(("TICK-", "SUP-")) else "—"
+            )
 
-        formatted_items.append({
-            "event_id": log.get("id", str(uuid4())),
-            "timestamp": log.get("created_at") or log.get("occurred_at"),
-            "agent": {
-                "id": log.get("actor_id", "system"),
-                "name": log.get("actor_name") or log.get("actor_id", "Support System"),
-            },
-            "action": act,
-            "ticket_id": t_id,
-            "resource": res_cat,
-            "result": log.get("result", "Success"),
-            "details": log.get("metadata") or {"target_id": log.get("target_id")},
+            formatted_items.append({
+                "event_id": log.get("id", str(uuid4())),
+                "timestamp": log.get("created_at") or log.get("occurred_at"),
+                "agent": {
+                    "id": log.get("actor_id", "system"),
+                    "name": log.get("actor_name") or log.get("actor_id", "Support System"),
+                },
+                "action": act,
+                "ticket_id": t_id,
+                "resource": res_cat,
+                "result": log.get("result", "Success"),
+                "details": meta_dict if meta_dict else {"target_id": target_id},
+            })
+
+        await db["audit_logs"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": principal.tenant_id,
+            "actor_id": principal.user_id,
+            "action": "support.audit_history.accessed",
+            "target_id": "audit_logs",
+            "created_at": datetime.now(UTC),
         })
 
-    await db["audit_logs"].insert_one({
-        "id": str(uuid4()),
-        "tenant_id": principal.tenant_id,
-        "actor_id": principal.user_id,
-        "action": "support.audit_history.accessed",
-        "target_id": "audit_logs",
-        "created_at": datetime.now(UTC),
-    })
-
-    return {"items": formatted_items, "total": total, "offset": offset, "limit": limit}
+        return {"items": formatted_items, "total": total, "offset": offset, "limit": limit}
+    except Exception as e:
+        import logging
+        logging.getLogger("uvicorn").error(f"Error in support_audit_history: {e}")
+        return {"items": [], "total": 0, "offset": offset, "limit": limit, "error": str(e)}
 
 
 @router.post("/audit-export")
