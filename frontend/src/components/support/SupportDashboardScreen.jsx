@@ -521,6 +521,10 @@ function SupportDashboardContent({ user, onLogout }) {
         reporter_email: newTicketForm.requester_email,
       });
 
+      if (!createdTicket?.persistence_confirmed) {
+        throw new Error("The backend did not confirm that the support ticket was saved.");
+      }
+
       addToast(`Support ticket #${createdTicket.id || createdTicket.ticket_id || ""} created successfully`, "success");
       setShowCreateTicketModal(false);
       setNewTicketForm({

@@ -9,10 +9,10 @@ Provides support agents and administrators with full operational oversight:
 6. Video Consultation Diagnostics & Control
 7. Support Ticket & Escalation Desk
 """
+import base64
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
-import base64
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
@@ -144,21 +144,32 @@ def calculate_sla_due_at(created_at: datetime, priority: str) -> datetime:
     return created_at + timedelta(hours=hours)
 
 
-def get_sla_info(created_at_val: Any, priority: str, status: str) -> dict[str, Any]:
-    if isinstance(created_at_val, str):
+def _as_utc_datetime(value: Any, *, fallback: datetime | None = None) -> datetime:
+    """Normalize Mongo BSON and legacy ISO timestamps to aware UTC datetimes."""
+    if isinstance(value, str):
         try:
-            created_dt = datetime.fromisoformat(created_at_val.replace("Z", "+00:00"))
-        except Exception:
-            created_dt = datetime.now(UTC)
-    elif isinstance(created_at_val, datetime):
-        created_dt = created_at_val
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            parsed = fallback or datetime.now(UTC)
+    elif isinstance(value, datetime):
+        parsed = value
     else:
-        created_dt = datetime.now(UTC)
+        parsed = fallback or datetime.now(UTC)
 
-    due_at = calculate_sla_due_at(created_dt, priority)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def get_sla_info(created_at_val: Any, priority: str, status: str) -> dict[str, Any]:
+    created_dt = _as_utc_datetime(created_at_val)
+
+    normalized_priority = str(priority or "medium").lower()
+    normalized_status = str(status or "open").lower()
+    due_at = calculate_sla_due_at(created_dt, normalized_priority)
     now = datetime.now(UTC)
 
-    if status in {"resolved", "closed"}:
+    if normalized_status in {"resolved", "closed"}:
         sla_state = "met"
     elif now > due_at:
         sla_state = "breached"
@@ -170,7 +181,7 @@ def get_sla_info(created_at_val: Any, priority: str, status: str) -> dict[str, A
     return {
         "due_at": due_at.isoformat(),
         "status": sla_state,
-        "hours_target": 2 if priority == "urgent" else 4 if priority == "high" else 12 if priority == "medium" else 24,
+        "hours_target": 2 if normalized_priority == "urgent" else 4 if normalized_priority == "high" else 12 if normalized_priority == "medium" else 24,
     }
 
 
@@ -339,8 +350,8 @@ async def download_ticket_attachment(
 
 @router.get("/overview")
 async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -> dict[str, Any]:
+    db = mongo_database.database()
     try:
-        db = mongo_database.database()
         tenant_scope = _build_tenant_query(principal)
         now_dt = datetime.now(UTC)
         today = now_dt.isoformat()[:10]
@@ -423,25 +434,10 @@ async def support_overview(principal: MongoPrincipal = Depends(support_agent)) -
             "my_tickets": my_tickets,
             "recent_activity": recent_activity,
         }
-    except Exception as e:
+    except Exception as exc:
         import logging
-        logging.getLogger("uvicorn").error(f"Error in support_overview: {e}")
-        return {
-            "kpis": {
-                "open_tickets": 0,
-                "unassigned_tickets": 0,
-                "urgent_tickets": 0,
-                "resolved_today": 0,
-                "sla_breaches": 0,
-                "my_assigned_tickets": 0,
-                "active_video_rooms": 0,
-            },
-            "category_summary": {"technical": 0, "billing": 0, "appointment": 0, "account_access": 0, "clinical": 0, "general": 0},
-            "recent_tickets": [],
-            "my_tickets": [],
-            "recent_activity": [],
-            "error": str(e),
-        }
+        logging.getLogger("uvicorn").exception("Support overview query failed")
+        raise HTTPException(503, "Support dashboard data is temporarily unavailable") from exc
 
 
 def mask_email(email: str) -> str:
@@ -1257,13 +1253,6 @@ async def create_support_ticket(
             "doctor_id": payload.doctor_id,
             "related_record_id": payload.related_record_id,
         },
-        "assigned_to": principal.user_id,
-        "escalated_to": None,
-        "related_resources": {
-            "appointment_id": payload.appointment_id,
-            "doctor_id": payload.doctor_id,
-            "related_record_id": payload.related_record_id,
-        },
         "version": 1,
         "notes": [],
         "history": [history_entry],
@@ -1272,7 +1261,9 @@ async def create_support_ticket(
         "resolved_at": None,
     }
 
-    await db["support_tickets"].insert_one(ticket_doc)
+    insert_result = await db["support_tickets"].insert_one(ticket_doc)
+    if not insert_result.acknowledged:
+        raise HTTPException(503, "Support ticket could not be persisted")
     await db["support_ticket_events"].insert_one({
         "id": str(uuid4()),
         "tenant_id": principal.tenant_id,
@@ -1300,8 +1291,16 @@ async def create_support_ticket(
         "metadata": {"category": cat, "priority": prio},
         "created_at": now,
     })
-    res = _clean(ticket_doc)
+    persisted_ticket = await db["support_tickets"].find_one({
+        "tenant_id": principal.tenant_id,
+        "id": ticket_id,
+    })
+    if not persisted_ticket:
+        raise HTTPException(503, "Support ticket persistence could not be confirmed")
+
+    res = _clean(persisted_ticket)
     res["sla"] = get_sla_info(now, prio, "OPEN")
+    res["persistence_confirmed"] = True
     return res
 
 
@@ -1387,7 +1386,7 @@ async def update_support_ticket(
             "id": str(uuid4()),
             "action": "note_added",
             "actor_id": principal.user_id,
-            "details": f"Internal support note added",
+            "details": "Internal support note added",
             "created_at": now.isoformat(),
         })
         await db["support_ticket_events"].insert_one({
@@ -1767,39 +1766,53 @@ async def support_audit_history(
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
     db = mongo_database.database()
-    query: dict[str, Any] = _build_tenant_query(principal)
+    clauses: list[dict[str, Any]] = [_build_tenant_query(principal)]
 
     if start_date or end_date:
-        query["created_at"] = {
-            **({"$gte": start_date} if start_date else {}),
-            **({"$lte": f"{end_date}T23:59:59"} if end_date else {}),
-        }
+        date_range: dict[str, datetime] = {}
+        if start_date:
+            date_range["$gte"] = _as_utc_datetime(f"{start_date}T00:00:00+00:00")
+        if end_date:
+            date_range["$lte"] = _as_utc_datetime(f"{end_date}T23:59:59.999999+00:00")
+        clauses.append({"$or": [
+            {"created_at": date_range},
+            {"occurred_at": date_range},
+        ]})
 
     if actor_id:
-        query["$or"] = [
+        clauses.append({"$or": [
             {"actor_id": {"$regex": actor_id, "$options": "i"}},
             {"actor_name": {"$regex": actor_id, "$options": "i"}},
-        ]
+        ]})
 
     if ticket_id:
-        query["$or"] = [
+        clauses.append({"$or": [
             {"target_id": ticket_id},
             {"metadata.ticket_id": ticket_id},
-        ]
+        ]})
 
     if action:
-        query["action"] = {"$regex": action, "$options": "i"}
+        clauses.append({"action": {"$regex": action, "$options": "i"}})
 
     if resource:
-        query["$or"] = [
+        clauses.append({"$or": [
             {"action": {"$regex": f"^{resource}", "$options": "i"}},
             {"action": {"$regex": f"\\.{resource}\\.", "$options": "i"}},
-        ]
+        ]})
 
     if result_filter:
-        query["result"] = result_filter
+        clauses.append({"result": result_filter})
 
-    items_raw = [_clean(x) async for x in db["audit_logs"].find(query).sort("created_at", -1).skip(offset).limit(limit)]
+    query: dict[str, Any] = clauses[0] if len(clauses) == 1 else {"$and": clauses}
+
+    pipeline = [
+        {"$match": query},
+        {"$addFields": {"_event_time": {"$ifNull": ["$created_at", "$occurred_at"]}}},
+        {"$sort": {"_event_time": -1}},
+        {"$skip": offset},
+        {"$limit": limit},
+    ]
+    items_raw = [_clean(x) async for x in db["audit_logs"].aggregate(pipeline)]
     total = await db["audit_logs"].count_documents(query)
 
     formatted_items = []
@@ -1819,11 +1832,15 @@ async def support_audit_history(
         elif "escalation" in act:
             res_cat = "escalation"
 
-        t_id = log.get("metadata", {}).get("ticket_id") or (log.get("target_id") if "TICK-" in str(log.get("target_id")) else "—")
+        log.pop("_event_time", None)
+        target_id = str(log.get("target_id") or "")
+        t_id = log.get("metadata", {}).get("ticket_id") or (
+            target_id if target_id.startswith(("TICK-", "SUP-")) else "—"
+        )
 
         formatted_items.append({
             "event_id": log.get("id", str(uuid4())),
-            "timestamp": log.get("created_at"),
+            "timestamp": log.get("created_at") or log.get("occurred_at"),
             "agent": {
                 "id": log.get("actor_id", "system"),
                 "name": log.get("actor_name") or log.get("actor_id", "Support System"),
