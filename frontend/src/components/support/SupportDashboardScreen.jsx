@@ -79,6 +79,10 @@ function SupportDashboardContent({ user, onLogout }) {
   const [escalationsLoading, setEscalationsLoading] = useState(false);
   const [selectedEscalation, setSelectedEscalation] = useState(null);
   const [escalationNoteText, setEscalationNoteText] = useState("");
+  const [escalationAction, setEscalationAction] = useState(null);
+  const [escalationActionText, setEscalationActionText] = useState("");
+  const [escalationActionError, setEscalationActionError] = useState("");
+  const [escalationActionSubmitting, setEscalationActionSubmitting] = useState(false);
 
   // Create Escalation Modal State
   const [showCreateEscalationModal, setShowCreateEscalationModal] = useState(false);
@@ -391,6 +395,53 @@ function SupportDashboardContent({ user, onLogout }) {
       loadEscalations();
     } catch (err) {
       addToast(err.message || "Failed to update escalation", "error");
+    }
+  };
+
+  const openEscalationAction = (type, escalation) => {
+    setEscalationAction({ type, escalation });
+    setEscalationActionText("");
+    setEscalationActionError("");
+  };
+
+  const closeEscalationAction = () => {
+    if (escalationActionSubmitting) return;
+    setEscalationAction(null);
+    setEscalationActionText("");
+    setEscalationActionError("");
+  };
+
+  const handleEscalationActionSubmit = async (e) => {
+    e.preventDefault();
+    const value = escalationActionText.trim();
+    if (!value) {
+      setEscalationActionError(
+        escalationAction?.type === "resolve"
+          ? "Resolution summary is required."
+          : "Rejection reason is required.",
+      );
+      return;
+    }
+
+    setEscalationActionSubmitting(true);
+    setEscalationActionError("");
+    try {
+      const isResolution = escalationAction.type === "resolve";
+      const updated = await supportDashboardApi.updateEscalation(
+        escalationAction.escalation.id,
+        isResolution
+          ? { status: "RESOLVED", resolution_summary: value }
+          : { status: "REJECTED", rejection_reason: value },
+      );
+      setSelectedEscalation(updated);
+      await Promise.all([loadEscalations(), loadAuditHistory()]);
+      addToast(isResolution ? "Escalation resolved successfully" : "Escalation rejected", "success");
+      setEscalationAction(null);
+      setEscalationActionText("");
+    } catch (err) {
+      setEscalationActionError(err.message || "Unable to update this escalation.");
+    } finally {
+      setEscalationActionSubmitting(false);
     }
   };
 
@@ -2028,21 +2079,15 @@ function SupportDashboardContent({ user, onLogout }) {
                         {selectedEscalation.status !== "RESOLVED" && selectedEscalation.status !== "CLOSED" && (
                           <button
                             type="button"
-                            onClick={() => {
-                              const summary = window.prompt("Provide resolution summary for this escalation:");
-                              if (summary) handleUpdateEscalation(selectedEscalation.id, { status: "RESOLVED", resolution_summary: summary });
-                            }}
-                            className="px-3.5 py-2 bg-purple-700 text-white text-xs font-bold rounded-xl hover:bg-purple-800 cursor-pointer"
+                            onClick={() => openEscalationAction("resolve", selectedEscalation)}
+                            className="px-3.5 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 cursor-pointer"
                           >
                             Mark Escalation Resolved
                           </button>
                         )}
                         <button
                           type="button"
-                          onClick={() => {
-                            const rejReason = window.prompt("Reason for rejecting escalation:");
-                            if (rejReason) handleUpdateEscalation(selectedEscalation.id, { status: "REJECTED", rejection_reason: rejReason });
-                          }}
+                          onClick={() => openEscalationAction("reject", selectedEscalation)}
                           className="px-3.5 py-2 bg-red-50 text-red-700 text-xs font-semibold rounded-xl hover:bg-red-100 border border-red-200 cursor-pointer"
                         >
                           Reject Escalation
@@ -2865,6 +2910,114 @@ function SupportDashboardContent({ user, onLogout }) {
                   className="px-5 py-2 text-xs font-semibold text-white bg-[#1A7D67] hover:bg-[#156654] rounded-xl cursor-pointer"
                 >
                   Submit Ticket
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {escalationAction && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="escalation-action-title"
+            className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl border border-emerald-100 animate-in zoom-in-95 duration-200"
+          >
+            <div className={`px-6 py-5 text-white ${escalationAction.type === "resolve" ? "bg-[#176354]" : "bg-red-700"}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined rounded-xl bg-white/15 p-2 text-2xl">
+                    {escalationAction.type === "resolve" ? "task_alt" : "cancel"}
+                  </span>
+                  <div>
+                    <h3 id="escalation-action-title" className="text-lg font-bold">
+                      {escalationAction.type === "resolve" ? "Resolve Escalation" : "Reject Escalation"}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-white/75">
+                      This update will be recorded in the escalation audit timeline.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={escalationActionSubmitting}
+                  onClick={closeEscalationAction}
+                  aria-label="Close modal"
+                  className="rounded-lg p-1.5 text-white/80 hover:bg-white/15 hover:text-white disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleEscalationActionSubmit} className="space-y-5 p-5 sm:p-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Escalation ID</p>
+                  <p className="mt-1 font-mono text-sm font-bold text-[#176354]">{escalationAction.escalation.id}</p>
+                </div>
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Original Ticket ID</p>
+                  <p className="mt-1 font-mono text-sm font-bold text-zinc-800">{escalationAction.escalation.original_ticket_id}</p>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="escalation-action-text" className="mb-1.5 block text-xs font-bold text-zinc-700">
+                  {escalationAction.type === "resolve" ? "Resolution Summary" : "Rejection Reason"}
+                  <span className="ml-1 text-red-500">*</span>
+                </label>
+                <textarea
+                  id="escalation-action-text"
+                  rows={5}
+                  autoFocus
+                  value={escalationActionText}
+                  onChange={(e) => {
+                    setEscalationActionText(e.target.value);
+                    if (escalationActionError) setEscalationActionError("");
+                  }}
+                  placeholder={escalationAction.type === "resolve" ? "Describe the resolution and outcome…" : "Explain why this escalation is being rejected…"}
+                  aria-invalid={Boolean(escalationActionError)}
+                  aria-describedby={escalationActionError ? "escalation-action-error" : undefined}
+                  className={`w-full resize-none rounded-2xl border px-4 py-3 text-sm text-zinc-800 outline-none transition focus:ring-2 ${
+                    escalationActionError
+                      ? "border-red-400 bg-red-50/40 focus:border-red-500 focus:ring-red-100"
+                      : "border-zinc-300 bg-white focus:border-emerald-600 focus:ring-emerald-100"
+                  }`}
+                />
+                {escalationActionError && (
+                  <p id="escalation-action-error" role="alert" className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-600">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {escalationActionError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-zinc-100 pt-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  disabled={escalationActionSubmitting}
+                  onClick={closeEscalationAction}
+                  className="rounded-xl border border-zinc-300 px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={escalationActionSubmitting}
+                  className={`rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${
+                    escalationAction.type === "resolve"
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-red-700 hover:bg-red-800"
+                  }`}
+                >
+                  {escalationActionSubmitting
+                    ? "Saving…"
+                    : escalationAction.type === "resolve"
+                      ? "Confirm Resolution"
+                      : "Confirm Rejection"}
                 </button>
               </div>
             </form>

@@ -1845,12 +1845,17 @@ async def update_escalation(
     if payload.status:
         if payload.status == "REJECTED" and not payload.rejection_reason:
             raise HTTPException(422, "A rejection_reason is required when status is REJECTED")
+        if payload.status == "RESOLVED" and not (payload.resolution_summary or "").strip():
+            raise HTTPException(422, "A resolution_summary is required when status is RESOLVED")
         updates["status"] = payload.status
+        status_details = f"Escalation status changed to {payload.status}"
+        if payload.status == "RESOLVED":
+            status_details = f"Escalation resolved: {payload.resolution_summary.strip()}"
         history_logs.append({
             "id": str(uuid4()),
             "action": f"status_{payload.status.lower()}",
             "actor_id": principal.user_id,
-            "details": f"Escalation status changed to {payload.status}",
+            "details": status_details,
             "created_at": now.isoformat(),
         })
         if payload.status == "RESOLVED":
@@ -1873,7 +1878,7 @@ async def update_escalation(
         updates["incident_id"] = payload.incident_id
 
     if payload.resolution_summary:
-        updates["resolution_summary"] = payload.resolution_summary
+        updates["resolution_summary"] = payload.resolution_summary.strip()
 
     if payload.note:
         note_entry = {
@@ -1927,7 +1932,11 @@ async def update_escalation(
         "actor_id": principal.user_id,
         "action": "escalation.updated",
         "target_id": escalation_id,
-        "metadata": {"status": payload.status, "owner": payload.assigned_owner},
+        "metadata": {
+            "status": payload.status,
+            "owner": payload.assigned_owner,
+            "resolution_summary": updates.get("resolution_summary"),
+        },
         "created_at": now,
     })
 

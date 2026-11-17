@@ -2,13 +2,16 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import HTTPException
 
 from teleconsult.kernel.authz.mongodb_policy import MongoPrincipal
 from teleconsult.modules.admin import support_dashboard_routes
 from teleconsult.modules.admin.support_dashboard_routes import (
+    EscalationUpdate,
     TicketUpdate,
     ensure_ticket_escalation,
     get_sla_info,
+    update_escalation,
     update_support_ticket,
 )
 
@@ -136,3 +139,28 @@ async def test_ticket_escalation_is_persisted_once_and_linked_to_ticket() -> Non
     assert inserted["escalation_timestamp"] == inserted["created_at"]
     assert created == inserted
     assert duplicate == existing
+
+
+@pytest.mark.asyncio
+async def test_resolving_escalation_requires_summary(monkeypatch) -> None:
+    escalations = MagicMock()
+    escalations.find_one = AsyncMock(return_value={
+        "id": "ESC-123456",
+        "tenant_id": "tenant-1",
+        "original_ticket_id": "SUP-950477",
+    })
+    monkeypatch.setattr(
+        support_dashboard_routes.mongo_database,
+        "database",
+        lambda: {"escalations": escalations},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await update_escalation(
+            "ESC-123456",
+            EscalationUpdate(status="RESOLVED", resolution_summary="   "),
+            MongoPrincipal(user_id="agent-1", tenant_id="tenant-1", role="support"),
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail == "A resolution_summary is required when status is RESOLVED"
