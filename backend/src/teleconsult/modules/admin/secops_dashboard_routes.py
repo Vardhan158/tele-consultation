@@ -876,8 +876,9 @@ async def update_incident(
 
 class ProviderMaintenanceRequest(BaseModel):
     provider_key: str
-    status: str = Field(pattern="^(Maintenance|Degraded|Operational|Outage)$")
+    status: str = Field(default="Maintenance", pattern="^(Maintenance|Degraded|Operational|Outage)$")
     maintenance_reason: str = Field(min_length=3, max_length=500)
+    scheduled_start_time: str | None = None
     expected_end_time: str | None = None
 
 
@@ -886,7 +887,7 @@ async def get_provider_status(principal: MongoPrincipal = Depends(secops_user)) 
     db = mongo_database.database()
     now = datetime.now(UTC)
 
-    overrides_doc = await db["user_settings"].find_one({"tenant_id": principal.tenant_id, "setting_key": "secops_provider_overrides"})
+    overrides_doc = await db["user_settings"].find_one({"setting_key": "secops_provider_overrides"})
     overrides = overrides_doc.get("overrides", {}) if overrides_doc else {}
 
     payment_errors = await db["audit_logs"].count_documents({"tenant_id": principal.tenant_id, "action": {"$regex": r"payment.*fail"}, "created_at": {"$gte": now - timedelta(hours=24)}})
@@ -973,37 +974,54 @@ async def record_provider_maintenance(
     payload: ProviderMaintenanceRequest,
     principal: MongoPrincipal = Depends(secops_user),
 ) -> dict[str, Any]:
-    db = mongo_database.database()
-    now = datetime.now(UTC)
+    try:
+        db = mongo_database.database()
+        now = datetime.now(UTC)
 
-    overrides_doc = await db["user_settings"].find_one({"tenant_id": principal.tenant_id, "setting_key": "secops_provider_overrides"})
-    current_overrides = overrides_doc.get("overrides", {}) if overrides_doc else {}
+        user_id_val = principal.user_id or "system_secops"
+        tenant_id_val = principal.tenant_id or "default"
 
-    current_overrides[payload.provider_key] = {
-        "status": payload.status,
-        "maintenance_reason": payload.maintenance_reason,
-        "expected_end_time": payload.expected_end_time,
-        "updated_at": now.isoformat(),
-        "updated_by": principal.user_id,
-    }
+        overrides_doc = await db["user_settings"].find_one({"setting_key": "secops_provider_overrides"})
+        current_overrides = overrides_doc.get("overrides", {}) if overrides_doc else {}
 
-    await db["user_settings"].update_one(
-        {"tenant_id": principal.tenant_id, "setting_key": "secops_provider_overrides"},
-        {"$set": {"tenant_id": principal.tenant_id, "setting_key": "secops_provider_overrides", "overrides": current_overrides, "updated_at": now}},
-        upsert=True,
-    )
+        current_overrides[payload.provider_key] = {
+            "status": payload.status,
+            "maintenance_reason": payload.maintenance_reason,
+            "scheduled_start_time": payload.scheduled_start_time,
+            "expected_end_time": payload.expected_end_time,
+            "updated_at": now.isoformat(),
+            "updated_by": user_id_val,
+        }
 
-    await db["audit_logs"].insert_one({
-        "id": str(uuid4()),
-        "tenant_id": principal.tenant_id,
-        "actor_id": principal.user_id,
-        "action": "secops.provider_maintenance.recorded",
-        "target_id": payload.provider_key,
-        "metadata": {"status": payload.status, "reason": payload.maintenance_reason},
-        "created_at": now,
-    })
+        await db["user_settings"].update_one(
+            {"setting_key": "secops_provider_overrides"},
+            {
+                "$set": {
+                    "tenant_id": tenant_id_val,
+                    "user_id": user_id_val,
+                    "setting_key": "secops_provider_overrides",
+                    "overrides": current_overrides,
+                    "updated_at": now,
+                }
+            },
+            upsert=True,
+        )
 
-    return {"status": "success", "provider_key": payload.provider_key, "new_status": payload.status}
+        await db["audit_logs"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": tenant_id_val,
+            "actor_id": user_id_val,
+            "action": "secops.provider_maintenance.recorded",
+            "target_id": payload.provider_key,
+            "metadata": {"status": payload.status, "reason": payload.maintenance_reason, "scheduled_start_time": payload.scheduled_start_time, "expected_end_time": payload.expected_end_time},
+            "created_at": now,
+        })
+
+        return {"status": "success", "provider_key": payload.provider_key, "new_status": payload.status}
+    except Exception as e:
+        import logging
+        logging.getLogger("uvicorn").error(f"Error in record_provider_maintenance: {e}")
+        raise HTTPException(500, f"Failed to record provider maintenance: {str(e)}")
 
 
 @router.post("/providers/{provider_key}/check")
