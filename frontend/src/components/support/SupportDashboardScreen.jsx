@@ -15,6 +15,20 @@ function safeFormatDate(value, mode = "datetime", fallback = "Date unavailable")
   }
 }
 
+const ESCALATION_STATUS_TRANSITIONS = {
+  PENDING: ["ACCEPTED", "IN_PROGRESS", "REASSIGNED", "RESOLVED", "REJECTED"],
+  ACCEPTED: ["IN_PROGRESS", "REASSIGNED", "RESOLVED", "REJECTED"],
+  IN_PROGRESS: ["REASSIGNED", "RESOLVED", "REJECTED"],
+  REASSIGNED: ["ACCEPTED", "IN_PROGRESS", "RESOLVED", "REJECTED"],
+  RESOLVED: ["CLOSED"],
+  REJECTED: [],
+  CLOSED: [],
+};
+
+function canTransitionEscalation(currentStatus, nextStatus) {
+  return (ESCALATION_STATUS_TRANSITIONS[currentStatus] || []).includes(nextStatus);
+}
+
 function SupportDashboardContent({ user, onLogout }) {
   const { showToast } = useToast();
   const addToast = showToast;
@@ -358,13 +372,13 @@ function SupportDashboardContent({ user, onLogout }) {
     }
   };
 
-  const loadEscalations = async () => {
+  const loadEscalations = async ({ notifyOnError = true } = {}) => {
     setEscalationsLoading(true);
     try {
       const res = await supportDashboardApi.escalations(escalationStatus, escalationTeam, escalationPriority);
       setEscalations(res.items || []);
     } catch (err) {
-      addToast(err.message || "Failed to load escalations", "error");
+      if (notifyOnError) addToast(err.message || "Failed to load escalations", "error");
     } finally {
       setEscalationsLoading(false);
     }
@@ -392,7 +406,7 @@ function SupportDashboardContent({ user, onLogout }) {
       const updated = await supportDashboardApi.updateEscalation(id, updates);
       setSelectedEscalation(updated);
       addToast("Escalation record updated", "success");
-      loadEscalations();
+      void loadEscalations({ notifyOnError: false });
     } catch (err) {
       addToast(err.message || "Failed to update escalation", "error");
     }
@@ -434,10 +448,10 @@ function SupportDashboardContent({ user, onLogout }) {
           : { status: "REJECTED", rejection_reason: value },
       );
       setSelectedEscalation(updated);
-      await Promise.all([loadEscalations(), loadAuditHistory()]);
       addToast(isResolution ? "Escalation resolved successfully" : "Escalation rejected", "success");
       setEscalationAction(null);
       setEscalationActionText("");
+      void loadEscalations({ notifyOnError: false });
     } catch (err) {
       setEscalationActionError(err.message || "Unable to update this escalation.");
     } finally {
@@ -445,7 +459,7 @@ function SupportDashboardContent({ user, onLogout }) {
     }
   };
 
-  const loadAuditHistory = async () => {
+  const loadAuditHistory = async ({ notifyOnError = true } = {}) => {
     setAuditLoading(true);
     try {
       const res = await supportDashboardApi.auditHistory(
@@ -459,7 +473,7 @@ function SupportDashboardContent({ user, onLogout }) {
       );
       setAuditLogs(res.items || []);
     } catch (err) {
-      addToast(err.message || "Failed to load support audit history", "error");
+      if (notifyOnError) addToast(err.message || "Failed to load support audit history", "error");
     } finally {
       setAuditLoading(false);
     }
@@ -2039,13 +2053,22 @@ function SupportDashboardContent({ user, onLogout }) {
                           onChange={(e) => handleUpdateEscalation(selectedEscalation.id, { status: e.target.value })}
                           className="px-3 py-1.5 text-xs font-bold rounded-lg border border-purple-300 bg-purple-50 text-purple-900 outline-none"
                         >
-                          <option value="PENDING">PENDING</option>
-                          <option value="ACCEPTED">ACCEPTED</option>
-                          <option value="IN_PROGRESS">IN_PROGRESS</option>
-                          <option value="REASSIGNED">REASSIGNED</option>
-                          <option value="RESOLVED">RESOLVED</option>
-                          <option value="CLOSED">CLOSED</option>
-                          <option value="REJECTED">REJECTED</option>
+                          {["PENDING", "ACCEPTED", "IN_PROGRESS", "REASSIGNED", "RESOLVED", "CLOSED", "REJECTED"].map((status) => (
+                            <option
+                              key={status}
+                              value={status}
+                              disabled={
+                                status !== selectedEscalation.status
+                                && (
+                                  !canTransitionEscalation(selectedEscalation.status, status)
+                                  || status === "RESOLVED"
+                                  || status === "REJECTED"
+                                )
+                              }
+                            >
+                              {status}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -2076,7 +2099,7 @@ function SupportDashboardContent({ user, onLogout }) {
                             Accept Escalation
                           </button>
                         )}
-                        {selectedEscalation.status !== "RESOLVED" && selectedEscalation.status !== "CLOSED" && (
+                        {canTransitionEscalation(selectedEscalation.status, "RESOLVED") && (
                           <button
                             type="button"
                             onClick={() => openEscalationAction("resolve", selectedEscalation)}
@@ -2085,13 +2108,15 @@ function SupportDashboardContent({ user, onLogout }) {
                             Mark Escalation Resolved
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => openEscalationAction("reject", selectedEscalation)}
-                          className="px-3.5 py-2 bg-red-50 text-red-700 text-xs font-semibold rounded-xl hover:bg-red-100 border border-red-200 cursor-pointer"
-                        >
-                          Reject Escalation
-                        </button>
+                        {canTransitionEscalation(selectedEscalation.status, "REJECTED") && (
+                          <button
+                            type="button"
+                            onClick={() => openEscalationAction("reject", selectedEscalation)}
+                            className="px-3.5 py-2 bg-red-50 text-red-700 text-xs font-semibold rounded-xl hover:bg-red-100 border border-red-200 cursor-pointer"
+                          >
+                            Reject Escalation
+                          </button>
+                        )}
                       </div>
                     </div>
 

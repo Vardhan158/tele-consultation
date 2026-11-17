@@ -164,3 +164,32 @@ async def test_resolving_escalation_requires_summary(monkeypatch) -> None:
 
     assert exc_info.value.status_code == 422
     assert exc_info.value.detail == "A resolution_summary is required when status is RESOLVED"
+
+
+@pytest.mark.asyncio
+async def test_resolved_escalation_rejects_invalid_status_transition(monkeypatch) -> None:
+    escalations = MagicMock()
+    escalations.find_one = AsyncMock(return_value={
+        "id": "ESC-123456",
+        "tenant_id": "tenant-1",
+        "original_ticket_id": "SUP-950477",
+        "status": "RESOLVED",
+        "resolution_summary": "Service restored and verified.",
+    })
+    escalations.update_one = AsyncMock()
+    monkeypatch.setattr(
+        support_dashboard_routes.mongo_database,
+        "database",
+        lambda: {"escalations": escalations},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await update_escalation(
+            "ESC-123456",
+            EscalationUpdate(status="REJECTED", rejection_reason="Invalid request"),
+            MongoPrincipal(user_id="agent-1", tenant_id="tenant-1", role="support"),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "Escalation cannot transition from RESOLVED to REJECTED"
+    escalations.update_one.assert_not_awaited()

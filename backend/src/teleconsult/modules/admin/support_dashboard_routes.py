@@ -1591,6 +1591,17 @@ class EscalationUpdate(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
+ESCALATION_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    "PENDING": {"ACCEPTED", "IN_PROGRESS", "REASSIGNED", "RESOLVED", "REJECTED"},
+    "ACCEPTED": {"IN_PROGRESS", "REASSIGNED", "RESOLVED", "REJECTED"},
+    "IN_PROGRESS": {"REASSIGNED", "RESOLVED", "REJECTED"},
+    "REASSIGNED": {"ACCEPTED", "IN_PROGRESS", "RESOLVED", "REJECTED"},
+    "RESOLVED": {"CLOSED"},
+    "REJECTED": set(),
+    "CLOSED": set(),
+}
+
+
 ESCALATION_TEAM_MAP = {
     "account_security": "Security & Operations",
     "video_infrastructure": "Technical Operations",
@@ -1841,6 +1852,22 @@ async def update_escalation(
     now = datetime.now(UTC)
     updates: dict[str, Any] = {"updated_at": now}
     history_logs = []
+    current_status = str(esc.get("status") or "PENDING").upper()
+    requested_status = payload.status
+    if payload.destination_team:
+        requested_status = "REASSIGNED"
+    elif payload.assigned_owner and (not requested_status or requested_status == "PENDING"):
+        requested_status = "ACCEPTED"
+
+    if requested_status == current_status:
+        raise HTTPException(409, f"Escalation is already {current_status}")
+    if requested_status:
+        allowed_statuses = ESCALATION_STATUS_TRANSITIONS.get(current_status, set())
+        if requested_status not in allowed_statuses:
+            raise HTTPException(
+                409,
+                f"Escalation cannot transition from {current_status} to {requested_status}",
+            )
 
     if payload.status:
         if payload.status == "REJECTED" and not payload.rejection_reason:
