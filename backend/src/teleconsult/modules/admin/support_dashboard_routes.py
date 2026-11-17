@@ -2289,28 +2289,146 @@ async def support_audit_history(
         return {"items": [], "total": 0, "offset": offset, "limit": limit, "error": str(e)}
 
 
+class AuditExportRequest(BaseModel):
+    start_date: str = ""
+    end_date: str = ""
+    actor_id: str = ""
+    ticket_id: str = ""
+    action: str = ""
+    resource: str = ""
+    result_filter: str = ""
+
+
 @router.post("/audit-export")
+@router.get("/audit-export")
 async def export_support_audit(
+    start_date: str = "",
+    end_date: str = "",
+    actor_id: str = "",
+    ticket_id: str = "",
+    action: str = "",
+    resource: str = "",
+    result_filter: str = "",
+    payload: AuditExportRequest | None = None,
     principal: MongoPrincipal = Depends(support_agent),
 ) -> dict[str, Any]:
-    db = mongo_database.database()
-    now = datetime.now(UTC)
+    try:
+        db = mongo_database.database()
+        now = datetime.now(UTC)
 
-    await db["audit_logs"].insert_one({
-        "id": str(uuid4()),
-        "tenant_id": principal.tenant_id,
-        "actor_id": principal.user_id,
-        "action": "support.audit.exported",
-        "target_id": "audit_logs",
-        "created_at": now,
-    })
+        s_date = (payload.start_date if payload else "") or start_date
+        e_date = (payload.end_date if payload else "") or end_date
+        a_id = (payload.actor_id if payload else "") or actor_id
+        t_id = (payload.ticket_id if payload else "") or ticket_id
+        act_filter = (payload.action if payload else "") or action
+        res_filter = (payload.resource if payload else "") or resource
+        res_result = (payload.result_filter if payload else "") or result_filter
 
-    items = [_clean(x) async for x in db["audit_logs"].find({"tenant_id": principal.tenant_id}).sort("created_at", -1).limit(500)]
-    csv_lines = ["Event ID,Timestamp,Actor ID,Action,Target ID,Result"]
-    for x in items:
-        csv_lines.append(f'"{x.get("id")}","{x.get("created_at")}","{x.get("actor_id")}","{x.get("action")}","{x.get("target_id")}","{x.get("result", "Success")}"')
+        tenant_q = _build_tenant_query(principal)
+        clauses: list[dict[str, Any]] = [tenant_q]
 
-    return {"csv_data": "\n".join(csv_lines), "filename": f"support_audit_export_{now.strftime('%Y%m%d_%H%M%S')}.csv"}
+        if s_date or e_date:
+            date_range: dict[str, datetime] = {}
+            if s_date:
+                date_range["$gte"] = _as_utc_datetime(f"{s_date}T00:00:00+00:00")
+            if e_date:
+                date_range["$lte"] = _as_utc_datetime(f"{e_date}T23:59:59.999999+00:00")
+            clauses.append({"$or": [
+                {"created_at": date_range},
+                {"occurred_at": date_range},
+            ]})
+
+        if a_id:
+            clauses.append({"$or": [
+                {"actor_id": {"$regex": a_id, "$options": "i"}},
+                {"actor_name": {"$regex": a_id, "$options": "i"}},
+            ]})
+
+        if t_id:
+            clauses.append({"$or": [
+                {"target_id": t_id},
+                {"ticket_id": t_id},
+                {"metadata.ticket_id": t_id},
+                {"metadata.original_ticket_id": t_id},
+            ]})
+
+        if act_filter:
+            clauses.append({"action": {"$regex": act_filter, "$options": "i"}})
+
+        if res_filter:
+            clauses.append({"$or": [
+                {"action": {"$regex": f"^{res_filter}", "$options": "i"}},
+                {"action": {"$regex": f"\\.{res_filter}\\.", "$options": "i"}},
+                {"resource": {"$regex": res_filter, "$options": "i"}},
+            ]})
+
+        if res_result:
+            clauses.append({"result": res_result})
+
+        query: dict[str, Any] = clauses[0] if len(clauses) == 1 else {"$and": clauses}
+
+        audit_raw = [_clean(x) async for x in db["audit_logs"].find(query).sort("created_at", -1).limit(500)]
+
+        ticket_events_query: dict[str, Any] = {**tenant_q}
+        if t_id:
+            ticket_events_query["ticket_id"] = t_id
+        if a_id:
+            ticket_events_query["actor_id"] = {"$regex": a_id, "$options": "i"}
+
+        ticket_events_raw = [_clean(x) async for x in db["support_ticket_events"].find(ticket_events_query).sort("created_at", -1).limit(500)]
+
+        merged_map: dict[str, dict[str, Any]] = {}
+
+        for log in audit_raw:
+            eid = log.get("id") or str(uuid4())
+            merged_map[eid] = log
+
+        for evt in ticket_events_raw:
+            eid = evt.get("id") or str(uuid4())
+            if eid not in merged_map:
+                merged_map[eid] = {
+                    "id": eid,
+                    "tenant_id": evt.get("tenant_id"),
+                    "actor_id": evt.get("actor_id"),
+                    "actor_name": evt.get("actor_name"),
+                    "action": f"support_ticket.{evt.get('action')}",
+                    "target_id": evt.get("ticket_id"),
+                    "metadata": {"ticket_id": evt.get("ticket_id"), "details": evt.get("details")},
+                    "created_at": evt.get("created_at"),
+                }
+
+        all_events = sorted(
+            list(merged_map.values()),
+            key=lambda x: _as_utc_datetime(x.get("created_at") or x.get("occurred_at")),
+            reverse=True,
+        )
+
+        await db["audit_logs"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": principal.tenant_id,
+            "actor_id": principal.user_id,
+            "action": "support.audit.exported",
+            "target_id": t_id or "audit_logs",
+            "metadata": {"ticket_id": t_id, "filters": {"start_date": s_date, "end_date": e_date, "actor_id": a_id, "action": act_filter, "resource": res_filter, "result": res_result}},
+            "created_at": now,
+        })
+
+        csv_lines = ["Event ID,Timestamp,Actor ID,Action,Target ID,Result"]
+        for x in all_events:
+            eid = x.get("id") or str(uuid4())
+            ts = x.get("created_at") or x.get("occurred_at") or now.isoformat()
+            act_id = x.get("actor_id") or "system"
+            act_name = x.get("action") or "event"
+            meta_dict = x.get("metadata") if isinstance(x.get("metadata"), dict) else {}
+            target = meta_dict.get("ticket_id") or x.get("target_id") or "—"
+            result_val = x.get("result") or "Success"
+            csv_lines.append(f'"{eid}","{ts}","{act_id}","{act_name}","{target}","{result_val}"')
+
+        return {"csv_data": "\n".join(csv_lines), "filename": f"support_audit_export_{now.strftime('%Y%m%d_%H%M%S')}.csv"}
+    except Exception as e:
+        import logging
+        logging.getLogger("uvicorn").error(f"Error in export_support_audit: {e}")
+        return {"csv_data": "Event ID,Timestamp,Actor ID,Action,Target ID,Result\n", "filename": f"support_audit_export_error.csv"}
 
 
 # ============================================================================

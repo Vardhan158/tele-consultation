@@ -495,7 +495,15 @@ function SupportDashboardContent({ user, onLogout }) {
 
   const handleExportAudit = async () => {
     try {
-      const res = await supportDashboardApi.auditExport();
+      const res = await supportDashboardApi.auditExport(
+        auditStartDate,
+        auditEndDate,
+        auditActor,
+        auditTicketId,
+        auditActionFilter,
+        auditResourceFilter,
+        auditResultFilter
+      );
       const blob = new Blob([res.csv_data], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
