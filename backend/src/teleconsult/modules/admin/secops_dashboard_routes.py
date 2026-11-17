@@ -82,6 +82,25 @@ def secrets_id(prefix: str = "INC") -> str:
     return f"{prefix}-{secrets.randbelow(899999) + 100000}"
 
 
+def _build_tenant_query(principal: MongoPrincipal) -> dict[str, Any]:
+    settings = get_settings()
+    tenants = list({
+        str(principal.tenant_id),
+        str(settings.default_tenant_id),
+        "1",
+        "default",
+        "00000000-0000-0000-0000-000000000001",
+    })
+    return {
+        "$or": [
+            {"tenant_id": {"$in": tenants}},
+            {"tenant_id": {"$exists": False}},
+            {"tenant_id": None},
+            {"tenant_id": ""},
+        ]
+    }
+
+
 async def dispatch_secops_notification(
     db: Any,
     tenant_id: str,
@@ -1092,17 +1111,7 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
         tenant_q = _build_tenant_query(principal)
         tenant_id_val = str(principal.tenant_id or "default")
 
-        raw_backups = [_clean(x) async for x in db["secops_backups"].find({
-            "$or": [
-                tenant_q,
-                {"tenant_id": {"$exists": False}},
-                {"tenant_id": None},
-                {"tenant_id": ""},
-                {"tenant_id": "default"},
-                {"tenant_id": "1"},
-                {"tenant_id": str(principal.tenant_id)},
-            ]
-        })]
+        raw_backups = [_clean(x) async for x in db["secops_backups"].find(tenant_q)]
 
         # Python-level robust chronological sort to eliminate MongoDB BSON String vs Date type sorting mismatches
         backups = sorted(
@@ -1111,17 +1120,7 @@ async def get_backup_readiness(principal: MongoPrincipal = Depends(secops_user))
             reverse=True,
         )[:50]
 
-        raw_requests = [_clean(x) async for x in db["secops_recovery_requests"].find({
-            "$or": [
-                tenant_q,
-                {"tenant_id": {"$exists": False}},
-                {"tenant_id": None},
-                {"tenant_id": ""},
-                {"tenant_id": "default"},
-                {"tenant_id": "1"},
-                {"tenant_id": str(principal.tenant_id)},
-            ]
-        })]
+        raw_requests = [_clean(x) async for x in db["secops_recovery_requests"].find(tenant_q)]
 
         recovery_requests = sorted(
             raw_requests,
