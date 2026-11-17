@@ -571,17 +571,6 @@ function SecOpsDashboardContent({ user, onLogout }) {
               </div>
             )}
 
-            {/* Security Guardrails Compliance Banner (PRD Section 6.3) */}
-            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 flex items-start gap-3">
-              <span className="material-symbols-outlined text-emerald-700 text-lg shrink-0 mt-0.5">verified_user</span>
-              <div>
-                <p className="font-bold">Security &amp; Privacy Compliance Restrictions (PRD Section 6.3)</p>
-                <p className="mt-0.5 text-emerald-800">
-                  Passwords, OTP values, session cookies, API keys or access tokens are never exposed. Security events are recorded with reliable timestamps and correlation IDs. Accounts are not automatically blocked on weak or unverified signals.
-                </p>
-              </div>
-            </div>
-
             {/* Security Events Table (PRD Section 6.3) */}
             <div className="bg-white rounded-2xl border border-[#577877]/15 overflow-hidden shadow-xs">
               {securityLoading ? (
