@@ -1072,34 +1072,36 @@ function SecOpsDashboardContent({ user, onLogout }) {
                     </div>
 
                     {/* Mitigation & Investigation Toolbar */}
-                    <div className="space-y-3 pt-2 border-t border-[#577877]/15">
-                      <h4 className="text-[#577877] font-semibold uppercase tracking-wider text-[10px]">Mitigation &amp; Recovery Actions</h4>
-                      <div className="flex flex-wrap gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMitigationActionInput("");
-                            setMitigationError("");
-                            setShowMitigationModal(true);
-                          }}
-                          className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl cursor-pointer shadow-xs"
-                        >
-                          Record Mitigation Action
-                        </button>
+                    {!["RESOLVED", "CLOSED"].includes(selectedIncident.status?.toUpperCase()) && (
+                      <div className="space-y-3 pt-2 border-t border-[#577877]/15">
+                        <h4 className="text-[#577877] font-semibold uppercase tracking-wider text-[10px]">Mitigation &amp; Recovery Actions</h4>
+                        <div className="flex flex-wrap gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMitigationActionInput("");
+                              setMitigationError("");
+                              setShowMitigationModal(true);
+                            }}
+                            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl cursor-pointer shadow-xs"
+                          >
+                            Record Mitigation Action
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIncidentResolutionSummary("");
-                            setResolveIncidentError("");
-                            setShowResolveIncidentModal(true);
-                          }}
-                          className="px-3.5 py-2 bg-[#295255] hover:bg-[#1f3d3f] text-white font-bold rounded-xl cursor-pointer shadow-xs"
-                        >
-                          Mark Incident Resolved
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIncidentResolutionSummary("");
+                              setResolveIncidentError("");
+                              setShowResolveIncidentModal(true);
+                            }}
+                            className="px-3.5 py-2 bg-[#295255] hover:bg-[#1f3d3f] text-white font-bold rounded-xl cursor-pointer shadow-xs"
+                          >
+                            Mark Incident Resolved
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Chronological Timeline History */}
                     <div className="space-y-3 pt-2 border-t border-[#577877]/15">
