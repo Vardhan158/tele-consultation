@@ -365,6 +365,48 @@ function SecOpsDashboardContent({ user, onLogout }) {
     }
   };
 
+  // Schedule Provider Maintenance Modal State
+  const [selectedMaintenanceProvider, setSelectedMaintenanceProvider] = useState(null);
+  const [maintenanceReasonInput, setMaintenanceReasonInput] = useState("");
+  const [maintenanceStartTime, setMaintenanceStartTime] = useState("");
+  const [maintenanceEndTime, setMaintenanceEndTime] = useState("");
+  const [maintenanceError, setMaintenanceError] = useState("");
+  const [isSavingMaintenance, setIsSavingMaintenance] = useState(false);
+
+  const handleConfirmScheduleMaintenance = async (e) => {
+    e.preventDefault();
+    setMaintenanceError("");
+    const reason = maintenanceReasonInput.trim();
+    if (!reason) {
+      setMaintenanceError("Maintenance reason is required.");
+      return;
+    }
+
+    if (!selectedMaintenanceProvider) return;
+
+    setIsSavingMaintenance(true);
+    try {
+      await secopsDashboardApi.recordProviderMaintenance({
+        provider_key: selectedMaintenanceProvider.provider_key,
+        status: "Maintenance",
+        maintenance_reason: reason,
+        scheduled_start_time: maintenanceStartTime || undefined,
+        expected_end_time: maintenanceEndTime || undefined,
+      });
+      addToast(`Maintenance scheduled for ${selectedMaintenanceProvider.provider_name}`, "success");
+      setSelectedMaintenanceProvider(null);
+      setMaintenanceReasonInput("");
+      setMaintenanceStartTime("");
+      setMaintenanceEndTime("");
+      setMaintenanceError("");
+      loadProviders();
+    } catch (err) {
+      setMaintenanceError(err.message || "Failed to record maintenance.");
+    } finally {
+      setIsSavingMaintenance(false);
+    }
+  };
+
   const handleTriggerBackup = async () => {
     try {
       await secopsDashboardApi.triggerBackup();
@@ -1222,23 +1264,14 @@ function SecOpsDashboardContent({ user, onLogout }) {
                               </button>
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  const reason = window.prompt(`Reason for scheduling/recording maintenance on ${p.provider_name}:`);
-                                  if (reason) {
-                                    try {
-                                      await secopsDashboardApi.recordProviderMaintenance({
-                                        provider_key: p.provider_key,
-                                        status: "Maintenance",
-                                        maintenance_reason: reason,
-                                      });
-                                      addToast(`Recorded maintenance window for ${p.provider_name}`, "success");
-                                      loadProviders();
-                                    } catch (err) {
-                                      addToast(err.message || "Failed to record maintenance", "error");
-                                    }
-                                  }
+                                onClick={() => {
+                                  setSelectedMaintenanceProvider(p);
+                                  setMaintenanceReasonInput("");
+                                  setMaintenanceStartTime(new Date().toISOString().slice(0, 16));
+                                  setMaintenanceEndTime("");
+                                  setMaintenanceError("");
                                 }}
-                                className="px-2.5 py-1 bg-white hover:bg-zinc-50 text-zinc-700 font-semibold rounded-lg border border-[#577877]/25 cursor-pointer"
+                                className="px-2.5 py-1 bg-white hover:bg-zinc-50 text-zinc-700 font-semibold rounded-lg border border-[#577877]/25 cursor-pointer transition"
                               >
                                 Maintenance
                               </button>
@@ -1551,6 +1584,148 @@ function SecOpsDashboardContent({ user, onLogout }) {
         )}
 
       </main>
+
+      {/* Schedule Provider Maintenance Modal */}
+      {selectedMaintenanceProvider && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onKeyDown={(e) => e.key === "Escape" && !isSavingMaintenance && setSelectedMaintenanceProvider(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="maintenance-modal-title"
+            className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl border border-zinc-200 animate-in zoom-in-95 duration-200 text-[#162623]"
+          >
+            {/* Header */}
+            <div className="bg-[#123D35] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
+                  <span className="material-symbols-outlined text-2xl">build</span>
+                </div>
+                <div>
+                  <h3 id="maintenance-modal-title" className="text-base font-bold text-white leading-tight">
+                    Schedule Provider Maintenance
+                  </h3>
+                  <p className="text-xs text-[#20C7A7] mt-0.5">
+                    Schedule a planned maintenance window for this provider dependency.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isSavingMaintenance}
+                onClick={() => setSelectedMaintenanceProvider(null)}
+                aria-label="Close modal"
+                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleConfirmScheduleMaintenance} className="p-6 space-y-4 text-xs">
+              {/* Provider Info (Read-Only) */}
+              <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Provider Dependency</p>
+                <p className="font-bold text-[#162623] text-sm">{selectedMaintenanceProvider.provider_name}</p>
+                <p className="text-[11px] text-[#577877] font-semibold">{selectedMaintenanceProvider.service_category}</p>
+              </div>
+
+              {/* Maintenance Reason (Required) */}
+              <div>
+                <label htmlFor="maintenance-reason-textarea" className="block text-xs font-bold text-zinc-700 mb-1.5">
+                  Maintenance Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  id="maintenance-reason-textarea"
+                  required
+                  rows={3}
+                  autoFocus
+                  disabled={isSavingMaintenance}
+                  value={maintenanceReasonInput}
+                  onChange={(e) => {
+                    setMaintenanceReasonInput(e.target.value);
+                    if (maintenanceError) setMaintenanceError("");
+                  }}
+                  placeholder="Specify mandatory maintenance window reason, operational impact, and runbook reference…"
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs text-zinc-900 outline-none transition ${
+                    maintenanceError
+                      ? "border-red-400 bg-red-50/30 focus:border-red-500"
+                      : "border-zinc-300 focus:border-[#176354] focus:ring-2 focus:ring-[#176354]/10"
+                  }`}
+                />
+                {maintenanceError && (
+                  <p role="alert" className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-red-600">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {maintenanceError}
+                  </p>
+                )}
+              </div>
+
+              {/* Scheduled Start & End Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="maintenance-start-time" className="block text-xs font-bold text-zinc-700 mb-1">
+                    Scheduled Start Time
+                  </label>
+                  <input
+                    id="maintenance-start-time"
+                    type="datetime-local"
+                    disabled={isSavingMaintenance}
+                    value={maintenanceStartTime}
+                    onChange={(e) => setMaintenanceStartTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-300 text-xs text-zinc-800 outline-none focus:border-[#176354]"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="maintenance-end-time" className="block text-xs font-bold text-zinc-700 mb-1">
+                    Expected End Time
+                  </label>
+                  <input
+                    id="maintenance-end-time"
+                    type="datetime-local"
+                    disabled={isSavingMaintenance}
+                    value={maintenanceEndTime}
+                    onChange={(e) => setMaintenanceEndTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-zinc-300 text-xs text-zinc-800 outline-none focus:border-[#176354]"
+                  />
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  disabled={isSavingMaintenance}
+                  onClick={() => setSelectedMaintenanceProvider(null)}
+                  className="px-4 py-2.5 text-xs font-semibold text-zinc-700 border border-zinc-300 rounded-xl hover:bg-zinc-50 transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingMaintenance || !maintenanceReasonInput.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-[#176354] hover:bg-[#123D35] rounded-xl transition cursor-pointer disabled:opacity-50 shadow-sm"
+                >
+                  {isSavingMaintenance ? (
+                    <>
+                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">check</span>
+                      <span>Confirm Maintenance</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Resolve Operational Incident Modal */}
       {showResolveIncidentModal && selectedIncident && (
