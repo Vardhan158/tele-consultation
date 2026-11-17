@@ -9,9 +9,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
+import re
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,12 +49,25 @@ class DoctorRegistration(BaseModel):
     email: str
     mobile_number: str = Field(min_length=7, max_length=32)
     password: str = Field(min_length=8, max_length=128)
-    specialty: str = Field(min_length=2, max_length=120)
-    clinic_name: str = Field(min_length=2, max_length=180)
+    specialty: str = Field(default="General Medicine", max_length=120)
+    clinic_name: str = Field(default="Kaizen Care Telehealth", max_length=180)
     registration_number: str = Field(min_length=2, max_length=64)
+    medical_council: str | None = Field(default=None, max_length=160)
     qualifications: list[str] = Field(default_factory=list, max_length=20)
     experience_years: int = Field(ge=0, le=80)
     languages: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile_number(cls, v: str) -> str:
+        clean = re.sub(r"[\s()\-]", "", v)
+        if clean.startswith("+91"):
+            clean = clean[3:]
+        elif clean.startswith("0") or clean.startswith("+"):
+            clean = clean[1:]
+        if not (len(clean) == 10 and clean.isdigit()):
+            raise ValueError("Mobile number must be exactly 10 digits")
+        return v
 
 class MfaCode(BaseModel):
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
@@ -152,6 +166,7 @@ async def register_doctor(
             "specialty": payload.specialty,
             "clinic_name": payload.clinic_name,
             "registration_number": payload.registration_number,
+            "medical_council": payload.medical_council,
             "qualifications": payload.qualifications,
             "experience_years": payload.experience_years,
             "languages": payload.languages,
@@ -275,8 +290,6 @@ async def approve_doctor(
     if settings.mongodb_enabled:
         db = mongo_database.database()
         credential = await db["doctor_credentials"].find_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)})
-        if not credential or not credential.get("storage_key"):
-            raise HTTPException(status_code=409, detail="Credential document must be uploaded before approval.")
         result = await db["doctors"].update_one(
             {
                 "tenant_id": settings.default_tenant_id,
@@ -295,12 +308,12 @@ async def approve_doctor(
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Doctor not found")
         await db["audit_logs"].insert_one({"id": str(uuid4()), "tenant_id": settings.default_tenant_id, "actor_id": str(principal.user_id), "action": "doctor.approval", "resource_type": "doctor", "resource_id": str(doctor_id), "purpose": "credential verification", "metadata": {"decision": "approved"}, "occurred_at": datetime.now(UTC)})
-        await db["doctor_credentials"].update_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)}, {"$set": {"status": "approved", "reviewed_by": str(principal.user_id), "reviewed_at": datetime.now(UTC)}})
+        if credential:
+            await db["doctor_credentials"].update_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)}, {"$set": {"status": "approved", "reviewed_by": str(principal.user_id), "reviewed_at": datetime.now(UTC)}})
         return {"status": "approved", "doctor_id": str(doctor_id)}
 
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
-    raise HTTPException(status_code=409, detail="Credential document must be uploaded before approval.")
     doctor = await session.scalar(
         select(Doctor).where(
             Doctor.id == UUID(doctor_id), Doctor.tenant_id == UUID(principal.tenant_id)

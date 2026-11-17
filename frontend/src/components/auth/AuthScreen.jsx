@@ -135,6 +135,17 @@ export default function AuthScreen({
     setMessage("");
     try {
       if (mode === "register") {
+        const cleanMobile = form.mobile_number.replace(/[\s()-]/g, "");
+        const digitsOnly = cleanMobile.startsWith("+91")
+          ? cleanMobile.slice(3)
+          : cleanMobile.startsWith("0")
+          ? cleanMobile.slice(1)
+          : cleanMobile.startsWith("+")
+          ? cleanMobile.slice(1)
+          : cleanMobile;
+        if (!/^\d{10}$/.test(digitsOnly)) {
+          throw new Error("Mobile number must be exactly 10 digits.");
+        }
         if (form.password.length < 8) {
           throw new Error("Password must be at least 8 characters.");
         }
@@ -412,10 +423,12 @@ export default function AuthScreen({
                     <input
                       required
                       type="tel"
-                      minLength={7}
-                      maxLength={32}
-                      pattern="[+0-9() .-]{7,32}"
+                      inputMode="tel"
+                      maxLength={14}
+                      pattern="^(\+91[\-\s]?)?[0]?\d{10}$"
+                      title="Please enter a valid 10-digit mobile number"
                       name="mobile_number"
+                      placeholder="9876543210"
                       value={form.mobile_number}
                       onChange={update}
                       className={inputClass}

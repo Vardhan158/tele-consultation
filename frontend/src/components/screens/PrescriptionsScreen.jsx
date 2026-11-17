@@ -124,6 +124,21 @@ export default function PrescriptionsScreen({
   const handleSavePharmacy = async (e) => {
     e.preventDefault();
     if (!pharmacyForm.name.trim()) return;
+    if (pharmacyForm.phone && pharmacyForm.phone.trim()) {
+      const cleanPhone = pharmacyForm.phone.trim().replace(/[\s()-]/g, "");
+      const digitsOnly = cleanPhone.startsWith("+91")
+        ? cleanPhone.slice(3)
+        : cleanPhone.startsWith("0")
+        ? cleanPhone.slice(1)
+        : cleanPhone.startsWith("+")
+        ? cleanPhone.slice(1)
+        : cleanPhone;
+      if (!/^\d{10}$/.test(digitsOnly)) {
+        setToastMessage("Pharmacy phone number must be exactly 10 digits.");
+        setTimeout(() => setToastMessage(""), 3500);
+        return;
+      }
+    }
     try {
       await patientApi.updateProfile({
         preferred_pharmacy: pharmacyForm.name.trim(),
@@ -997,8 +1012,10 @@ export default function PrescriptionsScreen({
                   Phone Number
                 </label>
                 <input
-                  type="text"
-                  placeholder="e.g. (415) 555-0198"
+                  type="tel"
+                  inputMode="tel"
+                  maxLength={14}
+                  placeholder="e.g. 9876543210"
                   value={pharmacyForm.phone}
                   onChange={(e) =>
                     setPharmacyForm({ ...pharmacyForm, phone: e.target.value })
