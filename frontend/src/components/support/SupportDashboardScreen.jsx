@@ -2271,6 +2271,7 @@ function SupportDashboardContent({ user, onLogout }) {
                   <option value="payment">Payment</option>
                   <option value="video">Video Session</option>
                   <option value="escalation">Escalation</option>
+                  <option value="general">General</option>
                 </select>
                 <select
                   value={auditResultFilter}
