@@ -2171,7 +2171,8 @@ async def support_audit_history(
 ) -> dict[str, Any]:
     try:
         db = mongo_database.database()
-        clauses: list[dict[str, Any]] = [_build_tenant_query(principal)]
+        tenant_q = _build_tenant_query(principal)
+        clauses: list[dict[str, Any]] = [tenant_q]
 
         if start_date or end_date:
             date_range: dict[str, datetime] = {}
@@ -2193,7 +2194,9 @@ async def support_audit_history(
         if ticket_id:
             clauses.append({"$or": [
                 {"target_id": ticket_id},
+                {"ticket_id": ticket_id},
                 {"metadata.ticket_id": ticket_id},
+                {"metadata.original_ticket_id": ticket_id},
             ]})
 
         if action:
@@ -2203,6 +2206,7 @@ async def support_audit_history(
             clauses.append({"$or": [
                 {"action": {"$regex": f"^{resource}", "$options": "i"}},
                 {"action": {"$regex": f"\\.{resource}\\.", "$options": "i"}},
+                {"resource": {"$regex": resource, "$options": "i"}},
             ]})
 
         if result_filter:
@@ -2210,34 +2214,50 @@ async def support_audit_history(
 
         query: dict[str, Any] = clauses[0] if len(clauses) == 1 else {"$and": clauses}
 
-        pipeline = [
-            {"$match": query},
-            {"$addFields": {"_event_time": {"$ifNull": ["$created_at", "$occurred_at"]}}},
-            {"$sort": {"_event_time": -1}},
-            {"$skip": offset},
-            {"$limit": limit},
-        ]
-        items_raw = [_clean(x) async for x in db["audit_logs"].aggregate(pipeline)]
-        total = await db["audit_logs"].count_documents(query)
+        audit_raw = [_clean(x) async for x in db["audit_logs"].find(query).sort("created_at", -1).limit(300)]
+
+        ticket_events_query: dict[str, Any] = {**tenant_q}
+        if ticket_id:
+            ticket_events_query["ticket_id"] = ticket_id
+        if actor_id:
+            ticket_events_query["actor_id"] = {"$regex": actor_id, "$options": "i"}
+
+        ticket_events_raw = [_clean(x) async for x in db["support_ticket_events"].find(ticket_events_query).sort("created_at", -1).limit(300)]
+
+        merged_map: dict[str, dict[str, Any]] = {}
+
+        for log in audit_raw:
+            eid = log.get("id") or str(uuid4())
+            merged_map[eid] = log
+
+        for evt in ticket_events_raw:
+            eid = evt.get("id") or str(uuid4())
+            if eid not in merged_map:
+                merged_map[eid] = {
+                    "id": eid,
+                    "tenant_id": evt.get("tenant_id"),
+                    "actor_id": evt.get("actor_id"),
+                    "actor_name": evt.get("actor_name"),
+                    "action": f"support_ticket.{evt.get('action')}",
+                    "target_id": evt.get("ticket_id"),
+                    "metadata": {"ticket_id": evt.get("ticket_id"), "details": evt.get("details")},
+                    "created_at": evt.get("created_at"),
+                }
+
+        all_events = sorted(
+            list(merged_map.values()),
+            key=lambda x: _as_utc_datetime(x.get("created_at") or x.get("occurred_at")),
+            reverse=True,
+        )
+
+        paginated_events = all_events[offset : offset + limit]
+        total = len(all_events)
 
         formatted_items = []
-        for log in items_raw:
+        for log in paginated_events:
             act = log.get("action", "")
-            res_cat = "general"
-            if "ticket" in act:
-                res_cat = "ticket"
-            elif "account" in act or "auth" in act:
-                res_cat = "account"
-            elif "booking" in act or "appointment" in act:
-                res_cat = "booking"
-            elif "payment" in act or "refund" in act:
-                res_cat = "payment"
-            elif "video" in act or "consultation" in act:
-                res_cat = "video_session"
-            elif "escalation" in act:
-                res_cat = "escalation"
+            res_cat = "ticket" if "ticket" in act else "escalation" if "escalation" in act else "account" if ("account" in act or "auth" in act) else "booking" if ("booking" in act or "appointment" in act) else "payment" if ("payment" in act or "refund" in act) else "video_session" if ("video" in act or "consultation" in act) else "general"
 
-            log.pop("_event_time", None)
             meta = log.get("metadata")
             meta_dict = meta if isinstance(meta, dict) else {}
             target_id = str(log.get("target_id") or "")
@@ -2245,12 +2265,15 @@ async def support_audit_history(
                 target_id if target_id.startswith(("TICK-", "SUP-")) else "—"
             )
 
+            actor_id_val = log.get("actor_id", "system")
+            actor_name = log.get("actor_name") or await resolve_actor_name(db, principal.tenant_id, actor_id_val)
+
             formatted_items.append({
                 "event_id": log.get("id", str(uuid4())),
                 "timestamp": log.get("created_at") or log.get("occurred_at"),
                 "agent": {
-                    "id": log.get("actor_id", "system"),
-                    "name": log.get("actor_name") or log.get("actor_id", "Support System"),
+                    "id": actor_id_val,
+                    "name": actor_name,
                 },
                 "action": act,
                 "ticket_id": t_id,
@@ -2258,15 +2281,6 @@ async def support_audit_history(
                 "result": log.get("result", "Success"),
                 "details": meta_dict if meta_dict else {"target_id": target_id},
             })
-
-        await db["audit_logs"].insert_one({
-            "id": str(uuid4()),
-            "tenant_id": principal.tenant_id,
-            "actor_id": principal.user_id,
-            "action": "support.audit_history.accessed",
-            "target_id": "audit_logs",
-            "created_at": datetime.now(UTC),
-        })
 
         return {"items": formatted_items, "total": total, "offset": offset, "limit": limit}
     except Exception as e:
