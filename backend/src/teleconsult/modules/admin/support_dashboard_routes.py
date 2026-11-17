@@ -2219,13 +2219,6 @@ async def support_audit_history(
         if action:
             clauses.append({"action": {"$regex": action, "$options": "i"}})
 
-        if resource:
-            clauses.append({"$or": [
-                {"action": {"$regex": f"^{resource}", "$options": "i"}},
-                {"action": {"$regex": f"\\.{resource}\\.", "$options": "i"}},
-                {"resource": {"$regex": resource, "$options": "i"}},
-            ]})
-
         if result_filter:
             clauses.append({"result": result_filter})
 
@@ -2269,6 +2262,8 @@ async def support_audit_history(
 
         if resource:
             target_res = str(resource).strip().lower()
+            if target_res == "video":
+                target_res = "video_session"
             all_events = [x for x in all_events if compute_resource_category(x.get("action", "")) == target_res]
 
         paginated_events = all_events[offset : offset + limit]
@@ -2376,13 +2371,6 @@ async def export_support_audit(
         if act_filter:
             clauses.append({"action": {"$regex": act_filter, "$options": "i"}})
 
-        if res_filter:
-            clauses.append({"$or": [
-                {"action": {"$regex": f"^{res_filter}", "$options": "i"}},
-                {"action": {"$regex": f"\\.{res_filter}\\.", "$options": "i"}},
-                {"resource": {"$regex": res_filter, "$options": "i"}},
-            ]})
-
         if res_result:
             clauses.append({"result": res_result})
 
@@ -2426,6 +2414,8 @@ async def export_support_audit(
 
         if res_filter:
             target_res = str(res_filter).strip().lower()
+            if target_res == "video":
+                target_res = "video_session"
             all_events = [x for x in all_events if compute_resource_category(x.get("action", "")) == target_res]
 
         await db["audit_logs"].insert_one({
