@@ -32,6 +32,11 @@ from teleconsult.modules.patient_portal.models import Doctor
 router = APIRouter(prefix="/doctor", tags=["doctor-onboarding"])
 OTP_EXPIRY_MINUTES = 5
 CREDENTIAL_TYPES = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
+ALLOWED_CREDENTIAL_EXTENSIONS = {
+    "application/pdf": {".pdf"},
+    "image/jpeg": {".jpg", ".jpeg"},
+    "image/png": {".png"},
+}
 MAX_CREDENTIAL_BYTES = 10 * 1024 * 1024
 PRIVATE_CREDENTIAL_ROOT = Path(__file__).resolve().parents[4] / "private_storage" / "credentials"
 
@@ -197,10 +202,10 @@ async def register_doctor(
                     break
             if upload is not None and getattr(upload, "filename", None):
                 content_type = getattr(upload, "content_type", "") or ""
-                if content_type not in CREDENTIAL_TYPES:
+                if content_type not in ALLOWED_CREDENTIAL_EXTENSIONS:
                     raise HTTPException(status_code=415, detail=f"{meta['title']} must be a PDF, JPG, or PNG file")
                 raw_name = Path(getattr(upload, "filename", doc_type) or doc_type)
-                if raw_name.suffix.lower() != CREDENTIAL_TYPES[content_type]:
+                if raw_name.suffix.lower() not in ALLOWED_CREDENTIAL_EXTENSIONS[content_type]:
                     raise HTTPException(status_code=415, detail=f"{meta['title']} file extension does not match its type")
                 data = await upload.read(MAX_CREDENTIAL_BYTES + 1)
                 if len(data) > MAX_CREDENTIAL_BYTES:
@@ -772,10 +777,10 @@ async def upload_doctor_document(doctor_id: str, document_type: str, request: Re
     if upload is None or not hasattr(upload, "read"):
         raise HTTPException(status_code=422, detail="Document file is required")
     content_type = getattr(upload, "content_type", "") or ""
-    if content_type not in CREDENTIAL_TYPES:
+    if content_type not in ALLOWED_CREDENTIAL_EXTENSIONS:
         raise HTTPException(status_code=415, detail="Document must be a PDF, JPG, or PNG file")
     raw_name = Path(getattr(upload, "filename", document_type) or document_type)
-    if raw_name.suffix.lower() != CREDENTIAL_TYPES[content_type]:
+    if raw_name.suffix.lower() not in ALLOWED_CREDENTIAL_EXTENSIONS[content_type]:
         raise HTTPException(status_code=415, detail="Document file extension does not match its type")
     data = await upload.read(MAX_CREDENTIAL_BYTES + 1)
     if len(data) > MAX_CREDENTIAL_BYTES:

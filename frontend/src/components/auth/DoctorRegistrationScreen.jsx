@@ -289,7 +289,10 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
     const nextForm = { ...form, [name]: val };
     setForm(nextForm);
 
-    if (touched[name]) {
+    if (touched[name] || type === "file") {
+      if (type === "file") {
+        setTouched((prev) => ({ ...prev, [name]: true }));
+      }
       const err = validateField(name, val, nextForm);
       setErrors((prev) => ({ ...prev, [name]: err }));
 

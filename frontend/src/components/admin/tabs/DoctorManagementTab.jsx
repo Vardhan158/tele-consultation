@@ -421,10 +421,39 @@ export default function DoctorManagementTab() {
               </div>
             </div>
 
-            <div className="pt-2 text-right">
+            <div className="pt-2 flex items-center justify-between border-t border-[#577877]/15">
+              {selectedDoctor.approval_status === "pending" ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const docId = selectedDoctor.id;
+                      setSelectedDoctor(null);
+                      setReasonModal({ type: "approve", doctorId: docId });
+                    }}
+                    className="rounded-xl bg-emerald-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow hover:bg-emerald-800 cursor-pointer"
+                  >
+                    Approve Credentials
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const docId = selectedDoctor.id;
+                      setSelectedDoctor(null);
+                      setReasonModal({ type: "reject", doctorId: docId });
+                    }}
+                    className="rounded-xl border border-red-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 cursor-pointer"
+                  >
+                    Reject Application
+                  </button>
+                </div>
+              ) : (
+                <span />
+              )}
               <button
+                type="button"
                 onClick={() => setSelectedDoctor(null)}
-                className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-semibold text-white"
+                className="rounded-xl bg-[#25836F] px-4 py-2 text-xs font-semibold text-white cursor-pointer hover:bg-[#1d6e5d]"
               >
                 Done
               </button>
