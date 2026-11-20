@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { doctorApi } from "../../lib/api";
 
-function ClinicianHeader({ onBack }) {
+function ClinicianHeader({ onBack, isModal = false, onClose }) {
   return (
     <header className="bg-[#25836F] text-white px-4 sm:px-6 py-2.5 flex items-center justify-between shrink-0 shadow-sm">
       <div className="flex items-center gap-3">
@@ -42,7 +42,16 @@ function ClinicianHeader({ onBack }) {
         <span className="font-semibold text-[10px] tracking-wide text-white/90 bg-white/15 px-2.5 py-0.5 rounded-full border border-white/20 uppercase hidden sm:inline-block">
           Clinician Portal
         </span>
-        {onBack && (
+        {isModal && onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close Doctor Registration"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-xl text-white hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 transition cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        ) : onBack ? (
           <button
             type="button"
             onClick={onBack}
@@ -53,13 +62,37 @@ function ClinicianHeader({ onBack }) {
             </span>
             Back to Home
           </button>
-        )}
+        ) : null}
       </div>
     </header>
   );
 }
 
-export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchToPatientAuth }) {
+export default function DoctorRegistrationScreen({
+  onBack,
+  onSuccess,
+  onSwitchToPatientAuth,
+  isModal = false,
+  onClose,
+}) {
+  const inModal = isModal || Boolean(onClose);
+
+  useEffect(() => {
+    if (!inModal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && onClose) {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [inModal, onClose]);
+
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState({
     // Personal Information
@@ -462,12 +495,22 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
     form.indemnity_insurance,
   ].filter(Boolean).length;
 
-  return (
-    <div className="min-h-screen lg:h-screen lg:max-h-screen bg-[#F0F5F7] font-sans flex flex-col text-[#162623] lg:overflow-hidden">
-      {/* Top Header with Logo and Back Button */}
-      <ClinicianHeader onBack={onBack} />
+  const content = (
+    <div
+      className={`font-sans flex flex-col text-[#162623] ${
+        inModal
+          ? "relative w-full max-w-5xl max-h-[92vh] bg-[#F0F5F7] rounded-2xl shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
+          : "min-h-screen lg:h-screen lg:max-h-screen bg-[#F0F5F7] lg:overflow-hidden"
+      }`}
+    >
+      {/* Top Header with Logo and Back/Close Button */}
+      <ClinicianHeader onBack={onBack} isModal={inModal} onClose={onClose} />
 
-      <main className="flex-1 flex flex-col justify-between p-3.5 sm:p-4 lg:p-4.5 xl:p-5 max-w-6xl w-full mx-auto overflow-y-auto lg:overflow-hidden">
+      <main
+        className={`flex-1 flex flex-col justify-between p-3.5 sm:p-4 lg:p-4.5 xl:p-5 max-w-6xl w-full mx-auto overflow-y-auto ${
+          inModal ? "max-h-[calc(92vh-52px)]" : "lg:overflow-hidden"
+        }`}
+      >
         {/* Title & 3-Step Story Stepper */}
         <div className="w-full pb-1.5 border-b border-[#577877]/10 flex flex-col md:flex-row md:items-center md:justify-between gap-2 shrink-0">
           <div>
@@ -1322,7 +1365,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
 
       {/* Additional Documents Modal (Preserves single page view without vertical scrolling) */}
       {showAdditionalDocs && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-5 shadow-2xl space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
@@ -1411,7 +1454,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
 
       {/* Terms of Service Modal */}
       {showTermsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-5 sm:p-6 shadow-2xl space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
@@ -1452,7 +1495,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
 
       {/* Privacy Policy Modal */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-5 sm:p-6 shadow-2xl space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
@@ -1492,4 +1535,19 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
       )}
     </div>
   );
+
+  if (inModal) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && onClose) onClose();
+        }}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return content;
 }
