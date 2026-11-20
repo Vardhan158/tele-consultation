@@ -68,6 +68,45 @@ function ClinicianHeader({ onBack, isModal = false, onClose }) {
   );
 }
 
+const INDIAN_STATES = [
+  "Andaman and Nicobar Islands",
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chandigarh",
+  "Chhattisgarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi (NCT)",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jammu and Kashmir",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Ladakh",
+  "Lakshadweep",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Puducherry",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+];
+
 export default function DoctorRegistrationScreen({
   onBack,
   onSuccess,
@@ -186,8 +225,7 @@ export default function DoctorRegistrationScreen({
         return "";
 
       case "state":
-        if (!value || !value.trim()) return "State / Location is required.";
-        if (value.trim().length < 2) return "State must be at least 2 characters.";
+        if (!value || !value.trim()) return "Please select your state of practice.";
         return "";
 
       // 2. Professional Information
@@ -794,19 +832,24 @@ export default function DoctorRegistrationScreen({
                     <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
                       <span>State of Practice <span className="text-red-600">*</span></span>
                     </label>
-                    <input
+                    <select
                       name="state"
-                      type="text"
                       value={form.state}
                       onChange={update}
                       onBlur={handleBlur}
-                      placeholder="e.g. Karnataka, Maharashtra"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
                         touched.state && errors.state
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
                       }`}
-                    />
+                    >
+                      <option value="">Select State of Practice</option>
+                      {INDIAN_STATES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
                     {touched.state && errors.state && (
                       <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.state}</p>
                     )}
