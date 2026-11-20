@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.services.encryption import decrypt_clinical_text, encrypt_clinical_text
 from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.consultation.clinical_models import ClinicalNote, ClinicalNoteAmendment
 from teleconsult.modules.consultation.video_models import VideoSession
@@ -493,7 +494,7 @@ async def save_note(appointment_id: str, payload: NotePayload, session: AsyncSes
             "appointment_id": str(appointment_id),
             "doctor_id": str(doctor.get("id")),
             "author_id": str(principal.user_id),
-            "content_reference": payload.content_reference,
+            "content_reference": encrypt_clinical_text(payload.content_reference),
             "status": "draft",
             "created_at": datetime.now(UTC).isoformat(),
         }
@@ -554,7 +555,7 @@ async def appointment_notes(appointment_id: str, session: AsyncSession | None = 
             {
                 "id": item.get("id") or str(item.get("_id")),
                 "status": item.get("status", "draft"),
-                "content_reference": item.get("content_reference") or item.get("content", ""),
+                "content_reference": decrypt_clinical_text(item.get("content_reference") or item.get("content", "")),
                 "created_at": item.get("created_at"),
             }
             for item in notes
@@ -585,7 +586,10 @@ async def update_draft_note(note_id: str, payload: NotePayload, session: AsyncSe
             raise HTTPException(status_code=404, detail="Clinical note not found")
         if note.get("status") != "draft":
             raise HTTPException(status_code=409, detail="Finalized notes cannot be edited; create an amendment")
-        await db["clinical_notes"].update_one({"tenant_id": str(principal.tenant_id), "id": str(note_id)}, {"$set": {"content_reference": payload.content_reference}})
+        await db["clinical_notes"].update_one(
+            {"tenant_id": str(principal.tenant_id), "id": str(note_id)},
+            {"$set": {"content_reference": encrypt_clinical_text(payload.content_reference)}},
+        )
         return {"id": str(note_id), "status": "draft"}
     if session is None:
         raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
@@ -827,7 +831,15 @@ async def note_amendments(note_id: str, session: AsyncSession | None = Depends(a
         if note is None:
             raise HTTPException(status_code=404, detail="Clinical note not found")
         rows = await db["clinical_note_amendments"].find({"tenant_id": str(principal.tenant_id), "note_id": str(note_id)}).sort("version", 1).to_list(100)
-        return [{"id": row.get("id") or str(row.get("_id")), "version": row.get("version", 1), "content_reference": row.get("content_reference", ""), "created_at": row.get("created_at")} for row in rows]
+        return [
+            {
+                "id": row.get("id") or str(row.get("_id")),
+                "version": row.get("version", 1),
+                "content_reference": decrypt_clinical_text(row.get("content_reference", "")),
+                "created_at": row.get("created_at"),
+            }
+            for row in rows
+        ]
     if session is None:
         raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
     try:
@@ -854,7 +866,16 @@ async def amend_note(note_id: str, payload: NotePayload, session: AsyncSession |
             raise HTTPException(status_code=409, detail="Only finalized notes can be amended")
         latest = await db["clinical_note_amendments"].find({"tenant_id": str(principal.tenant_id), "note_id": str(note_id)}).sort("version", -1).to_list(1)
         version = int(latest[0].get("version", 0)) + 1 if latest else 1
-        amendment = {"id": f"amend-{secrets.token_hex(8)}", "tenant_id": str(principal.tenant_id), "note_id": str(note_id), "author_id": str(principal.user_id), "version": version, "content_reference": f"Reason:\n{payload.reason.strip()}\n\nChanged information:\n{payload.content_reference}", "created_at": datetime.now(UTC).isoformat()}
+        raw_amendment = f"Reason:\n{payload.reason.strip()}\n\nChanged information:\n{payload.content_reference}"
+        amendment = {
+            "id": f"amend-{secrets.token_hex(8)}",
+            "tenant_id": str(principal.tenant_id),
+            "note_id": str(note_id),
+            "author_id": str(principal.user_id),
+            "version": version,
+            "content_reference": encrypt_clinical_text(raw_amendment),
+            "created_at": datetime.now(UTC).isoformat(),
+        }
         await db["clinical_note_amendments"].insert_one(amendment)
         return {"id": amendment["id"], "version": version}
     if session is None:

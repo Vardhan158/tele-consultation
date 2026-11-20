@@ -83,6 +83,15 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
     "audit_logs": [([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {})],
     "blocked_dates": [([("tenant_id", ASCENDING), ("date", ASCENDING)], {"unique": True})],
     "notifications": [([("tenant_id", ASCENDING), ("recipient_id", ASCENDING), ("created_at", DESCENDING)], {})],
+    "doctor_payout_ledger": [
+        ([("tenant_id", ASCENDING), ("payment_id", ASCENDING)], {"unique": True}),
+        ([("tenant_id", ASCENDING), ("doctor_id", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("appointment_id", ASCENDING)], {}),
+    ],
+    "rate_limit_events": [
+        ([("expires_at", ASCENDING)], {"expireAfterSeconds": 0}),
+        ([("client_ip", ASCENDING), ("tier", ASCENDING), ("timestamp", DESCENDING)], {}),
+    ],
 }
 
 

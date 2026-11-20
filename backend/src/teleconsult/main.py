@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from time import perf_counter
@@ -9,10 +10,15 @@ from fastapi.responses import JSONResponse
 
 from teleconsult.config.routes import router as config_router
 from teleconsult.config.settings import get_settings
+from teleconsult.kernel.http.rate_limiter import RateLimiterMiddleware
 from teleconsult.kernel.http.security_headers import SecurityHeadersMiddleware
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.kernel.mongodb.schema import ensure_schema
-from teleconsult.kernel.observability.logging import configure_logging
+from teleconsult.kernel.observability.logging import (
+    configure_logging,
+    get_correlation_id,
+    set_correlation_id,
+)
 from teleconsult.kernel.tenancy.context import set_tenant
 from teleconsult.modules.admin.routes import router as admin_router
 from teleconsult.modules.audit.routes import router as audit_router
@@ -65,6 +71,9 @@ def create_app() -> FastAPI:
     # API docs are disabled by default; enable per environment deliberately.
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # Enforce fail-fast secret verification in production (AUD-09, GAP-02, GL-03)
+        get_settings().validate_production_configuration()
+
         await mongo_database.connect()
         if mongo_database.enabled:
             await ensure_schema()
@@ -79,12 +88,15 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unhandled_error(request: Request, exc: Exception) -> JSONResponse:
+        corr_id = get_correlation_id()
         if isinstance(exc, HTTPException):
             response = JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
             origin = request.headers.get("origin")
             if origin in allowed_origins:
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["X-Correlation-ID"] = corr_id
+            response.headers["X-Request-ID"] = corr_id
             return response
         import traceback
         traceback.print_exc()
@@ -96,6 +108,8 @@ def create_app() -> FastAPI:
         if origin in allowed_origins:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["X-Correlation-ID"] = corr_id
+        response.headers["X-Request-ID"] = corr_id
         return response
 
     app.add_middleware(
@@ -108,6 +122,10 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def request_observability(request: Request, call_next: Any) -> Response:
+        raw_corr_id = request.headers.get("X-Correlation-ID") or request.headers.get("X-Request-ID")
+        correlation_id = raw_corr_id.strip() if raw_corr_id and raw_corr_id.strip() else str(uuid.uuid4())
+        set_correlation_id(correlation_id)
+
         if get_settings().environment in {"dev", "local"}:
             set_tenant(request.headers.get("X-Dev-Tenant-Id", get_settings().default_tenant_id))
         started = perf_counter()
@@ -116,7 +134,10 @@ def create_app() -> FastAPI:
         # Operational telemetry only: no patient data, query strings, or bodies.
         response.headers["Server-Timing"] = f"app;dur={duration_ms}"
         response.headers["X-Request-Duration-Ms"] = str(duration_ms)
+        response.headers["X-Correlation-ID"] = correlation_id
+        response.headers["X-Request-ID"] = correlation_id
         return response
+    app.add_middleware(RateLimiterMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.mount("/socket.io", socket_app)
 

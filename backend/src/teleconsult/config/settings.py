@@ -75,6 +75,32 @@ class Settings(BaseSettings):
     mongodb_min_pool_size: int = Field(default=0, validation_alias="MONGODB_MIN_POOL_SIZE")
     mongodb_repositories_enabled: bool = Field(default=False, validation_alias="MONGODB_REPOSITORIES_ENABLED")
 
+    # API Security & Rate Limiting (BE-07, SEC-04, GAP-04)
+    rate_limiting_enabled: bool = Field(default=True, validation_alias="RATE_LIMITING_ENABLED")
+
+    # Sensitive Health Data Encryption (DB-07, SEC-08, GAP-11)
+    clinical_encryption_key: str = Field(default="", validation_alias="CLINICAL_ENCRYPTION_KEY")
+
+    def validate_production_configuration(self) -> None:
+        """Enforce fail-fast configuration validation when running in production/staging (AUD-09, GAP-02).
+
+        Hardcoded secrets have been purged. Production environments MUST supply valid secrets via environment variables.
+        """
+        if self.environment.lower() in ("prod", "production", "staging"):
+            missing: list[str] = []
+            if not self.database_url.strip() and not (self.mongodb_enabled and self.mongodb_uri.strip()):
+                missing.append("DATABASE_URL or MONGODB_URI")
+            if not self.razorpay_key_id.strip() or not self.razorpay_key_secret.strip():
+                missing.append("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET")
+            if not self.clinical_encryption_key.strip():
+                missing.append("CLINICAL_ENCRYPTION_KEY")
+                missing.append("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET")
+            if missing:
+                raise RuntimeError(
+                    f"Production startup failed: Required production environment credentials missing: {', '.join(missing)}. "
+                    "Hardcoded fallback secrets have been purged per security compliance (AUD-09, GAP-02, GL-03)."
+                )
+
     @property
     def allowed_frontend_origins(self) -> list[str]:
         """Return the configured browser origins with whitespace removed."""

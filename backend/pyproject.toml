@@ -17,6 +17,7 @@ dependencies = [
   "python-socketio[asgi]>=5.11",
   "pymongo>=4.13",
   "aiohttp>=3.10",
+  "cryptography>=42.0",
 ]
 
 [dependency-groups]

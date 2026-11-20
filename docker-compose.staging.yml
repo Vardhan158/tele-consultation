@@ -1,0 +1,83 @@
+version: "3.8"
+
+# Kaizen Care Teleconsultation Platform - Staging Orchestration
+# Checklist References: AUD-07, AUD-08, BE-13, SEC-04, GL-03
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: teleconsult-mongodb-staging
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-staging-data:/data/db
+    networks:
+      - teleconsult-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: teleconsult-backend-staging
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=staging
+      - PORT=8000
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/teleconsult_staging}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - CLINICAL_ENCRYPTION_KEY=${CLINICAL_ENCRYPTION_KEY}
+      - SESSION_SECRET=${SESSION_SECRET:-staging_session_secret_32_characters_minimum}
+      - DEFAULT_TENANT_ID=${DEFAULT_TENANT_ID:-1}
+      - ALLOWED_FRONTEND_ORIGINS=${ALLOWED_FRONTEND_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - RATE_LIMITING_ENABLED=true
+    networks:
+      - teleconsult-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    container_name: teleconsult-frontend-staging
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - teleconsult-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  teleconsult-net:
+    driver: bridge
+
+volumes:
+  mongo-staging-data:
+    driver: local

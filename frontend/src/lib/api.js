@@ -216,6 +216,11 @@ export const doctorApi = {
       method: "POST",
       body: JSON.stringify({ code }),
     }),
+  publishPrescription: (payload) =>
+    apiRequest("/clinician/clinical-outputs/prescriptions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const authApi = {

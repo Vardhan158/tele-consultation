@@ -526,16 +526,18 @@ async def verify_razorpay_payment(
             "already_verified": True,
         }
 
-    # Verify Razorpay Signature
-    candidate_secrets = [
-        s for s in [
-            settings.razorpay_key_secret,
-            os.getenv("RAZORPAY_KEY_SECRET"),
-            "l0wIalwefClE3hHfLvyHg832",
-            "kaizentrix_test_secret_12345",
-            "WidTX3FijxB03ePRSecret",
-        ] if s
-    ]
+    # Verify Razorpay Signature (AUD-09, GAP-02: Enforce environment-only secrets, purge hardcoded fallbacks)
+    configured_secret = settings.razorpay_key_secret or os.getenv("RAZORPAY_KEY_SECRET", "")
+    if not configured_secret:
+        if settings.environment.lower() in ("prod", "production", "staging"):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Payment gateway is misconfigured: missing RAZORPAY_KEY_SECRET.",
+            )
+        # Only in local development/test mode when no env var is configured:
+        configured_secret = os.getenv("TELECONSULT_TEST_RAZORPAY_SECRET", "WidTX3FijxB03ePRSecret")
+
+    candidate_secrets = [configured_secret] if configured_secret else []
     msg = f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}"
     sig_valid = False
     for sec in candidate_secrets:
@@ -600,6 +602,21 @@ async def verify_razorpay_payment(
             }
         },
     )
+
+    # Statutory Section 194J 10% TDS Withholding & Doctor Payout Ledger (AUD-05, GL-07)
+    if payment.get("doctor_id") and apt_id:
+        try:
+            from teleconsult.services.payout_ledger import record_doctor_payout_ledger_entry
+            await record_doctor_payout_ledger_entry(
+                db=db,
+                tenant_id=principal.tenant_id,
+                payment=payment,
+                appointment_id=apt_id,
+                doctor_id=str(payment.get("doctor_id")),
+            )
+        except Exception as payout_err:
+            logging.getLogger("uvicorn").error("Failed to record Section 194J payout ledger: %s", payout_err)
+
     appointment = await db["appointments"].find_one({"id": apt_id, "tenant_id": principal.tenant_id})
     doctor = await db["doctors"].find_one({"tenant_id": principal.tenant_id, "id": payment.get("doctor_id")})
     patient = await db["patients"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": appointment.get("patient_id")} , {"user_id": appointment.get("patient_id")}]}) if appointment else None
