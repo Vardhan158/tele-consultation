@@ -6,12 +6,14 @@ test('professional doctor registration renders all 13 required fields across 3 s
   await page.goto('/doctor/register');
   await expect(page.getByRole('heading', { name: /Doctor Registration/i })).toBeVisible();
 
-  // Section 1: Personal Information (4 fields)
+  // Section 1: Personal Information (6 fields)
   await expect(page.getByRole('heading', { name: /Personal Information/i })).toBeVisible();
   await expect(page.locator('input[name="full_name"]')).toBeVisible();
   await expect(page.locator('input[name="email"]')).toBeVisible();
   await expect(page.locator('input[name="mobile_number"]')).toBeVisible();
   await expect(page.locator('input[name="state"]')).toBeVisible();
+  await expect(page.locator('input[name="date_of_birth"]')).toBeVisible();
+  await expect(page.locator('select[name="gender"]')).toBeVisible();
 
   // Section 2: Professional Information (7 fields)
   await expect(page.getByRole('heading', { name: /Professional Information/i })).toBeVisible();
@@ -50,6 +52,8 @@ test('doctor registration form client-side validations', async ({ page }) => {
   await page.locator('input[name="email"]').fill('drtest@clinic.com');
   await page.locator('input[name="mobile_number"]').fill('9876543210');
   await page.locator('input[name="state"]').fill('Karnataka');
+  await page.locator('input[name="date_of_birth"]').fill('1990-05-15');
+  await page.locator('select[name="gender"]').selectOption('Male');
   await page.locator('select[name="specialty"]').selectOption('Cardiology');
   await page.locator('input[name="registration_number"]').fill('REG-12345');
   await page.locator('input[name="medical_council"]').fill('Karnataka Medical Council');
@@ -83,6 +87,22 @@ test('doctor registration mobile number validation requires exactly 10 digits', 
   await expect(page.locator('text=Mobile number must be exactly 10 digits.')).toHaveCount(0);
 });
 
+test('doctor registration date of birth validation requires age 21 or older', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ json: { authenticated: false } }));
+  await page.goto('/doctor/register');
+
+  const today = new Date();
+  const underageDob = `${today.getFullYear() - 18}-01-01`;
+  await page.locator('input[name="date_of_birth"]').fill(underageDob);
+  await page.locator('input[name="date_of_birth"]').blur();
+  await expect(page.locator('text=Doctor must be at least 21 years of age.').first()).toBeVisible();
+
+  const validDob = `${today.getFullYear() - 30}-01-01`;
+  await page.locator('input[name="date_of_birth"]').fill(validDob);
+  await page.locator('input[name="date_of_birth"]').blur();
+  await expect(page.locator('text=Doctor must be at least 21 years of age.')).toHaveCount(0);
+});
+
 test('successful doctor registration submission displays PENDING_VERIFICATION confirmation', async ({ page }) => {
   await page.route('**/auth/me', route => route.fulfill({ json: { authenticated: false } }));
   await page.route(url => url.pathname.includes('/doctor/register') && url.port === '8000', route => route.fulfill({
@@ -100,6 +120,8 @@ test('successful doctor registration submission displays PENDING_VERIFICATION co
   await page.locator('input[name="email"]').fill('dr.test@clinic.com');
   await page.locator('input[name="mobile_number"]').fill('9876543210');
   await page.locator('input[name="state"]').fill('Karnataka');
+  await page.locator('input[name="date_of_birth"]').fill('1988-08-20');
+  await page.locator('select[name="gender"]').selectOption('Male');
   await page.locator('select[name="specialty"]').selectOption('General Medicine');
   await page.locator('input[name="registration_number"]').fill('KMC-98765');
   await page.locator('input[name="medical_council"]').fill('Karnataka Medical Council');

@@ -481,6 +481,8 @@ async def get_me(request: Request) -> dict[str, object]:
                 "authenticated": True, "user_id": user["id"],
                 "tenant_id": user["tenant_id"], "full_name": user.get("full_name"),
                 "email": user.get("email"), "phone": user.get("mobile_number"),
+                "date_of_birth": user.get("date_of_birth") or (doc.get("date_of_birth") if user.get("role") == "doctor" and doc else None),
+                "gender": user.get("gender") or (doc.get("gender") if user.get("role") == "doctor" and doc else None),
                 "role": user.get("role", "patient"),
                 "approval_status": approval_status,
                 "rejection_reason": rejection_reason,

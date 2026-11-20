@@ -587,6 +587,8 @@ export default function DoctorManagementTab() {
                       <div><strong>Reg #:</strong> {doc.registration_number}</div>
                       <div><strong>Council:</strong> {doc.medical_council || "N/A"}</div>
                       <div><strong>State:</strong> {doc.state_of_practice || doc.state || "N/A"}</div>
+                      {doc.date_of_birth && <div><strong>DOB:</strong> {doc.date_of_birth}</div>}
+                      {doc.gender && <div><strong>Gender:</strong> {doc.gender}</div>}
                       <div><strong>Clinic:</strong> {doc.clinic_name}</div>
                     </div>
                   </div>
