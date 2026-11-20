@@ -93,48 +93,14 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
     "audit_logs": [([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {})],
     "blocked_dates": [([("tenant_id", ASCENDING), ("date", ASCENDING)], {"unique": True})],
     "notifications": [([("tenant_id", ASCENDING), ("recipient_id", ASCENDING), ("created_at", DESCENDING)], {})],
-    "support_tickets": [
-        ([("tenant_id", ASCENDING), ("ticket_id", ASCENDING)], {"unique": True, "sparse": True}),
-        ([("tenant_id", ASCENDING), ("requester_id", ASCENDING), ("created_at", DESCENDING)], {}),
-        ([("tenant_id", ASCENDING), ("assigned_to", ASCENDING), ("status", ASCENDING)], {}),
-        ([("tenant_id", ASCENDING), ("category", ASCENDING), ("status", ASCENDING)], {}),
-        ([("tenant_id", ASCENDING), ("priority", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)], {}),
+    "doctor_payout_ledger": [
+        ([("tenant_id", ASCENDING), ("payment_id", ASCENDING)], {"unique": True}),
+        ([("tenant_id", ASCENDING), ("doctor_id", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("appointment_id", ASCENDING)], {}),
     ],
-    "support_ticket_events": [
-        ([("tenant_id", ASCENDING), ("ticket_id", ASCENDING), ("created_at", DESCENDING)], {}),
-    ],
-    "support_escalations": [
-        ([("tenant_id", ASCENDING), ("original_ticket_id", ASCENDING), ("status", ASCENDING)], {}),
-        ([("tenant_id", ASCENDING), ("id", ASCENDING)], {"unique": True, "sparse": True}),
-    ],
-    "secops_incidents": [
-        ([("tenant_id", ASCENDING), ("incident_id", ASCENDING)], {"unique": True, "sparse": True}),
-        ([("tenant_id", ASCENDING), ("status", ASCENDING), ("severity", ASCENDING), ("created_at", DESCENDING)], {}),
-    ],
-    "secops_incident_events": [
-        ([("tenant_id", ASCENDING), ("incident_id", ASCENDING), ("created_at", DESCENDING)], {}),
-    ],
-    "secops_alerts": [
-        ([("tenant_id", ASCENDING), ("alert_id", ASCENDING)], {"unique": True, "sparse": True}),
-        ([("tenant_id", ASCENDING), ("status", ASCENDING), ("severity", ASCENDING), ("created_at", DESCENDING)], {}),
-        ([("tenant_id", ASCENDING), ("alert_rule", ASCENDING), ("status", ASCENDING)], {}),
-    ],
-    "secops_health_logs": [
-        ([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {}),
-    ],
-    "secops_provider_status": [
-        ([("tenant_id", ASCENDING), ("provider_key", ASCENDING), ("created_at", DESCENDING)], {}),
-    ],
-    "secops_backups": [
-        ([("tenant_id", ASCENDING), ("backup_id", ASCENDING)], {"unique": True, "sparse": True}),
-        ([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {}),
-    ],
-    "secops_recovery_requests": [
-        ([("tenant_id", ASCENDING), ("request_id", ASCENDING)], {"unique": True, "sparse": True}),
-        ([("tenant_id", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)], {}),
-    ],
-    "secops_events": [
-        ([("tenant_id", ASCENDING), ("actor_id", ASCENDING), ("created_at", DESCENDING)], {}),
+    "rate_limit_events": [
+        ([("expires_at", ASCENDING)], {"expireAfterSeconds": 0}),
+        ([("client_ip", ASCENDING), ("tier", ASCENDING), ("timestamp", DESCENDING)], {}),
     ],
 }
 

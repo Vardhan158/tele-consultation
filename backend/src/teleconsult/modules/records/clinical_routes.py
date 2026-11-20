@@ -12,6 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.config.settings import get_settings
+from teleconsult.domain.schedule_x import (
+    ScheduleXRestrictionException,
+    verify_telemedicine_prescription_safety,
+)
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
@@ -361,6 +365,10 @@ async def publish_summary(payload: ClinicalPublication, session: AsyncSession | 
 
 @clinician_router.post("/prescriptions", status_code=201)
 async def publish_prescription(payload: ClinicalPublication, session: AsyncSession | None = Depends(clinical_session), principal: Principal = Depends(require("clinical:publish"))):
+    # Statutory Clinical Safety Gate (AUD-04, GL-02):
+    # Strictly prohibit Schedule X and NDPS substances under Indian Telemedicine Practice Guidelines (2020) Reg 3.7.1
+    verify_telemedicine_prescription_safety(payload.content)
+
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({
@@ -373,10 +381,10 @@ async def publish_prescription(payload: ClinicalPublication, session: AsyncSessi
             "tenant_id": str(principal.tenant_id),
             "doctor_id": str(doctor.get("id")),
             "id": str(payload.appointment_id),
-            "status": "completed",
+            "status": {"$in": ["in_progress", "completed", "confirmed"]},
         })
         if appointment is None:
-            raise HTTPException(status_code=409, detail="Only the assigned clinician can publish after consultation completion")
+            raise HTTPException(status_code=409, detail="Only the assigned clinician can publish for active or completed consultation")
         prescription = {
             "id": f"rx-{secrets.token_hex(8)}",
             "tenant_id": str(principal.tenant_id),
@@ -396,9 +404,9 @@ async def publish_prescription(payload: ClinicalPublication, session: AsyncSessi
         raise HTTPException(status_code=503, detail="No application database is configured")
     appointment = await session.scalar(select(Appointment).where(
         Appointment.id == UUID(str(payload.appointment_id)), Appointment.tenant_id == UUID(principal.tenant_id),
-        Appointment.doctor_id == UUID(principal.user_id), Appointment.status == "completed"))
+        Appointment.doctor_id == UUID(principal.user_id), Appointment.status.in_(["in_progress", "completed", "confirmed"])))
     if appointment is None:
-        raise HTTPException(status_code=409, detail="Only the assigned clinician can publish after consultation completion")
+        raise HTTPException(status_code=409, detail="Only the assigned clinician can publish for active or completed consultation")
     prescription = Prescription(tenant_id=appointment.tenant_id, appointment_id=appointment.id,
         patient_id=appointment.patient_id, author_id=UUID(principal.user_id), content=payload.content,
         status="released", released_at=datetime.now(UTC))

@@ -32,8 +32,51 @@ from teleconsult.modules.patient_portal.models import Doctor
 router = APIRouter(prefix="/doctor", tags=["doctor-onboarding"])
 OTP_EXPIRY_MINUTES = 5
 CREDENTIAL_TYPES = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
+ALLOWED_CREDENTIAL_EXTENSIONS = {
+    "application/pdf": {".pdf"},
+    "image/jpeg": {".jpg", ".jpeg"},
+    "image/png": {".png"},
+}
 MAX_CREDENTIAL_BYTES = 10 * 1024 * 1024
 PRIVATE_CREDENTIAL_ROOT = Path(__file__).resolve().parents[4] / "private_storage" / "credentials"
+
+DOCUMENT_DEFINITIONS = {
+    "medical_council_certificate": {
+        "title": "Medical Council Registration Certificate",
+        "mandatory": True,
+        "aliases": ["credential_document", "council_certificate"],
+    },
+    "qualification_certificate": {
+        "title": "Recognized Medical Qualification Certificate (MBBS / Applicable)",
+        "mandatory": True,
+        "aliases": ["mbbs_certificate", "degree_certificate"],
+    },
+    "identity_proof": {
+        "title": "Government-Issued Identity Proof",
+        "mandatory": True,
+        "aliases": ["id_proof", "govt_id"],
+    },
+    "specialty_certificate": {
+        "title": "Postgraduate / Specialty Certificate",
+        "mandatory": False,
+        "aliases": ["pg_certificate"],
+    },
+    "renewal_proof": {
+        "title": "Registration Renewal Proof",
+        "mandatory": False,
+        "aliases": ["renewal_certificate"],
+    },
+    "clinic_authorization": {
+        "title": "Clinic Authorization Letter",
+        "mandatory": False,
+        "aliases": ["authorization_letter"],
+    },
+    "indemnity_insurance": {
+        "title": "Professional Indemnity Insurance Policy",
+        "mandatory": False,
+        "aliases": ["insurance_policy"],
+    },
+}
 
 
 def generate_verification_otp() -> str:
@@ -48,14 +91,17 @@ class DoctorRegistration(BaseModel):
     full_name: str = Field(min_length=2, max_length=100)
     email: str
     mobile_number: str = Field(min_length=7, max_length=32)
+    date_of_birth: str | None = Field(default=None, max_length=30)
+    gender: str | None = Field(default=None, max_length=50)
     state: str | None = Field(default=None, max_length=100)
+    state_of_practice: str | None = Field(default=None, max_length=100)
     password: str = Field(min_length=8, max_length=128)
     specialty: str = Field(default="General Medicine", max_length=120)
     clinic_name: str = Field(default="Kaizen Care Telehealth", max_length=180)
     registration_number: str = Field(min_length=2, max_length=64)
     medical_council: str | None = Field(default=None, max_length=160)
     qualifications: list[str] = Field(default_factory=list, max_length=20)
-    experience_years: int = Field(ge=0, le=80)
+    experience_years: int = Field(default=0, ge=0, le=80)
     languages: list[str] = Field(default_factory=list, max_length=20)
 
     @field_validator("mobile_number")
@@ -70,8 +116,30 @@ class DoctorRegistration(BaseModel):
             raise ValueError("Mobile number must be exactly 10 digits")
         return v
 
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_date_of_birth(cls, v: str | None) -> str | None:
+        if not v:
+            return None
+        v_str = str(v).strip()
+        try:
+            dob = datetime.strptime(v_str, "%Y-%m-%d").date()
+            today = datetime.now(UTC).date()
+            age = (today - dob).days // 365
+            if age < 21:
+                raise ValueError("Doctor must be at least 21 years of age")
+            if age > 100:
+                raise ValueError("Invalid date of birth")
+        except ValueError as e:
+            if "at least 21" in str(e) or "Invalid date of birth" in str(e):
+                raise e
+            raise ValueError("Date of birth must be in YYYY-MM-DD format") from e
+        return v_str
+
+
 class MfaCode(BaseModel):
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
 
 def _totp(secret: str, counter: int | None = None) -> str:
     key = base64.b32decode(secret + "=" * ((8 - len(secret) % 8) % 8), casefold=True)
@@ -107,7 +175,7 @@ async def register_doctor(
     request: Request,
     session: AsyncSession | None = Depends(auth_database_session),
 ):
-    credential = None
+    uploaded_docs = []  # list of tuples: (doc_type, doc_title, filename, content_type, data)
     if request.headers.get("content-type", "").startswith("multipart/form-data"):
         form = await request.form()
         values = {}
@@ -115,27 +183,46 @@ async def register_doctor(
             val = form.get(key)
             if val is not None:
                 values[key] = val
+        if "state" not in values and "state_of_practice" in values:
+            values["state"] = values["state_of_practice"]
+        elif "state_of_practice" not in values and "state" in values:
+            values["state_of_practice"] = values["state"]
         values["qualifications"] = [v.strip() for v in str(values.get("qualifications") or "").split(",") if v.strip()]
         values["languages"] = [v.strip() for v in str(values.get("languages") or "").split(",") if v.strip()]
         payload = DoctorRegistration.model_validate(values)
-        upload = form.get("credential_document")
-        if upload is None or not hasattr(upload, "read"):
-            raise HTTPException(status_code=422, detail="Credential document is required")
-        content_type = getattr(upload, "content_type", "") or ""
-        if content_type not in CREDENTIAL_TYPES:
-            raise HTTPException(status_code=415, detail="Credential must be a PDF, JPG, or PNG file")
-        raw_name = Path(getattr(upload, "filename", "credential") or "credential")
-        if raw_name.suffix.lower() != CREDENTIAL_TYPES[content_type]:
-            raise HTTPException(status_code=415, detail="Credential file extension does not match its type")
-        data = await upload.read(MAX_CREDENTIAL_BYTES + 1)
-        if len(data) > MAX_CREDENTIAL_BYTES:
-            raise HTTPException(status_code=413, detail="Credential file exceeds the 10 MB limit")
-        credential = (raw_name.name, content_type, data)
+
+        found_types = set()
+        for doc_type, meta in DOCUMENT_DEFINITIONS.items():
+            field_names = [doc_type] + meta["aliases"]
+            upload = None
+            for fname in field_names:
+                fval = form.get(fname)
+                if fval is not None and hasattr(fval, "read") and getattr(fval, "filename", None):
+                    upload = fval
+                    break
+            if upload is not None and getattr(upload, "filename", None):
+                content_type = getattr(upload, "content_type", "") or ""
+                if content_type not in ALLOWED_CREDENTIAL_EXTENSIONS:
+                    raise HTTPException(status_code=415, detail=f"{meta['title']} must be a PDF, JPG, or PNG file")
+                raw_name = Path(getattr(upload, "filename", doc_type) or doc_type)
+                if raw_name.suffix.lower() not in ALLOWED_CREDENTIAL_EXTENSIONS[content_type]:
+                    raise HTTPException(status_code=415, detail=f"{meta['title']} file extension does not match its type")
+                data = await upload.read(MAX_CREDENTIAL_BYTES + 1)
+                if len(data) > MAX_CREDENTIAL_BYTES:
+                    raise HTTPException(status_code=413, detail=f"{meta['title']} exceeds the 10 MB limit")
+                if len(data) > 0:
+                    found_types.add(doc_type)
+                    uploaded_docs.append((doc_type, meta["title"], raw_name.name, content_type, data))
+
+        # Check for mandatory council certificate
+        if "medical_council_certificate" not in found_types:
+            raise HTTPException(status_code=422, detail="Medical council registration certificate is required")
     else:
         try:
             payload = DoctorRegistration.model_validate(await request.json())
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Registration payload is invalid") from exc
+
     email = payload.email.strip().lower()
     settings = get_settings()
     if settings.mongodb_enabled:
@@ -155,6 +242,9 @@ async def register_doctor(
             "email": email,
             "phone": payload.mobile_number,
             "mobile_number": payload.mobile_number,
+            "date_of_birth": payload.date_of_birth,
+            "gender": payload.gender,
+            "state_of_practice": payload.state_of_practice or payload.state,
             "password_hash": password_hash(payload.password),
             "terms_version": "doctor-terms-current",
             "terms_accepted_at": now,
@@ -172,7 +262,10 @@ async def register_doctor(
             "clinic_name": payload.clinic_name,
             "registration_number": payload.registration_number,
             "medical_council": payload.medical_council,
-            "state": payload.state,
+            "state": payload.state or payload.state_of_practice,
+            "state_of_practice": payload.state_of_practice or payload.state,
+            "date_of_birth": payload.date_of_birth,
+            "gender": payload.gender,
             "qualifications": payload.qualifications,
             "experience_years": payload.experience_years,
             "languages": payload.languages,
@@ -180,22 +273,36 @@ async def register_doctor(
             "active": False,
             "approved_for_consultation": False,
             "approval_status": "pending",
+            "approval_reason": None,
+            "rejection_reason": None,
             "created_at": now,
         }
         code = generate_verification_otp()
-        credential_path = None
-        credential_meta = None
-        if credential:
-            filename, content_type, data = credential
-            credential_path = PRIVATE_CREDENTIAL_ROOT / tenant_id / f"{user_id}{CREDENTIAL_TYPES[content_type]}"
-            credential_path.parent.mkdir(parents=True, exist_ok=True)
-            credential_path.write_bytes(data)
+        created_file_paths = []
+        credential_metas = []
+
+        for doc_type, doc_title, filename, content_type, data in uploaded_docs:
+            doc_id = str(uuid4())
+            rel_path = f"{tenant_id}/{user_id}_{doc_type}{CREDENTIAL_TYPES[content_type]}"
+            file_path = PRIVATE_CREDENTIAL_ROOT / tenant_id / f"{user_id}_{doc_type}{CREDENTIAL_TYPES[content_type]}"
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_bytes(data)
+            created_file_paths.append(file_path)
+
+            if doc_type == "medical_council_certificate":
+                legacy_path = PRIVATE_CREDENTIAL_ROOT / tenant_id / f"{user_id}{CREDENTIAL_TYPES[content_type]}"
+                legacy_path.write_bytes(data)
+                created_file_paths.append(legacy_path)
+
             file_b64 = base64.b64encode(data).decode('utf-8')
-            credential_meta = {
+            credential_metas.append({
+                "id": doc_id,
                 "doctor_id": user_id,
                 "tenant_id": tenant_id,
                 "registration_number": payload.registration_number.strip(),
-                "storage_key": str(credential_path.relative_to(PRIVATE_CREDENTIAL_ROOT)),
+                "document_type": doc_type,
+                "document_title": doc_title,
+                "storage_key": rel_path,
                 "file_name": filename,
                 "content_type": content_type,
                 "size_bytes": len(data),
@@ -204,20 +311,22 @@ async def register_doctor(
                 "created_at": now,
                 "uploaded_at": now,
                 "uploaded_by": user_id,
-            }
+            })
+
         try:
             await db["users"].insert_one(user)
             await db["doctors"].insert_one(doctor)
-            if credential_meta:
-                await db["doctor_credentials"].insert_one(credential_meta)
+            if credential_metas:
+                await db["doctor_credentials"].insert_many(credential_metas)
             await db["recovery_tokens"].insert_one({
                 "id": str(uuid4()), "user_id": user_id, "token_hash": token_hash(code),
                 "expires_at": otp_expiry(now), "used_at": None, "attempts": 0,
             })
             await send_verification_email(email, code)
         except DuplicateKeyError:
-            if credential_path and credential_path.is_file():
-                credential_path.unlink()
+            for p in created_file_paths:
+                if p.is_file():
+                    p.unlink(missing_ok=True)
             existing_user = await mongo_database.database()["users"].find_one({
                 "tenant_id": tenant_id, "email": email
             })
@@ -244,7 +353,7 @@ async def register_doctor(
 
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
-    if credential:
+    if uploaded_docs:
         raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
     existing_user = await session.scalar(select(UserAccount).where(UserAccount.email == email))
     if existing_user:
@@ -293,9 +402,17 @@ async def approve_doctor(
     if "clinic:doctor:approve" not in principal.permissions and "clinic_admin" not in principal.roles:
         raise HTTPException(status_code=403, detail="Permission denied")
 
+    notes = "Credentials verified and approved"
+    if request.headers.get("content-type", "").startswith("application/json"):
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                notes = body.get("notes") or body.get("reason") or notes
+        except Exception:
+            pass
+
     if settings.mongodb_enabled:
         db = mongo_database.database()
-        credential = await db["doctor_credentials"].find_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)})
         result = await db["doctors"].update_one(
             {
                 "tenant_id": settings.default_tenant_id,
@@ -306,6 +423,8 @@ async def approve_doctor(
                     "approval_status": "approved",
                     "active": True,
                     "approved_for_consultation": True,
+                    "approval_reason": notes,
+                    "rejection_reason": None,
                     "approval_decided_by": str(principal.user_id),
                     "approval_decided_at": datetime.now(UTC),
                 }
@@ -313,9 +432,30 @@ async def approve_doctor(
         )
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Doctor not found")
-        await db["audit_logs"].insert_one({"id": str(uuid4()), "tenant_id": settings.default_tenant_id, "actor_id": str(principal.user_id), "action": "doctor.approval", "resource_type": "doctor", "resource_id": str(doctor_id), "purpose": "credential verification", "metadata": {"decision": "approved"}, "occurred_at": datetime.now(UTC)})
-        if credential:
-            await db["doctor_credentials"].update_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)}, {"$set": {"status": "approved", "reviewed_by": str(principal.user_id), "reviewed_at": datetime.now(UTC)}})
+        await db["audit_logs"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": settings.default_tenant_id,
+            "actor_id": str(principal.user_id),
+            "action": "doctor.approval",
+            "resource_type": "doctor",
+            "resource_id": str(doctor_id),
+            "purpose": "credential verification",
+            "metadata": {"decision": "approved", "notes": notes},
+            "occurred_at": datetime.now(UTC),
+        })
+        await db["doctor_credentials"].update_many(
+            {
+                "tenant_id": settings.default_tenant_id,
+                "$or": [{"doctor_id": str(doctor_id)}],
+            },
+            {
+                "$set": {
+                    "status": "approved",
+                    "reviewed_by": str(principal.user_id),
+                    "reviewed_at": datetime.now(UTC),
+                }
+            },
+        )
         return {"status": "approved", "doctor_id": str(doctor_id)}
 
     if session is None:
@@ -328,6 +468,86 @@ async def approve_doctor(
     if doctor is None:
         raise HTTPException(status_code=404, detail="Doctor not found")
     doctor.approval_status, doctor.active, doctor.approved_for_consultation = "approved", True, True
+    return {"status": doctor.approval_status, "doctor_id": str(doctor.id)}
+
+
+@router.post("/{doctor_id}/reject")
+async def reject_doctor(
+    doctor_id: str,
+    request: Request,
+    session: AsyncSession | None = Depends(auth_database_session),
+):
+    settings = get_settings()
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if "clinic:doctor:approve" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    reason = "Credentials verification rejected"
+    if request.headers.get("content-type", "").startswith("application/json"):
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                reason = body.get("reason") or body.get("notes") or reason
+        except Exception:
+            pass
+
+    if settings.mongodb_enabled:
+        db = mongo_database.database()
+        result = await db["doctors"].update_one(
+            {
+                "tenant_id": settings.default_tenant_id,
+                "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+            },
+            {
+                "$set": {
+                    "approval_status": "rejected",
+                    "active": False,
+                    "approved_for_consultation": False,
+                    "rejection_reason": reason,
+                    "approval_decided_by": str(principal.user_id),
+                    "approval_decided_at": datetime.now(UTC),
+                }
+            },
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        await db["audit_logs"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": settings.default_tenant_id,
+            "actor_id": str(principal.user_id),
+            "action": "doctor.rejection",
+            "resource_type": "doctor",
+            "resource_id": str(doctor_id),
+            "purpose": "credential verification",
+            "metadata": {"decision": "rejected", "reason": reason},
+            "occurred_at": datetime.now(UTC),
+        })
+        await db["doctor_credentials"].update_many(
+            {
+                "tenant_id": settings.default_tenant_id,
+                "$or": [{"doctor_id": str(doctor_id)}],
+            },
+            {
+                "$set": {
+                    "status": "rejected",
+                    "reviewed_by": str(principal.user_id),
+                    "reviewed_at": datetime.now(UTC),
+                }
+            },
+        )
+        return {"status": "rejected", "doctor_id": str(doctor_id), "reason": reason}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+    doctor = await session.scalar(
+        select(Doctor).where(
+            Doctor.id == UUID(doctor_id), Doctor.tenant_id == UUID(principal.tenant_id)
+        )
+    )
+    if doctor is None:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    doctor.approval_status, doctor.active, doctor.approved_for_consultation = "rejected", False, False
     return {"status": doctor.approval_status, "doctor_id": str(doctor.id)}
 
 
@@ -377,6 +597,115 @@ async def pending_doctors(
         }
         for row in rows
     ]
+
+
+@router.get("/{doctor_id}/documents")
+async def list_doctor_documents(doctor_id: str, request: Request):
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if principal.user_id != str(doctor_id) and "clinic:doctor:read" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    settings = get_settings()
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Document storage is unavailable for this database backend")
+
+    db = mongo_database.database()
+    doctor = await db["doctors"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+    })
+    doc_target_id = str(doctor.get("id") or doctor.get("user_id") or doctor_id) if doctor else str(doctor_id)
+
+    docs = await db["doctor_credentials"].find({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [{"doctor_id": doc_target_id}, {"doctor_id": str(doctor_id)}],
+    }).to_list(100)
+
+    return [
+        {
+            "id": doc.get("id") or str(doc.get("_id")),
+            "doctor_id": doc.get("doctor_id"),
+            "document_type": doc.get("document_type", "medical_council_certificate"),
+            "document_title": doc.get("document_title") or DOCUMENT_DEFINITIONS.get(doc.get("document_type", ""), {}).get("title", "Credential Document"),
+            "file_name": doc.get("file_name", "document.pdf"),
+            "content_type": doc.get("content_type", "application/pdf"),
+            "size_bytes": doc.get("size_bytes", 0),
+            "status": doc.get("status", "pending_verification"),
+            "uploaded_at": doc.get("uploaded_at") or doc.get("created_at"),
+        }
+        for doc in docs
+    ]
+
+
+@router.get("/{doctor_id}/documents/{document_type}/download")
+async def download_doctor_document(doctor_id: str, document_type: str, request: Request):
+    from teleconsult.kernel.authz.policy import get_principal
+    principal = await get_principal(request)
+    if principal.user_id != str(doctor_id) and "clinic:doctor:read" not in principal.permissions and "clinic_admin" not in principal.roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    settings = get_settings()
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
+
+    db = mongo_database.database()
+    doctor = await db["doctors"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+    })
+    doc_target_id = str(doctor.get("id") or doctor.get("user_id") or doctor_id) if doctor else str(doctor_id)
+
+    aliases = [document_type]
+    for dt, dmeta in DOCUMENT_DEFINITIONS.items():
+        if document_type in [dt] + dmeta["aliases"]:
+            aliases = list(set([dt] + dmeta["aliases"]))
+            break
+
+    document = await db["doctor_credentials"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [
+            {"doctor_id": doc_target_id, "document_type": {"$in": aliases}},
+            {"doctor_id": str(doctor_id), "document_type": {"$in": aliases}},
+            {"doctor_id": doc_target_id, "id": document_type},
+            {"doctor_id": str(doctor_id), "id": document_type},
+        ],
+    })
+    if not document:
+        if "medical_council_certificate" in aliases or document_type in ("credentials", "credential"):
+            document = await db["doctor_credentials"].find_one({
+                "tenant_id": settings.default_tenant_id,
+                "$or": [{"doctor_id": doc_target_id}, {"doctor_id": str(doctor_id)}],
+            })
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_bytes = None
+    path = (PRIVATE_CREDENTIAL_ROOT / document.get("storage_key", "")).resolve()
+    if PRIVATE_CREDENTIAL_ROOT.resolve() in path.parents and path.is_file():
+        file_bytes = path.read_bytes()
+    elif document.get("file_data_base64"):
+        try:
+            file_bytes = base64.b64decode(document["file_data_base64"])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(file_bytes)
+        except Exception:
+            pass
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=404,
+            detail="Document content is unavailable. Please re-upload.",
+        )
+
+    is_inline = request.query_params.get("inline") == "true"
+    disposition = "inline" if is_inline else "attachment"
+    safe_filename = document.get("file_name", f"{document_type}.pdf")
+    content_type = document.get("content_type", "application/pdf")
+
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={"Content-Disposition": f'{disposition}; filename="{safe_filename}"'},
+    )
 
 
 @router.get("/{doctor_id}/credentials")
@@ -433,8 +762,8 @@ async def get_doctor_credentials(doctor_id: str, request: Request):
     )
 
 
-@router.post("/{doctor_id}/credentials")
-async def upload_doctor_credentials(doctor_id: str, request: Request):
+@router.post("/{doctor_id}/documents/{document_type}")
+async def upload_doctor_document(doctor_id: str, document_type: str, request: Request):
     from teleconsult.kernel.authz.policy import get_principal
     principal = await get_principal(request)
     if principal.user_id != str(doctor_id) and "clinic:doctor:read" not in principal.permissions and "clinic_admin" not in principal.roles:
@@ -442,35 +771,55 @@ async def upload_doctor_credentials(doctor_id: str, request: Request):
     settings = get_settings()
     if not settings.mongodb_enabled:
         raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
+
     form = await request.form()
-    upload = form.get("credential_document")
+    upload = form.get("file") or form.get("document") or form.get(document_type) or form.get("credential_document")
     if upload is None or not hasattr(upload, "read"):
-        raise HTTPException(status_code=422, detail="Credential document is required")
+        raise HTTPException(status_code=422, detail="Document file is required")
     content_type = getattr(upload, "content_type", "") or ""
-    if content_type not in CREDENTIAL_TYPES:
-        raise HTTPException(status_code=415, detail="Credential must be a PDF, JPG, or PNG file")
-    raw_name = Path(getattr(upload, "filename", "credential") or "credential")
-    if raw_name.suffix.lower() != CREDENTIAL_TYPES[content_type]:
-        raise HTTPException(status_code=415, detail="Credential file extension does not match its type")
+    if content_type not in ALLOWED_CREDENTIAL_EXTENSIONS:
+        raise HTTPException(status_code=415, detail="Document must be a PDF, JPG, or PNG file")
+    raw_name = Path(getattr(upload, "filename", document_type) or document_type)
+    if raw_name.suffix.lower() not in ALLOWED_CREDENTIAL_EXTENSIONS[content_type]:
+        raise HTTPException(status_code=415, detail="Document file extension does not match its type")
     data = await upload.read(MAX_CREDENTIAL_BYTES + 1)
     if len(data) > MAX_CREDENTIAL_BYTES:
-        raise HTTPException(status_code=413, detail="Credential file exceeds the 10 MB limit")
+        raise HTTPException(status_code=413, detail="Document file exceeds the 10 MB limit")
+
     db = mongo_database.database()
-    doctor = await db["doctors"].find_one({"tenant_id": settings.default_tenant_id, "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}]})
+    doctor = await db["doctors"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+    })
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
+
+    target_id = str(doctor.get("id") or doctor.get("user_id"))
     now = datetime.now(UTC)
-    path = PRIVATE_CREDENTIAL_ROOT / settings.default_tenant_id / f"{doctor.get('id') or doctor.get('user_id')}{CREDENTIAL_TYPES[content_type]}"
+    rel_path = f"{settings.default_tenant_id}/{target_id}_{document_type}{CREDENTIAL_TYPES[content_type]}"
+    path = PRIVATE_CREDENTIAL_ROOT / settings.default_tenant_id / f"{target_id}_{document_type}{CREDENTIAL_TYPES[content_type]}"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     file_b64 = base64.b64encode(data).decode('utf-8')
 
+    doc_title = DOCUMENT_DEFINITIONS.get(document_type, {}).get("title", document_type.replace("_", " ").title())
+
+    aliases = [document_type]
+    if document_type in DOCUMENT_DEFINITIONS:
+        aliases = list(set([document_type] + DOCUMENT_DEFINITIONS[document_type]["aliases"]))
+
     await db["doctor_credentials"].update_one(
-        {"tenant_id": settings.default_tenant_id, "$or": [{"doctor_id": str(doctor.get("id"))}, {"doctor_id": str(doctor.get("user_id"))}, {"doctor_id": str(doctor_id)}]},
+        {
+            "tenant_id": settings.default_tenant_id,
+            "$or": [{"doctor_id": target_id}, {"doctor_id": str(doctor_id)}],
+            "document_type": {"$in": aliases},
+        },
         {"$set": {
-            "doctor_id": str(doctor.get("id") or doctor.get("user_id")),
+            "doctor_id": target_id,
             "registration_number": doctor.get("registration_number"),
-            "storage_key": str(path.relative_to(PRIVATE_CREDENTIAL_ROOT)),
+            "document_type": document_type,
+            "document_title": doc_title,
+            "storage_key": rel_path,
             "file_name": raw_name.name,
             "content_type": content_type,
             "size_bytes": len(data),
@@ -482,55 +831,20 @@ async def upload_doctor_credentials(doctor_id: str, request: Request):
         }},
         upsert=True,
     )
-    return {"status": "stored", "doctor_id": str(doctor.get("id") or doctor.get("user_id")), "file_name": raw_name.name, "uploaded_at": now, "approval_status": doctor.get("approval_status", "pending")}
+    return {
+        "status": "stored",
+        "doctor_id": target_id,
+        "document_type": document_type,
+        "document_title": doc_title,
+        "file_name": raw_name.name,
+        "uploaded_at": now,
+        "approval_status": doctor.get("approval_status", "pending"),
+    }
 
 
-@router.post("/{doctor_id}/reject")
-async def reject_doctor(
-    doctor_id: str,
-    request: Request,
-    session: AsyncSession | None = Depends(auth_database_session),
-):
-    settings = get_settings()
-    from teleconsult.kernel.authz.policy import get_principal
-    principal = await get_principal(request)
-    if "clinic:doctor:approve" not in principal.permissions and "clinic_admin" not in principal.roles:
-        raise HTTPException(status_code=403, detail="Permission denied")
-
-    if settings.mongodb_enabled:
-        db = mongo_database.database()
-        result = await db["doctors"].update_one(
-            {
-                "tenant_id": settings.default_tenant_id,
-                "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
-            },
-            {
-                "$set": {
-                    "approval_status": "rejected",
-                    "active": False,
-                    "approved_for_consultation": False,
-                    "approval_decided_by": str(principal.user_id),
-                    "approval_decided_at": datetime.now(UTC),
-                }
-            },
-        )
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Doctor not found")
-        await db["audit_logs"].insert_one({"id": str(uuid4()), "tenant_id": settings.default_tenant_id, "actor_id": str(principal.user_id), "action": "doctor.approval", "resource_type": "doctor", "resource_id": str(doctor_id), "purpose": "credential verification", "metadata": {"decision": "rejected"}, "occurred_at": datetime.now(UTC)})
-        await db["doctor_credentials"].update_one({"tenant_id": settings.default_tenant_id, "doctor_id": str(doctor_id)}, {"$set": {"status": "rejected", "reviewed_by": str(principal.user_id), "reviewed_at": datetime.now(UTC)}})
-        return {"status": "rejected", "doctor_id": str(doctor_id)}
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    doctor = await session.scalar(
-        select(Doctor).where(
-            Doctor.id == UUID(doctor_id), Doctor.tenant_id == UUID(principal.tenant_id)
-        )
-    )
-    if doctor is None:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-    doctor.approval_status, doctor.active, doctor.approved_for_consultation = "rejected", False, False
-    return {"status": doctor.approval_status, "doctor_id": str(doctor.id)}
+@router.post("/{doctor_id}/credentials")
+async def upload_doctor_credentials(doctor_id: str, request: Request):
+    return await upload_doctor_document(doctor_id=doctor_id, document_type="medical_council_certificate", request=request)
 
 
 @router.post("/mfa/enroll")

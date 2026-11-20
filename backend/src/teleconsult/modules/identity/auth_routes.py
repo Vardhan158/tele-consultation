@@ -469,18 +469,23 @@ async def get_me(request: Request) -> dict[str, object]:
             if not user:
                 return {"authenticated": False}
             approval_status = "approved"
+            rejection_reason = None
             if user.get("role") == "doctor":
                 doc = await database["doctors"].find_one({
                     "tenant_id": settings.default_tenant_id,
                     "$or": [{"id": user["id"]}, {"user_id": user["id"]}, {"user_account_id": user["id"]}]
                 })
                 approval_status = doc.get("approval_status", "pending") if doc else "pending"
+                rejection_reason = doc.get("rejection_reason") if doc else None
             return {
                 "authenticated": True, "user_id": user["id"],
                 "tenant_id": user["tenant_id"], "full_name": user.get("full_name"),
                 "email": user.get("email"), "phone": user.get("mobile_number"),
+                "date_of_birth": user.get("date_of_birth") or (doc.get("date_of_birth") if user.get("role") == "doctor" and doc else None),
+                "gender": user.get("gender") or (doc.get("gender") if user.get("role") == "doctor" and doc else None),
                 "role": user.get("role", "patient"),
                 "approval_status": approval_status,
+                "rejection_reason": rejection_reason,
                 "email_verified": bool(user.get("verified_at")),
             }
         except Exception:
