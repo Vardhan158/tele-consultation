@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('professional doctor registration renders all 13 required fields across 3 sections', async ({ page }) => {
+test('professional doctor registration renders all 13 required fields across 3 sections on a single page without scrolling', async ({ page }) => {
   await page.route('**/auth/me', route => route.fulfill({ json: { authenticated: false } }));
   await page.setViewportSize({ width: 1440, height: 750 });
   await page.goto('/doctor/register');
@@ -38,9 +38,15 @@ test('professional doctor registration renders all 13 required fields across 3 s
   await expect(page.locator('input[name="terms_consent"]')).toBeVisible();
   await expect(page.locator('input[name="declaration_consent"]')).toBeVisible();
 
-  // Submit button
-  await page.getByRole('button', { name: /Submit Doctor Registration/i }).scrollIntoViewIfNeeded();
+  // Submit button directly visible without scrolling
   await expect(page.getByRole('button', { name: /Submit Doctor Registration/i })).toBeVisible();
+
+  // Verify single page layout without vertical scrolling on desktop viewport
+  const isScrollable = await page.evaluate(() => {
+    const main = document.querySelector('main');
+    return main ? main.scrollHeight > main.clientHeight : false;
+  });
+  expect(isScrollable).toBe(false);
 });
 
 test('doctor registration form client-side validations', async ({ page }) => {
@@ -120,28 +126,27 @@ test('successful doctor registration submission displays PENDING_VERIFICATION co
   await page.locator('input[name="email"]').fill('dr.test@clinic.com');
   await page.locator('input[name="mobile_number"]').fill('9876543210');
   await page.locator('input[name="state"]').fill('Karnataka');
-  await page.locator('input[name="date_of_birth"]').fill('1988-08-20');
+  await page.locator('input[name="date_of_birth"]').fill('1988-11-20');
   await page.locator('select[name="gender"]').selectOption('Male');
   await page.locator('select[name="specialty"]').selectOption('General Medicine');
-  await page.locator('input[name="registration_number"]').fill('KMC-98765');
+  await page.locator('input[name="registration_number"]').fill('KMC-998877');
   await page.locator('input[name="medical_council"]').fill('Karnataka Medical Council');
-  await page.locator('input[name="password"]').fill('Secret123#');
-  await page.locator('input[name="confirm_password"]').fill('Secret123#');
+  await page.locator('input[name="qualifications"]').fill('MBBS, MD');
   await page.locator('input[name="experience_years"]').fill('12');
-  await page.locator('input[name="qualifications"]').fill('MBBS, MS');
-  await page.locator('input[name="languages"]').fill('English, Kannada');
+  await page.locator('input[name="languages"]').fill('English, Hindi, Kannada');
   await page.locator('input[name="credential_document"]').setInputFiles({
-    name: 'test_certificate.pdf',
+    name: 'council_reg.pdf',
     mimeType: 'application/pdf',
-    buffer: Buffer.from('%PDF-1.4 test certificate content'),
+    buffer: Buffer.from('%PDF-1.4 mock council cert'),
   });
+  await page.locator('input[name="password"]').fill('ValidPass123!');
+  await page.locator('input[name="confirm_password"]').fill('ValidPass123!');
   await page.locator('input[name="terms_consent"]').check();
   await page.locator('input[name="declaration_consent"]').check();
 
   await page.getByRole('button', { name: /Submit Doctor Registration/i }).click();
+
+  await expect(page.locator('text=Registration Submitted Successfully')).toBeVisible();
   await expect(page.locator('text=PENDING_VERIFICATION').first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Registration Submitted Successfully/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Proceed to Email Verification/i })).toBeVisible();
 });
-
-
