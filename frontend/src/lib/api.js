@@ -134,16 +134,34 @@ export const patientApi = {
 
 export const doctorApi = {
   register: (payload) => {
-    if (payload?.credential_document instanceof File) {
+    const hasFile = Object.values(payload || {}).some((v) => v instanceof File);
+    if (hasFile) {
       const form = new FormData();
       Object.entries(payload).forEach(([key, value]) => {
-        if (key === "credential_document") form.append(key, value);
+        if (value instanceof File) form.append(key, value);
         else if (Array.isArray(value)) form.append(key, value.join(","));
         else if (value !== undefined && value !== null) form.append(key, String(value));
       });
       return apiRequest("/doctor/register", { method: "POST", body: form });
     }
     return apiRequest("/doctor/register", { method: "POST", body: JSON.stringify(payload) });
+  },
+  documents: (doctorId) => apiRequest(`/doctor/${doctorId}/documents`),
+  downloadDocument: async (doctorId, documentType, inline = false) => {
+    const response = await fetch(
+      `${API_BASE_URL}/doctor/${doctorId}/documents/${documentType}/download${inline ? "?inline=true" : ""}`,
+      { credentials: "include" },
+    );
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Document content is unavailable.");
+    }
+    return response.blob();
+  },
+  uploadDocument: (doctorId, documentType, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiRequest(`/doctor/${doctorId}/documents/${documentType}`, { method: "POST", body: form });
   },
   dashboard: () => apiRequest("/doctor/dashboard"),
   notifications: () => apiRequest("/doctor/notifications"),
@@ -387,8 +405,16 @@ export const adminApi = {
   overview: () => apiRequest("/admin/overview"),
   doctors: () => apiRequest("/admin/doctors"),
   pendingDoctors: () => apiRequest("/doctor/pending"),
-  approveDoctor: (id) => apiRequest(`/doctor/${id}/approve`, { method: "POST" }),
-  rejectDoctor: (id) => apiRequest(`/doctor/${id}/reject`, { method: "POST" }),
+  approveDoctor: (id, notes = "") =>
+    apiRequest(`/doctor/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ notes }),
+    }),
+  rejectDoctor: (id, reason = "") =>
+    apiRequest(`/doctor/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
   downloadDoctorCredential: async (id, inline = false) => {
     const response = await fetch(
       `${API_BASE_URL}/doctor/${id}/credentials${inline ? "?inline=true" : ""}`,
@@ -404,6 +430,23 @@ export const adminApi = {
     const form = new FormData();
     form.append("credential_document", file);
     return apiRequest(`/doctor/${id}/credentials`, { method: "POST", body: form });
+  },
+  doctorDocuments: (id) => apiRequest(`/doctor/${id}/documents`),
+  downloadDoctorDocument: async (id, documentType, inline = false) => {
+    const response = await fetch(
+      `${API_BASE_URL}/doctor/${id}/documents/${documentType}/download${inline ? "?inline=true" : ""}`,
+      { credentials: "include" },
+    );
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Document content is unavailable.");
+    }
+    return response.blob();
+  },
+  uploadDoctorDocument: (id, documentType, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiRequest(`/doctor/${id}/documents/${documentType}`, { method: "POST", body: form });
   },
   toggleDoctorStatus: (id, active, reason = "") =>
     apiRequest(`/admin/doctors/${id}/status`, {

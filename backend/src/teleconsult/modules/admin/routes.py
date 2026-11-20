@@ -302,8 +302,26 @@ async def get_doctors(
             d.get("user_account_id") or d.get("user_id") or d.get("id") for d in docs
         ]
         users = await db["users"].find({"id": {"$in": user_ids}}).to_list(200)
-        credentials = await db["doctor_credentials"].find({"tenant_id": settings.default_tenant_id, "doctor_id": {"$in": user_ids}}).to_list(200)
-        credentials_by_doctor = {item.get("doctor_id"): item for item in credentials}
+        credentials = await db["doctor_credentials"].find({"tenant_id": settings.default_tenant_id, "doctor_id": {"$in": user_ids}}).to_list(1000)
+        credentials_by_doctor = {}
+        all_docs_by_doctor = {}
+        for item in credentials:
+            d_id = item.get("doctor_id")
+            if d_id not in credentials_by_doctor:
+                credentials_by_doctor[d_id] = item
+            if d_id not in all_docs_by_doctor:
+                all_docs_by_doctor[d_id] = []
+            all_docs_by_doctor[d_id].append({
+                "id": item.get("id") or str(item.get("_id")),
+                "document_type": item.get("document_type", "medical_council_certificate"),
+                "document_title": item.get("document_title") or item.get("file_name"),
+                "file_name": item.get("file_name"),
+                "content_type": item.get("content_type", "application/pdf"),
+                "size_bytes": item.get("size_bytes", 0),
+                "status": item.get("status", "pending_verification"),
+                "uploaded_at": item.get("uploaded_at") or item.get("created_at"),
+            })
+
         for u in users:
             users_by_id[u["id"]] = u
 
@@ -317,18 +335,25 @@ async def get_doctors(
                 "full_name": d.get("full_name") or u_info.get("full_name", "Doctor"),
                 "email": u_info.get("email", ""),
                 "mobile_number": u_info.get("mobile_number") or u_info.get("phone", ""),
+                "date_of_birth": d.get("date_of_birth") or u_info.get("date_of_birth"),
+                "gender": d.get("gender") or u_info.get("gender"),
+                "state": d.get("state") or d.get("state_of_practice", ""),
+                "state_of_practice": d.get("state_of_practice") or d.get("state", ""),
                 "specialty": d.get("specialty", "General"),
                 "clinic_name": d.get("clinic_name", "Kaizentrix Care Clinic"),
                 "registration_number": d.get("registration_number", "N/A"),
+                "medical_council": d.get("medical_council", "N/A"),
                 "experience_years": d.get("experience_years", 0),
                 "qualifications": d.get("qualifications", []),
                 "languages": d.get("languages", ["English"]),
                 "approval_status": d.get("approval_status", "pending"),
                 "approval_reason": d.get("approval_reason"),
+                "rejection_reason": d.get("rejection_reason"),
                 "active": d.get("active", False),
                 "approved_for_consultation": d.get("approved_for_consultation", False),
                 "email_verified": bool(u_info.get("verified_at")),
                 "created_at": d.get("created_at"),
+                "documents": all_docs_by_doctor.get(u_id, []),
                 "credential_document": ({
                     "file_name": credentials_by_doctor[u_id].get("file_name"),
                     "uploaded_at": credentials_by_doctor[u_id].get("created_at"),

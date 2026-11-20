@@ -45,10 +45,10 @@ export default function DoctorManagementTab() {
     setActionLoading(doctorId);
     try {
       if (type === "approve") {
-        await adminApi.approveDoctor(doctorId);
+        await adminApi.approveDoctor(doctorId, reasonText);
         showToast("Doctor account verified & approved successfully.", "success");
       } else {
-        await adminApi.rejectDoctor(doctorId);
+        await adminApi.rejectDoctor(doctorId, reasonText);
         showToast("Doctor application rejected.", "info");
       }
       setReasonModal(null);
@@ -273,6 +273,10 @@ export default function DoctorManagementTab() {
                 <div><strong>Specialty:</strong> {selectedDoctor.specialty}</div>
                 <div><strong>Clinic Affiliation:</strong> {selectedDoctor.clinic_name}</div>
                 <div><strong>Professional Registration #:</strong> {selectedDoctor.registration_number}</div>
+                <div><strong>Medical Council:</strong> {selectedDoctor.medical_council || "N/A"}</div>
+                <div><strong>State of Practice:</strong> {selectedDoctor.state_of_practice || selectedDoctor.state || "N/A"}</div>
+                <div><strong>Date of Birth:</strong> {selectedDoctor.date_of_birth || "N/A"}</div>
+                <div><strong>Gender:</strong> {selectedDoctor.gender || "N/A"}</div>
                 <div><strong>Experience:</strong> {selectedDoctor.experience_years} Years</div>
                 <div><strong>Qualifications:</strong> {Array.isArray(selectedDoctor.qualifications) ? selectedDoctor.qualifications.join(", ") : selectedDoctor.qualifications}</div>
                 <div><strong>Languages:</strong> {Array.isArray(selectedDoctor.languages) ? selectedDoctor.languages.join(", ") : selectedDoctor.languages}</div>
@@ -281,9 +285,84 @@ export default function DoctorManagementTab() {
                 <div><strong>Email Verification:</strong> {selectedDoctor.email_verified ? "Verified ✅" : "Pending ⏳"}</div>
               </div>
 
+              {selectedDoctor.rejection_reason && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+                  <div className="font-bold text-red-950 flex items-center gap-1.5 mb-1">
+                    <span className="material-symbols-outlined text-sm text-red-700">cancel</span>
+                    Rejection Reason:
+                  </div>
+                  <p className="font-mono text-[11px] bg-white p-2 rounded border border-red-200">{selectedDoctor.rejection_reason}</p>
+                </div>
+              )}
+
               <div className="border-t border-[#577877]/15 pt-2">
-                <div className="font-semibold text-[#162623] mb-1">Credential Document</div>
-                {selectedDoctor.credential_document ? (
+                <div className="font-semibold text-[#162623] mb-2 flex items-center justify-between">
+                  <span>Uploaded Verification Documents</span>
+                  <span className="text-[11px] text-[#577877] font-normal">
+                    {selectedDoctor.documents?.length || (selectedDoctor.credential_document ? 1 : 0)} Document(s)
+                  </span>
+                </div>
+
+                {selectedDoctor.documents && selectedDoctor.documents.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedDoctor.documents.map((doc, dIdx) => (
+                      <div key={doc.id || dIdx} className="rounded-xl bg-[#EEF6F3] p-3 text-[11px] text-[#577877] space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[#162623] text-xs">{doc.document_title || doc.document_type}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            doc.status === "approved"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : doc.status === "rejected"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-amber-100 text-amber-800"
+                          }`}>
+                            {doc.status}
+                          </span>
+                        </div>
+                        <div><strong>Filename:</strong> {doc.file_name} {doc.size_bytes ? `(${Math.round(doc.size_bytes / 1024)} KB)` : ""}</div>
+                        <div><strong>Uploaded:</strong> {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : "Unknown"}</div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const blob = await adminApi.downloadDoctorDocument(selectedDoctor.id, doc.document_type || doc.id, true);
+                                const url = URL.createObjectURL(blob);
+                                window.open(url, "_blank");
+                              } catch (err) {
+                                showToast(err.message || "Document content unavailable.", "error");
+                              }
+                            }}
+                            className="rounded-lg bg-[#25836F] px-2.5 py-1 font-semibold text-white cursor-pointer hover:bg-[#1d6e5d]"
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const blob = await adminApi.downloadDoctorDocument(selectedDoctor.id, doc.document_type || doc.id, false);
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement("a");
+                                link.href = url;
+                                link.download = doc.file_name || `${doc.document_type}.pdf`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                URL.revokeObjectURL(url);
+                              } catch (err) {
+                                showToast(err.message || "Document content unavailable.", "error");
+                              }
+                            }}
+                            className="rounded-lg border border-[#25836F]/30 bg-white px-2.5 py-1 font-semibold text-[#25836F] cursor-pointer hover:bg-[#F0F5F7]"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : selectedDoctor.credential_document ? (
                   <div className="rounded-xl bg-[#EEF6F3] p-3 text-[11px] text-[#577877] space-y-2">
                     <div><strong>Filename:</strong> {selectedDoctor.credential_document.file_name}</div>
                     <div><strong>Uploaded:</strong> {selectedDoctor.credential_document.uploaded_at ? new Date(selectedDoctor.credential_document.uploaded_at).toLocaleString() : "Unknown"}</div>
@@ -326,12 +405,16 @@ export default function DoctorManagementTab() {
                       </button>
                     </div>
                   </div>
-                ) : <div className="text-[11px] text-[#577877]">Credential document not uploaded</div>}
-                <label className="inline-flex cursor-pointer rounded-lg border border-[#25836F]/30 bg-white px-3 py-1.5 text-[11px] font-semibold text-[#25836F]">
-                  Upload credential
-                  <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const result = await adminApi.uploadDoctorCredential(selectedDoctor.id, file); setSelectedDoctor((current) => ({ ...current, credential_document: { file_name: result.file_name, uploaded_at: result.uploaded_at, status: "pending_verification" } })); showToast("Credential document uploaded for review.", "success"); } catch (error) { showToast(error.message || "Credential upload failed.", "error"); } event.target.value = ""; }} />
-                </label>
-                <div className="font-semibold text-[#162623] mb-1">Audit History</div>
+                ) : <div className="text-[11px] text-[#577877]">No credential documents uploaded</div>}
+
+                <div className="pt-2">
+                  <label className="inline-flex cursor-pointer rounded-lg border border-[#25836F]/30 bg-white px-3 py-1.5 text-[11px] font-semibold text-[#25836F] hover:bg-[#F0F5F7]">
+                    Upload credential document
+                    <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const result = await adminApi.uploadDoctorCredential(selectedDoctor.id, file); setSelectedDoctor((current) => ({ ...current, credential_document: { file_name: result.file_name, uploaded_at: result.uploaded_at, status: "pending_verification" } })); showToast("Credential document uploaded for review.", "success"); } catch (error) { showToast(error.message || "Credential upload failed.", "error"); } event.target.value = ""; }} />
+                  </label>
+                </div>
+
+                <div className="font-semibold text-[#162623] mt-3 mb-1">Audit History</div>
                 <div className="text-[11px] text-[#577877]">
                   Account registered on {selectedDoctor.created_at ? new Date(selectedDoctor.created_at).toLocaleString() : "System Record"}
                 </div>
@@ -502,6 +585,8 @@ export default function DoctorManagementTab() {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#577877]">
                       <div><strong>Specialty:</strong> {doc.specialty}</div>
                       <div><strong>Reg #:</strong> {doc.registration_number}</div>
+                      <div><strong>Council:</strong> {doc.medical_council || "N/A"}</div>
+                      <div><strong>State:</strong> {doc.state_of_practice || doc.state || "N/A"}</div>
                       <div><strong>Clinic:</strong> {doc.clinic_name}</div>
                     </div>
                   </div>

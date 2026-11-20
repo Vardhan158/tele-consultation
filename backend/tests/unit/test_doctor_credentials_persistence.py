@@ -93,6 +93,7 @@ async def test_doctor_credentials_mongo_persistence_and_access(monkeypatch: pyte
     import teleconsult.kernel.mongodb.client as mongo_client
     import teleconsult.kernel.authz.policy as policy_mod
 
+    monkeypatch.setattr(get_settings(), "mongodb_enabled", True)
     monkeypatch.setattr(mongo_client.mongo_database, "database", lambda: db)
 
     # 1. Test Admin Access (Allowed)
