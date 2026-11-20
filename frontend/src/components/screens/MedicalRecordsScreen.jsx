@@ -1,119 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { recordsApi } from "../../lib/api";
 
-// Legacy fixture retained only for backwards-compatible layout data.
-// eslint-disable-next-line no-unused-vars
-const initialMedicalRecords = [
-  {
-    id: "REC-2026-001",
-    name: "Blood pressure log.pdf",
-    date: "Nov 4, 2026",
-    addedBy: "You",
-    category: "Other",
-    categoryDisplay: "Clinical documents",
-    size: "245 KB",
-  },
-  {
-    id: "REC-2026-002",
-    name: "Metabolic panel.pdf",
-    date: "Oct 30, 2026",
-    addedBy: "Dr. Sarah Chen",
-    category: "Lab reports",
-    categoryDisplay: "Lab report",
-    size: "1.2 MB",
-  },
-  {
-    id: "REC-2026-003",
-    name: "Consultation summary.pdf",
-    date: "Oct 29, 2026",
-    addedBy: "Dr. Sarah Chen",
-    category: "Other",
-    categoryDisplay: "Clinical document",
-    size: "480 KB",
-  },
-  {
-    id: "REC-2026-004",
-    name: "Annual wellness labs.pdf",
-    date: "Aug 20, 2026",
-    addedBy: "Dr. Michael Patel",
-    category: "Lab reports",
-    categoryDisplay: "Lab report",
-    size: "2.1 MB",
-  },
-  {
-    id: "REC-2026-005",
-    name: "Chest X-ray report.pdf",
-    date: "Jun 19, 2026",
-    addedBy: "Bayview Medical",
-    category: "Imaging",
-    categoryDisplay: "Imaging report",
-    size: "4.8 MB",
-  },
-  {
-    id: "REC-2026-006",
-    name: "Allergy history.pdf",
-    date: "Mar 12, 2026",
-    addedBy: "You",
-    category: "Other",
-    categoryDisplay: "Clinical document",
-    size: "180 KB",
-  },
-  {
-    id: "REC-2026-007",
-    name: "Lipid panel breakdown.pdf",
-    date: "Apr 2, 2026",
-    addedBy: "Dr. Michael Patel",
-    category: "Lab reports",
-    categoryDisplay: "Lab report",
-    size: "1.5 MB",
-  },
-  {
-    id: "REC-2026-008",
-    name: "Brain MRI scan report.pdf",
-    date: "Jan 14, 2026",
-    addedBy: "Bayview Radiology",
-    category: "Imaging",
-    categoryDisplay: "Imaging report",
-    size: "8.4 MB",
-  },
-  {
-    id: "REC-2026-009",
-    name: "Complete blood count (CBC).pdf",
-    date: "Dec 18, 2025",
-    addedBy: "Quest Diagnostics",
-    category: "Lab reports",
-    categoryDisplay: "Lab report",
-    size: "950 KB",
-  },
-  {
-    id: "REC-2026-010",
-    name: "Discharge summary - Surgery.pdf",
-    date: "Oct 11, 2025",
-    addedBy: "UCSF Medical",
-    category: "Other",
-    categoryDisplay: "Clinical document",
-    size: "3.2 MB",
-  },
-  {
-    id: "REC-2026-011",
-    name: "Immunization history record.pdf",
-    date: "Sep 05, 2025",
-    addedBy: "You",
-    category: "Other",
-    categoryDisplay: "Clinical document",
-    size: "310 KB",
-  },
-  {
-    id: "REC-2026-012",
-    name: "Cardiology follow-up note.pdf",
-    date: "Jul 29, 2025",
-    addedBy: "Dr. Sarah Chen",
-    category: "Other",
-    categoryDisplay: "Clinical document",
-    size: "520 KB",
-  },
-];
-
 export default function MedicalRecordsScreen({ onNavigate }) {
   const [activeCategory, setActiveCategory] = useState("All records");
   const [searchTerm, setSearchTerm] = useState("");
@@ -190,14 +77,12 @@ export default function MedicalRecordsScreen({ onNavigate }) {
                   day: "numeric",
                   year: "numeric",
                 })
-              : "Nov 4, 2026",
+              : "Date unavailable",
             addedBy:
               doc.uploaded_by ||
               (doc.uploaded_by_role === "doctor"
-                ? "Dr. Sarah Chen"
-                : doc.category === "imaging"
-                  ? "Bayview Radiology"
-                  : "You"),
+                ? "Treating Clinician"
+                : "You"),
             category: doc.category?.toLowerCase().includes("lab")
               ? "Lab reports"
               : doc.category?.toLowerCase().includes("imaging")
@@ -213,7 +98,7 @@ export default function MedicalRecordsScreen({ onNavigate }) {
               ? doc.size_bytes >= 1048576
                 ? `${(doc.size_bytes / 1048576).toFixed(1)} MB`
                 : `${Math.round(doc.size_bytes / 1024)} KB`
-              : "1.2 MB",
+              : "—",
           })),
         );
       }

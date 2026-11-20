@@ -122,7 +122,7 @@ export default function DoctorManagementTab() {
   return (
     <div className="space-y-6 font-sans">
       {/* Cinematic Animated Banner */}
-      <div className="relative min-h-[220px] lg:min-h-[245px] overflow-hidden rounded-2xl bg-gradient-to-r from-[#162623] via-[#25836F] to-[#1d6e5d] p-6 sm:p-8 text-white shadow-xl border border-[rgba(87,120,119,0.25)] flex flex-col justify-between">
+      <div className="relative min-h-[220px] lg:min-h-[245px] overflow-hidden rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] p-6 sm:p-8 text-white shadow-xl border border-[#185A4D]/30 flex flex-col justify-between">
         {/* Soft Background Illumination Orbs */}
         <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-[#577877]/30 blur-3xl animate-glow pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-teal-400/20 blur-3xl animate-glow pointer-events-none" />

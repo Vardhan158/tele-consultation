@@ -17,7 +17,7 @@ async def test_duplicate_and_concurrent_block_date_requests(mongodb_test_databas
         await mongo_database.connect()
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="https://test") as client:
         # 1. Login as clinic_admin
         login_res = await client.post(
             "/api/v1/auth/login",

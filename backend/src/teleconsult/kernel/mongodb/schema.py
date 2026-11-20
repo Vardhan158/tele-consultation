@@ -146,7 +146,7 @@ async def ensure_clinic_seeded(db: Any = None) -> None:
     now_iso = datetime.now(UTC).isoformat()
 
     # 1. Seed / Upsert Clinic Settings
-    admin_email = os.getenv("CLINIC_ADMIN_EMAIL", "admin@kaizencare.in")
+    admin_email = os.getenv("CLINIC_ADMIN_EMAIL", "clinic-admin@teleconsult.local")
     admin_password = os.getenv("CLINIC_ADMIN_PASSWORD", "AdminPassword123!")
     clinic_name = os.getenv("CLINIC_NAME", "Kaizen Care Telehealth Center")
     clinic_tz = os.getenv("CLINIC_TIMEZONE", "Asia/Kolkata")
@@ -235,10 +235,17 @@ async def ensure_schema(db: Any = None) -> dict[str, Any]:
     created = []
     for name, validator in COLLECTIONS.items():
         if name not in existing:
-            await db.create_collection(name, validator={"$jsonSchema": validator}, validationLevel="strict")
-            created.append(name)
+            try:
+                await db.create_collection(name, validator={"$jsonSchema": validator}, validationLevel="strict")
+                created.append(name)
+            except Exception:
+                pass
         else:
-            await db.command({"collMod": name, "validator": {"$jsonSchema": validator}, "validationLevel": "strict"})
+            try:
+                await db.command({"collMod": name, "validator": {"$jsonSchema": validator}, "validationLevel": "strict"})
+            except Exception:
+                # Dedicated test users with readWrite permissions may lack collMod privileges on existing collections
+                pass
         specs = INDEXES.get(name, [])
         if specs:
             await db[name].create_indexes([

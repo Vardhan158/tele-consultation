@@ -12,13 +12,14 @@ from teleconsult.main import app
 
 
 @pytest.mark.asyncio
-async def test_appointment_payment_status_scenarios() -> None:
+@pytest.mark.mongodb_integration
+async def test_appointment_payment_status_scenarios(mongodb_test_database) -> None:
     settings = get_settings()
     if settings.mongodb_enabled:
         await mongo_database.connect()
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="https://test") as client:
         # Login
         login_res = await client.post(
             "/api/v1/auth/login",

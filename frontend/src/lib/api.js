@@ -93,7 +93,9 @@ export const patientApi = {
       `/api/v1/patient/doctors?${new URLSearchParams({ ...(specialty ? { specialty } : {}), ...(language ? { language } : {}) })}`,
     ),
   availability: (doctorId) =>
-    apiRequest(`/api/v1/patient/doctors/${doctorId}/availability`),
+    apiRequest(`/patient/doctors/${doctorId}/availability`),
+  doctorAvailability: (doctorId) =>
+    apiRequest(`/patient/doctors/${doctorId}/availability`),
   pricing: (doctorId, appointmentType) =>
     apiRequest(`/api/v1/patient/doctors/${doctorId}/pricing?${new URLSearchParams({ appointment_type: appointmentType })}`),
   createProfile: (profile) =>
@@ -118,12 +120,15 @@ export const patientApi = {
       body: JSON.stringify(payload),
     }),
   appointments: () => apiRequest("/patient/appointments"),
-  cancelAppointment: (id) =>
-    apiRequest(`/patient/appointments/${id}/cancel`, { method: "POST" }),
-  rescheduleAppointment: (id, starts_at) =>
+  cancelAppointment: (id, payload = {}) =>
+    apiRequest(`/patient/appointments/${id}/cancel`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  rescheduleAppointment: (id, payload) =>
     apiRequest(`/patient/appointments/${id}/reschedule`, {
       method: "POST",
-      body: JSON.stringify({ starts_at }),
+      body: JSON.stringify(typeof payload === "object" ? payload : { starts_at: payload }),
     }),
 };
 

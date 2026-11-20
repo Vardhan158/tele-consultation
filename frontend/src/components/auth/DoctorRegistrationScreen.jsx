@@ -90,17 +90,32 @@ function ClinicianBrandPanel({ onBack }) {
 
 export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchToPatientAuth }) {
   const [form, setForm] = useState({
+    // Personal Information
     full_name: "",
     email: "",
     mobile_number: "",
+    state: "",
+
+    // Professional Information
+    specialty: "",
+    registration_number: "",
+    medical_council: "",
+    qualifications: "",
+    experience_years: "",
+    languages: "",
+    credential_document: null,
+
+    // Account Security
     password: "",
     confirm_password: "",
-    registration_number: "",
-    experience_years: "",
-    qualifications: "",
-    languages: "",
+
+    // Consents & Declarations
     terms_consent: false,
+    declaration_consent: false,
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [state, setState] = useState("idle");
@@ -112,6 +127,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
   // Validation function that checks a specific field or all fields
   const validateField = (name, value, allValues = form) => {
     switch (name) {
+      // 1. Personal Information
       case "full_name":
         if (!value || !value.trim()) return "Full name is required.";
         if (value.trim().length < 2) return "Full name must be at least 2 characters.";
@@ -133,11 +149,58 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
         return "";
       }
 
+      case "state":
+        if (!value || !value.trim()) return "State / Location is required.";
+        if (value.trim().length < 2) return "State must be at least 2 characters.";
+        return "";
+
+      // 2. Professional Information
+      case "specialty":
+        if (!value || !value.trim()) return "Medical specialization is required.";
+        return "";
+
       case "registration_number":
-        if (!value || !value.trim()) return "Registration number is required.";
+        if (!value || !value.trim()) return "Medical registration number is required.";
         if (value.trim().length < 2) return "Registration number must be at least 2 characters.";
         return "";
 
+      case "medical_council":
+        if (!value || !value.trim()) return "Medical council / authority is required.";
+        return "";
+
+      case "qualifications":
+        if (!value || !value.trim()) return "Qualifications are required.";
+        if (value.trim().length < 2) return "Please enter your degrees (e.g. MBBS, MD).";
+        return "";
+
+      case "experience_years": {
+        if (value === "" || value === null || value === undefined) return "Experience is required.";
+        const exp = Number(value);
+        if (!Number.isInteger(exp) || exp < 0) return "Enter a non-negative whole number (0 or higher).";
+        if (exp > 60) return "Experience years cannot exceed 60.";
+        return "";
+      }
+
+      case "languages": {
+        if (!value || !value.trim()) return "Supported languages are required.";
+        const langs = typeof value === "string" ? value.split(",").map((s) => s.trim()).filter(Boolean) : [];
+        if (langs.length === 0) return "Enter at least one language (e.g. English, Hindi).";
+        return "";
+      }
+
+      case "credential_document": {
+        if (!value) return "Medical registration certificate is required.";
+        const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+        if (!allowedTypes.includes(value.type)) {
+          return "Certificate must be a PDF, JPG, or PNG file.";
+        }
+        if (value.size > 10 * 1024 * 1024) {
+          return "Certificate file size cannot exceed 10 MB.";
+        }
+        return "";
+      }
+
+      // 3. Account Security
       case "password":
         if (!value) return "Password is required.";
         if (value.length < 8) return "Password must be at least 8 characters.";
@@ -151,28 +214,13 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
         if (value !== allValues.password) return "Passwords do not match.";
         return "";
 
-      case "experience_years": {
-        if (value === "" || value === null || value === undefined) return "Experience is required.";
-        const exp = Number(value);
-        if (!Number.isInteger(exp) || exp < 0) return "Enter a non-negative whole number (0 or higher).";
-        if (exp > 60) return "Experience years cannot exceed 60.";
-        return "";
-      }
-
-      case "qualifications":
-        if (!value || !value.trim()) return "Qualifications are required.";
-        if (value.trim().length < 2) return "Please enter your degree qualifications (e.g. MBBS, MD).";
-        return "";
-
-      case "languages": {
-        if (!value || !value.trim()) return "Supported languages are required.";
-        const langs = value.split(",").map((s) => s.trim()).filter(Boolean);
-        if (langs.length === 0) return "Enter at least one language (e.g. English, Hindi).";
-        return "";
-      }
-
+      // 4. Consents & Declarations
       case "terms_consent":
         if (!value) return "You must agree to the Terms of Service and Privacy Policy.";
+        return "";
+
+      case "declaration_consent":
+        if (!value) return "You must declare that all professional information is accurate.";
         return "";
 
       default:
@@ -190,8 +238,13 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
   };
 
   const update = (event) => {
-    const { name, value, type, checked } = event.target;
-    const val = type === "checkbox" ? checked : value;
+    const { name, value, type, checked, files } = event.target;
+    let val = type === "checkbox" ? checked : type === "file" ? (files && files[0] ? files[0] : null) : value;
+
+    // Enforce digits only and max 10 digits for mobile number
+    if (name === "mobile_number") {
+      val = val.replace(/\D/g, "").slice(0, 10);
+    }
 
     const nextForm = { ...form, [name]: val };
     setForm(nextForm);
@@ -210,8 +263,8 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
   };
 
   const handleBlur = (event) => {
-    const { name, value, type, checked } = event.target;
-    const val = type === "checkbox" ? checked : value;
+    const { name, value, type, checked, files } = event.target;
+    const val = type === "checkbox" ? checked : type === "file" ? (files && files[0] ? files[0] : null) : value;
     setTouched((prev) => ({ ...prev, [name]: true }));
     const err = validateField(name, val, form);
     setErrors((prev) => ({ ...prev, [name]: err }));
@@ -243,19 +296,28 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
     setState("loading");
     setMessage("");
     try {
-      const response = await doctorApi.register({
+      const payload = {
         full_name: form.full_name.trim(),
         email: form.email.trim().toLowerCase(),
         mobile_number: form.mobile_number.trim(),
-        password: form.password,
+        state: form.state.trim(),
+        specialty: form.specialty.trim(),
         registration_number: form.registration_number.trim(),
-        experience_years: experience,
+        medical_council: form.medical_council.trim(),
         qualifications: form.qualifications
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
+        experience_years: experience,
         languages: parsedLanguages,
-      });
+        password: form.password,
+      };
+
+      if (form.credential_document) {
+        payload.credential_document = form.credential_document;
+      }
+
+      const response = await doctorApi.register(payload);
 
       setState("success");
       setSubmittedData({
@@ -274,9 +336,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
     <div className="min-h-screen bg-[#F0F5F7] font-sans grid grid-cols-1 lg:grid-cols-2 text-[#162623] lg:h-screen lg:overflow-hidden">
       <ClinicianBrandPanel onBack={onBack} />
 
-      <main className="flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-14 min-h-screen overflow-y-auto lg:h-screen">
+      <main className="flex flex-col justify-between p-6 pb-2 sm:p-10 sm:pb-3 lg:p-12 lg:pb-4 xl:p-14 xl:pb-4 min-h-screen overflow-y-auto lg:h-screen">
         {/* Top Header / Back button */}
-        <div className="w-full max-w-xl mx-auto flex items-center justify-between text-xs text-[#577877]">
+        <div className="w-full max-w-xl mx-auto flex items-center justify-between text-xs text-[#577877] mb-2 lg:mb-4">
           {onBack ? (
             <button
               type="button"
@@ -293,7 +355,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
         </div>
 
         {/* Centered Form Content Box */}
-        <div className="w-full max-w-xl mx-auto my-auto py-6 sm:py-8 space-y-5">
+        <div className="w-full max-w-xl mx-auto py-2 sm:py-4 space-y-4">
           {state === "success" && submittedData ? (
             /* Successful Submission Confirmation */
             <div className="rounded-2xl border border-[#25836F]/30 bg-white p-6 sm:p-8 shadow-sm space-y-5 animate-in fade-in duration-300">
@@ -386,235 +448,398 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </p>
               </div>
 
-              <form onSubmit={submit} noValidate className="space-y-3.5 pt-1">
-                {/* Row 1: Full Name | Email Address */}
-                <div className="grid gap-3.5 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-[#162623]">
-                      Full Name <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      name="full_name"
-                      type="text"
-                      value={form.full_name}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      placeholder="Dr. Harshavardhan m v"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                        touched.full_name && errors.full_name
-                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                          : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                      }`}
-                    />
-                    {touched.full_name && errors.full_name && (
-                      <p className="text-[11px] text-red-600 font-medium">{errors.full_name}</p>
-                    )}
+              <form onSubmit={submit} noValidate className="space-y-4 pt-1">
+                {/* 1. Personal Information */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
+                    <span className="material-symbols-outlined text-[#25836F] text-base">person</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#162623]">
+                      Personal Information
+                    </h3>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {/* 1. Full Name */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Full Name <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="full_name"
+                        type="text"
+                        value={form.full_name}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="Dr. Harshavardhan M V"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.full_name && errors.full_name
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.full_name && errors.full_name && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.full_name}</p>
+                      )}
+                    </div>
+
+                    {/* 2. Email Address */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Email Address <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="email"
+                        type="email"
+                        value={form.email}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="doctor@clinic.com"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.email && errors.email
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.email && errors.email && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.email}</p>
+                      )}
+                    </div>
+
+                    {/* 3. Mobile Number */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Mobile Number <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="mobile_number"
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={10}
+                        value={form.mobile_number}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="Enter 10 digit mobile number"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.mobile_number && errors.mobile_number
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.mobile_number && errors.mobile_number && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.mobile_number}</p>
+                      )}
+                    </div>
+
+                    {/* 4. State / Location */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        State / Location <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="state"
+                        type="text"
+                        value={form.state}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="e.g. Karnataka, India"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.state && errors.state
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.state && errors.state && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.state}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Professional Information */}
+                <div className="space-y-2.5 pt-1">
+                  <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
+                    <span className="material-symbols-outlined text-[#25836F] text-base">medical_services</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#162623]">
+                      Professional Information
+                    </h3>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {/* 5. Medical Specialization */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Medical Specialization <span className="text-red-600">*</span>
+                      </label>
+                      <select
+                        name="specialty"
+                        value={form.specialty}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs ${
+                          touched.specialty && errors.specialty
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      >
+                        <option value="">Select Specialization</option>
+                        <option value="General Medicine">General Medicine</option>
+                        <option value="Cardiology">Cardiology</option>
+                        <option value="Dermatology">Dermatology</option>
+                        <option value="Pediatrics">Pediatrics</option>
+                        <option value="Orthopedics">Orthopedics</option>
+                        <option value="Neurology">Neurology</option>
+                        <option value="Psychiatry">Psychiatry</option>
+                        <option value="Gynecology">Gynecology</option>
+                        <option value="ENT">ENT</option>
+                        <option value="Ophthalmology">Ophthalmology</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      {touched.specialty && errors.specialty && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.specialty}</p>
+                      )}
+                    </div>
+
+                    {/* 6. Medical Registration Number */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Medical Registration Number <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="registration_number"
+                        type="text"
+                        value={form.registration_number}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="e.g. KMC-123456"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.registration_number && errors.registration_number
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.registration_number && errors.registration_number && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.registration_number}</p>
+                      )}
+                    </div>
+
+                    {/* 7. Medical Council / Registration Authority */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Medical Council / Authority <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="medical_council"
+                        type="text"
+                        value={form.medical_council}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="e.g. Karnataka Medical Council"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.medical_council && errors.medical_council
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.medical_council && errors.medical_council && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.medical_council}</p>
+                      )}
+                    </div>
+
+                    {/* 8. Qualifications */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Qualifications <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="qualifications"
+                        type="text"
+                        value={form.qualifications}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="MBBS, MD, DNB (comma separated)"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.qualifications && errors.qualifications
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.qualifications && errors.qualifications && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.qualifications}</p>
+                      )}
+                    </div>
+
+                    {/* 9. Experience (Years) */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Experience (Years) <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="experience_years"
+                        type="number"
+                        min="0"
+                        max="60"
+                        step="1"
+                        value={form.experience_years}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="e.g. 5"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.experience_years && errors.experience_years
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.experience_years && errors.experience_years && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.experience_years}</p>
+                      )}
+                    </div>
+
+                    {/* 10. Supported Languages */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Supported Languages <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        name="languages"
+                        type="text"
+                        value={form.languages}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        placeholder="English, Hindi, Kannada (comma separated)"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                          touched.languages && errors.languages
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                            : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                        }`}
+                      />
+                      {touched.languages && errors.languages && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.languages}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 11. Medical Registration Certificate */}
+                  <div className="space-y-1 pt-1">
                     <label className="block text-xs font-semibold text-[#162623]">
-                      Email Address <span className="text-red-600">*</span>
+                      Medical Registration Certificate <span className="text-red-600">*</span>
+                      <span className="font-normal text-[#577877] ml-1">(PDF, JPG, PNG · Max 10 MB)</span>
                     </label>
-                    <input
-                      name="email"
-                      type="email"
-                      value={form.email}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      placeholder="doctor@clinic.com"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                        touched.email && errors.email
-                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                          : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                      }`}
-                    />
-                    {touched.email && errors.email && (
-                      <p className="text-[11px] text-red-600 font-medium">{errors.email}</p>
+                    <div className="relative">
+                      <input
+                        name="credential_document"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                        onChange={update}
+                        onBlur={handleBlur}
+                        className={`w-full px-3.5 py-2 rounded-xl border bg-white text-xs text-[#162623] file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer ${
+                          touched.credential_document && errors.credential_document
+                            ? "border-red-500 focus:border-red-500"
+                            : "border-[#577877]/25 focus:border-[#25836F]"
+                        }`}
+                      />
+                    </div>
+                    {touched.credential_document && errors.credential_document && (
+                      <p className="text-[11px] text-red-600 font-medium">{errors.credential_document}</p>
                     )}
                   </div>
                 </div>
 
-                {/* Row 2: Mobile Number | Registration Number */}
-                <div className="grid gap-3.5 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-[#162623]">
-                      Mobile Number <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      name="mobile_number"
-                      type="tel"
-                      inputMode="tel"
-                      maxLength={14}
-                      value={form.mobile_number}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      placeholder="9876543210"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                        touched.mobile_number && errors.mobile_number
-                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                          : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                      }`}
-                    />
-                    {touched.mobile_number && errors.mobile_number && (
-                      <p className="text-[11px] text-red-600 font-medium">{errors.mobile_number}</p>
-                    )}
+                {/* 3. Account Security */}
+                <div className="space-y-2.5 pt-1">
+                  <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
+                    <span className="material-symbols-outlined text-[#25836F] text-base">lock</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#162623]">
+                      Account Security
+                    </h3>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-[#162623]">
-                      Registration Number <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      name="registration_number"
-                      type="text"
-                      value={form.registration_number}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      placeholder="e.g. KMC-123456"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                        touched.registration_number && errors.registration_number
-                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                          : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                      }`}
-                    />
-                    {touched.registration_number && errors.registration_number && (
-                      <p className="text-[11px] text-red-600 font-medium">{errors.registration_number}</p>
-                    )}
-                  </div>
-                </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {/* 12. Password */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Password <span className="text-red-600">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          value={form.password}
+                          onChange={update}
+                          onBlur={handleBlur}
+                          placeholder="••••••••"
+                          className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                            touched.password && errors.password
+                              ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                              : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-base">
+                            {showPassword ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
+                      </div>
+                      {touched.password && errors.password && (
+                        <p className="text-[11px] text-red-600 font-medium leading-tight">{errors.password}</p>
+                      )}
+                    </div>
 
-                {/* Row 3: Password | Confirm Password */}
-                <div className="grid gap-3.5 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-[#162623]">
-                      Password <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      name="password"
-                      type="password"
-                      autoComplete="new-password"
-                      value={form.password}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      placeholder="••••••••"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                        touched.password && errors.password
-                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                          : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                      }`}
-                    />
-                    {touched.password && errors.password && (
-                      <p className="text-[11px] text-red-600 font-medium leading-tight">{errors.password}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-[#162623]">
-                      Confirm Password <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      name="confirm_password"
-                      type="password"
-                      autoComplete="new-password"
-                      value={form.confirm_password}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      placeholder="Re-enter password"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                        touched.confirm_password && errors.confirm_password
-                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                          : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                      }`}
-                    />
-                    {touched.confirm_password && errors.confirm_password && (
-                      <p className="text-[11px] text-red-600 font-medium">{errors.confirm_password}</p>
-                    )}
+                    {/* 13. Confirm Password */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[#162623]">
+                        Confirm Password <span className="text-red-600">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          name="confirm_password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          value={form.confirm_password}
+                          onChange={update}
+                          onBlur={handleBlur}
+                          placeholder="Re-enter password"
+                          className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                            touched.confirm_password && errors.confirm_password
+                              ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
+                              : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-base">
+                            {showConfirmPassword ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
+                      </div>
+                      {touched.confirm_password && errors.confirm_password && (
+                        <p className="text-[11px] text-red-600 font-medium">{errors.confirm_password}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Row 4: Experience (Years) | Qualifications */}
-                <div className="grid gap-3.5 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-[#162623]">
-                      Experience (Years) <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      name="experience_years"
-                      type="number"
-                      min="0"
-                      max="60"
-                      step="1"
-                      value={form.experience_years}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      placeholder="e.g. 5"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                        touched.experience_years && errors.experience_years
-                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                          : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                      }`}
-                    />
-                    {touched.experience_years && errors.experience_years && (
-                      <p className="text-[11px] text-red-600 font-medium">{errors.experience_years}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-[#162623]">
-                      Qualifications <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      name="qualifications"
-                      type="text"
-                      value={form.qualifications}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      placeholder="MBBS, MD, DNB (comma separated)"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                        touched.qualifications && errors.qualifications
-                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                          : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                      }`}
-                    />
-                    {touched.qualifications && errors.qualifications && (
-                      <p className="text-[11px] text-red-600 font-medium">{errors.qualifications}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Row 5: Supported Languages (full width) */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-[#162623]">
-                    Supported Languages <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    name="languages"
-                    type="text"
-                    value={form.languages}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="English, Hindi, Kannada (comma separated)"
-                    className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
-                      touched.languages && errors.languages
-                        ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20"
-                        : "border-[#577877]/25 focus:border-[#25836F] focus:ring-1 focus:ring-[#25836F]/20"
-                    }`}
-                  />
-                  {touched.languages && errors.languages && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.languages}</p>
-                  )}
-                </div>
-
-                {/* Terms & Privacy Consent */}
-                <div className="pt-2 space-y-1">
-                  <label className="flex items-center gap-2.5 text-xs text-[#162623] cursor-pointer">
+                {/* Consents & Required Declarations */}
+                <div className="pt-2 space-y-2">
+                  {/* Terms & Privacy Consent */}
+                  <label className="flex items-start gap-2.5 text-xs text-[#162623] cursor-pointer">
                     <input
                       type="checkbox"
                       name="terms_consent"
                       checked={form.terms_consent}
                       onChange={update}
                       onBlur={handleBlur}
-                      className="h-4 w-4 rounded border-[#577877]/30 text-[#25836F] focus:ring-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
+                      className="mt-0.5 h-4 w-4 rounded border-[#577877]/30 text-[#25836F] focus:ring-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
                     />
                     <span className="leading-snug text-[#577877]">
                       I agree to the{" "}
@@ -638,6 +863,24 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   </label>
                   {touched.terms_consent && errors.terms_consent && (
                     <p className="text-[11px] text-red-600 font-medium">{errors.terms_consent}</p>
+                  )}
+
+                  {/* Professional Declaration Consent */}
+                  <label className="flex items-start gap-2.5 text-xs text-[#162623] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="declaration_consent"
+                      checked={form.declaration_consent}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      className="mt-0.5 h-4 w-4 rounded border-[#577877]/30 text-[#25836F] focus:ring-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
+                    />
+                    <span className="leading-snug text-[#577877]">
+                      I declare that all medical registration, qualifications, and authority information provided are accurate and authentic. <span className="text-red-600">*</span>
+                    </span>
+                  </label>
+                  {touched.declaration_consent && errors.declaration_consent && (
+                    <p className="text-[11px] text-red-600 font-medium">{errors.declaration_consent}</p>
                   )}
                 </div>
 
@@ -679,8 +922,8 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
           )}
         </div>
 
-        {/* Footer pinned to bottom */}
-        <footer className="w-full max-w-xl mx-auto py-3 text-center text-xs text-[#577877]">
+        {/* Footer pinned cleanly to bottom without trailing space */}
+        <footer className="w-full max-w-xl mx-auto pt-2 pb-0 text-center text-xs text-[#577877]">
           © 2026 Kaizen Care · Clinician Credentialing Workspace.
         </footer>
       </main>

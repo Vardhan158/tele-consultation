@@ -1,4 +1,5 @@
 """Clinic Administrator endpoints for the 8-screen admin dashboard."""
+import os
 import secrets
 from datetime import UTC, datetime, time, timedelta
 from typing import Any
@@ -1210,13 +1211,23 @@ async def refund_payment_admin(
         rzp_client = get_razorpay_client()
         tx_id = payment.get("provider_transaction_id") or payment.get("razorpay_payment_id")
 
+        refund_type = "simulated"
         if rzp_client and tx_id and not tx_id.startswith("tx_pending"):
-            try:
-                rzp_refund = rzp_client.payment.refund(tx_id, {"amount": amount_paise})
-                if isinstance(rzp_refund, dict) and rzp_refund.get("id"):
-                    razorpay_refund_id = rzp_refund["id"]
-            except Exception:
-                pass
+            if not tx_id.startswith("pay_synth_"):
+                # Real provider transaction
+                try:
+                    rzp_refund = rzp_client.payment.refund(tx_id, {"amount": amount_paise})
+                    if isinstance(rzp_refund, dict) and rzp_refund.get("id"):
+                        razorpay_refund_id = rzp_refund["id"]
+                        refund_type = "provider_confirmed"
+                    else:
+                        raise HTTPException(status_code=502, detail="Provider refund failed to return confirmation")
+                except HTTPException:
+                    raise
+                except Exception as exc:
+                    raise HTTPException(status_code=502, detail=f"Provider refund failed: {str(exc)}") from exc
+            else:
+                refund_type = "simulated"
 
         await db["payments"].update_one(
             {"tenant_id": settings.default_tenant_id, "$or": [{"id": str(payment_id)}, {"id": str(payment_id).lower()}]},
@@ -1224,6 +1235,8 @@ async def refund_payment_admin(
                 "$set": {
                     "status": "refunded",
                     "refund_reason": payload.reason,
+                    "refund_type": refund_type,
+                    "refund_status": "confirmed" if refund_type == "provider_confirmed" else "simulated",
                     "refund_id": razorpay_refund_id,
                     "razorpay_refund_id": razorpay_refund_id,
                     "refunded_at": now_iso,
@@ -1460,7 +1473,7 @@ DEFAULT_CLINIC_SETTINGS = {
     "intake_policy": "clinic_configured",
     "prescriptions_enabled": True,
     "operating_hours": "Mon - Sat: 08:00 AM - 08:00 PM IST",
-    "authorized_administrators": ["admin@kaizencare.in"],
+    "authorized_administrators": [os.getenv("CLINIC_ADMIN_EMAIL", "clinic-admin@teleconsult.local")],
     "email_alerts_new_doctor": True,
     "email_alerts_daily_summary": True,
     "email_alerts_payment_failures": True,

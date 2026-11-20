@@ -1,199 +1,88 @@
 import { useState, useEffect } from "react";
-import { clinicalApi } from "../../lib/api";
-
-// Legacy fixture retained only for backwards-compatible layout data.
-// eslint-disable-next-line no-unused-vars
-const defaultConsultationsList = [
-  {
-    id: "KC-APT-1038",
-    summaryId: "SUM-2026-1038",
-    dateDisplay: "Oct 29, 2026",
-    dateFull: "Oct 29, 2026 · Video consultation · 30 minutes",
-    title: "Blood pressure review",
-    doctor: {
-      name: "Dr. Sarah Chen",
-      fullName: "Dr. Sarah Chen, MD",
-      initials: "SC",
-      specialty: "Internal medicine",
-    },
-    status: "Completed",
-    signedStatus: "Signed by doctor",
-    signedDate: "Signed Oct 29, 2026 at 11:20 AM PT · Dr. Sarah Chen, MD",
-    patient: "Emma Mitchell · KC-20481",
-    appointmentRef: "KC-APT-1038",
-    whatWeDiscussed:
-      "Reviewed home blood pressure readings and medication tolerance. Emma reported taking medication consistently with no new concerns. Discussed activity, sleep, and a lower-sodium eating pattern.",
-    vitals: {
-      bp: "134 / 84 mmHg",
-      pulse: "72 bpm",
-      medication: "No change today",
-    },
-    carePlan: [
-      "Continue medication as prescribed.",
-      "Record morning and evening blood pressure readings.",
-      "Complete the ordered metabolic panel before the next review.",
-      "Follow up with Dr. Chen on November 12.",
-    ],
-  },
-  {
-    id: "KC-APT-1011",
-    summaryId: "SUM-2026-1011",
-    dateDisplay: "Sep 24, 2026",
-    dateFull: "Sep 24, 2026 · Video consultation · 25 minutes",
-    title: "Routine follow-up",
-    doctor: {
-      name: "Dr. Sarah Chen",
-      fullName: "Dr. Sarah Chen, MD",
-      initials: "SC",
-      specialty: "Internal medicine",
-    },
-    status: "Completed",
-    signedStatus: "Signed by doctor",
-    signedDate: "Signed Sep 24, 2026 at 3:45 PM PT · Dr. Sarah Chen, MD",
-    patient: "Emma Mitchell · KC-20481",
-    appointmentRef: "KC-APT-1011",
-    whatWeDiscussed:
-      "Routine review of comprehensive metabolic panel and fasting lipid profile. Discussed seasonal allergies and overall energy levels.",
-    vitals: {
-      bp: "128 / 80 mmHg",
-      pulse: "70 bpm",
-      medication: "Added Vitamin D3",
-    },
-    carePlan: [
-      "Start Vitamin D3 1,000 IU softgel daily with food.",
-      "Maintain daily 30-minute brisk walk.",
-      "Log blood pressure readings twice weekly.",
-    ],
-  },
-  {
-    id: "KC-APT-0987",
-    summaryId: "SUM-2026-0987",
-    dateDisplay: "Aug 19, 2026",
-    dateFull: "Aug 19, 2026 · Video consultation · 30 minutes",
-    title: "Annual wellness",
-    doctor: {
-      name: "Dr. Michael Patel",
-      fullName: "Dr. Michael Patel, MD",
-      initials: "MP",
-      specialty: "Internal medicine",
-    },
-    status: "Completed",
-    signedStatus: "Signed by doctor",
-    signedDate: "Signed Aug 19, 2026 at 10:15 AM PT · Dr. Michael Patel, MD",
-    patient: "Emma Mitchell · KC-20481",
-    appointmentRef: "KC-APT-0987",
-    whatWeDiscussed:
-      "Comprehensive preventive health exam and screening review. Evaluated cardiovascular risk factors, diet, and immunization history.",
-    vitals: {
-      bp: "130 / 82 mmHg",
-      pulse: "74 bpm",
-      medication: "Cetirizine 10mg as needed",
-    },
-    carePlan: [
-      "Annual bloodwork ordered (CBC, CMP, Lipid panel).",
-      "Continue Cetirizine 10mg PRN for allergy flare-ups.",
-      "Follow up on lab report findings.",
-    ],
-  },
-  {
-    id: "KC-APT-0920",
-    summaryId: "SUM-2026-0920",
-    dateDisplay: "Jun 18, 2026",
-    dateFull: "Jun 18, 2026 · Video consultation · 20 minutes",
-    title: "Medication review",
-    doctor: {
-      name: "Dr. Sarah Chen",
-      fullName: "Dr. Sarah Chen, MD",
-      initials: "SC",
-      specialty: "Internal medicine",
-    },
-    status: "Completed",
-    signedStatus: "Signed by doctor",
-    signedDate: "Signed Jun 18, 2026 at 2:00 PM PT · Dr. Sarah Chen, MD",
-    patient: "Emma Mitchell · KC-20481",
-    appointmentRef: "KC-APT-0920",
-    whatWeDiscussed:
-      "Medication tolerance evaluation for Lisinopril 10mg. No reported dry cough, dizziness, or peripheral edema.",
-    vitals: {
-      bp: "126 / 82 mmHg",
-      pulse: "68 bpm",
-      medication: "Lisinopril 10mg renewal",
-    },
-    carePlan: [
-      "Renewed Lisinopril prescription for 90 days.",
-      "Maintain home blood pressure monitoring.",
-    ],
-  },
-];
+import { clinicalApi, patientApi } from "../../lib/api";
 
 export default function ConsultationSummariesScreen({ onNavigate }) {
   const [dbSummaries, setDbSummaries] = useState([]);
+  const [patientName, setPatientName] = useState("");
+  const [selectedConsultationId, setSelectedConsultationId] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
+  const [showPlanModal, setShowPlanModal] = useState(false);
+
+  useEffect(() => {
+    patientApi
+      .profile()
+      .then((p) => setPatientName(p?.full_name || p?.name || "Patient"))
+      .catch(() => setPatientName("Patient"));
+  }, []);
 
   useEffect(() => {
     clinicalApi
       .summaries()
       .then((items) => {
         if (Array.isArray(items) && items.length > 0) {
-          setDbSummaries(
-            items.map((s) => ({
+          const mapped = items.map((s) => {
+            const docName = s.doctor?.full_name || s.doctor?.name || "Treating Clinician";
+            const dateStr = s.created_at
+              ? new Date(s.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              : "Date unavailable";
+            const vitalsObj = s.structured_data?.vitals || {};
+
+            return {
               id: s.appointment_id || s.id,
               summaryId: s.id,
-              dateDisplay: s.created_at
-                ? new Date(s.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : "Oct 29, 2026",
+              dateDisplay: dateStr,
               dateFull: s.created_at
-                ? `${new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · Video consultation · 30 minutes`
-                : "Oct 29, 2026 · Video consultation",
+                ? `${dateStr} · Video consultation · 30 minutes`
+                : "Video consultation",
               title: s.title || "Consultation summary",
               doctor: {
-                name: s.doctor?.name || "Authorized clinician",
-                fullName:
-                  s.doctor?.full_name ||
-                  s.doctor?.name ||
-                  "Authorized clinician",
-                initials: (s.doctor?.name || "AC")
+                name: docName,
+                fullName: docName,
+                initials: docName
                   .split(" ")
                   .map((part) => part[0])
+                  .filter(Boolean)
                   .join("")
                   .slice(0, 2)
-                  .toUpperCase(),
-                specialty: s.doctor?.specialty || "Specialty unavailable",
+                  .toUpperCase() || "MD",
+                specialty: s.doctor?.specialty || "General Medicine",
               },
               status: "Completed",
               signedStatus: "Signed by doctor",
               signedDate: s.created_at
-                ? `Signed ${new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · Dr. Sarah Chen, MD`
-                : "Signed by Dr. Sarah Chen, MD",
-              patient: "Emma Mitchell · KC-20481",
+                ? `Signed ${dateStr} · ${docName}`
+                : `Signed by ${docName}`,
+              patient: patientName || "Patient",
               appointmentRef: s.appointment_id
-                ? `KC-APT-${s.appointment_id.slice(0, 4).toUpperCase()}`
-                : "KC-APT-1038",
+                ? (s.appointment_id.startsWith("apt-")
+                    ? s.appointment_id
+                    : `KC-APT-${s.appointment_id.slice(0, 4).toUpperCase()}`)
+                : "Appointment Summary",
               whatWeDiscussed:
-                s.discussion || "No discussion details published.",
-              vitals: s.structured_data?.vitals || {
-                bp: "134 / 84 mmHg",
-                pulse: "72 bpm",
-                medication: "No change today",
+                s.discussion || "No discussion details recorded.",
+              vitals: {
+                bp: vitalsObj.bp || "Not recorded",
+                pulse: vitalsObj.pulse || "Not recorded",
+                medication: vitalsObj.medication || "None documented",
               },
-              carePlan: [...(s.recommendations || []), ...(s.follow_up || [])],
-            })),
-          );
+              carePlan: [
+                ...(s.recommendations || []),
+                ...(s.follow_up || []),
+              ],
+            };
+          });
+          setDbSummaries(mapped);
+          setSelectedConsultationId(mapped[0]?.id || "");
         }
       })
       .catch(() => {});
-  }, []);
+  }, [patientName]);
 
   const consultationsList = dbSummaries;
-
-  const [selectedConsultationId, setSelectedConsultationId] = useState(
-    consultationsList[0]?.id || "KC-APT-1038",
-  );
-  const [toastMessage, setToastMessage] = useState("");
-  const [showPlanModal, setShowPlanModal] = useState(false);
 
   const activeConsultation =
     consultationsList.find((c) => c.id === selectedConsultationId) ||
@@ -228,48 +117,6 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
     } catch (err) {
       setToastMessage(err.message);
     }
-    setTimeout(() => setToastMessage(""), 3500);
-  };
-
-  // Legacy local-export implementation retained for compatibility; the UI uses the authorized API export above.
-  // eslint-disable-next-line no-unused-vars
-  const handleDownloadSummary = () => {
-    const summaryText = [
-      "Kaizen Care - Clinical Consultation Summary",
-      `Title: ${activeConsultation.title}`,
-      `Date: ${activeConsultation.dateFull}`,
-      `Clinician: ${activeConsultation.doctor.fullName} (${activeConsultation.doctor.specialty})`,
-      `Patient: ${activeConsultation.patient}`,
-      `Appointment ID: ${activeConsultation.appointmentRef}`,
-      "--------------------------------------------------",
-      "WHAT WAS DISCUSSED:",
-      activeConsultation.whatWeDiscussed,
-      "",
-      "RECORDED VITALS & STATUS:",
-      `• Home BP: ${activeConsultation.vitals.bp}`,
-      `• Pulse: ${activeConsultation.vitals.pulse}`,
-      `• Medication Status: ${activeConsultation.vitals.medication}`,
-      "",
-      "AGREED CARE PLAN:",
-      ...activeConsultation.carePlan.map((step, idx) => `${idx + 1}. ${step}`),
-      "--------------------------------------------------",
-      activeConsultation.signedDate,
-    ].join("\n");
-
-    const blob = new Blob([summaryText], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `${activeConsultation.appointmentRef}-Summary.txt`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setToastMessage(`Downloaded summary for ${activeConsultation.title}.`);
     setTimeout(() => setToastMessage(""), 3500);
   };
 

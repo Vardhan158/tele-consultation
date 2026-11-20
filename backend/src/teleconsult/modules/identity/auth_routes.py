@@ -7,7 +7,7 @@ import struct
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
@@ -543,7 +543,31 @@ async def logout(request: Request, response: Response, session: AsyncSession | N
 
 
 @router.post("/recovery")
-async def recovery(payload: RecoveryRequest, session: AsyncSession = Depends(tenant_session)) -> dict[str, str]:
+async def recovery(payload: RecoveryRequest, session: AsyncSession | None = Depends(auth_database_session)) -> dict[str, str]:
+    settings = get_settings()
+    if settings.mongodb_enabled:
+        db = mongo_database.database()
+        user = await db["users"].find_one({"tenant_id": settings.default_tenant_id, "email": payload.email.strip().lower()})
+        if user:
+            raw_token = secrets.token_urlsafe(32)
+            now = datetime.now(UTC)
+            await db["recovery_tokens"].insert_one({
+                "id": str(uuid4()),
+                "user_id": user["id"],
+                "token_hash": token_hash(raw_token),
+                "expires_at": now + timedelta(minutes=15),
+                "used_at": None,
+                "attempts": 0,
+                "created_at": now,
+            })
+            try:
+                await send_recovery_email(user["email"], raw_token)
+            except Exception:
+                pass
+        return {"status": "accepted", "message": "If the account exists, recovery instructions will be sent"}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
     user = await session.scalar(select(UserAccount).where(UserAccount.email == payload.email.strip().lower()))
     if user:
         raw_token = secrets.token_urlsafe(32)
@@ -553,7 +577,27 @@ async def recovery(payload: RecoveryRequest, session: AsyncSession = Depends(ten
 
 
 @router.post("/recovery/reset")
-async def reset_password(payload: ResetPasswordRequest, session: AsyncSession = Depends(tenant_session)) -> dict[str, str]:
+async def reset_password(payload: ResetPasswordRequest, session: AsyncSession | None = Depends(auth_database_session)) -> dict[str, str]:
+    settings = get_settings()
+    if settings.mongodb_enabled:
+        db = mongo_database.database()
+        token_doc = await db["recovery_tokens"].find_one({
+            "token_hash": token_hash(payload.token),
+            "used_at": None,
+            "expires_at": {"$gt": datetime.now(UTC)},
+        })
+        if not token_doc:
+            raise HTTPException(status_code=400, detail="Recovery token is invalid or expired")
+        user = await db["users"].find_one({"id": token_doc["user_id"]})
+        if not user:
+            raise HTTPException(status_code=400, detail="Recovery token is invalid or expired")
+        now = datetime.now(UTC)
+        await db["users"].update_one({"_id": user["_id"]}, {"$set": {"password_hash": password_hash(payload.password), "updated_at": now}})
+        await db["recovery_tokens"].update_one({"_id": token_doc["_id"]}, {"$set": {"used_at": now}})
+        return {"status": "password_updated"}
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
     recovery = await session.scalar(select(RecoveryToken).where(RecoveryToken.token_hash == token_hash(payload.token)))
     if recovery is None or recovery.used_at or recovery.expires_at <= datetime.now(UTC):
         raise HTTPException(status_code=400, detail="Recovery token is invalid or expired")

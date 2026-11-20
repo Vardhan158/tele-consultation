@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict
 
 class ClinicalOutputResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    appointment_id: UUID
+    id: UUID | str
+    appointment_id: UUID | str
     content: str
     status: str
     created_at: datetime

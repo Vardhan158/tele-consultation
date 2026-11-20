@@ -33,7 +33,9 @@ from teleconsult.modules.patient_portal.models import (
     DoctorAvailability,
     Patient,
 )
+import secrets
 from teleconsult.modules.patient_portal.schemas import (
+    AppointmentCancelRequest,
     AppointmentCreate,
     AppointmentReschedule,
     AppointmentResponse,
@@ -759,9 +761,12 @@ async def doctor_availability(
     doctor_id: UUID,
     session: AsyncSession | None = Depends(patient_session),
     principal: Principal = Depends(require("directory:read")),
-) -> list[DoctorAvailability]:
+) -> list[AvailabilityResponse]:
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
+        clinic_settings = await db["clinic_settings"].find_one({"tenant_id": principal.tenant_id})
+        doctor = await db["doctors"].find_one({"tenant_id": principal.tenant_id, "id": str(doctor_id)})
+        clinic_timezone = (clinic_settings or {}).get("timezone") or (doctor or {}).get("timezone") or "Asia/Kolkata"
         documents = db["doctor_availability"].find({
             "tenant_id": principal.tenant_id, "doctor_id": str(doctor_id), "status": "available",
         }).sort("starts_at", 1)
@@ -773,7 +778,13 @@ async def doctor_availability(
             occupied = any(_parse_datetime(item.get("starts_at")) < end and _parse_datetime(item.get("ends_at")) > start for item in active_appointments)
             if end <= now_utc or occupied:
                 continue
-            result.append(AvailabilityResponse(id=str(document["id"]), doctor_id=UUID(document["doctor_id"]), starts_at=start, ends_at=end))
+            result.append(AvailabilityResponse(
+                id=str(document["id"]),
+                doctor_id=UUID(document["doctor_id"]),
+                starts_at=start,
+                ends_at=end,
+                timezone=clinic_timezone,
+            ))
         return result
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
@@ -785,7 +796,13 @@ async def doctor_availability(
     appointments = list(await session.scalars(select(Appointment).where(
         Appointment.tenant_id == UUID(principal.tenant_id), Appointment.doctor_id == doctor_id,
         Appointment.status.in_(ACTIVE_BOOKING_STATUSES))))
-    return [slot for slot in result if slot.ends_at > now_utc and not any(item.starts_at < slot.ends_at and item.ends_at > slot.starts_at for item in appointments)]
+    doctor_timezone = await session.scalar(select(Doctor.timezone).where(Doctor.id == doctor_id, Doctor.tenant_id == UUID(principal.tenant_id)))
+    clinic_timezone = doctor_timezone or "Asia/Kolkata"
+    return [
+        AvailabilityResponse.model_validate({**slot.__dict__, "timezone": clinic_timezone})
+        for slot in result
+        if slot.ends_at > now_utc and not any(item.starts_at < slot.ends_at and item.ends_at > slot.starts_at for item in appointments)
+    ]
 
 
 @router.post("/appointments", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
@@ -798,6 +815,17 @@ async def book_appointment(
     settings = get_settings()
     if settings.mongodb_enabled:
         db = mongo_database.database()
+        effective_idempotency_key = (idempotency_key or "").strip()
+        if effective_idempotency_key:
+            existing_apt = await db["appointments"].find_one({
+                "tenant_id": principal.tenant_id,
+                "idempotency_key": effective_idempotency_key,
+            })
+            if existing_apt:
+                return existing_apt
+        else:
+            effective_idempotency_key = f"apt-idemp-{uuid4()}"
+
         doctor = await db["doctors"].find_one({"tenant_id": principal.tenant_id, "id": str(payload.doctor_id), "active": True, "approved_for_consultation": True})
         if doctor is None:
             raise HTTPException(status_code=404, detail="Doctor not found")
@@ -851,8 +879,46 @@ async def book_appointment(
         if slot is None:
             raise HTTPException(status_code=409, detail="Selected appointment slot is no longer available")
         appointment_id = str(uuid4())
-        appointment = {"id": appointment_id, "tenant_id": principal.tenant_id, "patient_id": principal.user_id, "doctor_id": str(payload.doctor_id), "service_id": service.get("id"), "base_fee_paise": base_fee_paise, "platform_fee_paise": platform_fee_paise, "total_payable_paise": total_payable_paise, "currency": currency, "starts_at": payload.starts_at.isoformat(), "ends_at": (payload.starts_at + timedelta(minutes=payload.duration_minutes)).isoformat(), "status": "confirmed", "payment_status": "not_required", "appointment_type": payload.appointment_type, "visit_format": payload.visit_format, "reason": payload.reason, "notes": payload.notes, "created_at": datetime.now(UTC).isoformat()}
-        await db["appointments"].insert_one(appointment)
+        appointment = {
+            "id": appointment_id,
+            "tenant_id": principal.tenant_id,
+            "patient_id": principal.user_id,
+            "doctor_id": str(payload.doctor_id),
+            "service_id": service.get("id"),
+            "base_fee_paise": base_fee_paise,
+            "platform_fee_paise": platform_fee_paise,
+            "total_payable_paise": total_payable_paise,
+            "currency": currency,
+            "starts_at": payload.starts_at.isoformat(),
+            "ends_at": (payload.starts_at + timedelta(minutes=payload.duration_minutes)).isoformat(),
+            "status": "confirmed",
+            "payment_status": "not_required",
+            "appointment_type": payload.appointment_type,
+            "visit_format": payload.visit_format,
+            "reason": payload.reason,
+            "notes": payload.notes,
+            "idempotency_key": effective_idempotency_key,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        try:
+            await db["appointments"].insert_one(appointment)
+        except Exception as exc:
+            from pymongo.errors import DuplicateKeyError
+            if isinstance(exc, DuplicateKeyError):
+                if slot and slot.get("id"):
+                    await db["doctor_availability"].update_one(
+                        {"tenant_id": principal.tenant_id, "id": slot.get("id")},
+                        {"$set": {"status": "available", "booked": False}},
+                    )
+                if effective_idempotency_key:
+                    existing = await db["appointments"].find_one({
+                        "tenant_id": principal.tenant_id,
+                        "idempotency_key": effective_idempotency_key,
+                    })
+                    if existing:
+                        return existing
+                raise HTTPException(status_code=409, detail="Selected appointment slot is no longer available") from exc
+            raise
         return appointment
     tenant_id = UUID(principal.tenant_id)
     patient_id = UUID(principal.user_id)
@@ -1101,12 +1167,197 @@ async def list_appointments(
 
 @router.post("/appointments/{appointment_id}/cancel", response_model=AppointmentResponse)
 async def cancel_appointment(
-    appointment_id: UUID,
-    session: AsyncSession = Depends(tenant_session),
+    appointment_id: str,
+    payload: AppointmentCancelRequest | None = None,
+    session: AsyncSession | None = Depends(patient_session),
     principal: Principal = Depends(require("appointment:write")),
-) -> Appointment:
+) -> AppointmentResponse:
+    if get_settings().mongodb_enabled:
+        database = mongo_database.database()
+        patient_ids = await patient_identity_ids(database, principal)
+
+        appointment = await database["appointments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [{"id": str(appointment_id)}, {"_id": str(appointment_id)}],
+            "patient_id": {"$in": patient_ids},
+        })
+        if not appointment:
+            other_apt = await database["appointments"].find_one({
+                "tenant_id": str(principal.tenant_id),
+                "$or": [{"id": str(appointment_id)}, {"_id": str(appointment_id)}],
+            })
+            if other_apt:
+                raise HTTPException(status_code=403, detail="Forbidden: You cannot cancel another patient's appointment")
+            raise HTTPException(status_code=404, detail="Appointment not found")
+
+        current_status = str(appointment.get("status", "")).lower()
+        if current_status in {"completed", "cancelled"}:
+            raise HTTPException(status_code=409, detail=f"Appointment cannot be cancelled (current status: {current_status})")
+
+        starts_at_dt, ends_at_dt = appointment_times(appointment)
+        if starts_at_dt <= datetime.now(UTC) and current_status == "completed":
+            raise HTTPException(status_code=409, detail="Completed consultations cannot be cancelled")
+
+        doctor_id = str(appointment.get("doctor_id") or "")
+        # Release doctor's availability slot
+        await database["doctor_availability"].update_many(
+            {
+                "tenant_id": str(principal.tenant_id),
+                "doctor_id": doctor_id,
+                "$or": [
+                    {"starts_at": appointment.get("starts_at")},
+                    {"starts_at": starts_at_dt.isoformat()},
+                    {"starts_at": starts_at_dt.strftime("%Y-%m-%dT%H:%M:%SZ")},
+                ],
+            },
+            {"$set": {"status": "available", "booked": False, "is_booked": False}},
+        )
+
+        reason_text = payload.reason if payload and payload.reason else "Patient requested cancellation"
+        new_payment_status = str(appointment.get("payment_status", "pending")).lower()
+        payment = await latest_payment(database, principal.tenant_id, str(appointment_id))
+
+        if payment:
+            pay_status = str(payment.get("status", "")).lower()
+            if pay_status in {"captured", "success", "paid"}:
+                amount_paise = int(payment.get("amount_paise") or payment.get("amount") or 0)
+                refund_id = f"rfnd_{secrets.token_hex(8)}"
+                now_iso = datetime.now(UTC).isoformat()
+
+                refund_type = "simulated"
+                from teleconsult.modules.payments.patient_routes import get_razorpay_client
+                rzp_client = get_razorpay_client()
+                tx_id = payment.get("provider_transaction_id") or payment.get("razorpay_payment_id")
+                if rzp_client and tx_id and not tx_id.startswith("tx_pending"):
+                    if not tx_id.startswith("pay_synth_"):
+                        try:
+                            rzp_res = rzp_client.payment.refund(
+                                tx_id,
+                                {"amount": amount_paise},
+                            )
+                            if isinstance(rzp_res, dict) and rzp_res.get("id"):
+                                refund_id = rzp_res["id"]
+                                refund_type = "provider_confirmed"
+                            else:
+                                raise HTTPException(status_code=502, detail="Provider refund failed to return confirmation")
+                        except HTTPException:
+                            raise
+                        except Exception as rzp_err:
+                            import logging
+                            logging.getLogger("teleconsult.payments").warning("Razorpay refund error: %s", rzp_err)
+                            raise HTTPException(status_code=502, detail=f"Provider refund failed: {str(rzp_err)}") from rzp_err
+                    else:
+                        refund_type = "simulated"
+
+                await database["payments"].update_one(
+                    {"_id": payment["_id"]},
+                    {"$set": {
+                        "status": "refunded",
+                        "refund_id": refund_id,
+                        "refund_type": refund_type,
+                        "refund_status": "confirmed" if refund_type == "provider_confirmed" else "simulated",
+                        "refund_reason": reason_text,
+                        "refunded_at": now_iso,
+                    }},
+                )
+                await database["refunds"].update_one(
+                    {"tenant_id": str(principal.tenant_id), "payment_id": str(payment.get("id") or payment["_id"])},
+                    {"$set": {
+                        "id": f"refund-{payment.get('id') or payment['_id']}",
+                        "tenant_id": str(principal.tenant_id),
+                        "payment_id": str(payment.get("id") or payment["_id"]),
+                        "appointment_id": str(appointment_id),
+                        "amount_paise": amount_paise,
+                        "status": "refunded",
+                        "refund_type": refund_type,
+                        "reason": reason_text,
+                        "razorpay_refund_id": refund_id,
+                        "created_at": now_iso,
+                    }},
+                    upsert=True,
+                )
+                new_payment_status = "refunded"
+
+        now_iso = datetime.now(UTC).isoformat()
+        await database["appointments"].update_one(
+            {"_id": appointment["_id"]},
+            {"$set": {
+                "status": "cancelled",
+                "payment_status": new_payment_status,
+                "cancellation_reason": reason_text,
+                "cancelled_at": now_iso,
+            }},
+        )
+
+        await database["appointment_events"].insert_one({
+            "id": f"evt-{secrets.token_hex(8)}",
+            "tenant_id": str(principal.tenant_id),
+            "appointment_id": str(appointment_id),
+            "actor_id": str(principal.user_id),
+            "from_status": current_status,
+            "to_status": "cancelled",
+            "created_at": now_iso,
+        })
+
+        await database["notifications"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": str(appointment.get("patient_id")),
+            "recipient_id": str(appointment.get("patient_id")),
+            "event_type": "appointment_cancelled",
+            "subject": "Appointment Cancelled",
+            "body": f"Your appointment on {starts_at_dt.strftime('%b %d, %Y')} has been cancelled. Cancellation recorded.",
+            "channel": "in_app",
+            "status": "queued",
+            "created_at": now_iso,
+        })
+
+        doctor = None
+        if doctor_id:
+            doctor = await database["doctors"].find_one({
+                "tenant_id": str(principal.tenant_id),
+                "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+            })
+        clinic_settings = await database["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
+        clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
+
+        doctor_response = None
+        if doctor:
+            doctor_response = DoctorResponse(
+                id=_to_uuid(doctor.get("id") or doctor.get("user_id") or doctor_id),
+                full_name=str(doctor.get("full_name") or "Doctor"),
+                specialty=str(doctor.get("specialty") or "Specialist"),
+                clinic_name=str(doctor.get("clinic_name") or "Kaizen Care Telehealth Center"),
+                fee_paise=_to_int(doctor.get("fee_paise")),
+                timezone=str(doctor.get("timezone") or clinic_timezone),
+                supported_languages=doctor.get("supported_languages") if isinstance(doctor.get("supported_languages"), list) else ["English"],
+                registration_number=doctor.get("registration_number"),
+            )
+
+        fee_paise = _to_int(appointment.get("total_payable_paise", appointment.get("fee_paise")))
+        base_fee_paise = _to_int(appointment.get("base_fee_paise"))
+        platform_fee_paise = _to_int(appointment.get("platform_fee_paise"))
+
+        return AppointmentResponse(
+            id=str(appointment_id),
+            doctor_id=str(doctor_id or principal.user_id),
+            patient_id=str(appointment.get("patient_id") or principal.user_id),
+            starts_at=starts_at_dt,
+            ends_at=ends_at_dt,
+            status="cancelled",
+            payment_status=new_payment_status,
+            join_window_minutes=get_settings().video_join_window_minutes,
+            base_fee_paise=base_fee_paise,
+            platform_fee_paise=platform_fee_paise,
+            total_payable_paise=fee_paise,
+            currency=str(appointment.get("currency") or "INR"),
+            doctor=doctor_response,
+        )
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
     appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == appointment_id, Appointment.tenant_id == UUID(principal.tenant_id),
+        Appointment.id == UUID(appointment_id), Appointment.tenant_id == UUID(principal.tenant_id),
         Appointment.patient_id == UUID(principal.user_id)
     ))
     if appointment is None:
@@ -1125,24 +1376,213 @@ async def cancel_appointment(
     await audit(session, principal, "appointment.cancel", appointment.id)
     queue_patient_notification(session, tenant_id=appointment.tenant_id, patient_id=appointment.patient_id,
         event_type="appointment_cancelled", subject="Appointment cancelled", body="Your appointment cancellation has been recorded.")
-    return appointment
+    return AppointmentResponse(
+        id=appointment.id,
+        doctor_id=appointment.doctor_id,
+        patient_id=appointment.patient_id,
+        starts_at=appointment.starts_at,
+        ends_at=appointment.ends_at,
+        status=appointment.status,
+        payment_status=appointment.payment_status,
+        join_window_minutes=get_settings().video_join_window_minutes,
+    )
 
 
 @router.post("/appointments/{appointment_id}/reschedule", response_model=AppointmentResponse)
 async def reschedule_appointment(
-    appointment_id: UUID,
+    appointment_id: str,
     payload: AppointmentReschedule,
-    session: AsyncSession = Depends(tenant_session),
+    session: AsyncSession | None = Depends(patient_session),
     principal: Principal = Depends(require("appointment:write")),
-) -> Appointment:
+) -> AppointmentResponse:
+    if get_settings().mongodb_enabled:
+        database = mongo_database.database()
+        patient_ids = await patient_identity_ids(database, principal)
+
+        appointment = await database["appointments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "$or": [{"id": str(appointment_id)}, {"_id": str(appointment_id)}],
+            "patient_id": {"$in": patient_ids},
+        })
+        if not appointment:
+            other_apt = await database["appointments"].find_one({
+                "tenant_id": str(principal.tenant_id),
+                "$or": [{"id": str(appointment_id)}, {"_id": str(appointment_id)}],
+            })
+            if other_apt:
+                raise HTTPException(status_code=403, detail="Forbidden: You cannot reschedule another patient's appointment")
+            raise HTTPException(status_code=404, detail="Appointment not found")
+
+        current_status = str(appointment.get("status", "")).lower()
+        if current_status in {"completed", "cancelled"}:
+            raise HTTPException(status_code=409, detail="Appointment cannot be rescheduled")
+
+        doctor_id = str(appointment.get("doctor_id") or "")
+        new_starts_at = None
+        duration_min = 30
+        matching_slot = None
+
+        if payload.slot_id:
+            matching_slot = await database["doctor_availability"].find_one({
+                "tenant_id": str(principal.tenant_id),
+                "$or": [{"id": str(payload.slot_id)}, {"_id": str(payload.slot_id)}],
+            })
+            if not matching_slot:
+                raise HTTPException(status_code=404, detail="Selected slot not found")
+            new_starts_at = _parse_datetime(matching_slot["starts_at"])
+            duration_min = int(matching_slot.get("duration_minutes") or 30)
+        elif payload.starts_at:
+            new_starts_at = payload.starts_at
+            matching_slot = await database["doctor_availability"].find_one({
+                "tenant_id": str(principal.tenant_id),
+                "doctor_id": doctor_id,
+                "$or": [
+                    {"starts_at": new_starts_at},
+                    {"starts_at": new_starts_at.isoformat()},
+                    {"starts_at": new_starts_at.strftime("%Y-%m-%dT%H:%M:%SZ")},
+                    {"starts_at": new_starts_at.strftime("%Y-%m-%dT%H:%M:%S+00:00")},
+                ],
+            })
+            if matching_slot:
+                duration_min = int(matching_slot.get("duration_minutes") or 30)
+        else:
+            raise HTTPException(status_code=400, detail="Missing starts_at or slot_id in reschedule request")
+
+        if new_starts_at <= datetime.now(UTC):
+            raise HTTPException(status_code=400, detail="Cannot reschedule to a past date or time")
+
+        if matching_slot:
+            is_occupied = (
+                matching_slot.get("booked") is True
+                or matching_slot.get("is_booked") is True
+                or str(matching_slot.get("status", "")).lower() in {"booked", "occupied", "reserved"}
+            )
+            if is_occupied:
+                raise HTTPException(status_code=409, detail="Selected slot is no longer available")
+
+        new_ends_at = new_starts_at + timedelta(minutes=duration_min)
+
+        conflict = await database["appointments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": doctor_id,
+            "$or": [{"id": {"$ne": str(appointment.get("id") or appointment.get("_id"))}}, {"_id": {"$ne": appointment["_id"]}}],
+            "status": {"$in": ["requested", "confirmed", "checked_in", "rescheduled"]},
+            "starts_at": {"$lt": new_ends_at.isoformat()},
+            "ends_at": {"$gt": new_starts_at.isoformat()},
+        })
+        if conflict:
+            raise HTTPException(status_code=409, detail="Doctor is not available for this time")
+
+        old_starts_at = appointment.get("starts_at")
+        await database["doctor_availability"].update_many(
+            {
+                "tenant_id": str(principal.tenant_id),
+                "doctor_id": doctor_id,
+                "$or": [
+                    {"starts_at": old_starts_at},
+                    {"starts_at": _parse_datetime(old_starts_at).isoformat() if old_starts_at else None},
+                ],
+            },
+            {"$set": {"status": "available", "booked": False, "is_booked": False}},
+        )
+
+        if matching_slot:
+            await database["doctor_availability"].update_one(
+                {"_id": matching_slot["_id"]},
+                {"$set": {"status": "booked", "booked": True, "is_booked": True}},
+            )
+
+        now_iso = datetime.now(UTC).isoformat()
+        new_starts_str = new_starts_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        new_ends_str = new_ends_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        await database["appointments"].update_one(
+            {"_id": appointment["_id"]},
+            {"$set": {
+                "starts_at": new_starts_str,
+                "ends_at": new_ends_str,
+                "status": "rescheduled",
+                "rescheduled_at": now_iso,
+            }},
+        )
+
+        await database["appointment_events"].insert_one({
+            "id": f"evt-{secrets.token_hex(8)}",
+            "tenant_id": str(principal.tenant_id),
+            "appointment_id": str(appointment_id),
+            "actor_id": str(principal.user_id),
+            "from_status": current_status,
+            "to_status": "rescheduled",
+            "created_at": now_iso,
+        })
+
+        await database["notifications"].insert_one({
+            "id": str(uuid4()),
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": str(appointment.get("patient_id")),
+            "recipient_id": str(appointment.get("patient_id")),
+            "event_type": "appointment_rescheduled",
+            "subject": "Appointment Rescheduled",
+            "body": f"Your appointment has been updated to {new_starts_at.strftime('%b %d, %Y at %I:%M %p')}.",
+            "channel": "in_app",
+            "status": "queued",
+            "created_at": now_iso,
+        })
+
+        doctor = None
+        if doctor_id:
+            doctor = await database["doctors"].find_one({
+                "tenant_id": str(principal.tenant_id),
+                "$or": [{"id": str(doctor_id)}, {"user_id": str(doctor_id)}, {"user_account_id": str(doctor_id)}],
+            })
+        clinic_settings = await database["clinic_settings"].find_one({"tenant_id": str(principal.tenant_id)})
+        clinic_timezone = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
+
+        doctor_response = None
+        if doctor:
+            doctor_response = DoctorResponse(
+                id=_to_uuid(doctor.get("id") or doctor.get("user_id") or doctor_id),
+                full_name=str(doctor.get("full_name") or "Doctor"),
+                specialty=str(doctor.get("specialty") or "Specialist"),
+                clinic_name=str(doctor.get("clinic_name") or "Kaizen Care Telehealth Center"),
+                fee_paise=_to_int(doctor.get("fee_paise")),
+                timezone=str(doctor.get("timezone") or clinic_timezone),
+                supported_languages=doctor.get("supported_languages") if isinstance(doctor.get("supported_languages"), list) else ["English"],
+                registration_number=doctor.get("registration_number"),
+            )
+
+        fee_paise = _to_int(appointment.get("total_payable_paise", appointment.get("fee_paise")))
+        base_fee_paise = _to_int(appointment.get("base_fee_paise"))
+        platform_fee_paise = _to_int(appointment.get("platform_fee_paise"))
+
+        return AppointmentResponse(
+            id=str(appointment_id),
+            doctor_id=str(doctor_id or principal.user_id),
+            patient_id=str(appointment.get("patient_id") or principal.user_id),
+            starts_at=new_starts_at,
+            ends_at=new_ends_at,
+            status="rescheduled",
+            payment_status=str(appointment.get("payment_status", "captured")).lower(),
+            join_window_minutes=get_settings().video_join_window_minutes,
+            base_fee_paise=base_fee_paise,
+            platform_fee_paise=platform_fee_paise,
+            total_payable_paise=fee_paise,
+            currency=str(appointment.get("currency") or "INR"),
+            doctor=doctor_response,
+        )
+
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
     appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == appointment_id, Appointment.tenant_id == UUID(principal.tenant_id),
+        Appointment.id == UUID(appointment_id), Appointment.tenant_id == UUID(principal.tenant_id),
         Appointment.patient_id == UUID(principal.user_id)
     ))
     if appointment is None:
         raise HTTPException(status_code=404, detail="Appointment not found")
     if appointment.status in {"completed", "cancelled"}:
         raise HTTPException(status_code=409, detail="Appointment cannot be rescheduled")
+    if payload.starts_at is None:
+        raise HTTPException(status_code=400, detail="starts_at is required")
     new_end = payload.starts_at + (appointment.ends_at - appointment.starts_at)
     new_slot = await session.scalar(select(DoctorAvailability).where(
         DoctorAvailability.tenant_id == UUID(principal.tenant_id), DoctorAvailability.doctor_id == appointment.doctor_id,
@@ -1170,4 +1610,14 @@ async def reschedule_appointment(
     await audit(session, principal, "appointment.reschedule", appointment.id)
     queue_patient_notification(session, tenant_id=appointment.tenant_id, patient_id=appointment.patient_id,
         event_type="appointment_rescheduled", subject="Appointment rescheduled", body="Your appointment time has been updated.")
-    return appointment
+    return AppointmentResponse(
+        id=appointment.id,
+        doctor_id=appointment.doctor_id,
+        patient_id=appointment.patient_id,
+        starts_at=appointment.starts_at,
+        ends_at=appointment.ends_at,
+        status=appointment.status,
+        payment_status=appointment.payment_status,
+        join_window_minutes=get_settings().video_join_window_minutes,
+    )
+

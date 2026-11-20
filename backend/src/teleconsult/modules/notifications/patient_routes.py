@@ -169,9 +169,20 @@ async def list_notifications(
                 else:
                     read_at_dt = None
 
-                nid_str = str(doc.get("id") or doc.get("_id") or uuid4())
+                nid_raw = str(doc.get("id") or doc.get("_id") or uuid4())
+                uuid_obj = _to_uuid(nid_raw)
+                uuid_str = str(uuid_obj)
+                if doc.get("id") != uuid_str:
+                    try:
+                        await db["notifications"].update_one(
+                            {"_id": doc["_id"]},
+                            {"$set": {"id": uuid_str}},
+                        )
+                    except Exception:
+                        pass
+
                 results.append(NotificationResponse(
-                    id=_to_uuid(nid_str),
+                    id=uuid_obj,
                     event_type=str(doc.get("event_type", "general")),
                     channel=str(doc.get("channel", "in_app")),
                     subject=str(doc.get("subject", "Notification")),
@@ -248,20 +259,19 @@ async def mark_read(
         nid_str = str(notification_id)
         now = datetime.now(UTC)
 
-        await db["notifications"].update_one(
+        result = await db["notifications"].update_one(
             {
                 "tenant_id": str(principal.tenant_id),
+                "id": {"$in": [nid_str, nid_str.lower()]},
                 "$or": [
                     {"recipient_id": {"$in": patient_ids}},
                     {"patient_id": {"$in": patient_ids}},
                 ],
-                "$or": [
-                    {"id": nid_str},
-                    {"id": nid_str.lower()},
-                ],
             },
             {"$set": {"read_at": now.isoformat(), "status": "read"}},
         )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Notification not found")
         return {"status": "read"}
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
@@ -289,13 +299,10 @@ async def retry_notification(
 
         notification = await db["notifications"].find_one({
             "tenant_id": str(principal.tenant_id),
+            "id": {"$in": [nid_str, nid_str.lower()]},
             "$or": [
                 {"recipient_id": {"$in": patient_ids}},
                 {"patient_id": {"$in": patient_ids}},
-            ],
-            "$or": [
-                {"id": nid_str},
-                {"id": nid_str.lower()},
             ],
         })
         if notification is None:

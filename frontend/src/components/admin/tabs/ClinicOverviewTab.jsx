@@ -28,7 +28,7 @@ export default function ClinicOverviewTab({ onSelectTab }) {
   return (
     <div className="space-y-6 font-sans">
       {/* Top Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] to-[#162623] p-6 text-white shadow-md border border-[rgba(87,120,119,0.15)] sm:p-8">
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] p-6 text-white shadow-sm border border-[#185A4D]/30 sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white">

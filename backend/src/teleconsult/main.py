@@ -31,6 +31,7 @@ from teleconsult.modules.notifications.patient_routes import router as notificat
 from teleconsult.modules.notifications.routes import router as notifications_router
 from teleconsult.modules.newsletter.routes import router as newsletter_router
 from teleconsult.modules.notifications.doctor_routes import router as doctor_notifications_router
+from teleconsult.modules.contact.routes import router as contact_router
 from teleconsult.modules.patient_portal.routes import public_router as public_patient_router
 from teleconsult.modules.patient_portal.routes import router as patient_router
 from teleconsult.modules.payments.patient_routes import router as payment_router
@@ -58,7 +59,7 @@ PUBLIC_PATHS = frozenset({
     "/api/v1/auth/recovery", "/api/v1/auth/recovery/reset", "/api/v1/auth/me",
     "/api/v1/auth/logout", "/api/v1/patient/payments/webhook",
     "/api/v1/patient/doctors", "/api/v1/patient/doctors/{doctor_id}/availability",
-    "/doctor/register",
+    "/doctor/register", "/contact/inquiries",
 })
 
 
@@ -153,6 +154,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(config_router)
     app.include_router(newsletter_router)
+    app.include_router(contact_router)
     # Versioned API contract. The module-native paths above remain available
     # for local compatibility while clients migrate to /api/v1.
     app.include_router(public_patient_router, prefix="/api/v1")
@@ -165,7 +167,6 @@ def create_app() -> FastAPI:
     app.include_router(directory_router)
     app.include_router(scheduling_router)
     app.include_router(consultation_router)
-    app.include_router(video_router)
     app.include_router(consent_router)
     app.include_router(payments_router)
     app.include_router(notifications_router)

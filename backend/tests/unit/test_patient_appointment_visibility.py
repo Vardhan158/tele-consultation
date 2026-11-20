@@ -20,9 +20,15 @@ def matches(document, query):
         if key == "$or":
             if not any(matches(document, clause) for clause in value):
                 return False
-        elif isinstance(value, dict) and "$in" in value:
-            if document.get(key) not in value["$in"]:
+        elif isinstance(value, dict):
+            if "$in" in value and document.get(key) not in value["$in"]:
                 return False
+            if "$lte" in value and not (document.get(key) is not None and document.get(key) <= value["$lte"]):
+                return False
+            if "$exists" in value:
+                exists = key in document and document.get(key) is not None
+                if exists != value["$exists"]:
+                    return False
         elif document.get(key) != value:
             return False
     return True
@@ -56,7 +62,22 @@ class Collection:
         for row in self.rows:
             if matches(row, query):
                 row.update(update.get("$set", {}))
+                for unset_key in update.get("$unset", {}):
+                    row.pop(unset_key, None)
                 return
+
+    async def find_one_and_update(self, query, update, return_document=None, **kwargs):
+        for row in self.rows:
+            if matches(row, query):
+                before = deepcopy(row)
+                row.update(update.get("$set", {}))
+                for unset_key in update.get("$unset", {}):
+                    row.pop(unset_key, None)
+                from pymongo import ReturnDocument
+                if return_document == ReturnDocument.AFTER:
+                    return deepcopy(row)
+                return before
+        return None
 
 
 @pytest.fixture
@@ -266,22 +287,27 @@ def test_naive_mongo_datetime_is_utc():
 
 
 async def test_http_listing_authentication_permissions_and_serialization(portal):
+    import inspect
     from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient
 
-    from teleconsult.kernel.authz.policy import get_principal
+    import teleconsult.kernel.authz.policy as policy_mod
+
+    authz_dep = inspect.signature(routes.list_appointments).parameters["principal"].default.dependency
+    target_get_principal = inspect.signature(authz_dep).parameters["principal"].default.dependency
+    policy_mod.get_principal = target_get_principal
 
     _, principal = portal
     app = FastAPI()
     app.include_router(routes.router)
     app.dependency_overrides[routes.patient_session] = lambda: None
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="https://test") as client:
         assert (await client.get("/patient/appointments")).status_code == 401
-        app.dependency_overrides[get_principal] = lambda: principal
+        app.dependency_overrides[target_get_principal] = lambda: principal
         response = await client.get("/patient/appointments")
         assert response.status_code == 200
         assert response.json()[0]["id"] == "apt-45bde4b19136"
-        app.dependency_overrides[get_principal] = lambda: Principal(PATIENT, "1", frozenset(), frozenset())
+        app.dependency_overrides[target_get_principal] = lambda: Principal(PATIENT, "1", frozenset(), frozenset())
         assert (await client.get("/patient/appointments")).status_code == 403
 
 

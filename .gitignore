@@ -19,3 +19,5 @@ dist/
 frontend/output/
 output/
 .idea/
+backend/private_storage/
+scratch/

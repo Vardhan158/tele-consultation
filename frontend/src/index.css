@@ -10,6 +10,8 @@
 @layer base {
   html, body {
     font-family: "Poppins", sans-serif;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 
   button, input, textarea, select, h1, h2, h3, h4, h5, h6, p, span, a, div, table, th, td {

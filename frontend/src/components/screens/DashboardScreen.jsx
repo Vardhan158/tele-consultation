@@ -179,7 +179,7 @@ export default function DashboardScreen({ onNavigate }) {
   });
 
   return (
-    <div className="space-y-6 font-sans text-[#162623]">
+    <div className="space-y-6 font-sans text-[#162623] max-w-full overflow-x-hidden">
       {/* Top Greeting & Date Banner matching Portal Brand System */}
       <div
         title={todayLabel}

@@ -26,14 +26,15 @@ class PatientCreate(BaseModel):
 class PatientResponse(PatientCreate):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    phone: str | None = None
     date_of_birth: datetime | str | None = None
     preferred_language: str | None = None
     address: str | None = None
-    emergency_contact: str | None = None
+    emergency_contact: str | dict | None = None
     preferred_pharmacy: str | None = None
     pharmacy_address: str | None = None
     pharmacy_phone: str | None = None
-    allergies: str | None = None
+    allergies: str | list | None = None
 
 
 class DoctorResponse(BaseModel):
@@ -90,7 +91,13 @@ class AppointmentResponse(BaseModel):
 
 
 class AppointmentReschedule(BaseModel):
-    starts_at: datetime
+    starts_at: datetime | None = None
+    slot_id: str | None = None
+
+
+class AppointmentCancelRequest(BaseModel):
+    reason: str | None = None
+
 
 
 class ConsentCreate(BaseModel):
