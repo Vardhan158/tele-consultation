@@ -1,0 +1,718 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>KGS Go-Live Checklist</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap">
+<style>
+/* Layout concept: a phase rail beside one long audit register. Each row is a
+   record with a priority stripe, a quick tick, and a status pill. Palette
+   starts from the KGS primary blue (#004B87) named in the audit's design tokens. */
+:root{
+  --bg:#EEF2F7; --surface:#FFFFFF; --surface-2:#F5F8FB;
+  --ink:#0B1F33; --muted:#566678; --line:#D5DDE7; --line-strong:#B4C2D2;
+  --accent:#004B87; --accent-ink:#FFFFFF; --accent-soft:#E0ECF8;
+  --ok:#0E7A4E; --ok-bg:#DAF1E5; --on-ok:#FFFFFF;
+  --warn:#9A5B00; --warn-bg:#FAEACB;
+  --bad:#B3261E; --bad-bg:#FBE3E0;
+  --idle:#4C5E72; --idle-bg:#E4EAF1;
+  --na:#6B7886; --na-bg:#ECEFF3;
+  --crit:#B3261E; --high:#9A5B00; --med:#3D5A80;
+  --f-display:"Sora","Segoe UI",system-ui,sans-serif;
+  --f-body:"Public Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A1522; --surface:#0F2033; --surface-2:#132A42;
+    --ink:#E7EFF8; --muted:#97A9BD; --line:#1E3550; --line-strong:#33506F;
+    --accent:#6DB3F2; --accent-ink:#06192B; --accent-soft:#12324F;
+    --ok:#4FD39A; --ok-bg:#0F3A2B; --on-ok:#06231A;
+    --warn:#F0B454; --warn-bg:#3A2A0C;
+    --bad:#FF8A80; --bad-bg:#431A18;
+    --idle:#A9BACD; --idle-bg:#1A2F47;
+    --na:#8496AA; --na-bg:#162537;
+    --crit:#FF8A80; --high:#F0B454; --med:#8FB4E3;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A1522; --surface:#0F2033; --surface-2:#132A42;
+  --ink:#E7EFF8; --muted:#97A9BD; --line:#1E3550; --line-strong:#33506F;
+  --accent:#6DB3F2; --accent-ink:#06192B; --accent-soft:#12324F;
+  --ok:#4FD39A; --ok-bg:#0F3A2B; --on-ok:#06231A;
+  --warn:#F0B454; --warn-bg:#3A2A0C;
+  --bad:#FF8A80; --bad-bg:#431A18;
+  --idle:#A9BACD; --idle-bg:#1A2F47;
+  --na:#8496AA; --na-bg:#162537;
+  --crit:#FF8A80; --high:#F0B454; --med:#8FB4E3;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.55 var(--f-body);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+code{font-family:var(--f-mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;overflow-wrap:anywhere}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.wrap{max-width:1260px;margin:0 auto;padding-block:28px 72px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* Masthead */
+.masthead{display:grid;gap:14px;margin-bottom:24px}
+.eyebrow{margin:0;font:500 12px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{margin:0;font:700 clamp(26px,4.4vw,40px)/1.12 var(--f-display);letter-spacing:-.02em;text-wrap:balance}
+.lede{margin:0;max-width:62ch;color:var(--muted);font-size:16px}
+.facts{margin:4px 0 0;padding:0;list-style:none;display:grid;gap:8px 28px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.facts{align-items:start}
+.facts li{display:grid;gap:2px;align-content:start;font-size:13.5px;min-width:0}
+.facts span{font:500 11px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+/* Summary */
+.summary{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);margin-bottom:20px}
+@media(min-width:860px){.summary{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}}
+.verdict,.prog{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;min-width:0}
+.verdict{display:grid;gap:6px;align-content:start;border-left:5px solid var(--bad)}
+.verdict[data-state="clear"]{border-left-color:var(--ok)}
+.v-label{margin:0;font:500 11px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.v-head{margin:0;font:700 24px/1.2 var(--f-display);letter-spacing:-.01em;color:var(--bad)}
+.verdict[data-state="clear"] .v-head{color:var(--ok)}
+.v-sub,.v-sprint{margin:0;font-size:14px}
+.v-sprint{color:var(--muted);font-family:var(--f-mono);font-size:12.5px}
+.prog-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.pct{margin:0;font:700 34px/1 var(--f-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pct small{font:500 13px var(--f-body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.prog-meta{margin:0;color:var(--muted);font-size:13.5px;font-variant-numeric:tabular-nums}
+.bar{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--idle-bg);margin-bottom:14px}
+.bar span{display:block;height:100%;transition:width .25s ease}
+.bar .s-validated{background:var(--ok)}
+.bar .s-pending{background:var(--line-strong)}
+.bar .s-failed{background:var(--bad)}
+.bar .s-na{background:var(--na)}
+.legend{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface-2);cursor:pointer;font-size:13px;font-weight:500}
+.chip i{width:9px;height:9px;border-radius:50%;background:var(--line-strong);display:block}
+.chip[data-k="validated"] i{background:var(--ok)}
+.chip[data-k="failed"] i{background:var(--bad)}
+.chip[data-k="na"] i{background:var(--na)}
+.chip b{font:500 12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip[aria-pressed="true"] b{color:inherit;opacity:.85}
+.chip[aria-pressed="true"] i{box-shadow:0 0 0 2px var(--accent-ink)}
+
+/* Key */
+.key{margin-bottom:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.key summary{cursor:pointer;padding:12px 18px;font-weight:600;font-size:14px}
+.key-body{display:grid;gap:18px 32px;padding:4px 18px 18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));font-size:13.5px}
+.key-body h3{margin:0 0 6px;font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.key-body dl{margin:0;display:grid;gap:6px}
+.key-body dt{font-weight:700;display:inline}
+.key-body dd{margin:0;display:inline;color:var(--muted)}
+.key-body div{display:block}
+
+/* Toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px}
+.field{flex:1 1 240px;min-width:0;position:relative}
+.field input{width:100%;padding:9px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink)}
+.toolbar select{padding:9px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink)}
+.check{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer;padding:0 4px}
+.check input{width:16px;height:16px;accent-color:var(--accent)}
+.btn{padding:9px 14px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);cursor:pointer;font-weight:600;font-size:13.5px}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{color:var(--accent-ink);filter:brightness(1.08)}
+.sync{display:flex;align-items:center;gap:8px;margin:0 0 20px;font:500 12px var(--f-mono);color:var(--muted)}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
+.sync[data-s="live"]::before{background:var(--ok)}
+.sync[data-s="slow"]::before,.sync[data-s="loading"]::before{background:var(--high)}
+.sync[data-s="error"]::before,.sync[data-s="offline"]::before{background:var(--bad)}
+.sync[data-s="readonly"]::before{background:var(--na)}
+
+/* Layout */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+@media(min-width:960px){
+  .layout{grid-template-columns:260px minmax(0,1fr);gap:36px;align-items:start}
+}
+.nav{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;min-width:0}
+.navbtn{flex:0 0 auto;display:flex;align-items:center;gap:8px;position:relative;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 12px;cursor:pointer;font-size:13px}
+.navbtn:hover{background:var(--accent-soft)}
+.navbtn .n{font:500 11px var(--f-mono);color:var(--muted)}
+.navbtn .cd{font:600 12px var(--f-mono);color:var(--accent)}
+.navbtn .nm{display:none;font-size:13.5px;font-weight:500;line-height:1.3}
+.navbtn .ct{font:500 12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.navbtn .nbar{display:none;grid-column:2 / 4;height:3px;border-radius:3px;background:var(--idle-bg);margin-top:6px;overflow:hidden}
+.navbtn .nbar span{display:block;height:100%;background:var(--ok)}
+@media(min-width:960px){
+  .nav{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto;flex-direction:column;gap:2px}
+  .navbtn{width:100%;display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:start;border-color:transparent;background:transparent;border-radius:8px;padding:8px 10px;text-align:left}
+  .navbtn .nm{display:block}
+  .navbtn .nbar{display:block}
+  .navbtn .cd{display:none}
+  .navbtn .n{padding-top:2px}
+  .navbtn .ct{padding-top:2px}
+}
+
+/* Phases */
+.phase{margin-bottom:34px;scroll-margin-top:16px;min-width:0}
+.ph{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.pcode{font:500 12px var(--f-mono);letter-spacing:.06em;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:3px 8px}
+.ph h2{margin:0;font:600 20px/1.25 var(--f-display);letter-spacing:-.01em;flex:1 1 220px;min-width:0;text-wrap:balance}
+.pcount{font:500 12.5px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.pbar{height:4px;border-radius:4px;background:var(--idle-bg);overflow:hidden;margin-bottom:12px}
+.pbar span{display:block;height:100%;background:var(--ok);transition:width .25s ease}
+.ref{margin:0 0 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.ref summary{cursor:pointer;padding:10px 14px;font-weight:600;font-size:13.5px}
+.ref .inner{padding:0 14px 14px}
+.ref ol{margin:0;padding-left:22px;display:grid;gap:4px;font-size:13.5px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:13px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font:500 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+.items{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.item{border-bottom:1px solid var(--line);box-shadow:inset 3px 0 0 var(--stripe,transparent)}
+.item:last-child{border-bottom:0}
+.item[data-prio="Critical"]{--stripe:var(--crit)}
+.item[data-prio="High"]{--stripe:var(--high)}
+.item[data-prio="Medium"]{--stripe:var(--med)}
+.item[data-prio="Low"]{--stripe:var(--line-strong)}
+.item[hidden]{display:none}
+.row{display:grid;gap:8px 12px;align-items:center;padding:12px 14px 12px 18px;
+  grid-template-columns:26px minmax(0,1fr) auto;grid-template-areas:"tick id status" "ttl ttl ttl"}
+@media(min-width:720px){.row{grid-template-columns:26px 92px minmax(0,1fr) auto;grid-template-areas:"tick id ttl status"}}
+.tick{grid-area:tick;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line-strong);background:transparent;display:grid;place-items:center;color:transparent;cursor:pointer;padding:0}
+.tick:hover{border-color:var(--ok)}
+.item[data-status="validated"] .tick{background:var(--ok);border-color:var(--ok);color:var(--on-ok)}
+.item[data-status="na"] .tick{border-style:dashed}
+.id{grid-area:id;font:500 12.5px var(--f-mono);color:var(--muted);letter-spacing:.02em;white-space:nowrap}
+.ttl{grid-area:ttl;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;text-align:left;background:none;border:0;padding:0;cursor:pointer;width:100%;min-width:0}
+.ttl .tx{display:grid;gap:2px;min-width:0}
+.ttl .t{font-weight:600;font-size:14.5px;line-height:1.4;overflow-wrap:anywhere}
+.ttl .sub{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12.5px;color:var(--muted)}
+.ttl .chev{flex:0 0 auto;margin-top:3px;color:var(--muted);transition:transform .15s ease}
+.item.open .chev{transform:rotate(180deg)}
+.item[data-status="validated"] .t{color:var(--muted)}
+.prio{font:600 10.5px var(--f-mono);letter-spacing:.07em;text-transform:uppercase}
+.prio[data-p="Critical"]{color:var(--crit)}
+.prio[data-p="High"]{color:var(--high)}
+.prio[data-p="Medium"]{color:var(--med)}
+.prio[data-p="Low"]{color:var(--muted)}
+.status{grid-area:status;appearance:none;-webkit-appearance:none;cursor:pointer;border:1px solid transparent;border-radius:99px;padding:6px 30px 6px 12px;font:600 12.5px var(--f-body);
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
+  background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.status[data-s="validated"]{color:var(--ok);background-color:var(--ok-bg)}
+.status[data-s="pending"]{color:var(--idle);background-color:var(--idle-bg)}
+.status[data-s="failed"]{color:var(--bad);background-color:var(--bad-bg)}
+.status[data-s="na"]{color:var(--na);background-color:var(--na-bg);border-color:var(--line-strong);border-style:dashed}
+.status:disabled,.tick:disabled{cursor:not-allowed;opacity:.7}
+
+.detail{display:none;padding:2px 18px 18px 56px;gap:14px 28px;grid-template-columns:minmax(0,1fr)}
+.item.open .detail{display:grid}
+@media(min-width:720px){.detail{grid-template-columns:repeat(2,minmax(0,1fr));padding-left:148px}}
+@media(max-width:719px){.detail{padding-left:18px}}
+.blk{min-width:0}
+.blk h4{margin:0 0 3px;font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.blk p{margin:0;font-size:14px;overflow-wrap:anywhere}
+.blk.wide{grid-column:1 / -1}
+.blk textarea{width:100%;min-height:64px;resize:vertical;padding:9px 11px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);color:var(--ink);line-height:1.5}
+.upd{display:block;margin-top:5px;font:400 12px var(--f-mono);color:var(--muted)}
+
+.empty{padding:36px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:12px}
+.empty .btn{margin-top:10px}
+.foot{margin-top:12px;color:var(--muted);font-size:12.5px;max-width:78ch}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Kaizentrix Global Solutions · Audit 1.0.0-PROD-AUDIT · 17 Nov 2026</p>
+    <h1>Teleconsultation Platform<br>Go-Live Checklist</h1>
+    <p class="lede">Production-readiness audit and Azure deployment verification. Set each item's status once it is completed or verified, and keep the evidence in its notes.</p>
+    <ul class="facts">
+      <li><span>Target cloud</span>Microsoft Azure · Central India primary, South India disaster recovery</li>
+      <li><span>Statutory mandates</span>MoHFW Telemedicine Guidelines 2020 · DPDP Act 2023 · ABDM M1 to M3 · Income Tax §194J TDS · Drugs and Cosmetics Act</li>
+    </ul>
+  </header>
+
+  <section class="summary" aria-label="Progress summary">
+    <div class="verdict" id="verdict" data-state="blocked">
+      <p class="v-label">Go-live gate</p>
+      <p class="v-head" id="vHead">Blocked</p>
+      <p class="v-sub" id="vSub"></p>
+      <p class="v-sprint" id="vSprint"></p>
+    </div>
+    <div class="prog">
+      <div class="prog-top">
+        <p class="pct"><span id="pctNum">0</span><small>% of applicable items validated</small></p>
+        <p class="prog-meta" id="progMeta"></p>
+      </div>
+      <div class="bar" id="bar" role="img" aria-label="Status breakdown">
+        <span class="s-validated"></span><span class="s-failed"></span><span class="s-pending"></span><span class="s-na"></span>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+
+  <details class="key">
+    <summary>Status and priority key</summary>
+    <div class="key-body">
+      <div>
+        <h3>Status</h3>
+        <dl>
+          <div><dt>Validated.</dt> <dd>Verified by a running test, a compiler check, or inspected source that meets the requirement.</dd></div>
+          <div><dt>Not validated.</dt> <dd>The work exists or is required, but has not been verified in the target staging or production environment.</dd></div>
+          <div><dt>Failed.</dt> <dd>The inspected implementation has a vulnerability, defect, or gap against production standards.</dd></div>
+          <div><dt>Not applicable.</dt> <dd>Intentionally outside the scope of this release.</dd></div>
+        </dl>
+      </div>
+      <div>
+        <h3>Priority</h3>
+        <dl>
+          <div><dt>Critical.</dt> <dd>Blocks deployment. Resolve before any external traffic.</dd></div>
+          <div><dt>High.</dt> <dd>Significant security, operational, or legal risk. Resolve before general public release.</dd></div>
+          <div><dt>Medium.</dt> <dd>Operational or performance work for the first maintenance cycle after deployment.</dd></div>
+          <div><dt>Gap items.</dt> <dd>Failed means the gap is open. Not validated means a fix is applied and awaiting verification. Validated means the fix is verified.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </details>
+
+  <div class="toolbar">
+    <div class="field"><input id="q" type="search" placeholder="Search by ID, item, or what to verify" aria-label="Search checklist"></div>
+    <select id="prio" aria-label="Filter by priority">
+      <option value="all">All priorities</option>
+      <option value="Critical">Critical</option>
+      <option value="High">High</option>
+      <option value="Medium">Medium</option>
+    </select>
+    <label class="check"><input id="hideDone" type="checkbox"> Hide validated</label>
+    <button class="btn" id="expandAll" type="button">Expand all</button>
+    <button class="btn primary" id="exportBtn" type="button" hidden>Export CSV</button>
+  </div>
+  <p class="sync" id="sync" data-s="loading" role="status">Loading saved statuses</p>
+
+  <div class="layout">
+    <nav class="nav" id="nav" aria-label="Checklist phases"></nav>
+    <main id="phases" style="min-width:0">
+      <div class="empty" id="empty" hidden>
+        <div>No items match these filters.</div>
+        <button class="btn" id="resetFilters" type="button">Clear filters</button>
+      </div>
+      <p class="foot">Source: Enterprise Teleconsultation Industry Production-Readiness Audit and Azure Validation Framework, version 1.0.0-PROD-AUDIT, 17 November 2026. Starting statuses come from that audit. Changes and notes you make here are saved on this page.</p>
+    </main>
+  </div>
+</div>
+
+<script type="application/json" id="kgs-data">{"phases": [{"n": 1, "name": "Existing Application Audit", "code": "AUD"}, {"n": 2, "name": "Frontend Validation", "code": "FE"}, {"n": 3, "name": "Backend Validation", "code": "BE"}, {"n": 4, "name": "Database Validation", "code": "DB"}, {"n": 5, "name": "Security and Privacy Validation", "code": "SEC"}, {"n": 6, "name": "Azure Pre-Deployment Readiness", "code": "AZ-PRE"}, {"n": 7, "name": "Azure Deployment Execution", "code": "AZ-DEP"}, {"n": 8, "name": "Post-Deployment Validation", "code": "AZ-POST"}, {"n": 9, "name": "High Availability, Backup & Disaster Recovery", "code": "HA-DR"}, {"n": 10, "name": "Scalability & Performance Validation", "code": "PERF"}, {"n": 11, "name": "Monitoring, Observability & Operational Maintenance", "code": "MON-OPS"}, {"n": 12, "name": "Final Production Go-Live Approval", "code": "GO-LIVE"}, {"n": 13, "name": "Gap Analysis & Remediation", "code": "GAP"}], "items": [{"id": "AUD-01", "phase": "AUD", "kind": "check", "area": "Architecture", "title": "Full-Stack Monorepo Layout", "verify": "Inspect project structure for separation of concerns between backend, web, migrations, and design system.", "how": "Run directory inspection of `backend/`, `web/`, `design-system/`, `replica/`.", "expected": "Clear decoupling between Next.js frontend, FastAPI backend, and PostgreSQL migrations.", "status": "validated", "priority": "Critical", "remarks": "Verified decoupled structure with independent `backend/Dockerfile` and `web/Dockerfile`."}, {"id": "AUD-02", "phase": "AUD", "kind": "check", "area": "Backend API", "title": "Router Coverage & Endpoint Registrations", "verify": "Verify that all 11 endpoint modules are registered under `/api/v1` prefix.", "how": "Inspect `backend/app/api/v1/router.py` and `backend/app/main.py`.", "expected": "36 distinct REST routes covering health, auth, doctors, appointments, consultations, prescriptions, payments, abdm, pharmacy, diagnostics, spoke.", "status": "validated", "priority": "Critical", "remarks": "Line 16-45 of `backend/app/api/v1/router.py` mounts all microservice endpoint routers cleanly."}, {"id": "AUD-03", "phase": "AUD", "kind": "check", "area": "Database", "title": "Alembic Migration Baseline", "verify": "Verify migration script `e324b1270dad_0001_initial_schema.py` defines all 19 database tables.", "how": "Inspect migration versions against `backend/app/models/`.", "expected": "19 tables created with primary keys, indexes, and foreign key cascades matching models.", "status": "validated", "priority": "Critical", "remarks": "`e324b1270dad_0001_initial_schema.py` lines 24-400 verify complete table DDL definitions."}, {"id": "AUD-04", "phase": "AUD", "kind": "check", "area": "Clinical Safety", "title": "MoHFW Schedule X Intercept", "verify": "Verify teleconsultation prohibition of Schedule X narcotic/psychotropic drugs.", "how": "Inspect `backend/app/api/v1/endpoints/prescriptions.py` and EMR client logic.", "expected": "HTTP 400 `ScheduleXRestrictionException` raised when Schedule X substance is prescribed.", "status": "validated", "priority": "Critical", "remarks": "Verified in `prescriptions.py` lines 42-47 and `web/src/app/doctor/emr/[patientId]/page.tsx` line 102."}, {"id": "AUD-05", "phase": "AUD", "kind": "check", "area": "Financial Accounting", "title": "Section 194J 10% TDS Withholding", "verify": "Verify calculation of 10% TDS withholding and 15% platform fee on clinician payouts.", "how": "Inspect `backend/app/api/v1/endpoints/payments.py` lines 130-146.", "expected": "`DoctorPayoutLedger` records gross, 15% platform fee, 10% TDS, and net payable upon payment capture.", "status": "validated", "priority": "Critical", "remarks": "Verified in `payments.py` line 132-145 and `finance.py` models."}, {"id": "AUD-06", "phase": "AUD", "kind": "check", "area": "WebRTC Video", "title": "LiveKit WebRTC Token Minting", "verify": "Verify cryptographically signed token generation for consultation encounters.", "how": "Inspect `backend/app/api/v1/endpoints/consultations.py` line 69-124.", "expected": "JWT minted with participant identity, room name, and video publishing claims signed by `LIVEKIT_API_SECRET`.", "status": "validated", "priority": "High", "remarks": "Verified in `consultations.py` lines 98-123. Note: LiveKit official Python SDK is not in `requirements.txt`."}, {"id": "AUD-07", "phase": "AUD", "kind": "check", "area": "Containerization", "title": "Non-Root User Container Execution", "verify": "Verify Dockerfiles do not execute processes as root user (UID 0).", "how": "Inspect `backend/Dockerfile` and `web/Dockerfile`.", "expected": "Backend runs as `appuser` (UID 1001); web runs as `nextjs` (UID 1001).", "status": "validated", "priority": "High", "remarks": "`backend/Dockerfile` line 29 (`USER appuser`) and `web/Dockerfile` line 37 (`USER nextjs`)."}, {"id": "AUD-08", "phase": "AUD", "kind": "check", "area": "Staging Config", "title": "Docker Compose Staging Configuration", "verify": "Inspect `docker-compose.staging.yml` for PostgreSQL, Redis, Backend, and Web topology.", "how": "Inspect root `docker-compose.staging.yml`.", "expected": "Complete multi-container staging network with health checks and volume persistence.", "status": "validated", "priority": "High", "remarks": "PostgreSQL 16 (PostGIS), Redis 7, Backend, and Web configured with health checks on port 8000 and 3000."}, {"id": "AUD-09", "phase": "AUD", "kind": "check", "area": "Secret Management", "title": "Codebase Secret Sanitization", "verify": "Inspect configuration files for hardcoded production credentials.", "how": "Inspect `config.py`, `.env.example`, `docker-compose.staging.yml`.", "expected": "Default fallback secrets present in development templates; must be externalized for Azure.", "status": "failed", "priority": "Critical", "remarks": "Default secrets in `backend/app/config.py` lines 49-76 (`kgs_dev_secret_key...`) must be replaced by Azure Key Vault."}, {"id": "AUD-10", "phase": "AUD", "kind": "check", "area": "CI/CD Infrastructure", "title": "Automated Pipeline Configurations", "verify": "Check for `.github/workflows` or `azure-pipelines.yml`.", "how": "Inspect workspace root and `.github/`.", "expected": "CI/CD pipelines defined for automated build, test, container push, and deployment.", "status": "failed", "priority": "Critical", "remarks": "No CI/CD configuration files exist in workspace. Manual builds required currently."}, {"id": "FE-01", "phase": "FE", "kind": "check", "area": "Build", "title": "Next.js 15 Production Compilation", "verify": "Verify that Next.js application compiles without TypeScript or build errors.", "how": "Execute `npm run build` inside `web/`.", "expected": "Zero TypeScript compilation errors; `.next` production bundles emitted.", "status": "pending", "priority": "Critical", "remarks": "Source inspection confirms type fixes in `bugs.md`, but local build execution in sandbox requires validation."}, {"id": "FE-02", "phase": "FE", "kind": "check", "area": "Auth Storage", "title": "Token Storage Vulnerability", "verify": "Verify where JWT bearer tokens are stored in the client runtime.", "how": "Inspect `web/src/lib/api-client.ts` lines 32, 88, 117.", "expected": "Tokens stored in `localStorage` (`kgs_token`); vulnerable to XSS exfiltration.", "status": "failed", "priority": "High", "remarks": "Code evidence: `localStorage.setItem(\"kgs_token\", res.access_token)`. Recommend migrating to HttpOnly cookies."}, {"id": "FE-03", "phase": "FE", "kind": "check", "area": "Route Guards", "title": "Protected Route Access Enforcement", "verify": "Verify if unauthenticated users are redirected from clinician and admin routes.", "how": "Navigate to `/doctor/dashboard` without setting `kgs_token`.", "expected": "Unauthenticated requests redirected to login modal or root `/`.", "status": "failed", "priority": "Critical", "remarks": "`web/src/middleware.ts` is missing. Route renders dashboard layout without authentication redirect."}, {"id": "FE-04", "phase": "FE", "kind": "check", "area": "API Handling", "title": "Silent Mock Fallback Behavior", "verify": "Verify frontend behavior when backend API returns HTTP 500 or network offline.", "how": "Inspect `catch` blocks in `web/src/lib/api-client.ts` and UI pages.", "expected": "Explicit error toast / banner shown to user; no silent fallback to static mock store.", "status": "failed", "priority": "High", "remarks": "Code evidence: `api-client.ts` lines 76-78, 92-108, 177-180 silently return `MOCK_*` fixtures on error."}, {"id": "FE-05", "phase": "FE", "kind": "check", "area": "Forms", "title": "Doctor Discovery & Filtering", "verify": "Verify search, specialty filter, fee slider, and online status toggles.", "how": "Inspect `web/src/app/doctors/page.tsx` lines 33-76.", "expected": "Filters update query params and trigger API client `kgsApi.doctors.list`.", "status": "validated", "priority": "Medium", "remarks": "Verified implementation in `web/src/app/doctors/page.tsx` lines 35-70 with dynamic badge toggles."}, {"id": "FE-06", "phase": "FE", "kind": "check", "area": "Forms", "title": "Slot Booking & Lock Acquisition", "verify": "Verify slot selection triggers temporary lock call before routing to checkout.", "how": "Inspect `web/src/app/booking/[id]/page.tsx` lines 80-97.", "expected": "Calls `kgsApi.appointments.lockSlot(slotId)`; displays 409 conflict message if locked.", "status": "validated", "priority": "High", "remarks": "Verified in `booking/[id]/page.tsx` lines 84-90 with explicit 409 status handling."}, {"id": "FE-07", "phase": "FE", "kind": "check", "area": "Clinical EMR", "title": "EMR Charting Backend Persistence", "verify": "Verify that clicking \"Sign & Issue Prescription\" sends payload to backend API.", "how": "Inspect `web/src/app/doctor/emr/[patientId]/page.tsx` lines 143-150.", "expected": "Calls `kgsApi.prescriptions.create()` with SOAP notes and medicine items.", "status": "failed", "priority": "Critical", "remarks": "Code evidence: `handleFinalizeSigning` uses `setTimeout` and hardcoded redirect to `/prescription/rx-98421`."}, {"id": "FE-08", "phase": "FE", "kind": "check", "area": "Media", "title": "WebRTC Video Player SDK Integration", "verify": "Verify that active video room mounts live media tracks using LiveKit WebRTC client.", "how": "Inspect `web/src/app/room/[id]/page.tsx` lines 81-89, 109-136.", "expected": "Real WebRTC audio/video elements mounted with camera/mic stream tracks.", "status": "failed", "priority": "High", "remarks": "Code evidence: `room/[id]/page.tsx` renders simulated CSS avatar pulses; `@livekit/components-react` not installed."}, {"id": "FE-09", "phase": "FE", "kind": "check", "area": "Static Documents", "title": "Prescription PDF Generation", "verify": "Verify PDF download triggers tamper-proof server-generated binary PDF.", "how": "Inspect `web/src/app/prescription/[id]/page.tsx` line 71.", "expected": "PDF stream downloaded to client with cryptographic verification seal.", "status": "failed", "priority": "Medium", "remarks": "Code evidence: Line 71 executes `onClick={() => alert(\"Downloading tamper-proof PDF...\")}`. Stub only."}, {"id": "FE-10", "phase": "FE", "kind": "check", "area": "Security Headers", "title": "Client-Side Security Headers", "verify": "Inspect HTTP security headers emitted by Next.js server.", "how": "Inspect `web/next.config.mjs` lines 7-35.", "expected": "`X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `HSTS`, `Permissions-Policy`.", "status": "validated", "priority": "High", "remarks": "Verified in `next.config.mjs`. Note: Content Security Policy (CSP) header is currently omitted."}, {"id": "FE-11", "phase": "FE", "kind": "check", "area": "Responsiveness", "title": "Mobile Viewport Adaptability", "verify": "Verify UI layouts across 320px, 768px, 1024px, and 1440px viewports.", "how": "Inspect Tailwind grid and flex utility classes across all screens.", "expected": "Responsive drawer navigation, flexible card layouts, and touch-friendly controls.", "status": "validated", "priority": "Medium", "remarks": "Clean responsive utility classes (`sm:`, `md:`, `lg:`) verified across all 27 route components."}, {"id": "FE-12", "phase": "FE", "kind": "check", "area": "Accessibility", "title": "WCAG 2.1 AA Color Contrast", "verify": "Verify clinical design tokens against WCAG contrast guidelines.", "how": "Inspect `design-system/tokens.json` and `design-system/kaizentrix_design_system.md`.", "expected": "Text and interactive elements meet 4.5:1 minimum contrast ratio.", "status": "validated", "priority": "Medium", "remarks": "Verified in design tokens: primary blue `#004B87` against white yields 8.6:1 contrast ratio."}, {"id": "BE-01", "phase": "BE", "kind": "check", "area": "Lifecycle", "title": "Database Connection Lifecycle", "verify": "Verify async engine disposal on application shutdown.", "how": "Inspect `backend/app/main.py` lines 18-28.", "expected": "`engine.dispose()` called during lifespan shutdown; no leaked connection pools.", "status": "validated", "priority": "Critical", "remarks": "Verified in `main.py` lines 25-27 inside `asynccontextmanager lifespan`."}, {"id": "BE-02", "phase": "BE", "kind": "check", "area": "DDL Collision", "title": "Startup Table Auto-Creation Risk", "verify": "Verify if `init_db()` executes `create_all` at runtime startup.", "how": "Inspect `backend/app/main.py` line 22 and `backend/app/database.py` line 53.", "expected": "`create_all` executed on every worker boot; risk of DDL locking in clustered deployment.", "status": "failed", "priority": "Critical", "remarks": "Code evidence: `main.py` line 22 calls `await init_db()` on boot. Must be decoupled from production startup."}, {"id": "BE-03", "phase": "BE", "kind": "check", "area": "Authentication", "title": "OTP Store Multi-Worker Safety", "verify": "Verify OTP persistence across multiple Uvicorn workers or container replicas.", "how": "Inspect `backend/app/auth/otp.py` line 11 (`_OTP_CACHE`).", "expected": "In-memory Python dictionary used; fails across multi-worker / multi-container instances.", "status": "failed", "priority": "Critical", "remarks": "Code evidence: `_OTP_CACHE: Dict = {}`. Must be migrated to Redis with TTL keys (`otp:{phone}`)."}, {"id": "BE-04", "phase": "BE", "kind": "check", "area": "Authentication", "title": "TOTP Multi-Factor Authentication", "verify": "Verify RFC 6238 TOTP verification algorithm for clinicians and administrators.", "how": "Inspect `backend/app/auth/security.py` lines 56-65.", "expected": "TOTP code validated against cryptographic shared secret using HMAC-SHA1.", "status": "failed", "priority": "Critical", "remarks": "Code evidence: `verify_totp_code` returns `code == \"123456\"`. Real TOTP library (e.g. `pyotp`) missing."}, {"id": "BE-05", "phase": "BE", "kind": "check", "area": "Authorization", "title": "Broken Object Level Auth (BOLA)", "verify": "Verify access controls on appointments, encounters, and prescriptions.", "how": "Inspect `check_appointment_access`, `check_encounter_access`, `get_prescription_detail`.", "expected": "HTTP 403 Forbidden raised when unauthorized patient/doctor accesses foreign record.", "status": "validated", "priority": "Critical", "remarks": "Verified in `appointments.py` (L215), `consultations.py` (L26), `prescriptions.py` (L173)."}, {"id": "BE-06", "phase": "BE", "kind": "check", "area": "Concurrency", "title": "Slot Double-Booking Protection", "verify": "Verify slot locking under concurrent booking attempts.", "how": "Inspect `backend/app/api/v1/endpoints/appointments.py` lines 56, 93.", "expected": "`with_for_update()` row lock serializes checkout; second concurrent lock receives HTTP 409.", "status": "validated", "priority": "Critical", "remarks": "Verified `with_for_update()` in `appointments.py`. Redis Redlock is fallback mock."}, {"id": "BE-07", "phase": "BE", "kind": "check", "area": "Throttling", "title": "API Rate Limiting Enforcement", "verify": "Verify presence of global and per-route rate limiters.", "how": "Inspect `backend/app/main.py` and endpoint definitions for `slowapi` or Limiter.", "expected": "Rate limit headers (`X-RateLimit-Limit`) emitted; HTTP 429 returned on threshold breach.", "status": "failed", "priority": "Critical", "remarks": "No rate limiting middleware exists. Endpoints vulnerable to automated brute-force attacks."}, {"id": "BE-08", "phase": "BE", "kind": "check", "area": "CORS", "title": "Allowed Origins Whitelist", "verify": "Verify CORS middleware configuration.", "how": "Inspect `backend/app/main.py` lines 48-55 and `backend/app/config.py` lines 25-33.", "expected": "Restricted to production domain and staging origins; `allow_credentials=True`.", "status": "validated", "priority": "High", "remarks": "Verified in `main.py`. Origins configured in `config.py` without wildcard `*`."}, {"id": "BE-09", "phase": "BE", "kind": "check", "area": "Third-Party", "title": "Razorpay Order Creation Integration", "verify": "Verify if `create_payment_order` calls official Razorpay API.", "how": "Inspect `backend/app/api/v1/endpoints/payments.py` lines 48-58.", "expected": "Real Razorpay order ID minted via `razorpay` Python SDK client.", "status": "failed", "priority": "High", "remarks": "Code evidence: `order_id = f\"order_{appt.id[:8]}_{int(datetime.now().timestamp())}\"`. SDK call missing."}, {"id": "BE-10", "phase": "BE", "kind": "check", "area": "Third-Party", "title": "Gupshup SMS Gateway Integration", "verify": "Verify if `generate_and_dispatch_otp` dispatches SMS via Gupshup API.", "how": "Inspect `backend/app/auth/otp.py` lines 44-45.", "expected": "HTTP POST dispatched to `https://media.smsgupshup.com` with API credentials.", "status": "failed", "priority": "High", "remarks": "Code evidence: Only logs `logger.info(\"[SMS Gateway Mock] Dispatched OTP...\")`. Real HTTP dispatch missing."}, {"id": "BE-11", "phase": "BE", "kind": "check", "area": "Third-Party", "title": "ABDM Gateway Integration", "verify": "Verify if ABHA OTP and consent verification connect to NHA sandbox.", "how": "Inspect `backend/app/api/v1/endpoints/abdm.py` lines 23-45.", "expected": "Real API handshake with ABDM Gateway (`dev.abdm.gov.in/gateway`).", "status": "failed", "priority": "High", "remarks": "Code evidence: Uses in-memory `_ABHA_TXNS` dictionary with mock OTP `\"123456\"`."}, {"id": "BE-12", "phase": "BE", "kind": "check", "area": "Observability", "title": "Health Probe Endpoints", "verify": "Verify `/health`, `/health/live`, and `/health/ready` probe functionality.", "how": "Inspect `backend/app/api/v1/endpoints/health.py` lines 11-50.", "expected": "Liveness returns 200 `alive`; readiness executes `SELECT 1` against database.", "status": "validated", "priority": "High", "remarks": "Verified in `health.py`. Properly returns HTTP 503 if database check fails."}, {"id": "BE-13", "phase": "BE", "kind": "check", "area": "Logging", "title": "Correlation ID Request Propagation", "verify": "Verify injection of `X-Correlation-ID` across logging contexts.", "how": "Inspect `backend/app/logging.py` lines 10-24 and `main.py` lines 58-77.", "expected": "All logs formatted with `[corr_id=UUID]`; matching header returned in HTTP response.", "status": "validated", "priority": "High", "remarks": "Verified in `logging.py` (`CorrelationIdFilter`) and `main.py` middleware."}, {"id": "DB-01", "phase": "DB", "kind": "check", "area": "Schema", "title": "Primary Key & UUID Data Types", "verify": "Verify primary key declarations across all 19 models.", "how": "Inspect `backend/app/models/` files for `mapped_column(primary_key=True)`.", "expected": "Primary keys defined as `String(36)` with `generate_uuid` default generator.", "status": "validated", "priority": "Critical", "remarks": "Verified across all models in `core.py`, `clinical.py`, `finance.py`, `audit.py`."}, {"id": "DB-02", "phase": "DB", "kind": "check", "area": "Schema", "title": "Foreign Key Integrity & Cascades", "verify": "Verify foreign keys and cascade delete rules on dependent entities.", "how": "Inspect `backend/app/models/` and migration script.", "expected": "Relational integrity enforced; prescription items cascade on prescription deletion.", "status": "validated", "priority": "Critical", "remarks": "`Prescription.items` has `cascade=\"all, delete-orphan\"`; foreign keys defined on all child tables."}, {"id": "DB-03", "phase": "DB", "kind": "check", "area": "Performance", "title": "Indexing Strategy on High-Volume Columns", "verify": "Verify indexing on search, filter, and concurrency columns.", "how": "Inspect indexes in `e324b1270dad_0001_initial_schema.py`.", "expected": "Indexes present on `mobile_number`, `council_registration_number`, `start_time`, `doctor_id + start_time`.", "status": "validated", "priority": "High", "remarks": "Verified composite index `idx_doctor_start_time` on `appointment_slots` (`clinical.py` L48)."}, {"id": "DB-04", "phase": "DB", "kind": "check", "area": "Transactions", "title": "Explicit Session Rollback Handling", "verify": "Verify that database sessions roll back on unhandled exceptions.", "how": "Inspect `backend/app/database.py` lines 38-48 (`get_db`).", "expected": "`session.rollback()` executed in `except` block before session closure.", "status": "validated", "priority": "Critical", "remarks": "Verified in `database.py` lines 43-44: `except Exception: await session.rollback()`."}, {"id": "DB-05", "phase": "DB", "kind": "check", "area": "Pooling", "title": "Async Connection Pool Configuration", "verify": "Verify pool size, overflow, and pre-ping settings for PostgreSQL.", "how": "Inspect `backend/app/database.py` lines 17-23.", "expected": "`pool_pre_ping=True`, `pool_size=10`, `max_overflow=20` configured for non-SQLite URLs.", "status": "validated", "priority": "High", "remarks": "Verified in `database.py` line 21-22. Prevents stale connections from serving traffic."}, {"id": "DB-06", "phase": "DB", "kind": "check", "area": "Migrations", "title": "Head Revision Synchronization", "verify": "Verify database schema matches latest Alembic revision.", "how": "Execute `alembic current` and `alembic heads` against target database.", "expected": "Schema version matches `e324b1270dad`; zero unapplied model diffs.", "status": "pending", "priority": "Critical", "remarks": "Requires execution against active PostgreSQL database instance."}, {"id": "DB-07", "phase": "DB", "kind": "check", "area": "Security", "title": "Sensitive Health Data Encryption", "verify": "Verify encryption at rest for ABHA, medical notes, and diagnoses.", "how": "Inspect column data types in `patient_profiles` and `consultation_encounters`.", "expected": "Columns encrypted via application-level AES-256 or `pgcrypto`.", "status": "failed", "priority": "High", "remarks": "Columns defined as plaintext `String`/`JSON`/`Text`. Relies solely on disk encryption."}, {"id": "DB-08", "phase": "DB", "kind": "check", "area": "Permissions", "title": "Principle of Least Privilege Database User", "verify": "Verify database credentials used by the application runtime.", "how": "Inspect database connection string and role grants.", "expected": "Application connects as non-superuser with `SELECT`, `INSERT`, `UPDATE`, `DELETE` grants only.", "status": "pending", "priority": "High", "remarks": "Must be configured during Azure Database for PostgreSQL Flexible Server provisioning."}, {"id": "DB-09", "phase": "DB", "kind": "check", "area": "Audit Store", "title": "Audit Log Table Immutability", "verify": "Verify whether audit logs can be modified or deleted by application roles.", "how": "Inspect database table grants on `audit_logs`.", "expected": "`audit_logs` restricted to `INSERT` and `SELECT` only; `UPDATE` and `DELETE` revoked.", "status": "pending", "priority": "Critical", "remarks": "Must be enforced via SQL DDL permissions on the PostgreSQL database."}, {"id": "DB-10", "phase": "DB", "kind": "check", "area": "Maintenance", "title": "Automated Vacuum & Statistics", "verify": "Verify autovacuum configuration on PostgreSQL Flexible Server.", "how": "Query `pg_stat_user_tables` and server parameters.", "expected": "Autovacuum enabled with aggressive thresholds for high-turnover appointment slot tables.", "status": "pending", "priority": "Medium", "remarks": "To be validated on Azure PostgreSQL Flexible Server instance post-provisioning."}, {"id": "SEC-01", "phase": "SEC", "kind": "check", "area": "OWASP API1", "title": "Broken Object Level Authorization", "verify": "Verify authorization barriers on all clinical records.", "how": "Probe `/appointments/{id}` with a non-owner Bearer token.", "expected": "HTTP 403 Forbidden returned; no cross-tenant or cross-patient clinical data leak.", "status": "validated", "priority": "Critical", "remarks": "Verified in code: `check_appointment_access` (`appointments.py`) enforces strict persona checks."}, {"id": "SEC-02", "phase": "SEC", "kind": "check", "area": "OWASP API2", "title": "Broken Authentication & Session Hijacking", "verify": "Verify JWT token signing algorithm and expiration limits.", "how": "Inspect `backend/app/auth/security.py` lines 27-42.", "expected": "Signed with `SECRET_KEY`, 60-minute expiry, issuer claim validated, algorithm HS256 enforced.", "status": "validated", "priority": "Critical", "remarks": "Verified in `security.py`. Note: Production secret must be injected via Key Vault."}, {"id": "SEC-03", "phase": "SEC", "kind": "check", "area": "OWASP API3", "title": "Broken Object Property Level Authorization", "verify": "Verify Pydantic response models filter sensitive internal attributes.", "how": "Inspect response schemas in `backend/app/schemas/`.", "expected": "`password_hash` and `totp_secret` excluded from all API response models.", "status": "validated", "priority": "Critical", "remarks": "Verified: `UserProfileSummary` (`auth.py` schema) exposes only `mfa_enabled` boolean, never secrets."}, {"id": "SEC-04", "phase": "SEC", "kind": "check", "area": "OWASP API4", "title": "Unrestricted Resource Consumption", "verify": "Verify request body size limits and endpoint throttling.", "how": "Send oversized payload (>10MB) or rapid bursts (>100 req/sec).", "expected": "HTTP 413 Payload Too Large or HTTP 429 Too Many Requests returned.", "status": "failed", "priority": "Critical", "remarks": "No body size limit middleware or rate limiter configured in FastAPI application."}, {"id": "SEC-05", "phase": "SEC", "kind": "check", "area": "OWASP API5", "title": "Broken Function Level Authorization", "verify": "Verify role checks on administrative and clinician endpoints.", "how": "Attempt clinical endpoint call (`/prescriptions`) with `PATIENT` role token.", "expected": "HTTP 403 Forbidden with message indicating role lacks permissions.", "status": "validated", "priority": "Critical", "remarks": "Verified: `require_roles([UserRole.DOCTOR])` dependency enforced on `/prescriptions` (L28)."}, {"id": "SEC-06", "phase": "SEC", "kind": "check", "area": "OWASP API7", "title": "Server-Side Request Forgery (SSRF)", "verify": "Verify URLs passed to any webhook or external fetch handler.", "how": "Inspect external HTTP clients in backend code.", "expected": "No unvalidated user-supplied URLs accepted for server-side fetching.", "status": "validated", "priority": "High", "remarks": "No endpoints accept arbitrary external fetch URLs. Only hardcoded gateway URLs used."}, {"id": "SEC-07", "phase": "SEC", "kind": "check", "area": "DPDP Act 2023", "title": "Notice & Purpose Specification (§5)", "verify": "Verify presence of Privacy Notice specifying purpose of health data processing.", "how": "Inspect `web/src/app/privacy/page.tsx`.", "expected": "Plain-language privacy charter detailing clinical, billing, and regulatory processing.", "status": "validated", "priority": "High", "remarks": "Verified in `web/src/app/privacy/page.tsx` detailing statutory data rights and contact info."}, {"id": "SEC-08", "phase": "SEC", "kind": "check", "area": "DPDP Act 2023", "title": "Reasonable Security Safeguards (§8)", "verify": "Verify encryption in transit, encryption at rest, and access logging.", "how": "Inspect TLS certificates, database storage encryption, and audit service.", "expected": "End-to-end TLS 1.3 in transit, TDE at rest, tamper-evident audit logging for access.", "status": "pending", "priority": "Critical", "remarks": "Requires validation of Azure Front Door SSL, Azure PostgreSQL TDE, and audit log pipelines."}, {"id": "SEC-09", "phase": "SEC", "kind": "check", "area": "DPDP Act 2023", "title": "Right to Erasure & Data Principal Rights", "verify": "Verify technical capability to fulfill data deletion and correction requests.", "how": "Inspect backend endpoints for user data erasure and consent withdrawal.", "expected": "Workflows exist for data correction and account deletion subject to MoHFW 3-year rule.", "status": "failed", "priority": "High", "remarks": "No API endpoints or automated workflows exist for data principal erasure or correction requests."}, {"id": "SEC-10", "phase": "SEC", "kind": "check", "area": "MoHFW 2020", "title": "Clinician Council Identity Verification", "verify": "Verify that digital prescriptions embed council registration number.", "how": "Inspect `backend/app/api/v1/endpoints/prescriptions.py` lines 139-140.", "expected": "`doctor_council_reg` and medical council name embedded in prescription metadata.", "status": "validated", "priority": "Critical", "remarks": "Verified in `prescriptions.py` L140 and `PrescriptionResponse` schema."}, {"id": "SEC-11", "phase": "SEC", "kind": "check", "area": "MoHFW 2020", "title": "Statutory Record Retention Policy", "verify": "Verify preservation of clinical consultation records for minimum 3 years.", "how": "Inspect database retention rules and backup retention configuration.", "expected": "Data retention policy prevents deletion of consultations and prescriptions before 3 years.", "status": "pending", "priority": "High", "remarks": "Policy exists in specifications (`settings.STATUTORY_RETENTION_YEARS = 3`), requires DB lifecycle rule."}, {"id": "SEC-12", "phase": "SEC", "kind": "check", "area": "Dependency", "title": "Known CVE Vulnerability Audit", "verify": "Scan Python and Node.js package manifests against vulnerability databases.", "how": "Run `npm audit` in `web/` and `pip-audit` in `backend/`.", "expected": "Zero High or Critical severity CVEs in direct or transitive dependencies.", "status": "pending", "priority": "Critical", "remarks": "Requires execution of vulnerability scanners outside sandbox."}, {"id": "AZ-PRE-01", "phase": "AZ-PRE", "kind": "check", "area": "Subscription", "title": "Azure Enterprise Subscription & Quotas", "verify": "Verify subscription status, core quotas, and spending limits.", "how": "Azure CLI: `az account show` and `az vm list-usage`.", "expected": "Active production subscription with sufficient compute and vCPU quotas in primary region.", "status": "pending", "priority": "Critical", "remarks": "Target regions: Central India (Pune) primary, South India (Chennai) DR."}, {"id": "AZ-PRE-02", "phase": "AZ-PRE", "kind": "check", "area": "Resource Groups", "title": "Environment Resource Group Isolation", "verify": "Verify resource group separation for Staging vs Production.", "how": "Azure CLI: `az group list`.", "expected": "`rg-kaizentrix-prod-ci-01` and `rg-kaizentrix-stage-ci-01` created with mandatory tags.", "status": "pending", "priority": "High", "remarks": "Tags: `Environment=Production`, `Project=Kaizentrix-Telehealth`, `Compliance=DPDP-MoHFW`."}, {"id": "AZ-PRE-03", "phase": "AZ-PRE", "kind": "check", "area": "Networking", "title": "Virtual Network & Subnet Allocation", "verify": "Verify VNet address space and dedicated delegated subnets.", "how": "Azure CLI: `az network vnet show`.", "expected": "VNet `10.50.0.0/16` with subnets: `snet-aca-infra` (/23), `snet-pe` (/24), `snet-db` (/24).", "status": "pending", "priority": "Critical", "remarks": "Network Security Groups (NSGs) blocking all inbound Internet traffic to database and cache."}, {"id": "AZ-PRE-04", "phase": "AZ-PRE", "kind": "check", "area": "Key Vault", "title": "Key Vault Provisioning & RBAC", "verify": "Verify Key Vault creation, purge protection, and access model.", "how": "Azure CLI: `az keyvault show`.", "expected": "Soft delete enabled (90 days), purge protection enabled, Azure RBAC permission model active.", "status": "pending", "priority": "Critical", "remarks": "Secrets to populate: `DATABASE-URL`, `SECRET-KEY`, `RAZORPAY-SECRET`, `LIVEKIT-SECRET`, `GUPSHUP-KEY`."}, {"id": "AZ-PRE-05", "phase": "AZ-PRE", "kind": "check", "area": "Identity", "title": "User-Assigned Managed Identity", "verify": "Verify Managed Identity creation and role assignments.", "how": "Azure CLI: `az identity show`.", "expected": "`id-kaizentrix-backend-prod` has `Key Vault Secrets User` role on production Key Vault.", "status": "pending", "priority": "Critical", "remarks": "Eliminates stored credentials in application configuration or container environment vars."}, {"id": "AZ-PRE-06", "phase": "AZ-PRE", "kind": "check", "area": "Database", "title": "PostgreSQL Flexible Server Provisioning", "verify": "Verify PostgreSQL 16 Flexible Server configuration in private subnet.", "how": "Azure CLI: `az postgres flexible-server show`.", "expected": "Private DNS zone integration, TLS 1.3 enforced, SSL enforcement enabled, PgBouncer enabled.", "status": "pending", "priority": "Critical", "remarks": "Superuser credentials stored directly in Key Vault; public network access disabled (`0.0.0.0`)."}, {"id": "AZ-PRE-07", "phase": "AZ-PRE", "kind": "check", "area": "Redis Cache", "title": "Azure Cache for Redis Provisioning", "verify": "Verify Standard C1 Redis cache creation in private network.", "how": "Azure CLI: `az redis show`.", "expected": "Non-SSL port (6379) disabled; minimum TLS version set to 1.2; password stored in Key Vault.", "status": "pending", "priority": "High", "remarks": "Required to replace the volatile in-memory `_OTP_CACHE` in `backend/app/auth/otp.py`."}, {"id": "AZ-PRE-08", "phase": "AZ-PRE", "kind": "check", "area": "Storage", "title": "Azure Blob Storage & Container Creation", "verify": "Verify Blob storage account creation with security settings.", "how": "Azure CLI: `az storage account show`.", "expected": "Secure transfer required, TLS 1.2 minimum, containers created: `vault-records`, `prescriptions`.", "status": "pending", "priority": "High", "remarks": "Private endpoint linked to `snet-pe`; public blob access strictly disabled."}, {"id": "AZ-PRE-09", "phase": "AZ-PRE", "kind": "check", "area": "Ingress", "title": "Azure Front Door & WAF Configuration", "verify": "Verify Front Door profile, origin groups, and WAF rules.", "how": "Azure CLI: `az afd profile show`.", "expected": "Routing rules: `/api/*` -> Backend Container App; `/*` -> Web Frontend; WAF policy attached.", "status": "pending", "priority": "Critical", "remarks": "Rate limit rule configured: 100 requests/minute per IP on `/api/v1/auth/*` endpoints."}, {"id": "AZ-PRE-10", "phase": "AZ-PRE", "kind": "check", "area": "Observability", "title": "Log Analytics Workspace Provisioning", "verify": "Verify Log Analytics Workspace creation and diagnostic linking.", "how": "Azure CLI: `az monitor log-analytics workspace show`.", "expected": "Workspace active; diagnostic settings configured to stream ACA, PostgreSQL, and Key Vault logs.", "status": "pending", "priority": "High", "remarks": "Diagnostic queries verified in KQL; log alerts configured for HTTP 5xx spikes."}, {"id": "AZ-DEP-01", "phase": "AZ-DEP", "kind": "check", "area": "Build", "title": "Production Backend Container Build", "verify": "Build multi-stage Python 3.12 runner image.", "how": "`docker build -t acrkaizentrix.azurecr.io/kgs-backend:v1.0.0 ./backend`.", "expected": "Image builds cleanly; runner stage contains non-root `appuser` and zero build tools.", "status": "pending", "priority": "Critical", "remarks": "Tested locally with `Dockerfile`; requires building and tagging for ACR."}, {"id": "AZ-DEP-02", "phase": "AZ-DEP", "kind": "check", "area": "Build", "title": "Production Web Container Build", "verify": "Build multi-stage Node.js 20 Next.js runner image.", "how": "`docker build -t acrkaizentrix.azurecr.io/kgs-web:v1.0.0 ./web`.", "expected": "Standalone production bundle generated; image runs as non-root `nextjs` user.", "status": "pending", "priority": "Critical", "remarks": "Tested locally with `Dockerfile`; requires building and tagging for ACR."}, {"id": "AZ-DEP-03", "phase": "AZ-DEP", "kind": "check", "area": "Registry", "title": "Image Push & Vulnerability Gate", "verify": "Push images to ACR and verify Microsoft Defender scan.", "how": "`az acr repository list` and inspect Defender scan results.", "expected": "Images pushed; 0 Critical or High severity container vulnerabilities detected.", "status": "pending", "priority": "Critical", "remarks": "Container images gated by security vulnerability policy before deployment."}, {"id": "AZ-DEP-04", "phase": "AZ-DEP", "kind": "check", "area": "Migration", "title": "Isolated Alembic Migration Execution", "verify": "Execute database schema migrations via one-off container job.", "how": "Execute migration runner container: `alembic upgrade head`.", "expected": "Migration `e324b1270dad` applied to PostgreSQL Flexible Server with exit code 0.", "status": "pending", "priority": "Critical", "remarks": "Decouples migration execution from container startup, eliminating race conditions."}, {"id": "AZ-DEP-05", "phase": "AZ-DEP", "kind": "check", "area": "Configuration", "title": "Environment Variable & Secret Binding", "verify": "Verify container app environment variables read from Key Vault.", "how": "Inspect Container App JSON definition: `secrets` and `env`.", "expected": "`DATABASE_URL`, `SECRET_KEY`, `REDIS_URL` reference Key Vault secret URIs via Managed Identity.", "status": "pending", "priority": "Critical", "remarks": "No plaintext passwords or secrets in container app manifest files."}, {"id": "AZ-DEP-06", "phase": "AZ-DEP", "kind": "check", "area": "Ingress", "title": "Container App Ingress & Probes", "verify": "Verify internal ingress settings and HTTP health probe paths.", "how": "Inspect ACA configuration: `transport: auto`, `targetPort: 8000/3000`.", "expected": "Liveness probe: `/health/live` (30s interval); Readiness probe: `/health/ready` (10s interval).", "status": "pending", "priority": "Critical", "remarks": "Probes ensure unhealthy container replicas are automatically removed from rotation."}, {"id": "AZ-DEP-07", "phase": "AZ-DEP", "kind": "check", "area": "Custom Domain", "title": "Custom Domain Binding & SSL Handshake", "verify": "Verify custom domain association on Azure Front Door.", "how": "`curl -Iv https://telehealth.kaizentrix.com/health`.", "expected": "HTTP 200 OK; SSL certificate issued by trusted Microsoft CA; TLS 1.3 negotiated.", "status": "pending", "priority": "Critical", "remarks": "Front Door routes `telehealth.kaizentrix.com` to appropriate Container App origins."}, {"id": "AZ-DEP-08", "phase": "AZ-DEP", "kind": "check", "area": "Smoke Test", "title": "Automated API Smoke Verification", "verify": "Run core API smoke tests against deployed production endpoint.", "how": "Execute automated smoke script against `https://telehealth.kaizentrix.com/api/v1/health`.", "expected": "Returns `{\"status\":\"healthy\",\"database_connected\":true,\"redis_connected\":true}`.", "status": "pending", "priority": "Critical", "remarks": "Verifies end-to-end network, container, database, and cache connectivity."}, {"id": "AZ-DEP-09", "phase": "AZ-DEP", "kind": "check", "area": "Versioning", "title": "Semantic Release Version Tagging", "verify": "Verify git commit tag matches container image tag and API version.", "how": "Check git release tags against `APP_VERSION` in `config.py`.", "expected": "Git tag `v1.0.0` matches container tag `v1.0.0` and API version metadata.", "status": "pending", "priority": "Medium", "remarks": "Ensures full traceability between production running binaries and source git commits."}, {"id": "AZ-DEP-10", "phase": "AZ-DEP", "kind": "check", "area": "Rollback", "title": "Container Revision Rollback Readiness", "verify": "Verify Container Apps multiple revisions and traffic splitting.", "how": "Inspect ACA revision management: `az containerapp revision list`.", "expected": "Previous active revision preserved; capable of instant 100% traffic shift rollback.", "status": "pending", "priority": "Critical", "remarks": "Reverts traffic to previous healthy revision in < 30 seconds if smoke tests fail."}, {"id": "AZ-POST-01", "phase": "AZ-POST", "kind": "check", "area": "Ingress", "title": "End-to-End HTTPS Redirection", "verify": "Verify HTTP requests are permanently redirected to HTTPS.", "how": "`curl -I http://telehealth.kaizentrix.com/`.", "expected": "HTTP 301 Moved Permanently with `Location: https://telehealth.kaizentrix.com/`.", "status": "pending", "priority": "Critical", "remarks": "Front Door HTTP-to-HTTPS redirect rule validation."}, {"id": "AZ-POST-02", "phase": "AZ-POST", "kind": "check", "area": "Auth Flow", "title": "Live Mobile OTP Dispatch & Verification", "verify": "Verify OTP authentication against live SMS gateway.", "how": "Submit real phone number to `/api/v1/auth/otp/send` on production URL.", "expected": "Real SMS delivered within 15 seconds; OTP verifies successfully and issues valid JWT.", "status": "pending", "priority": "Critical", "remarks": "Verifies live Gupshup SMS gateway integration and Redis OTP state management."}, {"id": "AZ-POST-03", "phase": "AZ-POST", "kind": "check", "area": "Doctor Portal", "title": "Clinician Credential & MFA Login", "verify": "Verify doctor login with password and TOTP code.", "how": "Submit doctor credentials and live TOTP to `/api/v1/auth/login`.", "expected": "HTTP 200 OK; returns JWT token with `role: DOCTOR` and `doctor_id` claim populated.", "status": "pending", "priority": "Critical", "remarks": "Verifies bcrypt password verification and RFC 6238 TOTP validation in production."}, {"id": "AZ-POST-04", "phase": "AZ-POST", "kind": "check", "area": "Booking Flow", "title": "End-to-End Slot Lock & Appointment Creation", "verify": "Execute real booking flow from slot selection to appointment confirmation.", "how": "Lock slot via API, confirm appointment, and inspect database state.", "expected": "Slot status changes from `AVAILABLE` -> `LOCKED` -> `BOOKED`; `Appointment` created.", "status": "pending", "priority": "Critical", "remarks": "Verifies transactional integrity and absence of double-booking in live database."}, {"id": "AZ-POST-05", "phase": "AZ-POST", "kind": "check", "area": "WebRTC Room", "title": "Real-Time Consultation Video Room Handshake", "verify": "Connect two client browsers (doctor and patient) to room URL.", "how": "Open `/room/{id}` in two separate browsers; inspect WebRTC peer connection.", "expected": "WebRTC peer connection established (`connected`); bidirectional audio and video streaming.", "status": "pending", "priority": "Critical", "remarks": "Validates LiveKit SFU infrastructure, token validation, and firewall traversal (STUN/TURN)."}, {"id": "AZ-POST-06", "phase": "AZ-POST", "kind": "check", "area": "Clinical EMR", "title": "Digital Prescription Issuance & Signature", "verify": "Issue digital prescription from clinician EMR console.", "how": "Submit prescription with 2 List A drugs via EMR interface.", "expected": "`Prescription` created with valid SHA-256 signature hash; record visible on `/prescription/{id}`.", "status": "pending", "priority": "Critical", "remarks": "Verifies doctor authorization, digital signature generation, and prescription viewer."}, {"id": "AZ-POST-07", "phase": "AZ-POST", "kind": "check", "area": "Statutory Tax", "title": "Section 194J Payout Ledger Creation", "verify": "Verify ledger record created upon successful consultation payment.", "how": "Verify payment order and query `doctor_payout_ledgers` table.", "expected": "Ledger entry exists with exact 10% TDS deduction and 15% platform fee deduction.", "status": "pending", "priority": "High", "remarks": "Verifies automated compliance with Indian tax withholding regulations."}, {"id": "AZ-POST-08", "phase": "AZ-POST", "kind": "check", "area": "Audit Trail", "title": "Statutory Audit Log Event Emission", "verify": "Verify audit entries recorded for appointment, prescription, and consultation.", "how": "Query `audit_logs` table for correlation ID generated during test run.", "expected": "Immutable audit log entries present with user ID, action, resource, timestamp, and IP.", "status": "pending", "priority": "Critical", "remarks": "Verifies DPDP Act 2023 §8 compliance for electronic health record access tracking."}, {"id": "HA-01", "phase": "HA-DR", "kind": "check", "area": "Compute HA", "title": "Multi-Replica Container Availability", "verify": "Verify minimum 2 replicas running across availability zones.", "how": "Inspect ACA replica count: `az containerapp replica list`.", "expected": "Minimum 2 active replicas per container app distributed across Availability Zones.", "status": "pending", "priority": "Critical", "remarks": "Eliminates single container failure as a single point of failure (SPOF)."}, {"id": "HA-02", "phase": "HA-DR", "kind": "check", "area": "Database HA", "title": "Zone-Redundant PostgreSQL High Availability", "verify": "Verify PostgreSQL Flexible Server High Availability mode.", "how": "Inspect `az postgres flexible-server show` for `highAvailability.mode`.", "expected": "`ZoneRedundant` enabled with standby replica in alternate Availability Zone.", "status": "pending", "priority": "Critical", "remarks": "Automatic failover with zero data loss in under 60 seconds if primary zone fails."}, {"id": "HA-03", "phase": "HA-DR", "kind": "check", "area": "Redis HA", "title": "Standard Replicated Redis Pair", "verify": "Verify Azure Cache for Redis replication status.", "how": "Inspect Redis tier: Standard or Premium (two-node primary/replica).", "expected": "Primary and secondary replica active; automated failover enabled.", "status": "pending", "priority": "High", "remarks": "Ensures slot lock state and active OTP sessions survive node patching or reboots."}, {"id": "DR-01", "phase": "HA-DR", "kind": "check", "area": "DB Backup", "title": "Automated Continuous Backup & PITR", "verify": "Verify automated backup retention and Point-in-Time Recovery.", "how": "Inspect PostgreSQL backup settings: `backup.retentionDays`.", "expected": "Minimum 35-day backup retention; point-in-time recovery enabled to the second.", "status": "pending", "priority": "Critical", "remarks": "Satisfies regulatory requirements for historical clinical state restoration."}, {"id": "DR-02", "phase": "HA-DR", "kind": "check", "area": "Storage Backup", "title": "Geo-Redundant Storage Replication", "verify": "Verify Blob Storage replication configuration.", "how": "Inspect Storage Account `sku.name`: `Standard_GRS` or `Standard_GZRS`.", "expected": "Geo-Redundant Storage (GRS) replicating blobs to secondary region (South India).", "status": "pending", "priority": "High", "remarks": "Protects digital health vault documents and prescription records against regional disaster."}, {"id": "DR-03", "phase": "HA-DR", "kind": "check", "area": "Drill", "title": "Actual Backup Restoration Drill", "verify": "Execute actual database restore test to an isolated test server.", "how": "Trigger PITR restore of PostgreSQL database to a sandbox instance.", "expected": "Database restores cleanly; all 19 tables, indexes, and test records match source data.", "status": "pending", "priority": "Critical", "remarks": "Must be executed and documented quarterly to validate actual recovery readiness."}, {"id": "DR-04", "phase": "HA-DR", "kind": "check", "area": "Target Metrics", "title": "RTO & RPO Compliance Targets", "verify": "Verify Recovery Time Objective (RTO) and Recovery Point Objective (RPO).", "how": "Evaluate architecture against documented business continuity thresholds.", "expected": "**Target RTO ≤ 30 minutes**; **Target RPO ≤ 5 minutes** across all core clinical services.", "status": "pending", "priority": "Critical", "remarks": "Standard healthcare business continuity baseline under ISO 22301 / NABH."}, {"id": "DR-05", "phase": "HA-DR", "kind": "check", "area": "Failover", "title": "Secondary Region Failover Procedure", "verify": "Verify documented Runbook for secondary region deployment.", "how": "Review operational Runbook for deploying ACA and Front Door repointing to South India.", "expected": "Clear, actionable, step-by-step failover execution manual available to on-call engineers.", "status": "pending", "priority": "High", "remarks": "Required before formal production accreditation."}, {"id": "PERF-01", "phase": "PERF", "kind": "check", "area": "Autoscaling", "title": "KEDA HTTP Concurrency Autoscaling", "verify": "Verify Container Apps scaling based on concurrent HTTP requests.", "how": "Inspect ACA scale rules: `http` trigger with `concurrentRequests: 50`.", "expected": "Replicas scale horizontally from 2 to 10 as load increases, and scale down smoothly.", "status": "pending", "priority": "High", "remarks": "Prevents container saturation during peak morning OPD appointment rushes."}, {"id": "PERF-02", "phase": "PERF", "kind": "check", "area": "Latency", "title": "API Response Latency Under Load (p95)", "verify": "Measure response times for doctor discovery and slot retrieval.", "how": "Execute load test (e.g. Locust / k6) with target concurrent users.", "expected": "**Target: p95 latency < 250ms** for read queries (`/doctors`, `/slots`).", "status": "pending", "priority": "High", "remarks": "Target defined based on expected initial concurrency of 100 concurrent active users."}, {"id": "PERF-03", "phase": "PERF", "kind": "check", "area": "Concurrency", "title": "Slot Booking Concurrency Stress Test", "verify": "Simulate 50 concurrent patients attempting to lock the same slot.", "how": "Execute script issuing 50 concurrent `POST /appointments/lock` calls for `slot-01`.", "expected": "Exactly 1 request succeeds with HTTP 200; 49 requests receive HTTP 409 Conflict. Zero double-bookings.", "status": "pending", "priority": "Critical", "remarks": "Fundamental clinical safety invariant of the appointment booking engine."}, {"id": "PERF-04", "phase": "PERF", "kind": "check", "area": "DB Connections", "title": "PostgreSQL Connection Pool Saturation", "verify": "Verify database connection behavior under maximum container scale (10 replicas).", "how": "Calculate `max_connections` vs `(10 replicas * 30 pool size) = 300 connections`.", "expected": "PgBouncer connection pooling active; zero `FATAL: remaining connection slots reserved` errors.", "status": "pending", "priority": "Critical", "remarks": "Azure PostgreSQL Flexible Server must have built-in PgBouncer enabled."}, {"id": "PERF-05", "phase": "PERF", "kind": "check", "area": "Video SFU", "title": "WebRTC Media Bandwidth & Bitrate", "verify": "Verify video stream quality and bandwidth consumption.", "how": "Monitor LiveKit SFU dashboard during 10 simultaneous HD video consultations.", "expected": "Video adaptive bitrate drops smoothly under low bandwidth (300 kbps VP8); audio maintained.", "status": "pending", "priority": "High", "remarks": "Vital for Indian semi-urban and rural connectivity contexts (MoHFW compliance)."}, {"id": "PERF-06", "phase": "PERF", "kind": "check", "area": "Cost", "title": "Cost Optimization & Resource Right-Sizing", "verify": "Review compute allocations against actual utilization metrics.", "how": "Inspect Azure Cost Management and Container Apps resource graphs.", "expected": "Average CPU utilization 40–60%; memory utilization < 70%; zero idle over-provisioning.", "status": "pending", "priority": "Medium", "remarks": "Monthly estimated cloud expenditure within project budget allocations."}, {"id": "MON-01", "phase": "MON-OPS", "kind": "check", "area": "APM", "title": "Application Insights Telemetry Ingestion", "verify": "Verify live telemetry stream from FastAPI and Next.js applications.", "how": "Inspect Application Insights: Live Metrics and Application Map.", "expected": "Ingesting HTTP requests, dependency calls (PostgreSQL, Redis), exceptions, and traces.", "status": "pending", "priority": "High", "remarks": "OpenTelemetry / Azure Monitor SDK instrumentation must be enabled in `main.py`."}, {"id": "MON-02", "phase": "MON-OPS", "kind": "check", "area": "Distributed", "title": "End-to-End Distributed Transaction Tracing", "verify": "Trace single patient consultation lifecycle across frontend and backend.", "how": "Query Application Insights transaction search using `X-Correlation-ID`.", "expected": "Complete end-to-end trace view linking frontend user action to backend SQL queries.", "status": "pending", "priority": "High", "remarks": "Validates full correlation ID propagation across all microservice layers."}, {"id": "MON-03", "phase": "MON-OPS", "kind": "check", "area": "Alerts", "title": "Critical Severity Alert Rules", "verify": "Verify automated alerting on HTTP 5xx spikes and database outages.", "how": "Inspect Azure Monitor Alert Rules: trigger condition > 1% 5xx over 5 minutes.", "expected": "Alerts trigger PagerDuty / Email / SMS incident notification to on-call engineering team.", "status": "pending", "priority": "Critical", "remarks": "Alert rules: High Error Rate, Database Unavailable, Redis Memory > 85%, Disk > 80%."}, {"id": "MON-04", "phase": "MON-OPS", "kind": "check", "area": "Audit Monitoring", "title": "Failed Authentication & Brute-Force Alerts", "verify": "Monitor failed login bursts and unauthorized access attempts.", "how": "KQL Query on `audit_logs` table: failed logins > 10 in 5 minutes from single IP.", "expected": "Triggers security incident notification and temporary IP block via WAF.", "status": "pending", "priority": "High", "remarks": "Defends against credential stuffing and brute-force attacks on provider accounts."}, {"id": "OPS-01", "phase": "MON-OPS", "kind": "check", "area": "Secrets", "title": "Automated Secret & Certificate Rotation", "verify": "Verify 90-day secret rotation procedure for JWT and API keys.", "how": "Review Key Vault secret expiration policies and renewal procedures.", "expected": "Key Vault alerts 30 days prior to secret expiry; documented zero-downtime rotation.", "status": "pending", "priority": "High", "remarks": "Prevents unexpected service outages caused by expired certificates or gateway tokens."}, {"id": "OPS-02", "phase": "MON-OPS", "kind": "check", "area": "Patching", "title": "Container Base Image Vulnerability Patching", "verify": "Verify monthly routine for updating base operating system images.", "how": "Inspect CI/CD pipeline triggers on base image updates (`python:3.12-slim`, `node:20-alpine`).", "expected": "Base images automatically scanned and rebuilt on upstream security patch releases.", "status": "pending", "priority": "Medium", "remarks": "Maintains container hygiene and protects against zero-day Linux kernel vulnerabilities."}, {"id": "OPS-03", "phase": "MON-OPS", "kind": "check", "area": "Access Review", "title": "Azure Privileged Access (PIM) Review", "verify": "Verify Azure RBAC access permissions and Just-In-Time (JIT) access.", "how": "Review Azure Entra ID Privileged Identity Management (PIM) assignments.", "expected": "Zero standing Global Administrator or Contributor roles; JIT elevation with MFA required.", "status": "pending", "priority": "Critical", "remarks": "Enforces least-privilege administrative access under ISO 27001 / DPDP Act guidelines."}, {"id": "OPS-04", "phase": "MON-OPS", "kind": "check", "area": "Documentation", "title": "Standard Operating Procedures (SOPs)", "verify": "Verify operational documentation for runbooks and incident management.", "how": "Inspect `README.md` and operational documentation repository.", "expected": "Runbooks available for: Database Restore, Secret Rotation, Service Outage, Data Breach Incident.", "status": "validated", "priority": "High", "remarks": "Verified comprehensive local runbooks in `README.md` and `replica/` documentation."}, {"id": "GL-01", "phase": "GO-LIVE", "kind": "gate", "area": "Functional Parity", "title": "Functional Parity", "criteria": "All Core Patient and Clinician workflows verified end-to-end on Staging.", "owner": "Lead Full-Stack Architect", "status": "pending", "decision": "Pending live staging run", "priority": null}, {"id": "GL-02", "phase": "GO-LIVE", "kind": "gate", "area": "Clinical Safety Gate", "title": "Clinical Safety Gate", "criteria": "Schedule X prohibited narcotics hard-intercept verified; council reg embedded.", "owner": "Chief Medical Officer / Clinical Lead", "status": "validated", "decision": "Code verified pass", "priority": null}, {"id": "GL-03", "phase": "GO-LIVE", "kind": "gate", "area": "Security & Privacy Gate", "title": "Security & Privacy Gate", "criteria": "Zero Open Critical/High vulnerabilities; BOLA verified; DPDP notice published.", "owner": "Lead Security & SecOps Architect", "status": "pending", "decision": "Blocked by Secrets & Rate Limiting", "priority": null}, {"id": "GL-04", "phase": "GO-LIVE", "kind": "gate", "area": "Cloud Architecture Gate", "title": "Cloud Architecture Gate", "criteria": "Azure VNet private isolation, PostgreSQL HA, Redis, Key Vault, and Front Door active.", "owner": "Azure Cloud Solutions Architect", "status": "pending", "decision": "Pending Azure provisioning", "priority": null}, {"id": "GL-05", "phase": "GO-LIVE", "kind": "gate", "area": "Disaster Recovery Gate", "title": "Disaster Recovery Gate", "criteria": "Backup point-in-time recovery test executed; RTO ≤ 30m, RPO ≤ 5m confirmed.", "owner": "DevOps / Site Reliability Lead", "status": "pending", "decision": "Pending restore drill", "priority": null}, {"id": "GL-06", "phase": "GO-LIVE", "kind": "gate", "area": "Performance Gate", "title": "Performance Gate", "criteria": "Concurrency slot booking stress test passed with zero double bookings; p95 < 250ms.", "owner": "Performance Test Lead", "status": "pending", "decision": "Pending load testing", "priority": null}, {"id": "GL-07", "phase": "GO-LIVE", "kind": "gate", "area": "Statutory Compliance Gate", "title": "Statutory Compliance Gate", "criteria": "MoHFW 2020 Guidelines, DPDP Act 2023, Section 194J TDS compliance confirmed.", "owner": "Legal & Regulatory Compliance Officer", "status": "pending", "decision": "Pending DPO appointment", "priority": null}, {"id": "GL-08", "phase": "GO-LIVE", "kind": "gate", "area": "Final Go-Live Decision", "title": "Final Go-Live Decision", "criteria": "Unanimous consensus from all project stakeholders to route production DNS.", "owner": "Executive Project Sponsor (VP/Director)", "status": "pending", "decision": "DEPLOYMENT BLOCKED PENDING GAPS", "priority": null}, {"id": "GAP-01", "phase": "GAP", "kind": "gap", "severity": "Critical", "area": "Backend State", "title": "In-memory OTP cache breaks multi-instance login", "finding": "`_OTP_CACHE` in `backend/app/auth/otp.py` is an in-memory dictionary. In a multi-worker Uvicorn setup or multi-replica Azure Container App, OTP requests and verification land on different processes, resulting in 100% login failures for mobile OTP users.", "fix": "Refactor `otp.py` to store OTP hashes with a 300-second TTL in Azure Cache for Redis (`redis.setex(f\"otp:{phone}\", 300, otp_code)`). Add `redis` to `requirements.txt`.", "blocking": "YES (Deployment Blocker)", "status": "failed", "priority": "Critical", "sprint": "Sprint 1 · Days 1-4"}, {"id": "GAP-02", "phase": "GAP", "kind": "gap", "severity": "Critical", "area": "Security / Secrets", "title": "Hardcoded fallback secrets in config", "finding": "`backend/app/config.py` contains hardcoded fallback secrets (`kgs_dev_secret_key...`, `devsecret_mock_livekit...`, `rzp_secret_kaizentrix_mock`). If environment variables are missing, containers silently fall back to known dev keys in production.", "fix": "Enforce `Field(..., min_length=32)` without default strings in `Settings` class. Configure Azure Container Apps to bind secrets directly from Azure Key Vault via User-Assigned Managed Identity.", "blocking": "YES (Deployment Blocker)", "status": "failed", "priority": "Critical", "sprint": "Sprint 1 · Days 1-4"}, {"id": "GAP-03", "phase": "GAP", "kind": "gap", "severity": "Critical", "area": "Database DDL", "title": "Startup DDL race in application lifespan", "finding": "`backend/app/main.py` lifespan executes `await init_db()` (`Base.metadata.create_all`) on every process boot. When multiple container instances scale up concurrently, simultaneous DDL execution causes database table lock deadlocks and migration drift.", "fix": "Remove `init_db()` from `lifespan`. Decouple database migrations into an isolated, one-time pre-deployment container job (`alembic upgrade head`) triggered via the CI/CD release pipeline.", "blocking": "YES (Deployment Blocker)", "status": "failed", "priority": "Critical", "sprint": "Sprint 1 · Days 1-4"}, {"id": "GAP-04", "phase": "GAP", "kind": "gap", "severity": "Critical", "area": "Security / API", "title": "No API rate limiting", "finding": "No rate limiting middleware exists across the FastAPI backend (`slowapi` or similar is missing). Public endpoints (`/auth/login`, `/auth/otp/send`, `/appointments/lock`) are vulnerable to automated credential brute-forcing, denial-of-service, and SMS toll fraud.", "fix": "Implement Redis-backed token bucket rate limiting using `slowapi`. Configure Azure Front Door WAF rate limiting rules restricting traffic to 100 req/min per IP on `/api/v1/auth/*`.", "blocking": "YES (Deployment Blocker)", "status": "failed", "priority": "Critical", "sprint": "Sprint 1 · Days 1-4"}, {"id": "GAP-05", "phase": "GAP", "kind": "gap", "severity": "Critical", "area": "DevOps / IaC", "title": "No CI/CD pipelines or Infrastructure-as-Code", "finding": "No CI/CD workflows (`.github/workflows/` or `azure-pipelines.yml`) and no Infrastructure-as-Code (Bicep / Terraform) templates exist in the repository. Deployments are currently manual and error-prone.", "fix": "Author GitHub Actions / Azure DevOps CI/CD pipeline with automated testing, container build, ACR vulnerability gate, Alembic migration job, and ACA blue-green revision traffic shift.", "blocking": "YES (Deployment Blocker)", "status": "failed", "priority": "Critical", "sprint": "Sprint 1 · Days 1-4"}, {"id": "GAP-06", "phase": "GAP", "kind": "gap", "severity": "High", "area": "Frontend Auth", "title": "No route guard middleware in Next.js", "finding": "`web/src/middleware.ts` is absent. Role-based routes (`/doctor/dashboard`, `/doctor/emr/[patientId]`, `/admin/analytics`) do not enforce authentication redirects. Any visitor directly typing the URL renders the dashboard UI shell.", "fix": "Implement Next.js `middleware.ts` checking session cookies/tokens on all `/doctor/*`, `/admin/*`, and `/patient/*` routes, redirecting unauthenticated visitors to login.", "blocking": "YES (Launch Blocker)", "status": "failed", "priority": "High", "sprint": "Sprint 2 · Days 5-8"}, {"id": "GAP-07", "phase": "GAP", "kind": "gap", "severity": "High", "area": "Frontend Security", "title": "JWT stored in localStorage", "finding": "Client stores JWT tokens in `window.localStorage` (`kgs_token`). In a healthcare application handling sensitive clinical records, tokens stored in `localStorage` are vulnerable to XSS theft.", "fix": "Transition authentication tokens to `HttpOnly`, `SameSite=Strict`, `Secure` cookies with anti-CSRF tokens handled via Next.js Route Handlers or backend cookie headers.", "blocking": "YES (Launch Blocker)", "status": "failed", "priority": "High", "sprint": "Sprint 2 · Days 5-8"}, {"id": "GAP-08", "phase": "GAP", "kind": "gap", "severity": "High", "area": "Frontend Integration", "title": "EMR signing not wired to the prescriptions API", "finding": "The EMR charting page (`web/src/app/doctor/emr/[patientId]/page.tsx`) `handleFinalizeSigning` function uses `setTimeout` and hardcoded navigation to `/prescription/rx-98421` instead of calling `kgsApi.prescriptions.create`.", "fix": "Wire the EMR signing button to invoke `kgsApi.prescriptions.create()` with the active SOAP notes and medicine items, handling real API success and error states.", "blocking": "YES (Launch Blocker)", "status": "failed", "priority": "High", "sprint": "Sprint 2 · Days 5-8"}, {"id": "GAP-09", "phase": "GAP", "kind": "gap", "severity": "High", "area": "WebRTC Video", "title": "Simulated video room, no LiveKit SDK", "finding": "The teleconsultation video room (`web/src/app/room/[id]/page.tsx`) mints a token from the backend, but renders simulated CSS avatar animations. Neither `livekit-client` nor `@livekit/components-react` is installed in `web/package.json`.", "fix": "Install `@livekit/components-react` and `livekit-client`. Mount the `<LiveKitRoom>` component with active camera/microphone participant tracks in `room/[id]/page.tsx`.", "blocking": "YES (Launch Blocker)", "status": "failed", "priority": "High", "sprint": "Sprint 2 · Days 5-8"}, {"id": "GAP-10", "phase": "GAP", "kind": "gap", "severity": "High", "area": "Storage / Vault", "title": "No vault upload endpoint or Blob Storage", "finding": "Digital Health Vault (`/vault`) and Pharmacy Upload (`/pharmacy/upload`) handle medical document uploads via client-side `setTimeout` simulation. No file upload endpoint or Azure Blob Storage integration exists in the backend.", "fix": "Create FastAPI `/api/v1/vault/upload` endpoint using `python-multipart`. Stream uploaded PDF/image files to Azure Blob Storage private container with SAS tokens and server-side encryption.", "blocking": "YES (Launch Blocker)", "status": "failed", "priority": "High", "sprint": "Sprint 2 · Days 5-8"}, {"id": "GAP-11", "phase": "GAP", "kind": "gap", "severity": "High", "area": "Data Privacy", "title": "Patient health data stored unencrypted", "finding": "Sensitive patient health information (ABHA numbers, clinical SOAP notes, symptoms, vitals) is stored as unencrypted text/JSON strings in PostgreSQL.", "fix": "Implement application-level encryption for sensitive columns using AES-256 GCM (via `cryptography.fernet` or SQLAlchemy type decorators) before persisting to PostgreSQL.", "blocking": "NO (Hardening Sprint 1)", "status": "failed", "priority": "High", "sprint": "Sprint 3 · Days 9-12"}, {"id": "GAP-12", "phase": "GAP", "kind": "gap", "severity": "Medium", "area": "Statutory PDF", "title": "Prescription PDF download is a stub", "finding": "Prescription PDF download on `/prescription/[id]` executes a JavaScript `alert()` instead of downloading a verified binary PDF.", "fix": "Implement server-side PDF generation service (e.g. `ReportLab` or headless Chrome) creating digitally signed, tamper-proof prescription PDFs with embedded QR verification seals.", "blocking": "NO (Hardening Sprint 1)", "status": "failed", "priority": "Medium", "sprint": "Sprint 3 · Days 9-12"}], "services": [{"name": "Azure Container Apps (ACA)", "purpose": "Hosts Next.js Web and FastAPI Backend containers.", "mandate": "Mandatory", "sku": "Dedicated Consumption / Workload Profile (D4)", "config": "Backend: 1.0 vCPU, 2.0 GiB RAM; Web: 0.5 vCPU, 1.0 GiB RAM; Min 2, Max 10 replicas."}, {"name": "Azure Container Registry (ACR)", "purpose": "Private OCI image registry for backend and web container builds.", "mandate": "Mandatory", "sku": "Premium Tier (for Private Endpoints & Vulnerability Scanning)", "config": "Content trust enabled, Microsoft Defender for Containers vulnerability scanning."}, {"name": "Azure Database for PostgreSQL", "purpose": "Relational persistence for 19 clinical and financial tables.", "mandate": "Mandatory", "sku": "Flexible Server, General Purpose (D4ds_v5, 4 vCPU, 16 GiB)", "config": "Storage: 128 GB SSD with auto-grow, PostgreSQL v16, High Availability (Zone-redundant)."}, {"name": "Azure Cache for Redis", "purpose": "Distributed mutex for slot locking, shared OTP cache, and session cache.", "mandate": "Mandatory", "sku": "Standard Tier (C1, 1 GB Cache)", "config": "Replicated pair, VNet integrated or private endpoint, replaces volatile in-memory OTP cache."}, {"name": "Azure Blob Storage", "purpose": "Secure storage for patient documents, prescription PDFs, and logs.", "mandate": "Mandatory", "sku": "Standard General Purpose v2 (Hot Tier)", "config": "Soft delete (30 days), immutable WORM policy for audit records, CMK encryption option."}, {"name": "Azure Key Vault", "purpose": "Centralized secrets management for JWT keys, gateway credentials, DB strings.", "mandate": "Mandatory", "sku": "Standard Tier", "config": "Managed Identity access policies (RBAC), purge protection enabled, private endpoint."}, {"name": "Azure Front Door + WAF", "purpose": "Global ingress, SSL termination, DDoS protection, edge rate limiting.", "mandate": "Mandatory", "sku": "Premium Tier", "config": "Managed OWASP Top 10 rule set, custom rate limit rule (100 req/min per IP on `/api/v1/auth/*`)."}, {"name": "Azure Virtual Network (VNet)", "purpose": "Private network isolation for backend, database, cache, and storage.", "mandate": "Mandatory", "sku": "Custom VNet (e.g. `10.50.0.0/16`)", "config": "Delegated subnets for Container Apps, Private Endpoints subnet, NSG security rules."}, {"name": "Log Analytics & App Insights", "purpose": "Centralized logging, distributed tracing, telemetry, performance metrics.", "mandate": "Mandatory", "sku": "Per-GB Ingestion Workspace", "config": "Retention 90 days, daily cap configured, Application Insights OpenTelemetry instrumentation."}, {"name": "Azure DNS & App Service Certs", "purpose": "DNS resolution and automated managed TLS certificates.", "mandate": "Mandatory", "sku": "Azure Public DNS Zone", "config": "Custom domain (`telehealth.kaizentrix.com`), auto-renewing managed TLS certificate."}]}</script>
+<script>
+(function(){
+"use strict";
+var DATA = JSON.parse(document.getElementById("kgs-data").textContent);
+var STATUS = [
+  {k:"validated", label:"Validated"},
+  {k:"pending",   label:"Not validated"},
+  {k:"failed",    label:"Failed"},
+  {k:"na",        label:"Not applicable"}
+];
+var LABEL = {}; STATUS.forEach(function(s){ LABEL[s.k] = s.label; });
+var items = DATA.items;
+var byId = new Map(items.map(function(i){ return [i.id, i]; }));
+var byPhase = {};
+DATA.phases.forEach(function(p){ byPhase[p.code] = []; });
+items.forEach(function(i){ byPhase[i.phase].push(i); });
+var phaseByCode = {}; DATA.phases.forEach(function(p){ phaseByCode[p.code] = p; });
+
+var local = {};          // id -> {status, note, at}
+var els = {};            // id -> {li, select, tick, textarea, upd}
+var secEls = {};         // code -> {sec, count, bar, navCt, navBar}
+var f = {status:"all", prio:"all", q:"", hideDone:false};
+var canWrite = true;
+var dbc = null;
+var dlns = null;
+
+function $(s, r){ return (r || document).querySelector(s); }
+function h(tag, props){
+  var el = document.createElement(tag);
+  if (props) Object.keys(props).forEach(function(k){
+    var v = props[k];
+    if (k === "class") el.className = v;
+    else if (k === "text") el.textContent = v;
+    else if (k === "html") el.innerHTML = v;
+    else if (k.indexOf("on") === 0) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  });
+  for (var i = 2; i < arguments.length; i++){
+    var kids = [].concat(arguments[i]);
+    kids.forEach(function(kid){
+      if (kid == null || kid === false) return;
+      el.append(kid.nodeType ? kid : document.createTextNode(kid));
+    });
+  }
+  return el;
+}
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function md(s){ return esc(s).replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>"); }
+function fmt(at){
+  try { return new Date(at).toLocaleString(undefined, {day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"}); }
+  catch(e){ return ""; }
+}
+function effective(id){
+  var l = local[id];
+  if (l) return l;
+  return {status: byId.get(id).status, note:"", at:null};
+}
+function validStatus(s){ return Object.prototype.hasOwnProperty.call(LABEL, s); }
+
+/* ---------- build ---------- */
+var CHEV = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var CHECK = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function blk(label, text, wide){
+  if (!text) return null;
+  return h("div", {class:"blk" + (wide ? " wide" : "")}, h("h4", {text:label}), h("p", {html:md(text)}));
+}
+
+function buildItem(it){
+  var li = h("li", {class:"item", "data-id":it.id, "data-prio": it.priority || "none"});
+  var tick = h("button", {class:"tick", type:"button", "aria-label":"Mark " + it.id + " validated", onclick:function(){ toggleDone(it.id); }});
+  tick.innerHTML = CHECK;
+
+  var sub = h("span", {class:"sub"});
+  if (it.kind === "check"){ sub.append(h("span", {text:it.area})); }
+  if (it.kind === "gate"){ sub.append(h("span", {text:"Sign-off: " + it.owner})); }
+  if (it.kind === "gap"){ sub.append(h("span", {text:it.area}), h("span", {text:it.sprint})); }
+  if (it.priority){ sub.append(h("span", {class:"prio", "data-p":it.priority, text:it.priority + (it.kind === "gap" ? " severity" : "")})); }
+
+  var chev = h("span", {class:"chev"}); chev.innerHTML = CHEV;
+  var ttl = h("button", {class:"ttl", type:"button", "aria-expanded":"false", onclick:function(){ toggleOpen(li); }},
+    h("span", {class:"tx"}, h("span", {class:"t", text:it.title}), sub), chev);
+
+  var sel = h("select", {class:"status", id:"st-" + it.id, "aria-label":"Status of " + it.id, onchange:function(){ setStatus(it.id, sel.value); }},
+    STATUS.map(function(s){ return h("option", {value:s.k, text:s.label}); }));
+
+  var blocks;
+  if (it.kind === "check"){
+    blocks = [blk("What to verify", it.verify), blk("How to verify", it.how), blk("Expected result", it.expected), blk("Audit evidence", it.remarks)];
+  } else if (it.kind === "gate"){
+    blocks = [blk("Acceptance criteria", it.criteria, true), blk("Sign-off owner", it.owner), blk("Audit decision at baseline", it.decision)];
+  } else {
+    blocks = [blk("Finding and impact", it.finding, true), blk("Prescribed remediation", it.fix, true), blk("Blocks production", it.blocking), blk("Sprint", it.sprint)];
+  }
+  var ta = h("textarea", {id:"note-" + it.id, rows:"2", placeholder:"Evidence, ticket link, who verified it", "aria-label":"Notes for " + it.id,
+    oninput:function(){ onNote(it.id, ta.value); }});
+  var upd = h("span", {class:"upd"});
+  var notes = h("div", {class:"blk wide"}, h("h4", {text:"Your notes"}), ta, upd);
+  var detail = h("div", {class:"detail"}, blocks, notes);
+
+  li.append(h("div", {class:"row"}, tick, h("span", {class:"id", text:it.id}), ttl, sel), detail);
+  els[it.id] = {li:li, select:sel, tick:tick, ta:ta, upd:upd, ttl:ttl};
+  it._hay = [it.id, it.title, it.area, it.verify, it.how, it.expected, it.remarks, it.finding, it.fix, it.criteria, it.owner]
+    .filter(Boolean).join(" ").toLowerCase();
+  return li;
+}
+
+var SERVICE_TABLE = null;
+var SEQUENCE = [
+  "Secrets and identity validation (Key Vault and Managed Identity RBAC)",
+  "Azure Virtual Network and subnet verification",
+  "PostgreSQL Flexible Server and Redis provisioning (private endpoints)",
+  "Container image build and vulnerability scan (Azure Container Registry)",
+  "Database schema migration (one-time Alembic job container)",
+  "Backend Container App deployment (internal ingress and health probes)",
+  "Frontend Container App deployment (internal or external ingress)",
+  "Azure Front Door routing and WAF rule binding",
+  "Automated post-deployment smoke test suite",
+  "DNS cutover to the production custom domain"
+];
+
+function buildServices(){
+  var head = h("tr", null, ["Service","Purpose","Recommended SKU","Configuration"].map(function(t){ return h("th", {text:t}); }));
+  var rows = DATA.services.map(function(s){
+    return h("tr", null, h("td", {html:"<strong>" + esc(s.name) + "</strong>"}), h("td", {text:s.purpose}), h("td", {html:md(s.sku)}), h("td", {html:md(s.config)}));
+  });
+  return h("details", {class:"ref"},
+    h("summary", {text:"Azure service architecture and sizing (" + DATA.services.length + " services)"}),
+    h("div", {class:"inner"}, h("div", {class:"tablewrap"}, h("table", null, h("thead", null, head), h("tbody", null, rows)))));
+}
+function buildSequence(){
+  return h("details", {class:"ref"},
+    h("summary", {text:"Recommended deployment sequence (10 steps)"}),
+    h("div", {class:"inner"}, h("ol", null, SEQUENCE.map(function(s){ return h("li", {text:s}); }))));
+}
+
+function build(){
+  var navEl = $("#nav");
+  var host = $("#phases");
+  var anchor = $("#empty");
+  DATA.phases.forEach(function(p){
+    var list = byPhase[p.code];
+    var num = String(p.n).padStart(2, "0");
+    var count = h("span", {class:"pcount"});
+    var bar = h("span");
+    var sec = h("section", {class:"phase", id:"ph-" + p.code, "aria-label":p.name},
+      h("header", {class:"ph"}, h("span", {class:"pcode", text:p.code}), h("h2", {text:p.name}), count),
+      h("div", {class:"pbar"}, bar));
+    if (p.code === "AZ-PRE") sec.append(buildServices());
+    if (p.code === "AZ-DEP") sec.append(buildSequence());
+    sec.append(h("ol", {class:"items"}, list.map(buildItem)));
+    host.insertBefore(sec, anchor);
+
+    var navCt = h("span", {class:"ct"});
+    var navBar = h("span");
+    var nb = h("button", {class:"navbtn", type:"button", title:p.name, onclick:function(){
+      var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+      sec.scrollIntoView({behavior: reduce ? "auto" : "smooth", block:"start"});
+    }},
+      h("span", {class:"n", text:num}),
+      h("span", {class:"cd", text:p.code}),
+      h("span", {class:"nm", text:p.name}),
+      navCt,
+      h("span", {class:"nbar"}, navBar));
+    navEl.append(nb);
+    secEls[p.code] = {sec:sec, count:count, bar:bar, navCt:navCt, navBar:navBar};
+  });
+}
+
+/* ---------- state + render ---------- */
+function updateRow(id){
+  var e = effective(id), r = els[id];
+  if (!r) return;
+  r.li.setAttribute("data-status", e.status);
+  r.select.value = e.status;
+  r.select.setAttribute("data-s", e.status);
+  var done = e.status === "validated";
+  r.tick.setAttribute("aria-pressed", done ? "true" : "false");
+  r.tick.setAttribute("aria-label", (done ? "Mark " + id + " as not validated" : "Mark " + id + " validated"));
+  if (document.activeElement !== r.ta && r.ta.value !== (e.note || "")) r.ta.value = e.note || "";
+  r.upd.textContent = e.at ? "Updated " + fmt(e.at) : "From the 17 Nov 2026 audit. Not changed yet.";
+  r.li.hidden = !matches(byId.get(id));
+}
+function counts(list){
+  var c = {validated:0, pending:0, failed:0, na:0};
+  list.forEach(function(it){ c[effective(it.id).status]++; });
+  return c;
+}
+function updateSummary(){
+  var total = items.length, c = counts(items), applicable = total - c.na;
+  var pct = applicable ? Math.round(c.validated / applicable * 100) : 0;
+  $("#pctNum").textContent = pct;
+  $("#progMeta").textContent = c.validated + " validated of " + applicable + " applicable items · " + total + " in total";
+  var segs = $("#bar").children;
+  var order = ["validated","failed","pending","na"];
+  order.forEach(function(k, i){ segs[i].style.width = (c[k] / total * 100) + "%"; });
+  $("#bar").setAttribute("aria-label", order.map(function(k){ return c[k] + " " + LABEL[k].toLowerCase(); }).join(", "));
+  var counters = {all: total, validated:c.validated, pending:c.pending, failed:c.failed, na:c.na};
+  document.querySelectorAll("#legend .chip").forEach(function(b){
+    b.querySelector("b").textContent = counters[b.getAttribute("data-k")];
+    b.setAttribute("aria-pressed", String(f.status === b.getAttribute("data-k")));
+  });
+  var critOpen = items.filter(function(i){
+    var s = effective(i.id).status;
+    return i.priority === "Critical" && (s === "pending" || s === "failed");
+  }).length;
+  var v = $("#verdict");
+  if (critOpen === 0){
+    v.setAttribute("data-state", "clear");
+    $("#vHead").textContent = "Critical items cleared";
+    $("#vSub").textContent = "Every critical item is validated or not applicable. The go-live decision (GL-08) can go to the sponsor.";
+  } else {
+    v.setAttribute("data-state", "blocked");
+    $("#vHead").textContent = "Deployment blocked";
+    $("#vSub").textContent = critOpen + " critical " + (critOpen === 1 ? "item still needs" : "items still need") + " validation, and " + c.failed + " " + (c.failed === 1 ? "item has" : "items have") + " failed.";
+  }
+  var s1 = ["GAP-01","GAP-02","GAP-03","GAP-04","GAP-05"].filter(function(id){ return effective(id).status === "validated"; }).length;
+  $("#vSprint").textContent = "Sprint 1 blockers resolved: " + s1 + " of 5";
+  DATA.phases.forEach(function(p){
+    var list = byPhase[p.code], pc = counts(list), app = list.length - pc.na;
+    var txt = pc.validated + " of " + app;
+    var w = app ? (pc.validated / app * 100) + "%" : "0%";
+    var s = secEls[p.code];
+    s.count.textContent = txt + " validated";
+    s.bar.style.width = w;
+    s.navCt.textContent = pc.validated + "/" + app;
+    s.navBar.style.width = w;
+  });
+}
+function matches(it){
+  var e = effective(it.id);
+  if (f.status !== "all" && e.status !== f.status) return false;
+  if (f.prio !== "all" && it.priority !== f.prio) return false;
+  if (f.hideDone && e.status === "validated") return false;
+  if (f.q && it._hay.indexOf(f.q) === -1) return false;
+  return true;
+}
+function applyFilters(){
+  var any = false;
+  DATA.phases.forEach(function(p){
+    var vis = 0;
+    byPhase[p.code].forEach(function(it){
+      var m = matches(it);
+      els[it.id].li.hidden = !m;
+      if (m) vis++;
+    });
+    secEls[p.code].sec.hidden = vis === 0;
+    if (vis) any = true;
+  });
+  $("#empty").hidden = any;
+  updateSummary();
+}
+function refreshAll(){ items.forEach(function(it){ updateRow(it.id); }); applyFilters(); }
+
+/* ---------- editing ---------- */
+function setStatus(id, status){
+  if (!canWrite || !validStatus(status)) { updateRow(id); return; }
+  var e = effective(id);
+  if (e.status === status) return;
+  local[id] = {status:status, note:e.note || "", at:new Date().toISOString()};
+  updateRow(id); updateSummary();
+  persist(id);
+}
+function toggleDone(id){
+  var e = effective(id);
+  setStatus(id, e.status === "validated" ? "pending" : "validated");
+}
+var noteTimers = {};
+function onNote(id, val){
+  if (!canWrite) return;
+  clearTimeout(noteTimers[id]);
+  noteTimers[id] = setTimeout(function(){
+    var e = effective(id);
+    if ((e.note || "") === val) return;
+    local[id] = {status:e.status, note:val, at:new Date().toISOString()};
+    els[id].upd.textContent = "Updated " + fmt(local[id].at);
+    persist(id);
+  }, 700);
+}
+function toggleOpen(li){
+  var open = li.classList.toggle("open");
+  li.querySelector(".ttl").setAttribute("aria-expanded", String(open));
+  syncExpandLabel();
+}
+function syncExpandLabel(){
+  var all = document.querySelectorAll(".item"), open = document.querySelectorAll(".item.open");
+  $("#expandAll").textContent = open.length === all.length ? "Collapse all" : "Expand all";
+}
+
+/* ---------- persistence ---------- */
+var chains = {};
+function setSync(s){
+  var m = {
+    loading:"Loading saved statuses",
+    live:"Saved on this page. Changes sync as you make them.",
+    slow:"Saved statuses have not loaded yet. Showing the audit starting points.",
+    offline:"Changes cannot be saved in this view. They last until you leave.",
+    readonly:"View only. You can read this checklist but not change it.",
+    error:"The last change could not be saved. Try again in a moment."
+  };
+  var el = $("#sync"); el.setAttribute("data-s", s); el.textContent = m[s] || "";
+}
+function setReadOnly(){
+  canWrite = false;
+  items.forEach(function(it){
+    var r = els[it.id];
+    r.select.disabled = true; r.tick.disabled = true; r.ta.readOnly = true;
+  });
+  setSync("readonly");
+}
+function persist(id){
+  if (!dbc) return;
+  var ref = dbc.collection("checklist").doc(id);
+  chains[id] = (chains[id] || Promise.resolve()).then(function(){
+    var e = effective(id);
+    return ref.set({status:e.status, note:e.note || "", at:e.at || new Date().toISOString()});
+  }).then(function(){
+    if ($("#sync").getAttribute("data-s") !== "readonly") setSync("live");
+  }).catch(function(err){
+    if (err && err.code === "invalid_argument") setReadOnly();
+    else setSync("error");
+  });
+}
+function applyDoc(id, data){
+  if (!data || !validStatus(data.status)) return;
+  local[id] = {status:data.status, note: typeof data.note === "string" ? data.note : "", at: typeof data.at === "string" ? data.at : null};
+}
+async function initCaps(){
+  if (!window.claude || typeof window.claude.use !== "function"){ setSync("offline"); return; }
+  function get(n){ try { return window.claude.use(n).catch(function(){ return null; }); } catch(e){ return Promise.resolve(null); } }
+  var res = await Promise.all([get("db"), get("user"), get("downloads")]);
+  var db = res[0], user = res[1];
+  dlns = res[2];
+  if (dlns) $("#exportBtn").hidden = false;
+  if (!db){ setSync("offline"); return; }
+  if (user && typeof user.can === "function"){
+    try { if ((await user.can("data.write")) === false) setReadOnly(); } catch(e){}
+  }
+  dbc = db;
+  var slow = setTimeout(function(){ setSync("slow"); }, 10000);
+  db.collection("checklist").onSnapshot(function(snap){
+    snap.docChanges().forEach(function(ch){
+      var id = ch.doc.id;
+      if (!byId.has(id)) return;
+      if (ch.type === "removed") delete local[id];
+      else applyDoc(id, ch.doc.data());
+      updateRow(id);
+    });
+    updateSummary();
+    if (!snap.metadata.fromCache){
+      clearTimeout(slow);
+      if (canWrite) setSync("live");
+    }
+  }, function(err){
+    clearTimeout(slow);
+    setSync(err && err.code === "revoked" ? "offline" : "error");
+  });
+}
+
+/* ---------- export ---------- */
+function exportCsv(){
+  if (!dlns) return;
+  function cell(v){ return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"'; }
+  var rows = [["ID","Phase","Area","Item","Priority","Status","Audit starting status","Notes","Updated"]];
+  items.forEach(function(it){
+    var e = effective(it.id), p = phaseByCode[it.phase];
+    rows.push([it.id, p.n + ". " + p.name, it.area, it.title, it.priority || "", LABEL[e.status], LABEL[it.status], e.note || "", e.at || ""]);
+  });
+  var text = "﻿" + rows.map(function(r){ return r.map(cell).join(","); }).join("\r\n");
+  var d = new Date(), pad = function(n){ return String(n).padStart(2, "0"); };
+  var name = "kgs-golive-checklist-" + d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + ".csv";
+  dlns.save({filename:name, data:text}).catch(function(){});
+}
+
+/* ---------- wire up ---------- */
+build();
+(function(){
+  var legend = $("#legend");
+  [["all","All"],["validated","Validated"],["pending","Not validated"],["failed","Failed"],["na","Not applicable"]].forEach(function(p){
+    legend.append(h("button", {class:"chip", type:"button", "data-k":p[0], "aria-pressed":String(p[0] === "all"), onclick:function(){
+      f.status = (f.status === p[0] && p[0] !== "all") ? "all" : p[0]; applyFilters();
+    }}, h("i"), p[1], h("b", {text:"0"})));
+  });
+})();
+var qTimer;
+$("#q").addEventListener("input", function(e){
+  clearTimeout(qTimer);
+  var v = e.target.value;
+  qTimer = setTimeout(function(){ f.q = v.trim().toLowerCase(); applyFilters(); }, 150);
+});
+$("#prio").addEventListener("change", function(e){ f.prio = e.target.value; applyFilters(); });
+$("#hideDone").addEventListener("change", function(e){ f.hideDone = e.target.checked; applyFilters(); });
+$("#expandAll").addEventListener("click", function(){
+  var all = document.querySelectorAll(".item"), open = document.querySelectorAll(".item.open");
+  var openThem = open.length !== all.length;
+  all.forEach(function(li){ li.classList.toggle("open", openThem); li.querySelector(".ttl").setAttribute("aria-expanded", String(openThem)); });
+  syncExpandLabel();
+});
+$("#resetFilters").addEventListener("click", function(){
+  f = {status:"all", prio:"all", q:"", hideDone:false};
+  $("#q").value = ""; $("#prio").value = "all"; $("#hideDone").checked = false;
+  applyFilters();
+});
+$("#exportBtn").addEventListener("click", exportCsv);
+
+refreshAll();
+setSync("loading");
+initCaps();
+})();
+</script>
+
+</body></html>

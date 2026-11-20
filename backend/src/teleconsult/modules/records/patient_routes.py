@@ -37,6 +37,24 @@ def _to_uuid(val: Any) -> UUID:
     return UUID(bytes=raw_bytes)
 
 
+async def _resolve_patient_ids(db, tenant_id: str, user_id: str) -> list[str]:
+    patient_ids = [str(user_id)]
+    patient_doc = await db["patients"].find_one({
+        "tenant_id": str(tenant_id),
+        "$or": [
+            {"id": str(user_id)},
+            {"user_id": str(user_id)},
+            {"user_account_id": str(user_id)},
+        ],
+    })
+    if patient_doc:
+        for k in ("id", "user_id", "user_account_id"):
+            val = patient_doc.get(k)
+            if val and str(val) not in patient_ids:
+                patient_ids.append(str(val))
+    return patient_ids
+
+
 async def records_session() -> AsyncIterator[AsyncSession | None]:
     if get_settings().mongodb_enabled:
         yield None
@@ -54,20 +72,7 @@ async def list_documents(
 ) -> list[DocumentResponse]:
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
-        patient_ids = [str(principal.user_id)]
-        patient_doc = await db["patients"].find_one({
-            "tenant_id": str(principal.tenant_id),
-            "$or": [
-                {"id": str(principal.user_id)},
-                {"user_id": str(principal.user_id)},
-                {"user_account_id": str(principal.user_id)},
-            ],
-        })
-        if patient_doc:
-            for k in ("id", "user_id", "user_account_id"):
-                val = patient_doc.get(k)
-                if val and str(val) not in patient_ids:
-                    patient_ids.append(str(val))
+        patient_ids = await _resolve_patient_ids(db, str(principal.tenant_id), str(principal.user_id))
 
         query: dict[str, Any] = {
             "tenant_id": str(principal.tenant_id),
@@ -241,12 +246,17 @@ async def download_document(
 ):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
-        document = await db["medical_records"].find_one({
+        patient_ids = await _resolve_patient_ids(db, str(principal.tenant_id), str(principal.user_id))
+        query: dict[str, Any] = {
             "tenant_id": str(principal.tenant_id),
             "released_to_patient": True,
             "status": "available",
             "$or": [{"id": str(document_id)}, {"id": str(document_id).lower()}],
-        })
+        }
+        role = getattr(principal, "role", "patient") or "patient"
+        if role in {"patient", "user"}:
+            query["patient_id"] = {"$in": patient_ids}
+        document = await db["medical_records"].find_one(query)
         if document is None:
             raise HTTPException(status_code=404, detail="Document not found")
         path = (PRIVATE_ROOT / document["private_storage_key"]).resolve()
@@ -283,16 +293,27 @@ async def delete_document(
 ):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
-        document = await db["medical_records"].find_one({
+        patient_ids = await _resolve_patient_ids(db, str(principal.tenant_id), str(principal.user_id))
+        query: dict[str, Any] = {
             "tenant_id": str(principal.tenant_id),
             "$or": [{"id": str(document_id)}, {"id": str(document_id).lower()}],
-        })
+        }
+        role = getattr(principal, "role", "patient") or "patient"
+        if role in {"patient", "user"}:
+            query["patient_id"] = {"$in": patient_ids}
+        document = await db["medical_records"].find_one(query)
         if document is None:
             raise HTTPException(status_code=404, detail="Document not found")
         path = PRIVATE_ROOT / document["private_storage_key"]
         if path.is_file():
             path.unlink()
-        await db["medical_records"].delete_one({"id": str(document["id"]), "tenant_id": str(principal.tenant_id)})
+        delete_filter: dict[str, Any] = {
+            "id": str(document["id"]),
+            "tenant_id": str(principal.tenant_id),
+        }
+        if role in {"patient", "user"}:
+            delete_filter["patient_id"] = {"$in": patient_ids}
+        await db["medical_records"].delete_one(delete_filter)
         return None
     if session is None:
         raise HTTPException(status_code=503, detail="No application database is configured")
@@ -312,9 +333,27 @@ async def delete_document(
 @router.get("/{document_id}/access")
 async def access_document(
     document_id: str,
-    session: AsyncSession = Depends(tenant_session),
+    session: AsyncSession | None = Depends(records_session),
     principal: Principal = Depends(require("records:read")),
 ) -> dict[str, str]:
+    if get_settings().mongodb_enabled:
+        db = mongo_database.database()
+        patient_ids = await _resolve_patient_ids(db, str(principal.tenant_id), str(principal.user_id))
+        query: dict[str, Any] = {
+            "tenant_id": str(principal.tenant_id),
+            "released_to_patient": True,
+            "status": "available",
+            "$or": [{"id": str(document_id)}, {"id": str(document_id).lower()}],
+        }
+        role = getattr(principal, "role", "patient") or "patient"
+        if role in {"patient", "user"}:
+            query["patient_id"] = {"$in": patient_ids}
+        document = await db["medical_records"].find_one(query)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return {"status": "authorized", "document_id": str(document["id"]), "access": "private-storage-adapter"}
+    if session is None:
+        raise HTTPException(status_code=503, detail="No application database is configured")
     document = await session.scalar(select(PatientDocument).where(
         PatientDocument.id == _to_uuid(document_id),
         PatientDocument.tenant_id == _to_uuid(principal.tenant_id),

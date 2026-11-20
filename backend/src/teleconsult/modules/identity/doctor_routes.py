@@ -48,6 +48,7 @@ class DoctorRegistration(BaseModel):
     full_name: str = Field(min_length=2, max_length=100)
     email: str
     mobile_number: str = Field(min_length=7, max_length=32)
+    state: str | None = Field(default=None, max_length=100)
     password: str = Field(min_length=8, max_length=128)
     specialty: str = Field(default="General Medicine", max_length=120)
     clinic_name: str = Field(default="Kaizen Care Telehealth", max_length=180)
@@ -109,7 +110,11 @@ async def register_doctor(
     credential = None
     if request.headers.get("content-type", "").startswith("multipart/form-data"):
         form = await request.form()
-        values = {key: form.get(key) for key in DoctorRegistration.model_fields}
+        values = {}
+        for key in DoctorRegistration.model_fields:
+            val = form.get(key)
+            if val is not None:
+                values[key] = val
         values["qualifications"] = [v.strip() for v in str(values.get("qualifications") or "").split(",") if v.strip()]
         values["languages"] = [v.strip() for v in str(values.get("languages") or "").split(",") if v.strip()]
         payload = DoctorRegistration.model_validate(values)
@@ -167,6 +172,7 @@ async def register_doctor(
             "clinic_name": payload.clinic_name,
             "registration_number": payload.registration_number,
             "medical_council": payload.medical_council,
+            "state": payload.state,
             "qualifications": payload.qualifications,
             "experience_years": payload.experience_years,
             "languages": payload.languages,

@@ -70,8 +70,8 @@ export default function ConsentScreen({ onNavigate }) {
     basePermissionsList.map((perm) => ({
       ...perm,
       dbId: null,
-      granted: perm.required || perm.id === "medical_record_sharing" || perm.id === "reminders",
-      statusText: perm.required || perm.id === "medical_record_sharing" || perm.id === "reminders" ? "Granted" : "Not granted",
+      granted: perm.required || false,
+      statusText: perm.required ? "Granted" : "Not granted",
     }))
   );
   const [activity, setActivity] = useState([]);
@@ -104,8 +104,8 @@ export default function ConsentScreen({ onNavigate }) {
           return {
             ...perm,
             dbId: null,
-            granted: perm.required || perm.id === "medical_record_sharing" || perm.id === "reminders",
-            statusText: perm.required || perm.id === "medical_record_sharing" || perm.id === "reminders" ? "Granted" : "Not granted",
+            granted: perm.required || false,
+            statusText: perm.required ? "Granted" : "Not granted",
           };
         });
         setPermissions(mappedPermissions);

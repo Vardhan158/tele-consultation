@@ -25,6 +25,9 @@ async def mongodb_test_database(request: pytest.FixtureRequest) -> AsyncIterator
         yield None
         return
 
+    from dotenv import load_dotenv
+    load_dotenv()
+
     if not os.getenv("MONGODB_TEST_URI"):
         pytest.fail("MONGODB_TEST_URI must point to an isolated test replica set")
 

@@ -63,7 +63,7 @@ class MockRequest:
 
 
 @pytest.mark.asyncio
-async def test_doctor_credentials_mongo_persistence_and_access():
+async def test_doctor_credentials_mongo_persistence_and_access(monkeypatch: pytest.MonkeyPatch) -> None:
     tenant_id = get_settings().default_tenant_id
     doctor_id = "doc-arjun-101"
     admin_id = "admin-1"
@@ -92,43 +92,38 @@ async def test_doctor_credentials_mongo_persistence_and_access():
 
     import teleconsult.kernel.mongodb.client as mongo_client
     import teleconsult.kernel.authz.policy as policy_mod
-    original_database = mongo_client.mongo_database.database
 
-    try:
-        mongo_client.mongo_database.database = lambda: db
+    monkeypatch.setattr(mongo_client.mongo_database, "database", lambda: db)
 
-        # 1. Test Admin Access (Allowed)
-        async def mock_admin_principal(request):
-            return Principal(
-                user_id=admin_id,
-                tenant_id=tenant_id,
-                roles=frozenset({"clinic_admin"}),
-                permissions=frozenset({"clinic:doctor:read"}),
-            )
+    # 1. Test Admin Access (Allowed)
+    async def mock_admin_principal(request):
+        return Principal(
+            user_id=admin_id,
+            tenant_id=tenant_id,
+            roles=frozenset({"clinic_admin"}),
+            permissions=frozenset({"clinic:doctor:read"}),
+        )
 
-        policy_mod.get_principal = mock_admin_principal
+    monkeypatch.setattr(policy_mod, "get_principal", mock_admin_principal)
 
-        req = MockRequest(query_params={"inline": "true"})
-        res = await get_doctor_credentials(doctor_id=doctor_id, request=req)
+    req = MockRequest(query_params={"inline": "true"})
+    res = await get_doctor_credentials(doctor_id=doctor_id, request=req)
 
-        assert res.body.decode() == str_content
-        assert res.headers["content-type"] == "application/pdf"
-        assert 'inline; filename="arjun_license.pdf"' in res.headers["content-disposition"]
+    assert res.body.decode() == str_content
+    assert res.headers["content-type"] == "application/pdf"
+    assert 'inline; filename="arjun_license.pdf"' in res.headers["content-disposition"]
 
-        # 2. Test Unauthorized Access (Forbidden)
-        async def mock_unauthorized_principal(request):
-            return Principal(
-                user_id="random_patient_99",
-                tenant_id=tenant_id,
-                roles=frozenset({"patient"}),
-                permissions=frozenset({"patient:profile:read"}),
-            )
+    # 2. Test Unauthorized Access (Forbidden)
+    async def mock_unauthorized_principal(request):
+        return Principal(
+            user_id="random_patient_99",
+            tenant_id=tenant_id,
+            roles=frozenset({"patient"}),
+            permissions=frozenset({"patient:profile:read"}),
+        )
 
-        policy_mod.get_principal = mock_unauthorized_principal
+    monkeypatch.setattr(policy_mod, "get_principal", mock_unauthorized_principal)
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_doctor_credentials(doctor_id=doctor_id, request=req)
-        assert exc_info.value.status_code == 403
-
-    finally:
-        mongo_client.mongo_database.database = original_database
+    with pytest.raises(HTTPException) as exc_info:
+        await get_doctor_credentials(doctor_id=doctor_id, request=req)
+    assert exc_info.value.status_code == 403

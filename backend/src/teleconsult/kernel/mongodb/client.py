@@ -19,6 +19,7 @@ except Exception:
 class MongoDatabase:
     def __init__(self) -> None:
         self._client: AsyncMongoClient[dict[str, Any]] | None = None
+        self._loop: Any = None
 
     @property
     def enabled(self) -> bool:
@@ -28,6 +29,20 @@ class MongoDatabase:
     async def connect(self) -> None:
         if not self.enabled:
             return
+        import asyncio
+        current_loop = asyncio.get_running_loop()
+        if self._client is not None and self._loop is not None and self._loop is not current_loop:
+            # Event loop changed (e.g. between pytest-asyncio tests); close/recreate client for current loop
+            try:
+                await self._client.close()
+            except Exception:
+                pass
+            self._client = None
+            self._loop = None
+
+        if self._client is not None:
+            return
+
         settings = get_settings()
         self._client = AsyncMongoClient(
             settings.mongodb_uri,
@@ -37,6 +52,7 @@ class MongoDatabase:
             minPoolSize=settings.mongodb_min_pool_size,
             appname="kaizentrix-care",
         )
+        self._loop = current_loop
         for attempt in range(3):
             try:
                 await self._client.admin.command("ping")
@@ -49,8 +65,12 @@ class MongoDatabase:
 
     async def close(self) -> None:
         if self._client is not None:
-            await self._client.close()
+            try:
+                await self._client.close()
+            except Exception:
+                pass
             self._client = None
+            self._loop = None
 
     def database(self) -> AsyncDatabase[dict[str, Any]]:
         if self._client is None:

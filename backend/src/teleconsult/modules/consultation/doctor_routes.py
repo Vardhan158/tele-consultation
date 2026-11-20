@@ -411,6 +411,31 @@ async def delete_availability(
             raise HTTPException(status_code=403, detail="Approved doctor access is required")
 
         doctor_id = str(doctor_doc.get("id"))
+        slot = await db["doctor_availability"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": doctor_id,
+            "id": slot_id,
+        })
+        if slot is None:
+            raise HTTPException(status_code=404, detail="Availability slot not found")
+
+        # Protect booked / reserved availability slots against deletion
+        if slot.get("booked") is True or str(slot.get("status", "")).lower() in {"booked", "reserved"}:
+            raise HTTPException(status_code=409, detail="Cannot delete an availability slot that is already booked or reserved")
+
+        active_statuses = ["requested", "pending_payment", "confirmed", "checked_in", "in_progress", "rescheduled"]
+        active_apt = await db["appointments"].find_one({
+            "tenant_id": str(principal.tenant_id),
+            "doctor_id": doctor_id,
+            "status": {"$in": active_statuses},
+            "$or": [
+                {"slot_id": slot_id},
+                {"starts_at": slot.get("starts_at")},
+            ],
+        })
+        if active_apt:
+            raise HTTPException(status_code=409, detail="Cannot delete an availability slot with an active appointment")
+
         result = await db["doctor_availability"].delete_one({
             "tenant_id": str(principal.tenant_id),
             "doctor_id": doctor_id,
@@ -433,6 +458,8 @@ async def delete_availability(
     )
     if slot is None:
         raise HTTPException(status_code=404, detail="Availability slot not found")
+    if getattr(slot, "is_booked", False) or slot.status in {"booked", "reserved"}:
+        raise HTTPException(status_code=409, detail="Cannot delete an availability slot that is already booked or reserved")
     await session.delete(slot)
     return {"status": "deleted", "slot_id": slot_id}
 

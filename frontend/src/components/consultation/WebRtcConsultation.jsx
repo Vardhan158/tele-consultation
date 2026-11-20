@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { API_BASE_URL, consultationApi } from "../../lib/api";
+import { API_BASE_URL, consultationApi, doctorApi } from "../../lib/api";
 
 const fallbackIceServers = [
   ...(import.meta.env.VITE_STUN_URL
@@ -89,9 +89,7 @@ export default function WebRtcConsultation({
         const room =
           authorization ||
           (await (role === "doctor"
-            ? import("../../lib/api").then(({ doctorApi }) =>
-                doctorApi.joinConsultation(appointmentId),
-              )
+            ? doctorApi.joinConsultation(appointmentId)
             : consultationApi.join(appointmentId)));
         if (!active) return;
         const ice = await consultationApi
@@ -153,18 +151,81 @@ export default function WebRtcConsultation({
         };
         peer.onicecandidateerror = (event) =>
           diagnostic("ice-candidate-error", event.errorCode);
-        peer.oniceconnectionstatechange = () =>
+        peer.oniceconnectionstatechange = () => {
           diagnostic("ice-state", peer.iceConnectionState);
+          if (!active) return;
+          if (peer.iceConnectionState === "disconnected" || peer.iceConnectionState === "failed") {
+            setStatus("reconnecting");
+            if (role === "patient") {
+              socketRef.current?.emit("request_ice_restart");
+            } else if (role === "doctor") {
+              setTimeout(() => triggerIceRestart(), 1000);
+            }
+          } else if (peer.iceConnectionState === "connected" || peer.iceConnectionState === "completed") {
+            setStatus("in_progress");
+            if (remoteVideo.current && remoteStreamRef.current) {
+              remoteVideo.current.srcObject = remoteStreamRef.current;
+              remoteVideo.current.play?.().catch(() => {});
+            }
+          }
+        };
         peer.onsignalingstatechange = () =>
           diagnostic("signaling-state", peer.signalingState);
         peer.onconnectionstatechange = () => {
           diagnostic("connection-state", peer.connectionState);
           if (!active) return;
-          if (peer.connectionState === "connected" && remoteKindsRef.current.size > 0) setStatus("in_progress");
-          if (peer.connectionState === "disconnected")
+          if (peer.connectionState === "connected") {
+            setStatus("in_progress");
+            if (remoteVideo.current && remoteStreamRef.current) {
+              remoteVideo.current.srcObject = remoteStreamRef.current;
+              remoteVideo.current.play?.().catch(() => {});
+            }
+          }
+          if (peer.connectionState === "disconnected" || peer.connectionState === "failed") {
             setStatus("reconnecting");
-          if (peer.connectionState === "failed") setStatus("disconnected");
+          }
         };
+
+        const handleWindowOffline = () => {
+          diagnostic("window-offline");
+          if (active) setStatus("reconnecting");
+        };
+        const handleWindowOnline = () => {
+          diagnostic("window-online");
+          if (active) {
+            setStatus("reconnecting");
+            if (role === "doctor") {
+              setTimeout(() => triggerIceRestart(), 500);
+            } else {
+              socketRef.current?.emit("request_ice_restart");
+            }
+          }
+        };
+        window.addEventListener("offline", handleWindowOffline);
+        window.addEventListener("online", handleWindowOnline);
+
+        const triggerIceRestart = async () => {
+          if (cleaned || !active || !peerRef.current || !socketRef.current) return;
+          const p = peerRef.current;
+          diagnostic("triggering-ice-restart", { signalingState: p.signalingState, iceState: p.iceConnectionState });
+          try {
+            if (p.restartIce) {
+              p.restartIce();
+            }
+            if (p.signalingState !== "stable") {
+              try {
+                await p.setLocalDescription({ type: "rollback" });
+              } catch {}
+            }
+            const offer = await p.createOffer({ iceRestart: true });
+            await p.setLocalDescription(offer);
+            diagnostic("ice-restart-offer-created", { type: offer.type });
+            socketRef.current.emit("offer", { offer, sdp: offer, iceRestart: true });
+          } catch (err) {
+            diagnostic("ice-restart-error", err.message);
+          }
+        };
+
         const socket = io(API_BASE_URL, {
           withCredentials: true,
           auth: { consultationToken: room.token, sessionId: room.session_id },
@@ -184,14 +245,43 @@ export default function WebRtcConsultation({
         socket.on("connect", () => {
           diagnostic("socket-connected", { socketId: socket.id });
           socket.emit("join_room", { appointmentId, role }, (ack) => diagnostic("room-join-ack", ack || { acknowledged: true }));
-          if (active) setStatus("waiting");
+          socket.emit("signaling_ready");
+          if (peerRef.current && (peerRef.current.iceConnectionState === "disconnected" || peerRef.current.iceConnectionState === "failed" || peerRef.current.connectionState === "disconnected")) {
+            setStatus("reconnecting");
+            if (role === "doctor") {
+              setTimeout(() => triggerIceRestart(), 800);
+            } else {
+              socket.emit("request_ice_restart");
+            }
+          } else if (active && status !== "in_progress") {
+            setStatus("waiting");
+          }
         });
         socket.on("room_joined", (info) => diagnostic("room-joined", info));
-        socket.on("peer_presence", (info) => { diagnostic("peer-presence", info); if (active) setStatus("connecting"); });
+        socket.on("peer_presence", (info) => { diagnostic("peer-presence", info); if (active && status !== "in_progress") setStatus("connecting"); });
         socket.on("signaling_error", (info) => { diagnostic("signaling-error", info); if (active) { setError("Consultation room authorization failed."); setStatus("error"); } });
-        socket.on("reconnect", () => diagnostic("socket-reconnected", { socketId: socket.id }));
+        socket.on("reconnect", () => {
+          diagnostic("socket-reconnected", { socketId: socket.id });
+          socket.emit("join_room", { appointmentId, role });
+          socket.emit("signaling_ready");
+          if (role === "doctor") {
+            setTimeout(() => triggerIceRestart(), 800);
+          } else {
+            socket.emit("request_ice_restart");
+          }
+        });
+        socket.on("request_ice_restart", async () => {
+          diagnostic("received-request-ice-restart", { role });
+          if (role === "doctor") {
+            await triggerIceRestart();
+          }
+        });
         socket.on("disconnect", () => {
-          if (active) setStatus("disconnected");
+          if (active) setStatus("reconnecting");
+        });
+        socket.on("peer_disconnected", () => {
+          diagnostic("peer-disconnected");
+          if (active) setStatus("reconnecting");
         });
         socket.on("status", ({ status: next }) => {
           diagnostic("server-status", { status: next });
@@ -204,32 +294,51 @@ export default function WebRtcConsultation({
           const offer = await peer.createOffer();
           await peer.setLocalDescription(offer);
           diagnostic("offer-created", { signalingState: peer.signalingState });
-          socket.emit("offer", { offer });
+          socket.emit("offer", { offer, sdp: offer });
         });
-        socket.on("offer", async ({ offer }) => {
-          if (cleaned) return;
-          diagnostic("offer-received", { type: offer?.type });
-          await peer.setRemoteDescription(offer);
-          await flushIce();
-          const answer = await peer.createAnswer();
-          await peer.setLocalDescription(answer);
-          diagnostic("answer-created", { signalingState: peer.signalingState });
-          socket.emit("answer", { answer });
-        });
-        socket.on("answer", async ({ answer }) => {
-          if (!cleaned) {
-            await peer.setRemoteDescription(answer);
-            diagnostic("answer-received", { signalingState: peer.signalingState });
+        socket.on("offer", async (data) => {
+          if (cleaned || !active) return;
+          const offer = data?.offer || data?.sdp || data;
+          if (!offer || !offer.sdp) return;
+          diagnostic("offer-received", { type: offer?.type, iceRestart: Boolean(data?.iceRestart) });
+          try {
+            if (peer.signalingState !== "stable") {
+              try {
+                await peer.setLocalDescription({ type: "rollback" });
+              } catch {}
+            }
+            await peer.setRemoteDescription(new RTCSessionDescription(offer));
             await flushIce();
+            const answer = await peer.createAnswer();
+            await peer.setLocalDescription(answer);
+            diagnostic("answer-created", { signalingState: peer.signalingState });
+            socket.emit("answer", { answer, sdp: answer });
+          } catch (err) {
+            diagnostic("offer-handling-error", err.message);
           }
         });
-        socket.on("ice_candidate", async ({ candidate }) => {
+        socket.on("answer", async (data) => {
+          if (cleaned || !active) return;
+          const answer = data?.answer || data?.sdp || data;
+          if (!answer || !answer.sdp) return;
+          diagnostic("answer-received", { signalingState: peer.signalingState });
+          try {
+            if (peer.signalingState === "have-local-offer") {
+              await peer.setRemoteDescription(new RTCSessionDescription(answer));
+              await flushIce();
+            }
+          } catch (err) {
+            diagnostic("answer-handling-error", err.message);
+          }
+        });
+        socket.on("ice_candidate", async (data) => {
+          const candidate = data?.candidate || data;
           if (!candidate || cleaned) return;
           diagnostic("ice-candidate-received", { hasCandidate: true });
           if (!peer.remoteDescription) pendingIceRef.current.push(candidate);
           else {
             try {
-              await peer.addIceCandidate(candidate);
+              await peer.addIceCandidate(new RTCIceCandidate(candidate));
             } catch (candidateError) {
               diagnostic("ice-add-error", candidateError.message);
             }
@@ -242,7 +351,7 @@ export default function WebRtcConsultation({
           diagnostic("socket-connect-error", { message: err.message, code: err.data?.code });
           if (active) {
             setError(err.data?.code ? `Connection rejected (${err.data.code}).` : err.message);
-            setStatus("disconnected");
+            setStatus("reconnecting");
           }
         });
         socket.on("connect", () => socket.emit("signaling_ready"));
@@ -259,6 +368,10 @@ export default function WebRtcConsultation({
     return () => {
       active = false;
       cleaned = true;
+      try {
+        window.removeEventListener("offline", handleWindowOffline);
+        window.removeEventListener("online", handleWindowOnline);
+      } catch {}
       pendingIceRef.current = [];
       socketRef.current?.emit("leave_room");
       socketRef.current?.disconnect();

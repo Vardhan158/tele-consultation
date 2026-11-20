@@ -22,6 +22,8 @@ sio = socketio.AsyncServer(
     cors_allowed_origins=get_settings().allowed_frontend_origins,
     logger=False,
     engineio_logger=False,
+    ping_interval=2,
+    ping_timeout=3,
 )
 _rooms: dict[str, set[str]] = {}
 _ready: set[str] = set()
@@ -331,6 +333,13 @@ async def relay_ice_candidate(sid: str, data: dict[str, Any]) -> None:
     await _relay(sid, "ice_candidate", data)
 
 
+@sio.on("request_ice_restart")
+async def relay_ice_restart(sid: str, data: dict[str, Any] | None = None) -> None:
+    ctx = await sio.get_session(sid)
+    _trace("request_ice_restart", sid, ctx, room=f"consultation:{ctx['appointment_id']}")
+    await _relay(sid, "request_ice_restart", data or {})
+
+
 @sio.on("admit_patient")
 async def admit_patient(sid: str) -> None:
     ctx = await sio.get_session(sid)
@@ -421,7 +430,12 @@ async def disconnect(sid: str) -> None:
     for room, members in list(_rooms.items()):
         if sid in members:
             members.discard(sid)
+            _negotiation_started.discard(room)
             logger.info("socket-signaling disconnect %s", {"sid": sid, "room": room, "members": len(members)})
+            try:
+                await sio.emit("peer_disconnected", {"sid": sid}, room=room, skip_sid=sid)
+            except Exception:
+                pass
         if not members:
             _rooms.pop(room, None)
             _negotiation_started.discard(room)

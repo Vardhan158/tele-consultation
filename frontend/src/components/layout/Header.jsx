@@ -139,15 +139,15 @@ export default function Header({
           <span className="material-symbols-outlined text-xl">menu</span>
         </button>
 
-        <div className="flex items-center gap-2 text-xs font-medium text-[#577877]">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-medium text-[#577877] min-w-0 truncate">
           <span
-            className="hover:text-[#162623] cursor-pointer"
+            className="hover:text-[#162623] cursor-pointer hidden sm:inline truncate"
             onClick={() => onSelectTab(isAdmin ? "clinic-overview" : isDoctor ? "doctor-dashboard" : "dashboard")}
           >
             {isAdmin ? "Clinic Admin Workspace" : isDoctor ? "Doctor Portal" : "Patient Portal"}
           </span>
-          <span>/</span>
-          <span className="font-semibold text-[#162623]">
+          <span className="hidden sm:inline">/</span>
+          <span className="font-semibold text-[#162623] truncate">
             {getBreadcrumbTitle()}
           </span>
         </div>

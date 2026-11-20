@@ -238,6 +238,88 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
 
   const [toastMessage, setToastMessage] = useState("");
 
+  // Reschedule & Cancel Modal States
+  const [rescheduleApt, setRescheduleApt] = useState(null);
+  const [rescheduleSlots, setRescheduleSlots] = useState([]);
+  const [selectedRescheduleSlot, setSelectedRescheduleSlot] = useState(null);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState("");
+
+  const [cancelApt, setCancelApt] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+
+  const handleOpenReschedule = async (apt) => {
+    setRescheduleApt(apt);
+    setSelectedRescheduleSlot(null);
+    setRescheduleError("");
+    setRescheduleLoading(true);
+    try {
+      const docId = apt.doctor?.id || apt.doctor_id;
+      const slots = await patientApi.doctorAvailability(docId);
+      if (Array.isArray(slots)) {
+        const available = slots.filter((s) => {
+          const isBooked = s.booked === true || s.is_booked === true || s.status === "booked" || s.status === "occupied";
+          return !isBooked;
+        });
+        setRescheduleSlots(available);
+      } else {
+        setRescheduleSlots([]);
+      }
+    } catch (err) {
+      setRescheduleError(err.message || "Failed to load doctor availability.");
+      setRescheduleSlots([]);
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
+
+  const handleConfirmReschedule = async () => {
+    if (!rescheduleApt || !selectedRescheduleSlot || rescheduleSubmitting) return;
+    setRescheduleSubmitting(true);
+    setRescheduleError("");
+    try {
+      await patientApi.rescheduleAppointment(rescheduleApt.id, {
+        slot_id: selectedRescheduleSlot.id,
+        starts_at: selectedRescheduleSlot.starts_at,
+      });
+      setToastMessage("Appointment rescheduled successfully.");
+      setRescheduleApt(null);
+      await fetchAppointments();
+    } catch (err) {
+      setRescheduleError(err.message || "Unable to reschedule appointment.");
+    } finally {
+      setRescheduleSubmitting(false);
+    }
+  };
+
+  const handleOpenCancel = (apt) => {
+    setCancelApt(apt);
+    setCancelReason("Schedule conflict / Personal reasons");
+    setCancelError("");
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelApt || cancelSubmitting) return;
+    setCancelSubmitting(true);
+    setCancelError("");
+    try {
+      await patientApi.cancelAppointment(cancelApt.id, {
+        reason: cancelReason || "Schedule conflict",
+      });
+      setToastMessage("Appointment cancelled. Refund processed where applicable.");
+      setCancelApt(null);
+      await fetchAppointments();
+    } catch (err) {
+      setCancelError(err.message || "Unable to cancel appointment.");
+    } finally {
+      setCancelSubmitting(false);
+    }
+  };
+
+
   // Setup webcam stream for waiting room
   useEffect(() => {
     if (view === "waiting-room" || view === "waiting") {
@@ -918,7 +1000,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                     <div className="text-right space-y-2">
                       <div className="text-lg font-bold text-[#25836F]">{apt.fee}</div>
 
-                      <div className="flex items-center justify-end gap-2 pt-1">
+                      <div className="flex items-center justify-end gap-2 pt-1 flex-wrap">
                         {apt.isPendingPayment ? (
                           <button
                             type="button"
@@ -938,6 +1020,22 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                         ) : (
                           <span className="text-xs text-[#577877]">Joining is available during the consultation window after payment verification.</span>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReschedule(apt)}
+                          className="btn-secondary !py-2 !px-3.5 text-xs font-semibold cursor-pointer"
+                        >
+                          Reschedule
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCancel(apt)}
+                          className="rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 cursor-pointer transition"
+                        >
+                          Cancel Appointment
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -987,6 +1085,221 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
             )}
           </div>
         )}
+
+      {/* Reschedule Modal */}
+      {rescheduleApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/20">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] flex items-center justify-center">
+                  <span className="material-symbols-outlined !text-[#25836F] text-2xl">update</span>
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-[#162623]">Reschedule Appointment</h3>
+                  <p className="text-xs text-[#577877]">Select a replacement time with {rescheduleApt.doctor.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRescheduleApt(null)}
+                className="p-1.5 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-[#F0F5F7] p-3 text-xs space-y-1 border border-[#577877]/15">
+              <p className="text-[#577877]">Current Scheduled Time:</p>
+              <p className="font-bold text-[#162623]">🗓️ {rescheduleApt.dateShort} at {rescheduleApt.timeRange}</p>
+            </div>
+
+            {rescheduleLoading ? (
+              <div className="p-8 text-center text-[#577877] space-y-2">
+                <div className="w-8 h-8 border-4 border-[#25836F]/20 border-t-[#25836F] rounded-full animate-spin mx-auto" />
+                <p className="text-xs font-semibold">Loading available replacement slots…</p>
+              </div>
+            ) : rescheduleSlots.length === 0 ? (
+              <div className="p-6 text-center text-[#577877] rounded-xl border border-dashed border-[#577877]/30 space-y-1">
+                <p className="text-xs font-semibold text-[#162623]">No alternative slots available</p>
+                <p className="text-[11px]">There are currently no future open slots for this doctor.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-[#162623]">Choose Available Replacement Slot:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                  {rescheduleSlots.map((slot) => {
+                    const startDt = new Date(slot.starts_at);
+                    const isSelected = selectedRescheduleSlot?.id === slot.id || selectedRescheduleSlot?.starts_at === slot.starts_at;
+                    return (
+                      <button
+                        key={slot.id || slot.starts_at}
+                        type="button"
+                        onClick={() => setSelectedRescheduleSlot(slot)}
+                        className={`p-3 rounded-xl border text-left text-xs transition cursor-pointer ${
+                          isSelected
+                            ? "border-[#25836F] bg-[#25836F]/10 text-[#185A4D] font-bold ring-2 ring-[#25836F]/30"
+                            : "border-[#577877]/20 bg-white hover:border-[#25836F]/50"
+                        }`}
+                      >
+                        <p className="font-semibold text-[#162623]">
+                          {startDt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                        <p className="text-[11px] text-[#577877] mt-0.5">
+                          {startDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {selectedRescheduleSlot && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base text-emerald-700">check_circle</span>
+                  Rescheduling Confirmation
+                </p>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Your appointment will be rescheduled to{" "}
+                  <strong>{new Date(selectedRescheduleSlot.starts_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })} at {new Date(selectedRescheduleSlot.starts_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</strong>.
+                  Your current slot will be released back to the clinic.
+                </p>
+              </div>
+            )}
+
+            {rescheduleError && (
+              <p className="text-xs font-semibold text-rose-600 bg-rose-50 p-2.5 rounded-lg border border-rose-200">
+                {rescheduleError}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-[#577877]/20">
+              <button
+                type="button"
+                onClick={() => setRescheduleApt(null)}
+                className="btn-secondary !py-2.5 !px-4 text-xs font-semibold cursor-pointer"
+                disabled={rescheduleSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReschedule}
+                disabled={!selectedRescheduleSlot || rescheduleSubmitting}
+                className="btn-primary !py-2.5 !px-5 text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {rescheduleSubmitting ? "Rescheduling…" : "Confirm Reschedule"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Appointment Modal */}
+      {cancelApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/20">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-2xl font-bold">cancel</span>
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-[#162623]">Cancel Appointment</h3>
+                  <p className="text-xs text-[#577877]">Review cancellation policy &amp; refund terms</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCancelApt(null)}
+                className="p-1.5 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-[#F0F5F7] p-3 text-xs space-y-1.5 border border-[#577877]/15">
+              <div className="flex justify-between">
+                <span className="text-[#577877]">Doctor:</span>
+                <span className="font-bold text-[#162623]">{cancelApt.doctor.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#577877]">Scheduled For:</span>
+                <span className="font-semibold text-[#162623]">{cancelApt.dateShort} at {cancelApt.timeRange}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#577877]">Consultation Fee:</span>
+                <span className="font-semibold text-[#162623]">{cancelApt.fee}</span>
+              </div>
+            </div>
+
+            {/* Cancellation Policy Disclosure & Refund Eligibility */}
+            <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-900 text-xs space-y-2">
+              <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                <span className="material-symbols-outlined text-base text-amber-700">policy</span>
+                Cancellation &amp; Refund Policy
+              </div>
+              <p className="text-[11px] leading-relaxed text-amber-900">
+                Appointments cancelled at least 2 hours prior to consultation time are eligible for a 100% refund.
+                Refunds are processed automatically via Razorpay to the original payment source within 5–7 business days.
+              </p>
+              <div className="pt-1 flex items-center gap-2 font-bold text-[11px]">
+                <span className="text-[#577877]">Refund Status:</span>
+                {cancelApt.isPaid ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">
+                    ✓ Eligible for 100% Refund ({cancelApt.fee})
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[#577877] text-[10px]">
+                    No Payment Charged
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[#162623] block">
+                Reason for cancellation (optional):
+              </label>
+              <input
+                type="text"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g. Schedule conflict, feeling better, personal reasons"
+                className="w-full rounded-xl border border-[#577877]/30 px-3 py-2 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
+              />
+            </div>
+
+            {cancelError && (
+              <p className="text-xs font-semibold text-rose-600 bg-rose-50 p-2.5 rounded-lg border border-rose-200">
+                {cancelError}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-[#577877]/20">
+              <button
+                type="button"
+                onClick={() => setCancelApt(null)}
+                className="btn-secondary !py-2.5 !px-4 text-xs font-semibold cursor-pointer"
+                disabled={cancelSubmitting}
+              >
+                Keep Appointment
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={cancelSubmitting}
+                className="rounded-xl bg-rose-600 px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-rose-700 cursor-pointer disabled:opacity-50 transition"
+              >
+                {cancelSubmitting ? "Cancelling…" : "Confirm Cancellation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

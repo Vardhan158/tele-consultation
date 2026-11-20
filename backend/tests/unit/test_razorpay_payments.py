@@ -20,7 +20,7 @@ async def test_razorpay_payment_workflow_end_to_end(mongodb_test_database) -> No
         await mongo_database.connect()
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="https://test") as client:
         # 1. Login as synthetic patient or admin
         login_res = await client.post(
             "/api/v1/auth/login",
