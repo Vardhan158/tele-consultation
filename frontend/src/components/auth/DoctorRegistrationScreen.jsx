@@ -60,6 +60,7 @@ function ClinicianHeader({ onBack }) {
 }
 
 export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchToPatientAuth }) {
+  const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState({
     // Personal Information
     full_name: "",
@@ -311,6 +312,56 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
     setErrors((prev) => ({ ...prev, [name]: err }));
   };
 
+  const validateStep1 = () => {
+    const step1Fields = ["full_name", "email", "mobile_number", "state", "date_of_birth"];
+    const stepErrors = {};
+    const newTouched = { ...touched };
+    step1Fields.forEach((field) => {
+      newTouched[field] = true;
+      const err = validateField(field, form[field], form);
+      if (err) stepErrors[field] = err;
+    });
+    setTouched(newTouched);
+    setErrors((prev) => ({ ...prev, ...stepErrors }));
+    return Object.keys(stepErrors).length === 0;
+  };
+
+  const handleNextFromStep1 = () => {
+    if (validateStep1()) {
+      setMessage("");
+      setState("idle");
+      setCurrentStep(2);
+    } else {
+      setState("error");
+      setMessage("Please complete all required personal details correctly.");
+    }
+  };
+
+  const validateStep2 = () => {
+    const step2Fields = ["specialty", "registration_number", "medical_council", "qualifications", "experience_years", "languages"];
+    const stepErrors = {};
+    const newTouched = { ...touched };
+    step2Fields.forEach((field) => {
+      newTouched[field] = true;
+      const err = validateField(field, form[field], form);
+      if (err) stepErrors[field] = err;
+    });
+    setTouched(newTouched);
+    setErrors((prev) => ({ ...prev, ...stepErrors }));
+    return Object.keys(stepErrors).length === 0;
+  };
+
+  const handleNextFromStep2 = () => {
+    if (validateStep2()) {
+      setMessage("");
+      setState("idle");
+      setCurrentStep(3);
+    } else {
+      setState("error");
+      setMessage("Please complete all required professional credentials correctly.");
+    }
+  };
+
   const submit = async (event) => {
     event.preventDefault();
 
@@ -324,6 +375,16 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
     if (errorKeys.length > 0) {
       setState("error");
       setMessage(validationErrors[errorKeys[0]]);
+
+      const step1Keys = ["full_name", "email", "mobile_number", "state", "date_of_birth", "gender"];
+      const step2Keys = ["specialty", "registration_number", "medical_council", "qualifications", "experience_years", "languages"];
+      if (errorKeys.some((k) => step1Keys.includes(k))) {
+        setCurrentStep(1);
+      } else if (errorKeys.some((k) => step2Keys.includes(k))) {
+        setCurrentStep(2);
+      } else {
+        setCurrentStep(3);
+      }
       return;
     }
 
@@ -407,14 +468,118 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
       <ClinicianHeader onBack={onBack} />
 
       <main className="flex-1 flex flex-col justify-between p-3.5 sm:p-4 lg:p-4.5 xl:p-5 max-w-6xl w-full mx-auto overflow-y-auto lg:overflow-hidden">
-        {/* Title Row */}
-        <div className="w-full pb-1 border-b border-[#577877]/10">
-          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[#162623] leading-none">
-            Doctor Registration
-          </h2>
-          <p className="text-[11px] text-[#577877] mt-0.5">
-            Register medical credentials under Indian Telemedicine Practice Guidelines to request telehealth clinic privileges.
-          </p>
+        {/* Title & 3-Step Story Stepper */}
+        <div className="w-full pb-1.5 border-b border-[#577877]/10 flex flex-col md:flex-row md:items-center md:justify-between gap-2 shrink-0">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[#162623] leading-none">
+              Doctor Registration
+            </h2>
+            <p className="text-[11px] text-[#577877] mt-0.5">
+              {currentStep === 1 && "Step 1 of 3: Personal Information & Contact Details"}
+              {currentStep === 2 && "Step 2 of 3: Medical Credentials & Specialization"}
+              {currentStep === 3 && "Step 3 of 3: Verification Documents & Account Security"}
+            </p>
+          </div>
+
+          {/* Stepper Progress Indicator */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 bg-white px-3 py-1 rounded-xl border border-[#577877]/15 shadow-2xs self-start md:self-auto">
+            {/* Step 1 Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                if (currentStep > 1) {
+                  setCurrentStep(1);
+                  setMessage("");
+                }
+              }}
+              disabled={currentStep === 1}
+              className={`flex items-center gap-1.5 text-xs font-semibold transition ${
+                currentStep === 1
+                  ? "text-[#25836F] font-bold"
+                  : currentStep > 1
+                  ? "text-[#162623] hover:text-[#25836F] cursor-pointer"
+                  : "text-[#577877]/60 cursor-not-allowed"
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                  currentStep > 1
+                    ? "bg-[#25836F] text-white"
+                    : currentStep === 1
+                    ? "bg-[#25836F] text-white ring-2 ring-[#25836F]/20"
+                    : "bg-[#F0F5F7] text-[#577877]"
+                }`}
+              >
+                {currentStep > 1 ? (
+                  <span className="material-symbols-outlined text-[12px]">check</span>
+                ) : (
+                  "1"
+                )}
+              </span>
+              <span>1. Personal</span>
+            </button>
+
+            <span className="text-[#577877]/30 text-xs">/</span>
+
+            {/* Step 2 Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                if (currentStep > 2) {
+                  setCurrentStep(2);
+                  setMessage("");
+                } else if (currentStep === 1) {
+                  handleNextFromStep1();
+                }
+              }}
+              className={`flex items-center gap-1.5 text-xs font-semibold transition ${
+                currentStep === 2
+                  ? "text-[#25836F] font-bold"
+                  : currentStep > 2
+                  ? "text-[#162623] hover:text-[#25836F] cursor-pointer"
+                  : "text-[#577877]/60"
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                  currentStep > 2
+                    ? "bg-[#25836F] text-white"
+                    : currentStep === 2
+                    ? "bg-[#25836F] text-white ring-2 ring-[#25836F]/20"
+                    : "bg-[#F0F5F7] text-[#577877]"
+                }`}
+              >
+                {currentStep > 2 ? (
+                  <span className="material-symbols-outlined text-[12px]">check</span>
+                ) : (
+                  "2"
+                )}
+              </span>
+              <span>2. Credentials</span>
+            </button>
+
+            <span className="text-[#577877]/30 text-xs">/</span>
+
+            {/* Step 3 Pill */}
+            <div
+              className={`flex items-center gap-1.5 text-xs font-semibold ${
+                currentStep === 3
+                  ? "text-[#25836F] font-bold"
+                  : "text-[#577877]/60"
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                  currentStep === 3
+                    ? "bg-[#25836F] text-white ring-2 ring-[#25836F]/20"
+                    : "bg-[#F0F5F7] text-[#577877]"
+                }`}
+              >
+                3
+              </span>
+              <span>3. Verification</span>
+            </div>
+          </div>
         </div>
 
         {state === "success" && submittedData ? (
@@ -498,558 +663,567 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
           </div>
         ) : (
           <form onSubmit={submit} noValidate className="space-y-2 pt-1 flex-1 flex flex-col justify-between">
-            {/* 1. Personal Information */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
-                <span className="material-symbols-outlined text-[#25836F] text-sm">person</span>
-                <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
-                  Personal Information
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3">
-                {/* Full Name */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Full Name <span className="text-red-600">*</span></span>
-                  </label>
-                  <input
-                    name="full_name"
-                    type="text"
-                    value={form.full_name}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="Dr. Harshavardhan M V"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.full_name && errors.full_name
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.full_name && errors.full_name && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.full_name}</p>
-                  )}
-                </div>
-
-                {/* Email Address */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Email Address <span className="text-red-600">*</span></span>
-                  </label>
-                  <input
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="doctor@clinic.com"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.email && errors.email
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.email && errors.email && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.email}</p>
-                  )}
-                </div>
-
-                {/* Mobile Number */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Mobile Number <span className="text-red-600">*</span></span>
-                  </label>
-                  <input
-                    name="mobile_number"
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={10}
-                    value={form.mobile_number}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="10 digit mobile number"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.mobile_number && errors.mobile_number
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.mobile_number && errors.mobile_number && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.mobile_number}</p>
-                  )}
-                </div>
-
-                {/* State of Practice */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>State of Practice <span className="text-red-600">*</span></span>
-                  </label>
-                  <input
-                    name="state"
-                    type="text"
-                    value={form.state}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="e.g. Karnataka, Maharashtra"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.state && errors.state
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.state && errors.state && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.state}</p>
-                  )}
-                </div>
-
-                {/* Date of Birth */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Date of Birth</span>
-                    <span className="font-normal text-[10px] text-[#577877]">(Age 21+)</span>
-                  </label>
-                  <input
-                    name="date_of_birth"
-                    type="date"
-                    value={form.date_of_birth}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
-                      touched.date_of_birth && errors.date_of_birth
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.date_of_birth && errors.date_of_birth && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.date_of_birth}</p>
-                  )}
-                </div>
-
-                {/* Gender (Optional) */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Gender</span>
-                    <span className="font-normal text-[10px] text-[#577877]">(optional)</span>
-                  </label>
-                  <select
-                    name="gender"
-                    value={form.gender}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    className="w-full h-8.5 px-3 rounded-lg border border-[#577877]/25 bg-white text-xs text-[#162623] focus:border-[#25836F] focus:outline-none transition shadow-2xs box-border"
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                    <option value="Prefer not to say">Prefer not to say</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Professional Information & Credentials */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
-                <span className="material-symbols-outlined text-[#25836F] text-sm">medical_services</span>
-                <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
-                  Professional Information &amp; Credentials
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3">
-                {/* Medical Specialization */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Medical Specialization <span className="text-red-600">*</span></span>
-                  </label>
-                  <select
-                    name="specialty"
-                    value={form.specialty}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
-                      touched.specialty && errors.specialty
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  >
-                    <option value="">Select Specialization</option>
-                    <option value="General Medicine">General Medicine</option>
-                    <option value="Cardiology">Cardiology</option>
-                    <option value="Dermatology">Dermatology</option>
-                    <option value="Pediatrics">Pediatrics</option>
-                    <option value="Orthopedics">Orthopedics</option>
-                    <option value="Neurology">Neurology</option>
-                    <option value="Psychiatry">Psychiatry</option>
-                    <option value="Gynecology">Gynecology</option>
-                    <option value="ENT">ENT</option>
-                    <option value="Ophthalmology">Ophthalmology</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  {touched.specialty && errors.specialty && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.specialty}</p>
-                  )}
-                </div>
-
-                {/* Medical Registration Number */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Registration Number <span className="text-red-600">*</span></span>
-                  </label>
-                  <input
-                    name="registration_number"
-                    type="text"
-                    value={form.registration_number}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="e.g. KMC-123456"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.registration_number && errors.registration_number
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.registration_number && errors.registration_number && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.registration_number}</p>
-                  )}
-                </div>
-
-                {/* Medical Council / Authority */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Medical Council / Authority <span className="text-red-600">*</span></span>
-                  </label>
-                  <input
-                    name="medical_council"
-                    type="text"
-                    value={form.medical_council}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="e.g. Karnataka Medical Council, NMC"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.medical_council && errors.medical_council
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.medical_council && errors.medical_council && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.medical_council}</p>
-                  )}
-                </div>
-
-                {/* Qualifications */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Qualifications <span className="text-red-600">*</span></span>
-                  </label>
-                  <input
-                    name="qualifications"
-                    type="text"
-                    value={form.qualifications}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="MBBS, MD, DNB (comma separated)"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.qualifications && errors.qualifications
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.qualifications && errors.qualifications && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.qualifications}</p>
-                  )}
-                </div>
-
-                {/* Experience (Years) */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Experience (Years)</span>
-                    <span className="font-normal text-[10px] text-[#577877]">(optional)</span>
-                  </label>
-                  <input
-                    name="experience_years"
-                    type="number"
-                    min="0"
-                    max="60"
-                    step="1"
-                    value={form.experience_years}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="e.g. 5"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.experience_years && errors.experience_years
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.experience_years && errors.experience_years && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.experience_years}</p>
-                  )}
-                </div>
-
-                {/* Supported Languages */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Supported Languages <span className="text-red-600">*</span></span>
-                  </label>
-                  <input
-                    name="languages"
-                    type="text"
-                    value={form.languages}
-                    onChange={update}
-                    onBlur={handleBlur}
-                    placeholder="English, Hindi (comma separated)"
-                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                      touched.languages && errors.languages
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.languages && errors.languages && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.languages}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Mandatory Document Uploads & Optional Attachments */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between pb-1 border-b border-[#577877]/15">
-                <div className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[#25836F] text-sm">attachment</span>
+            {/* STEP 1: Personal Information */}
+            {currentStep === 1 && (
+              <div className="space-y-1.5 animate-in fade-in duration-200">
+                <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
+                  <span className="material-symbols-outlined text-[#25836F] text-sm">person</span>
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
-                    Document Uploads (PDF, JPG, PNG · Max 10 MB)
+                    Personal Information &amp; Contact Details
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAdditionalDocs(true)}
-                  className="text-[11px] font-semibold text-[#25836F] hover:underline cursor-pointer flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-xs">add_circle</span>
-                  <span>Additional Documents (Optional)</span>
-                  {optionalDocsCount > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-[#25836F] text-white text-[10px] font-bold">
-                      {optionalDocsCount}
-                    </span>
-                  )}
-                </button>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 xl:gap-3">
-                {/* 1. Medical Council Registration Certificate */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="1. Medical Council Registration Certificate *">
-                    <span>1. Council Certificate <span className="text-red-600">*</span></span>
-                    <span className="font-normal text-[10px] text-[#577877]">(Mandatory)</span>
-                  </label>
-                  <input
-                    name="credential_document"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                    onChange={update}
-                    onBlur={handleBlur}
-                    className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
-                      touched.credential_document && errors.credential_document
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.credential_document && errors.credential_document && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.credential_document}</p>
-                  )}
-                </div>
-
-                {/* 2. Recognized Medical Qualification Certificate */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="2. Qualification Certificate (MBBS / Primary)">
-                    <span>2. Qualification Certificate</span>
-                    <span className="font-normal text-[10px] text-[#577877]">(MBBS / Primary)</span>
-                  </label>
-                  <input
-                    name="qualification_certificate"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                    onChange={update}
-                    onBlur={handleBlur}
-                    className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
-                      touched.qualification_certificate && errors.qualification_certificate
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.qualification_certificate && errors.qualification_certificate && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.qualification_certificate}</p>
-                  )}
-                </div>
-
-                {/* 3. Government-Issued Identity Proof */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="3. Government ID Proof (Aadhaar / Passport / DL / PAN)">
-                    <span>3. Identity Proof</span>
-                    <span className="font-normal text-[10px] text-[#577877]">(Govt ID)</span>
-                  </label>
-                  <input
-                    name="identity_proof"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                    onChange={update}
-                    onBlur={handleBlur}
-                    className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
-                      touched.identity_proof && errors.identity_proof
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-[#577877]/25 focus:border-[#25836F]"
-                    }`}
-                  />
-                  {touched.identity_proof && errors.identity_proof && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.identity_proof}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 4. Account Security & Consents */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
-                <span className="material-symbols-outlined text-[#25836F] text-sm">lock</span>
-                <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
-                  Account Security &amp; Consents
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3 items-start">
-                {/* Password */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Password <span className="text-red-600">*</span></span>
-                  </label>
-                  <div className="relative">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3">
+                  {/* Full Name */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Full Name <span className="text-red-600">*</span></span>
+                    </label>
                     <input
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      value={form.password}
+                      name="full_name"
+                      type="text"
+                      value={form.full_name}
                       onChange={update}
                       onBlur={handleBlur}
-                      placeholder="••••••••"
-                      className={`w-full h-8.5 pl-3 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                        touched.password && errors.password
+                      placeholder="Dr. Harshavardhan M V"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.full_name && errors.full_name
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
                       }`}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        {showPassword ? "visibility_off" : "visibility"}
-                      </span>
-                    </button>
+                    {touched.full_name && errors.full_name && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.full_name}</p>
+                    )}
                   </div>
-                  {touched.password && errors.password && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.password}</p>
-                  )}
-                </div>
 
-                {/* Confirm Password */}
-                <div className="space-y-0.5">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Confirm Password <span className="text-red-600">*</span></span>
-                  </label>
-                  <div className="relative">
+                  {/* Email Address */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Email Address <span className="text-red-600">*</span></span>
+                    </label>
                     <input
-                      name="confirm_password"
-                      type={showConfirmPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      value={form.confirm_password}
+                      name="email"
+                      type="email"
+                      value={form.email}
                       onChange={update}
                       onBlur={handleBlur}
-                      placeholder="Re-enter password"
-                      className={`w-full h-8.5 pl-3 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
-                        touched.confirm_password && errors.confirm_password
+                      placeholder="doctor@clinic.com"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.email && errors.email
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
                       }`}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                    {touched.email && errors.email && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.email}</p>
+                    )}
+                  </div>
+
+                  {/* Mobile Number */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Mobile Number <span className="text-red-600">*</span></span>
+                    </label>
+                    <input
+                      name="mobile_number"
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={10}
+                      value={form.mobile_number}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      placeholder="10 digit mobile number"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.mobile_number && errors.mobile_number
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    />
+                    {touched.mobile_number && errors.mobile_number && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.mobile_number}</p>
+                    )}
+                  </div>
+
+                  {/* State of Practice */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>State of Practice <span className="text-red-600">*</span></span>
+                    </label>
+                    <input
+                      name="state"
+                      type="text"
+                      value={form.state}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      placeholder="e.g. Karnataka, Maharashtra"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.state && errors.state
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    />
+                    {touched.state && errors.state && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.state}</p>
+                    )}
+                  </div>
+
+                  {/* Date of Birth */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Date of Birth</span>
+                      <span className="font-normal text-[10px] text-[#577877]">(Age 21+)</span>
+                    </label>
+                    <input
+                      name="date_of_birth"
+                      type="date"
+                      value={form.date_of_birth}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
+                        touched.date_of_birth && errors.date_of_birth
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    />
+                    {touched.date_of_birth && errors.date_of_birth && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.date_of_birth}</p>
+                    )}
+                  </div>
+
+                  {/* Gender (Optional) */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Gender</span>
+                      <span className="font-normal text-[10px] text-[#577877]">(optional)</span>
+                    </label>
+                    <select
+                      name="gender"
+                      value={form.gender}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      className="w-full h-8.5 px-3 rounded-lg border border-[#577877]/25 bg-white text-xs text-[#162623] focus:border-[#25836F] focus:outline-none transition shadow-2xs box-border"
                     >
-                      <span className="material-symbols-outlined text-sm">
-                        {showConfirmPassword ? "visibility_off" : "visibility"}
-                      </span>
-                    </button>
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
                   </div>
-                  {touched.confirm_password && errors.confirm_password && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.confirm_password}</p>
-                  )}
-                </div>
-
-                {/* Consents Column */}
-                <div className="space-y-0.5 col-span-1 md:col-span-2 lg:col-span-1">
-                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
-                    <span>Declarations &amp; Privacy <span className="text-red-600">*</span></span>
-                  </label>
-                  <div className="h-8.5 flex flex-col justify-center space-y-1 px-1">
-                    <label className="flex items-center gap-1.5 text-[#162623] cursor-pointer leading-tight">
-                      <input
-                        type="checkbox"
-                        name="terms_consent"
-                        checked={form.terms_consent}
-                        onChange={update}
-                        onBlur={handleBlur}
-                        className="h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
-                      />
-                      <span className="text-[#577877] text-[10px] truncate">
-                        Agree to{" "}
-                        <button
-                          type="button"
-                          onClick={() => setShowTermsModal(true)}
-                          className="font-semibold text-[#25836F] hover:underline cursor-pointer"
-                        >
-                          Terms
-                        </button>{" "}
-                        &amp;{" "}
-                        <button
-                          type="button"
-                          onClick={() => setShowPrivacyModal(true)}
-                          className="font-semibold text-[#25836F] hover:underline cursor-pointer"
-                        >
-                          Privacy Policy
-                        </button>{" "}
-                        <span className="text-red-600">*</span>
-                      </span>
-                    </label>
-
-                    <label className="flex items-center gap-1.5 text-[#162623] cursor-pointer leading-tight">
-                      <input
-                        type="checkbox"
-                        name="declaration_consent"
-                        checked={form.declaration_consent}
-                        onChange={update}
-                        onBlur={handleBlur}
-                        className="h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
-                      />
-                      <span className="text-[#577877] text-[10px] truncate">
-                        Declare credentials authentic under Telehealth Guidelines <span className="text-red-600">*</span>
-                      </span>
-                    </label>
-                  </div>
-                  {(touched.terms_consent && errors.terms_consent) || (touched.declaration_consent && errors.declaration_consent) ? (
-                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">
-                      {errors.terms_consent || errors.declaration_consent}
-                    </p>
-                  ) : null}
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* STEP 2: Professional Information & Credentials */}
+            {currentStep === 2 && (
+              <div className="space-y-1.5 animate-in fade-in duration-200">
+                <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
+                  <span className="material-symbols-outlined text-[#25836F] text-sm">medical_services</span>
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
+                    Professional Information &amp; Credentials
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3">
+                  {/* Medical Specialization */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Medical Specialization <span className="text-red-600">*</span></span>
+                    </label>
+                    <select
+                      name="specialty"
+                      value={form.specialty}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
+                        touched.specialty && errors.specialty
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    >
+                      <option value="">Select Specialization</option>
+                      <option value="General Medicine">General Medicine</option>
+                      <option value="Cardiology">Cardiology</option>
+                      <option value="Dermatology">Dermatology</option>
+                      <option value="Pediatrics">Pediatrics</option>
+                      <option value="Orthopedics">Orthopedics</option>
+                      <option value="Neurology">Neurology</option>
+                      <option value="Psychiatry">Psychiatry</option>
+                      <option value="Gynecology">Gynecology</option>
+                      <option value="ENT">ENT</option>
+                      <option value="Ophthalmology">Ophthalmology</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {touched.specialty && errors.specialty && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.specialty}</p>
+                    )}
+                  </div>
+
+                  {/* Medical Registration Number */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Registration Number <span className="text-red-600">*</span></span>
+                    </label>
+                    <input
+                      name="registration_number"
+                      type="text"
+                      value={form.registration_number}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      placeholder="e.g. KMC-123456"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.registration_number && errors.registration_number
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    />
+                    {touched.registration_number && errors.registration_number && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.registration_number}</p>
+                    )}
+                  </div>
+
+                  {/* Medical Council / Authority */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Medical Council / Authority <span className="text-red-600">*</span></span>
+                    </label>
+                    <input
+                      name="medical_council"
+                      type="text"
+                      value={form.medical_council}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      placeholder="e.g. Karnataka Medical Council, NMC"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.medical_council && errors.medical_council
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    />
+                    {touched.medical_council && errors.medical_council && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.medical_council}</p>
+                    )}
+                  </div>
+
+                  {/* Qualifications */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Qualifications <span className="text-red-600">*</span></span>
+                    </label>
+                    <input
+                      name="qualifications"
+                      type="text"
+                      value={form.qualifications}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      placeholder="MBBS, MD, DNB (comma separated)"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.qualifications && errors.qualifications
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    />
+                    {touched.qualifications && errors.qualifications && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.qualifications}</p>
+                    )}
+                  </div>
+
+                  {/* Experience (Years) */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Experience (Years)</span>
+                      <span className="font-normal text-[10px] text-[#577877]">(optional)</span>
+                    </label>
+                    <input
+                      name="experience_years"
+                      type="number"
+                      min="0"
+                      max="60"
+                      step="1"
+                      value={form.experience_years}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      placeholder="e.g. 5"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.experience_years && errors.experience_years
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    />
+                    {touched.experience_years && errors.experience_years && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.experience_years}</p>
+                    )}
+                  </div>
+
+                  {/* Supported Languages */}
+                  <div className="space-y-0.5">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                      <span>Supported Languages <span className="text-red-600">*</span></span>
+                    </label>
+                    <input
+                      name="languages"
+                      type="text"
+                      value={form.languages}
+                      onChange={update}
+                      onBlur={handleBlur}
+                      placeholder="English, Hindi (comma separated)"
+                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                        touched.languages && errors.languages
+                          ? "border-red-500 focus:border-red-500"
+                          : "border-[#577877]/25 focus:border-[#25836F]"
+                      }`}
+                    />
+                    {touched.languages && errors.languages && (
+                      <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.languages}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: Mandatory Document Uploads & Account Security */}
+            {currentStep === 3 && (
+              <div className="space-y-2 animate-in fade-in duration-200">
+                {/* 3A. Mandatory Document Uploads & Optional Attachments */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between pb-1 border-b border-[#577877]/15">
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[#25836F] text-sm">attachment</span>
+                      <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
+                        Document Uploads (PDF, JPG, PNG · Max 10 MB)
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdditionalDocs(true)}
+                      className="text-[11px] font-semibold text-[#25836F] hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-xs">add_circle</span>
+                      <span>Additional Documents (Optional)</span>
+                      {optionalDocsCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-[#25836F] text-white text-[10px] font-bold">
+                          {optionalDocsCount}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 xl:gap-3">
+                    {/* 1. Medical Council Registration Certificate */}
+                    <div className="space-y-0.5">
+                      <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="1. Medical Council Registration Certificate *">
+                        <span>1. Council Certificate <span className="text-red-600">*</span></span>
+                        <span className="font-normal text-[10px] text-[#577877]">(Mandatory)</span>
+                      </label>
+                      <input
+                        name="credential_document"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                        onChange={update}
+                        onBlur={handleBlur}
+                        className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
+                          touched.credential_document && errors.credential_document
+                            ? "border-red-500 focus:border-red-500"
+                            : "border-[#577877]/25 focus:border-[#25836F]"
+                        }`}
+                      />
+                      {touched.credential_document && errors.credential_document && (
+                        <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.credential_document}</p>
+                      )}
+                    </div>
+
+                    {/* 2. Recognized Medical Qualification Certificate */}
+                    <div className="space-y-0.5">
+                      <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="2. Qualification Certificate (MBBS / Primary)">
+                        <span>2. Qualification Certificate</span>
+                        <span className="font-normal text-[10px] text-[#577877]">(MBBS / Primary)</span>
+                      </label>
+                      <input
+                        name="qualification_certificate"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                        onChange={update}
+                        onBlur={handleBlur}
+                        className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
+                          touched.qualification_certificate && errors.qualification_certificate
+                            ? "border-red-500 focus:border-red-500"
+                            : "border-[#577877]/25 focus:border-[#25836F]"
+                        }`}
+                      />
+                      {touched.qualification_certificate && errors.qualification_certificate && (
+                        <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.qualification_certificate}</p>
+                      )}
+                    </div>
+
+                    {/* 3. Government-Issued Identity Proof */}
+                    <div className="space-y-0.5">
+                      <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="3. Government ID Proof (Aadhaar / Passport / DL / PAN)">
+                        <span>3. Identity Proof</span>
+                        <span className="font-normal text-[10px] text-[#577877]">(Govt ID)</span>
+                      </label>
+                      <input
+                        name="identity_proof"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                        onChange={update}
+                        onBlur={handleBlur}
+                        className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
+                          touched.identity_proof && errors.identity_proof
+                            ? "border-red-500 focus:border-red-500"
+                            : "border-[#577877]/25 focus:border-[#25836F]"
+                        }`}
+                      />
+                      {touched.identity_proof && errors.identity_proof && (
+                        <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.identity_proof}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3B. Account Security & Consents */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
+                    <span className="material-symbols-outlined text-[#25836F] text-sm">lock</span>
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
+                      Account Security &amp; Consents
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3 items-start">
+                    {/* Password */}
+                    <div className="space-y-0.5">
+                      <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                        <span>Password <span className="text-red-600">*</span></span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          value={form.password}
+                          onChange={update}
+                          onBlur={handleBlur}
+                          placeholder="••••••••"
+                          className={`w-full h-8.5 pl-3 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                            touched.password && errors.password
+                              ? "border-red-500 focus:border-red-500"
+                              : "border-[#577877]/25 focus:border-[#25836F]"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm">
+                            {showPassword ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
+                      </div>
+                      {touched.password && errors.password && (
+                        <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.password}</p>
+                      )}
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div className="space-y-0.5">
+                      <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                        <span>Confirm Password <span className="text-red-600">*</span></span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          name="confirm_password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          value={form.confirm_password}
+                          onChange={update}
+                          onBlur={handleBlur}
+                          placeholder="Re-enter password"
+                          className={`w-full h-8.5 pl-3 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                            touched.confirm_password && errors.confirm_password
+                              ? "border-red-500 focus:border-red-500"
+                              : "border-[#577877]/25 focus:border-[#25836F]"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm">
+                            {showConfirmPassword ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
+                      </div>
+                      {touched.confirm_password && errors.confirm_password && (
+                        <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.confirm_password}</p>
+                      )}
+                    </div>
+
+                    {/* Consents Column */}
+                    <div className="space-y-0.5 col-span-1 md:col-span-2 lg:col-span-1">
+                      <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                        <span>Declarations &amp; Privacy <span className="text-red-600">*</span></span>
+                      </label>
+                      <div className="h-8.5 flex flex-col justify-center space-y-1 px-1">
+                        <label className="flex items-center gap-1.5 text-[#162623] cursor-pointer leading-tight">
+                          <input
+                            type="checkbox"
+                            name="terms_consent"
+                            checked={form.terms_consent}
+                            onChange={update}
+                            onBlur={handleBlur}
+                            className="h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
+                          />
+                          <span className="text-[#577877] text-[10px] truncate">
+                            Agree to{" "}
+                            <button
+                              type="button"
+                              onClick={() => setShowTermsModal(true)}
+                              className="font-semibold text-[#25836F] hover:underline cursor-pointer"
+                            >
+                              Terms
+                            </button>{" "}
+                            &amp;{" "}
+                            <button
+                              type="button"
+                              onClick={() => setShowPrivacyModal(true)}
+                              className="font-semibold text-[#25836F] hover:underline cursor-pointer"
+                            >
+                              Privacy Policy
+                            </button>{" "}
+                            <span className="text-red-600">*</span>
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-1.5 text-[#162623] cursor-pointer leading-tight">
+                          <input
+                            type="checkbox"
+                            name="declaration_consent"
+                            checked={form.declaration_consent}
+                            onChange={update}
+                            onBlur={handleBlur}
+                            className="h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
+                          />
+                          <span className="text-[#577877] text-[10px] truncate">
+                            Declare credentials authentic under Telehealth Guidelines <span className="text-red-600">*</span>
+                          </span>
+                        </label>
+                      </div>
+                      {(touched.terms_consent && errors.terms_consent) || (touched.declaration_consent && errors.declaration_consent) ? (
+                        <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">
+                          {errors.terms_consent || errors.declaration_consent}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Error Message if present */}
             {message && (
@@ -1065,28 +1239,77 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
               </div>
             )}
 
-            {/* Submission Actions Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 xl:gap-3 items-center pt-1.5 border-t border-[#577877]/10">
-              <div className="md:col-span-2">
-                <button
-                  type="submit"
-                  disabled={state === "loading"}
-                  className="w-full h-9 rounded-xl bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  {state === "loading" ? "Submitting Registration…" : "Submit Doctor Registration"}
-                </button>
-              </div>
+            {/* Step Action Navigation Controls */}
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-[#577877]/10 shrink-0">
+              {currentStep === 1 && (
+                <>
+                  <div className="text-xs text-[#577877]">
+                    Already registered?{" "}
+                    <button
+                      type="button"
+                      onClick={onSwitchToPatientAuth || onBack}
+                      className="font-bold text-[#25836F] hover:underline cursor-pointer"
+                    >
+                      Sign in
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleNextFromStep1}
+                    className="px-5 h-9 rounded-xl bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] cursor-pointer flex items-center gap-1.5 ml-auto"
+                  >
+                    <span>Continue to Professional Details</span>
+                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </button>
+                </>
+              )}
 
-              <div className="text-center md:text-right text-xs text-[#577877]">
-                Already registered?{" "}
-                <button
-                  type="button"
-                  onClick={onSwitchToPatientAuth || onBack}
-                  className="font-bold text-[#25836F] hover:underline cursor-pointer"
-                >
-                  Sign in
-                </button>
-              </div>
+              {currentStep === 2 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(1);
+                      setMessage("");
+                    }}
+                    className="px-4 h-9 rounded-xl border border-[#577877]/30 bg-white text-xs font-semibold text-[#577877] hover:border-[#25836F] hover:text-[#162623] transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-sm">arrow_back</span>
+                    <span>Back to Personal Info</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextFromStep2}
+                    className="px-5 h-9 rounded-xl bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Continue to Verification &amp; Security</span>
+                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </button>
+                </>
+              )}
+
+              {currentStep === 3 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(2);
+                      setMessage("");
+                    }}
+                    className="px-4 h-9 rounded-xl border border-[#577877]/30 bg-white text-xs font-semibold text-[#577877] hover:border-[#25836F] hover:text-[#162623] transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-sm">arrow_back</span>
+                    <span>Back to Credentials</span>
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={state === "loading"}
+                    className="px-6 h-9 rounded-xl bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    {state === "loading" ? "Submitting Registration…" : "Submit Doctor Registration"}
+                  </button>
+                </>
+              )}
             </div>
           </form>
         )}
