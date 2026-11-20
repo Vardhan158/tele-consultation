@@ -1,90 +1,61 @@
 import { useState } from "react";
 import { doctorApi } from "../../lib/api";
 
-function ClinicianBrandPanel({ onBack }) {
+function ClinicianHeader({ onBack }) {
   return (
-    <aside className="relative hidden overflow-hidden bg-[#25836F] text-white lg:flex lg:flex-col justify-between p-6 lg:p-7 xl:p-8 lg:col-span-4 xl:col-span-3.5 h-full">
-      <div className="space-y-6 relative z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#F0F5F7] text-[#125747] flex items-center justify-center font-bold shadow-sm">
-              <svg
-                width="22"
-                height="26"
-                viewBox="0 0 35 42"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-auto text-[#125747]"
-                aria-hidden="true"
-              >
-                <path
-                  d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
-                  fill="currentColor"
-                />
-                <rect
-                  width="12.629"
-                  height="32.626"
-                  rx="6.315"
-                  transform="rotate(-45 16.202 6.711)"
-                  fill="currentColor"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-lg font-bold tracking-tight text-white leading-tight">
-                Kaizen Care
-              </p>
-              <p className="text-[9px] tracking-[.18em] uppercase text-[#F0F5F7]/80 font-semibold">
-                Clinician Workspace
-              </p>
-            </div>
-          </div>
-
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg border border-white/10 transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-xs">
-                arrow_back
-              </span>
-              Back to Home
-            </button>
-          )}
+    <header className="bg-[#25836F] text-white px-4 sm:px-6 py-2.5 flex items-center justify-between shrink-0 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-xl bg-[#F0F5F7] text-[#125747] flex items-center justify-center font-bold shadow-sm">
+          <svg
+            width="20"
+            height="24"
+            viewBox="0 0 35 42"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4.5 w-auto text-[#125747]"
+            aria-hidden="true"
+          >
+            <path
+              d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
+              fill="currentColor"
+            />
+            <rect
+              width="12.629"
+              height="32.626"
+              rx="6.315"
+              transform="rotate(-45 16.202 6.711)"
+              fill="currentColor"
+            />
+          </svg>
         </div>
-
-        <div className="pt-4 xl:pt-8 space-y-3">
-          <span className="inline-block px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] font-semibold text-[#F0F5F7] tracking-wider uppercase border border-white/10">
-            Care That Connects
-          </span>
-          <h1 className="text-2xl xl:text-3xl font-bold leading-snug text-white">
-            Join our network of
-            <br />
-            verified clinicians.
-          </h1>
-          <p className="text-xs xl:text-sm text-[#F0F5F7]/85 leading-relaxed">
-            Expand your medical practice, conduct secure video teleconsultations,
-            issue electronic prescriptions, and manage follow-up care plans under
-            National Telemedicine Practice Guidelines.
+        <div>
+          <p className="text-base font-bold tracking-tight text-white leading-tight">
+            Kaizen Care
+          </p>
+          <p className="text-[9px] tracking-[.18em] uppercase text-[#F0F5F7]/80 font-semibold">
+            Clinician Workspace
           </p>
         </div>
       </div>
 
-      <div className="relative z-10 pt-4 border-t border-white/15 space-y-1.5">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
-          <span className="material-symbols-outlined !text-[#F0F5F7] text-sm">
-            verified_user
-          </span>
-          <span>Verified Professional Credentialing</span>
-        </div>
-        <p className="text-[11px] text-[#F0F5F7]/75 leading-normal">
-          Medical council credentials and qualification records are reviewed by an authorized clinic administrator before consultation access is enabled.
-        </p>
+      <div className="flex items-center gap-2.5">
+        <span className="font-semibold text-[10px] tracking-wide text-white/90 bg-white/15 px-2.5 py-0.5 rounded-full border border-white/20 uppercase hidden sm:inline-block">
+          Clinician Portal
+        </span>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-xl border border-white/20 transition cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-sm">
+              arrow_back
+            </span>
+            Back to Home
+          </button>
+        )}
       </div>
-
-      <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full bg-[#577877]/25 blur-3xl pointer-events-none" />
-    </aside>
+    </header>
   );
 }
 
@@ -428,39 +399,23 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
   ].filter(Boolean).length;
 
   return (
-    <div className="min-h-screen lg:h-screen lg:max-h-screen bg-[#F0F5F7] font-sans grid grid-cols-1 lg:grid-cols-12 text-[#162623] lg:overflow-hidden">
-      <ClinicianBrandPanel onBack={onBack} />
+    <div className="min-h-screen lg:h-screen lg:max-h-screen bg-[#F0F5F7] font-sans flex flex-col text-[#162623] lg:overflow-hidden">
+      {/* Top Header with Logo and Back Button */}
+      <ClinicianHeader onBack={onBack} />
 
-      <main className="lg:col-span-8 xl:col-span-8.5 h-full flex flex-col justify-between p-3 sm:p-4 lg:p-4 xl:p-5 overflow-y-auto lg:overflow-hidden">
-        {/* Top Header Row */}
-        <div className="w-full flex items-center justify-between text-xs text-[#577877] pb-1 border-b border-[#577877]/10">
-          <div className="flex items-center gap-2">
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="lg:hidden inline-flex items-center gap-1 text-xs font-semibold text-[#25836F] hover:underline cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-sm">arrow_back</span>
-                Home
-              </button>
-            )}
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[#162623] leading-none">
-                Doctor Registration
-              </h2>
-              <p className="text-[11px] text-[#577877] mt-0.5">
-                Register medical credentials under Indian Telemedicine Practice Guidelines.
-              </p>
-            </div>
-          </div>
-          <span className="font-semibold text-[10px] tracking-wide text-[#25836F] bg-[#EEF6F3] px-2.5 py-0.5 rounded-full border border-[#25836F]/20 uppercase">
-            Clinician Portal
-          </span>
+      <main className="flex-1 flex flex-col justify-between p-3 sm:p-4 lg:p-4 xl:p-5 max-w-6xl w-full mx-auto overflow-y-auto lg:overflow-hidden">
+        {/* Title Row */}
+        <div className="w-full pb-1 border-b border-[#577877]/10">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[#162623] leading-none">
+            Doctor Registration
+          </h2>
+          <p className="text-[11px] text-[#577877] mt-0.5">
+            Register medical credentials under Indian Telemedicine Practice Guidelines to request telehealth clinic privileges.
+          </p>
         </div>
 
         {state === "success" && submittedData ? (
-          <div className="my-auto rounded-2xl border border-[#25836F]/30 bg-white p-5 sm:p-6 shadow-sm space-y-4 animate-in fade-in duration-300 max-w-2xl mx-auto">
+          <div className="my-auto rounded-2xl border border-[#25836F]/30 bg-white p-5 sm:p-6 shadow-sm space-y-4 animate-in fade-in duration-300 max-w-2xl mx-auto w-full">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#EEF6F3] text-[#25836F] flex items-center justify-center shrink-0">
                 <span className="material-symbols-outlined text-2xl font-bold">check_circle</span>
