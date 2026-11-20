@@ -406,7 +406,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
       {/* Top Header with Logo and Back Button */}
       <ClinicianHeader onBack={onBack} />
 
-      <main className="flex-1 flex flex-col justify-between p-3 sm:p-4 lg:p-4 xl:p-5 max-w-6xl w-full mx-auto overflow-y-auto lg:overflow-hidden">
+      <main className="flex-1 flex flex-col justify-between p-3.5 sm:p-4 lg:p-4.5 xl:p-5 max-w-6xl w-full mx-auto overflow-y-auto lg:overflow-hidden">
         {/* Title Row */}
         <div className="w-full pb-1 border-b border-[#577877]/10">
           <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[#162623] leading-none">
@@ -500,18 +500,18 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
           <form onSubmit={submit} noValidate className="space-y-2 pt-1 flex-1 flex flex-col justify-between">
             {/* 1. Personal Information */}
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 pb-0.5 border-b border-[#577877]/15">
+              <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
                 <span className="material-symbols-outlined text-[#25836F] text-sm">person</span>
                 <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
                   Personal Information
                 </h3>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3">
                 {/* Full Name */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Full Name <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Full Name <span className="text-red-600">*</span></span>
                   </label>
                   <input
                     name="full_name"
@@ -520,7 +520,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="Dr. Harshavardhan M V"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.full_name && errors.full_name
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -532,9 +532,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Email Address */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Email Address <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Email Address <span className="text-red-600">*</span></span>
                   </label>
                   <input
                     name="email"
@@ -543,7 +543,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="doctor@clinic.com"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.email && errors.email
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -555,9 +555,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Mobile Number */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Mobile Number <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Mobile Number <span className="text-red-600">*</span></span>
                   </label>
                   <input
                     name="mobile_number"
@@ -569,7 +569,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="10 digit mobile number"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.mobile_number && errors.mobile_number
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -581,9 +581,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* State of Practice */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    State of Practice <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>State of Practice <span className="text-red-600">*</span></span>
                   </label>
                   <input
                     name="state"
@@ -592,7 +592,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="e.g. Karnataka, Maharashtra"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.state && errors.state
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -604,9 +604,10 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Date of Birth */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Date of Birth <span className="font-normal text-[#577877]">(Age 21+)</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Date of Birth</span>
+                    <span className="font-normal text-[10px] text-[#577877]">(Age 21+)</span>
                   </label>
                   <input
                     name="date_of_birth"
@@ -614,7 +615,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     value={form.date_of_birth}
                     onChange={update}
                     onBlur={handleBlur}
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
                       touched.date_of_birth && errors.date_of_birth
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -626,16 +627,17 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Gender (Optional) */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Gender <span className="font-normal text-[#577877]">(optional)</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Gender</span>
+                    <span className="font-normal text-[10px] text-[#577877]">(optional)</span>
                   </label>
                   <select
                     name="gender"
                     value={form.gender}
                     onChange={update}
                     onBlur={handleBlur}
-                    className="w-full h-8 px-2.5 rounded-lg border border-[#577877]/25 bg-white text-xs text-[#162623] focus:border-[#25836F] focus:outline-none transition shadow-2xs"
+                    className="w-full h-8.5 px-3 rounded-lg border border-[#577877]/25 bg-white text-xs text-[#162623] focus:border-[#25836F] focus:outline-none transition shadow-2xs box-border"
                   >
                     <option value="">Select Gender</option>
                     <option value="Male">Male</option>
@@ -649,25 +651,25 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
 
             {/* 2. Professional Information & Credentials */}
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 pb-0.5 border-b border-[#577877]/15">
+              <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
                 <span className="material-symbols-outlined text-[#25836F] text-sm">medical_services</span>
                 <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
                   Professional Information &amp; Credentials
                 </h3>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3">
                 {/* Medical Specialization */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Medical Specialization <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Medical Specialization <span className="text-red-600">*</span></span>
                   </label>
                   <select
                     name="specialty"
                     value={form.specialty}
                     onChange={update}
                     onBlur={handleBlur}
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
                       touched.specialty && errors.specialty
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -692,9 +694,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Medical Registration Number */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Medical Registration Number <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Registration Number <span className="text-red-600">*</span></span>
                   </label>
                   <input
                     name="registration_number"
@@ -703,7 +705,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="e.g. KMC-123456"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.registration_number && errors.registration_number
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -715,9 +717,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Medical Council / Authority */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Medical Council / Authority <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Medical Council / Authority <span className="text-red-600">*</span></span>
                   </label>
                   <input
                     name="medical_council"
@@ -726,7 +728,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="e.g. Karnataka Medical Council, NMC"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.medical_council && errors.medical_council
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -738,9 +740,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Qualifications */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Qualifications <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Qualifications <span className="text-red-600">*</span></span>
                   </label>
                   <input
                     name="qualifications"
@@ -749,7 +751,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="MBBS, MD, DNB (comma separated)"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.qualifications && errors.qualifications
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -761,9 +763,10 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Experience (Years) */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Experience (Years) <span className="font-normal text-[#577877]">(optional)</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Experience (Years)</span>
+                    <span className="font-normal text-[10px] text-[#577877]">(optional)</span>
                   </label>
                   <input
                     name="experience_years"
@@ -775,7 +778,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="e.g. 5"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.experience_years && errors.experience_years
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -787,9 +790,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Supported Languages */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Supported Languages <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Supported Languages <span className="text-red-600">*</span></span>
                   </label>
                   <input
                     name="languages"
@@ -798,7 +801,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     onChange={update}
                     onBlur={handleBlur}
                     placeholder="English, Hindi (comma separated)"
-                    className={`w-full h-8 px-2.5 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                    className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                       touched.languages && errors.languages
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -813,11 +816,11 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
 
             {/* 3. Mandatory Document Uploads & Optional Attachments */}
             <div className="space-y-1">
-              <div className="flex items-center justify-between pb-0.5 border-b border-[#577877]/15">
+              <div className="flex items-center justify-between pb-1 border-b border-[#577877]/15">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[#25836F] text-sm">attachment</span>
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
-                    Document Uploads (PDF, JPG, PNG)
+                    Document Uploads (PDF, JPG, PNG · Max 10 MB)
                   </h3>
                 </div>
                 <button
@@ -835,11 +838,12 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </button>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 xl:gap-3">
                 {/* 1. Medical Council Registration Certificate */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5 truncate" title="1. Medical Council Registration Certificate *">
-                    1. Council Certificate <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="1. Medical Council Registration Certificate *">
+                    <span>1. Council Certificate <span className="text-red-600">*</span></span>
+                    <span className="font-normal text-[10px] text-[#577877]">(Mandatory)</span>
                   </label>
                   <input
                     name="credential_document"
@@ -847,7 +851,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                     onChange={update}
                     onBlur={handleBlur}
-                    className={`w-full h-8 px-2 py-0.5 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer ${
+                    className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
                       touched.credential_document && errors.credential_document
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -859,9 +863,10 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* 2. Recognized Medical Qualification Certificate */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5 truncate" title="2. Qualification Certificate (MBBS / Primary)">
-                    2. Qualification Certificate
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="2. Qualification Certificate (MBBS / Primary)">
+                    <span>2. Qualification Certificate</span>
+                    <span className="font-normal text-[10px] text-[#577877]">(MBBS / Primary)</span>
                   </label>
                   <input
                     name="qualification_certificate"
@@ -869,7 +874,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                     onChange={update}
                     onBlur={handleBlur}
-                    className={`w-full h-8 px-2 py-0.5 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer ${
+                    className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
                       touched.qualification_certificate && errors.qualification_certificate
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -881,9 +886,10 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* 3. Government-Issued Identity Proof */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5 truncate" title="3. Government ID Proof (Aadhaar/Passport/DL/PAN)">
-                    3. Identity Proof (Govt ID)
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1 truncate" title="3. Government ID Proof (Aadhaar / Passport / DL / PAN)">
+                    <span>3. Identity Proof</span>
+                    <span className="font-normal text-[10px] text-[#577877]">(Govt ID)</span>
                   </label>
                   <input
                     name="identity_proof"
@@ -891,7 +897,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                     accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                     onChange={update}
                     onBlur={handleBlur}
-                    className={`w-full h-8 px-2 py-0.5 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer ${
+                    className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
                       touched.identity_proof && errors.identity_proof
                         ? "border-red-500 focus:border-red-500"
                         : "border-[#577877]/25 focus:border-[#25836F]"
@@ -906,18 +912,18 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
 
             {/* 4. Account Security & Consents */}
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 pb-0.5 border-b border-[#577877]/15">
+              <div className="flex items-center gap-1.5 pb-1 border-b border-[#577877]/15">
                 <span className="material-symbols-outlined text-[#25836F] text-sm">lock</span>
                 <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#162623]">
                   Account Security &amp; Consents
                 </h3>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 items-center">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 xl:gap-3 items-start">
                 {/* Password */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Password <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Password <span className="text-red-600">*</span></span>
                   </label>
                   <div className="relative">
                     <input
@@ -928,7 +934,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="••••••••"
-                      className={`w-full h-8 pl-2.5 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                      className={`w-full h-8.5 pl-3 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.password && errors.password
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -938,7 +944,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? "Hide password" : "Show password"}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-sm">
                         {showPassword ? "visibility_off" : "visibility"}
@@ -951,9 +957,9 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                 </div>
 
                 {/* Confirm Password */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#162623] mb-0.5">
-                    Confirm Password <span className="text-red-600">*</span>
+                <div className="space-y-0.5">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Confirm Password <span className="text-red-600">*</span></span>
                   </label>
                   <div className="relative">
                     <input
@@ -964,7 +970,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="Re-enter password"
-                      className={`w-full h-8 pl-2.5 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs ${
+                      className={`w-full h-8.5 pl-3 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.confirm_password && errors.confirm_password
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -974,7 +980,7 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-sm">
                         {showConfirmPassword ? "visibility_off" : "visibility"}
@@ -986,57 +992,61 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
                   )}
                 </div>
 
-                {/* Consents Compact Column */}
-                <div className="space-y-1 pt-1 sm:pt-0">
-                  <label className="flex items-start gap-1.5 text-[11px] text-[#162623] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="terms_consent"
-                      checked={form.terms_consent}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      className="mt-0.5 h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
-                    />
-                    <span className="leading-tight text-[#577877] text-[10px]">
-                      Agree to{" "}
-                      <button
-                        type="button"
-                        onClick={() => setShowTermsModal(true)}
-                        className="font-semibold text-[#25836F] hover:underline inline cursor-pointer"
-                      >
-                        Terms
-                      </button>{" "}
-                      &amp;{" "}
-                      <button
-                        type="button"
-                        onClick={() => setShowPrivacyModal(true)}
-                        className="font-semibold text-[#25836F] hover:underline inline cursor-pointer"
-                      >
-                        Privacy Policy
-                      </button>
-                      . <span className="text-red-600">*</span>
-                    </span>
+                {/* Consents Column */}
+                <div className="space-y-0.5 col-span-1 md:col-span-2 lg:col-span-1">
+                  <label className="flex items-center justify-between text-[11px] font-semibold text-[#162623] h-4 mb-1">
+                    <span>Declarations &amp; Privacy <span className="text-red-600">*</span></span>
                   </label>
-                  {touched.terms_consent && errors.terms_consent && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none truncate">{errors.terms_consent}</p>
-                  )}
+                  <div className="h-8.5 flex flex-col justify-center space-y-1 px-1">
+                    <label className="flex items-center gap-1.5 text-[#162623] cursor-pointer leading-tight">
+                      <input
+                        type="checkbox"
+                        name="terms_consent"
+                        checked={form.terms_consent}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        className="h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
+                      />
+                      <span className="text-[#577877] text-[10px] truncate">
+                        Agree to{" "}
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsModal(true)}
+                          className="font-semibold text-[#25836F] hover:underline cursor-pointer"
+                        >
+                          Terms
+                        </button>{" "}
+                        &amp;{" "}
+                        <button
+                          type="button"
+                          onClick={() => setShowPrivacyModal(true)}
+                          className="font-semibold text-[#25836F] hover:underline cursor-pointer"
+                        >
+                          Privacy Policy
+                        </button>{" "}
+                        <span className="text-red-600">*</span>
+                      </span>
+                    </label>
 
-                  <label className="flex items-start gap-1.5 text-[11px] text-[#162623] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="declaration_consent"
-                      checked={form.declaration_consent}
-                      onChange={update}
-                      onBlur={handleBlur}
-                      className="mt-0.5 h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
-                    />
-                    <span className="leading-tight text-[#577877] text-[10px]">
-                      Declare credentials are authentic under Telemedicine Guidelines. <span className="text-red-600">*</span>
-                    </span>
-                  </label>
-                  {touched.declaration_consent && errors.declaration_consent && (
-                    <p className="text-[10px] text-red-600 font-medium leading-none truncate">{errors.declaration_consent}</p>
-                  )}
+                    <label className="flex items-center gap-1.5 text-[#162623] cursor-pointer leading-tight">
+                      <input
+                        type="checkbox"
+                        name="declaration_consent"
+                        checked={form.declaration_consent}
+                        onChange={update}
+                        onBlur={handleBlur}
+                        className="h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
+                      />
+                      <span className="text-[#577877] text-[10px] truncate">
+                        Declare credentials authentic under Telehealth Guidelines <span className="text-red-600">*</span>
+                      </span>
+                    </label>
+                  </div>
+                  {(touched.terms_consent && errors.terms_consent) || (touched.declaration_consent && errors.declaration_consent) ? (
+                    <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">
+                      {errors.terms_consent || errors.declaration_consent}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1056,16 +1066,18 @@ export default function DoctorRegistrationScreen({ onBack, onSuccess, onSwitchTo
             )}
 
             {/* Submission Actions Row */}
-            <div className="pt-1 flex items-center justify-between gap-3">
-              <button
-                type="submit"
-                disabled={state === "loading"}
-                className="flex-1 max-w-sm rounded-xl bg-[#25836F] py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                {state === "loading" ? "Submitting Registration…" : "Submit Doctor Registration"}
-              </button>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 xl:gap-3 items-center pt-1.5 border-t border-[#577877]/10">
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={state === "loading"}
+                  className="w-full h-9 rounded-xl bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {state === "loading" ? "Submitting Registration…" : "Submit Doctor Registration"}
+                </button>
+              </div>
 
-              <div className="text-right text-[11px] text-[#577877] whitespace-nowrap">
+              <div className="text-center md:text-right text-xs text-[#577877]">
                 Already registered?{" "}
                 <button
                   type="button"
