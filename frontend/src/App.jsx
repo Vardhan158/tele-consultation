@@ -33,6 +33,8 @@ import DoctorSettingsScreen from "./components/screens/DoctorSettingsScreen";
 import DoctorConsultationScreen from "./components/screens/DoctorConsultationScreen";
 import DoctorNotificationsScreen from "./components/screens/DoctorNotificationsScreen";
 import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
+import SupportDashboardScreen from "./components/support/SupportDashboardScreen";
+import SecOpsDashboardScreen from "./components/secops/SecOpsDashboardScreen";
 
 const PATH_TO_TAB = {
   "/dashboard": "dashboard",
@@ -51,6 +53,7 @@ const PATH_TO_TAB = {
   "/profile": "profile",
   "/consent": "consent",
   "/support": "support",
+  "/secops": "secops",
   "/doctor/dashboard": "doctor-dashboard",
   "/doctor/appointments": "doctor-appointments",
   "/doctor/patients": "doctor-patients",
@@ -64,6 +67,8 @@ const PATH_TO_TAB = {
   "/clinic/appointments": "clinic-appointments",
   "/clinic/payments": "clinic-payments",
   "/clinic/reports": "clinic-reports",
+  "/clinic/support-staff": "clinic-support-staff",
+  "/clinic/secops": "clinic-secops",
   "/clinic/settings": "clinic-settings",
   "/clinic/approvals": "clinic-doctors",
 };
@@ -200,6 +205,8 @@ export default function App() {
               navigate("/login", { replace: true });
             } else if (res.role === "clinic_admin") {
               navigate("/clinic/overview", { replace: true });
+            } else if (res.role === "support") {
+              navigate("/support", { replace: true });
             } else if (res.role === "doctor") {
               navigate("/doctor/dashboard", { replace: true });
             } else {
@@ -221,6 +228,16 @@ export default function App() {
 
   const isDoctor = patient?.role === "doctor";
 
+  // Support Agent Dashboard View
+  if (patient?.role === "support" || (patient?.role === "clinic_admin" && location.pathname === "/support")) {
+    return (
+      <SupportDashboardScreen
+        user={patient}
+        onLogout={signOut}
+      />
+    );
+  }
+
   // Prevent clinician dashboard access until clinic approval is completed
   if (isDoctor && patient?.approval_status !== "approved") {
     return (
@@ -233,6 +250,9 @@ export default function App() {
   }
 
   const renderScreen = () => {
+    if (patient?.role === "secops" || patient?.role === "security_ops" || routedTab === "secops") {
+      return <SecOpsDashboardScreen user={patient} onLogout={signOut} />;
+    }
     if (patient?.role === "clinic_admin") {
       return (
         <ClinicAdminDashboard

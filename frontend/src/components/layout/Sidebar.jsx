@@ -21,6 +21,7 @@ const roleNavigation = {
     { id: "doctor-patients", label: "Patients", icon: "groups" },
     { id: "doctor-availability", label: "Availability", icon: "schedule" },
     { id: "doctor-settings", label: "Settings", icon: "tune" },
+    { id: "support", label: "Help & support", icon: "headset_mic" },
   ],
   clinic_admin: [
     { id: "clinic-overview", label: "Overview", icon: "dashboard" },
@@ -30,7 +31,28 @@ const roleNavigation = {
     { id: "clinic-appointments", label: "Appointments", icon: "calendar_month" },
     { id: "clinic-payments", label: "Payments", icon: "payments" },
     { id: "clinic-reports", label: "Reports", icon: "analytics" },
+    { id: "clinic-support-staff", label: "Support staff", icon: "support_agent" },
+    { id: "clinic-secops", label: "Security & Operations", icon: "shield_person" },
     { id: "clinic-settings", label: "Clinic settings", icon: "settings" },
+    { id: "support", label: "Help & support", icon: "headset_mic" },
+  ],
+  secops: [
+    { id: "secops-health", label: "System Health", icon: "monitor_heart" },
+    { id: "secops-security", label: "Security Monitoring", icon: "shield_lock" },
+    { id: "secops-audit", label: "Audit Logs", icon: "policy" },
+    { id: "secops-incidents", label: "Incident Management", icon: "warning" },
+    { id: "secops-providers", label: "Provider Outages", icon: "cloud_sync" },
+    { id: "secops-backups", label: "Backup & Recovery", icon: "settings_backup_restore" },
+    { id: "secops-alerts", label: "Operational Alerts", icon: "notifications_active" },
+  ],
+  support: [
+    { id: "support-overview", label: "Live Operations", icon: "grid_view" },
+    { id: "support-patients", label: "Patient Support", icon: "groups" },
+    { id: "support-doctors", label: "Doctor Roster", icon: "badge" },
+    { id: "support-appointments", label: "Appointments", icon: "calendar_month" },
+    { id: "support-payments", label: "Payments & Refunds", icon: "payments" },
+    { id: "support-video", label: "Video Diagnostics", icon: "video_camera_front" },
+    { id: "support-tickets", label: "Support Desk", icon: "headset_mic" },
   ],
 };
 
@@ -46,7 +68,7 @@ export default function Sidebar({
   onCloseMobile,
   patient,
 }) {
-  const role = patient?.role === "doctor" || patient?.role === "clinic_admin" ? patient.role : "patient";
+  const role = patient?.role === "doctor" || patient?.role === "clinic_admin" || patient?.role === "support" ? patient.role : "patient";
   const isDoctor = role === "doctor";
   const isAdmin = role === "clinic_admin";
   const navigation = roleNavigation[role];

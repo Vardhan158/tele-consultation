@@ -517,6 +517,193 @@ export const adminApi = {
     }),
 };
 
+export const supportStaffApi = {
+  list: () => apiRequest("/clinic-admin/support-staff"),
+  create: (payload) =>
+    apiRequest("/clinic-admin/support-staff", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  update: (id, payload) =>
+    apiRequest(`/clinic-admin/support-staff/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  delete: (id) =>
+    apiRequest(`/clinic-admin/support-staff/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+export const supportDashboardApi = {
+  overview: () => apiRequest("/api/v1/support-dashboard/overview"),
+  agents: () => apiRequest("/api/v1/support-dashboard/agents"),
+  accountDiagnostics: (query) =>
+    apiRequest(`/api/v1/support-dashboard/account-diagnostics?query=${encodeURIComponent(query)}`),
+  accountAction: (userId, action, ticketId = null, note = null) =>
+    apiRequest("/api/v1/support-dashboard/account-action", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, action, ticket_id: ticketId, note }),
+    }),
+  bookingDiagnostics: (query) =>
+    apiRequest(`/api/v1/support-dashboard/booking-diagnostics?query=${encodeURIComponent(query)}`),
+  bookingAction: (appointmentId, action, reason, startsAt = null, ticketId = null) =>
+    apiRequest("/api/v1/support-dashboard/booking-action", {
+      method: "POST",
+      body: JSON.stringify({ appointment_id: appointmentId, action, reason, starts_at: startsAt, ticket_id: ticketId }),
+    }),
+  patients: (search = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/patients?search=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`),
+  patientDetail: (id) => apiRequest(`/api/v1/support-dashboard/patients/${id}`),
+  doctors: (search = "", status = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/doctors?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&offset=${offset}&limit=${limit}`),
+  doctorDetail: (id) => apiRequest(`/api/v1/support-dashboard/doctors/${id}`),
+  appointments: (search = "", status = "", date = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/appointments?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&date=${encodeURIComponent(date)}&offset=${offset}&limit=${limit}`),
+  appointmentAction: (id, action, reason, startsAt = null) =>
+    apiRequest(`/api/v1/support-dashboard/appointments/${id}/action`, {
+      method: "POST",
+      body: JSON.stringify({ action, reason, ...(startsAt ? { starts_at: startsAt } : {}) }),
+    }),
+  payments: (search = "", status = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/payments?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&offset=${offset}&limit=${limit}`),
+  refundPayment: (id, reason, amount = null) =>
+    apiRequest(`/api/v1/support-dashboard/payments/${id}/refund`, {
+      method: "POST",
+      body: JSON.stringify({ reason, amount }),
+    }),
+  videoSessions: (status = "") =>
+    apiRequest(`/api/v1/support-dashboard/video-sessions?status=${encodeURIComponent(status)}`),
+  videoDiagnostics: (query) =>
+    apiRequest(`/api/v1/support-dashboard/video-diagnostics?query=${encodeURIComponent(query)}`),
+  videoAction: (sessionId, action, ticketId = null, note = null) =>
+    apiRequest("/api/v1/support-dashboard/video-action", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId, action, ticket_id: ticketId, note }),
+    }),
+  endVideoSession: (id) =>
+    apiRequest(`/api/v1/support-dashboard/video-sessions/${id}/end`, {
+      method: "POST",
+    }),
+  tickets: (status = "", priority = "", category = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/tickets?status=${encodeURIComponent(status)}&priority=${encodeURIComponent(priority)}&category=${encodeURIComponent(category)}&offset=${offset}&limit=${limit}`),
+  createTicket: (payload) =>
+    apiRequest("/api/v1/support-dashboard/tickets", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateTicket: (id, payload) =>
+    apiRequest(`/api/v1/support-dashboard/tickets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  ticketDetails: (id) => apiRequest(`/api/v1/support-dashboard/tickets/${id}`),
+  escalations: (status = "", team = "", priority = "", ticketId = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/support-dashboard/escalations?status=${encodeURIComponent(status)}&destination_team=${encodeURIComponent(team)}&priority=${encodeURIComponent(priority)}&ticket_id=${encodeURIComponent(ticketId)}&offset=${offset}&limit=${limit}`),
+  createEscalation: (payload) =>
+    apiRequest("/api/v1/support-dashboard/escalations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateEscalation: (id, payload) =>
+    apiRequest(`/api/v1/support-dashboard/escalations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  auditHistory: (startDate = "", endDate = "", actorId = "", ticketId = "", action = "", resource = "", resultFilter = "", offset = 0, limit = 50) =>
+    apiRequest(`/api/v1/support-dashboard/audit-history?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&actor_id=${encodeURIComponent(actorId)}&ticket_id=${encodeURIComponent(ticketId)}&action=${encodeURIComponent(action)}&resource=${encodeURIComponent(resource)}&result_filter=${encodeURIComponent(resultFilter)}&offset=${offset}&limit=${limit}`),
+  auditExport: (startDate = "", endDate = "", actorId = "", ticketId = "", action = "", resource = "", resultFilter = "") =>
+    apiRequest(`/api/v1/support-dashboard/audit-export?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&actor_id=${encodeURIComponent(actorId)}&ticket_id=${encodeURIComponent(ticketId)}&action=${encodeURIComponent(action)}&resource=${encodeURIComponent(resource)}&result_filter=${encodeURIComponent(resultFilter)}`, {
+      method: "POST",
+    }),
+  slaConfig: () => apiRequest("/api/v1/support-dashboard/sla-config"),
+  updateSlaConfig: (payload) =>
+    apiRequest("/api/v1/support-dashboard/sla-config", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  uploadAttachment: (ticketId, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiRequest(`/api/v1/support-dashboard/tickets/${ticketId}/attachments`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+};
+
+export const secopsDashboardApi = {
+  healthOverview: () => apiRequest("/api/v1/secops-dashboard/health-overview"),
+  triggerHealthCheck: () =>
+    apiRequest("/api/v1/secops-dashboard/health/check", { method: "POST" }),
+  securityEvents: (severity = "", search = "", eventType = "", status = "", startDate = "", endDate = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/secops-dashboard/security/events?severity=${encodeURIComponent(severity)}&search=${encodeURIComponent(search)}&event_type=${encodeURIComponent(eventType)}&status=${encodeURIComponent(status)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&offset=${offset}&limit=${limit}`),
+  updateSecurityEvent: (id, payload) =>
+    apiRequest(`/api/v1/secops-dashboard/security/events/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  executeSecurityAction: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/security/action", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  auditLogs: (startDate = "", endDate = "", actorId = "", action = "", resource = "", resultFilter = "", correlationId = "", offset = 0, limit = 50) =>
+    apiRequest(`/api/v1/secops-dashboard/audit-logs?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&actor_id=${encodeURIComponent(actorId)}&action=${encodeURIComponent(action)}&resource=${encodeURIComponent(resource)}&result_filter=${encodeURIComponent(resultFilter)}&correlation_id=${encodeURIComponent(correlationId)}&offset=${offset}&limit=${limit}`),
+  exportAuditLogs: () =>
+    apiRequest("/api/v1/secops-dashboard/audit/export", { method: "POST" }),
+  incidents: (status = "", severity = "", category = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/secops-dashboard/incidents?status=${encodeURIComponent(status)}&severity=${encodeURIComponent(severity)}&category=${encodeURIComponent(category)}&offset=${offset}&limit=${limit}`),
+  createIncident: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/incidents", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateIncident: (id, payload) =>
+    apiRequest(`/api/v1/secops-dashboard/incidents/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  providers: () => apiRequest("/api/v1/secops-dashboard/providers"),
+  probeProvider: (providerKey) =>
+    apiRequest(`/api/v1/secops-dashboard/providers/${providerKey}/check`, { method: "POST" }),
+  recordProviderMaintenance: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/providers/maintenance", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  backups: () => apiRequest("/api/v1/secops-dashboard/backups"),
+  triggerBackup: () =>
+    apiRequest("/api/v1/secops-dashboard/backups/trigger", { method: "POST" }),
+  verifyBackupArtifact: (id) =>
+    apiRequest(`/api/v1/secops-dashboard/backups/${id}/verify`, { method: "POST" }),
+  createRecoveryRequest: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/backups/recovery-requests", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateRecoveryRequest: (id, payload) =>
+    apiRequest(`/api/v1/secops-dashboard/backups/recovery-requests/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  alerts: (status = "", severity = "", offset = 0, limit = 25) =>
+    apiRequest(`/api/v1/secops-dashboard/alerts?status=${encodeURIComponent(status)}&severity=${encodeURIComponent(severity)}&offset=${offset}&limit=${limit}`),
+  acknowledgeAlert: (alertId) =>
+    apiRequest(`/api/v1/secops-dashboard/alerts/${alertId}/acknowledge`, { method: "POST" }),
+  updateAlertAction: (alertId, payload) =>
+    apiRequest(`/api/v1/secops-dashboard/alerts/${alertId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  alertRules: () => apiRequest("/api/v1/secops-dashboard/alerts/rules"),
+  updateAlertRules: (payload) =>
+    apiRequest("/api/v1/secops-dashboard/alerts/rules", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+};
+
 export function loadRazorpayScript() {
   return new Promise((resolve) => {
     if (typeof window !== "undefined" && window.Razorpay) {
