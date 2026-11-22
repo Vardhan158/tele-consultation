@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import stethoscopeGlbUrl from "../../assets/Stethoscope.glb?url";
 
 export default function Stethoscope3D({ className = "", interactive = true }) {
   const mountRef = useRef(null);
   const [hovered, setHovered] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -29,7 +32,7 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
     container.appendChild(renderer.domElement);
 
     // 2. Lighting System
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
     scene.add(ambientLight);
 
     const mainLight = new THREE.DirectionalLight(0xffffff, 2.5);
@@ -45,173 +48,149 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
     rimLight.position.set(-5, -5, -2);
     scene.add(rimLight);
 
-    // 3. Materials
+    // 3. Stethoscope 3D Model Group Container
+    const stethoscopeGroup = new THREE.Group();
+    scene.add(stethoscopeGroup);
+
+    // --- PROCEDURAL PROCEDURAL FALLBACK MESH ---
     const chromeMaterial = new THREE.MeshStandardMaterial({
       color: 0xe2e8f0,
       metalness: 0.92,
       roughness: 0.15,
-      envMapIntensity: 1.5,
     });
-
-    const darkGoldBrassMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd97706,
-      metalness: 0.85,
-      roughness: 0.2,
-    });
-
     const tubingMaterial = new THREE.MeshStandardMaterial({
       color: 0x123d35,
       roughness: 0.35,
       metalness: 0.1,
     });
-
     const rimRubberMaterial = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
       roughness: 0.7,
       metalness: 0.05,
     });
-
     const earTipMaterial = new THREE.MeshStandardMaterial({
       color: 0x334155,
       roughness: 0.4,
       metalness: 0.1,
     });
 
-    // 4. Stethoscope 3D Model Group
-    const stethoscopeGroup = new THREE.Group();
+    const fallbackGroup = new THREE.Group();
 
-    // --- CHESTPIECE (Diaphragm & Bell) ---
-    const chestpieceGroup = new THREE.Group();
-
-    // Main Diaphragm Disc
-    const diaphragmGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.22, 64);
-    const diaphragmMesh = new THREE.Mesh(diaphragmGeo, chromeMaterial);
+    // Diaphragm
+    const diaphragmMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.22, 64), chromeMaterial);
     diaphragmMesh.rotation.x = Math.PI / 2;
-    diaphragmMesh.castShadow = true;
-    chestpieceGroup.add(diaphragmMesh);
+    fallbackGroup.add(diaphragmMesh);
 
-    // Diaphragm Rubber Rim Ring
-    const rimRingGeo = new THREE.TorusGeometry(1.2, 0.09, 24, 64);
-    const rimRingMesh = new THREE.Mesh(rimRingGeo, rimRubberMaterial);
-    rimRingMesh.castShadow = true;
-    chestpieceGroup.add(rimRingMesh);
+    const rimRingMesh = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.09, 24, 64), rimRubberMaterial);
+    fallbackGroup.add(rimRingMesh);
 
-    // Diaphragm Inner Face Membrane
-    const faceGeo = new THREE.CircleGeometry(1.12, 64);
-    const faceMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      metalness: 0.3,
-      roughness: 0.1,
-    });
-    const faceMesh = new THREE.Mesh(faceGeo, faceMat);
+    const faceMesh = new THREE.Mesh(
+      new THREE.CircleGeometry(1.12, 64),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.3, roughness: 0.1 })
+    );
     faceMesh.position.z = 0.12;
-    chestpieceGroup.add(faceMesh);
+    fallbackGroup.add(faceMesh);
 
-    // Bell Side (Back Cone)
-    const bellGeo = new THREE.CylinderGeometry(0.7, 1.0, 0.4, 48);
-    const bellMesh = new THREE.Mesh(bellGeo, chromeMaterial);
+    const bellMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 0.4, 48), chromeMaterial);
     bellMesh.position.z = -0.28;
     bellMesh.rotation.x = Math.PI / 2;
-    bellMesh.castShadow = true;
-    chestpieceGroup.add(bellMesh);
+    fallbackGroup.add(bellMesh);
 
-    // Stem Connector Extension
-    const stemGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.7, 32);
-    const stemMesh = new THREE.Mesh(stemGeo, chromeMaterial);
-    stemMesh.position.set(0, 0.9, -0.1);
-    stemMesh.castShadow = true;
-    chestpieceGroup.add(stemMesh);
+    fallbackGroup.position.set(0, -1.8, 0.2);
 
-    chestpieceGroup.position.set(0, -1.8, 0.2);
-    stethoscopeGroup.add(chestpieceGroup);
-
-    // --- FLEXIBLE Y-TUBING ---
+    // Tubing Main
     const tubePathMain = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, -0.8, 0.1),
       new THREE.Vector3(0, -0.2, 0.3),
       new THREE.Vector3(0, 0.5, 0.2),
       new THREE.Vector3(0, 1.1, 0.0),
     ]);
-    const tubeMainGeo = new THREE.TubeGeometry(tubePathMain, 64, 0.16, 24, false);
-    const tubeMainMesh = new THREE.Mesh(tubeMainGeo, tubingMaterial);
-    tubeMainMesh.castShadow = true;
+    const tubeMainMesh = new THREE.Mesh(new THREE.TubeGeometry(tubePathMain, 64, 0.16, 24, false), tubingMaterial);
     stethoscopeGroup.add(tubeMainMesh);
 
-    // Y-Split Connector Junction
-    const yJunctionGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.45, 32);
-    const yJunctionMesh = new THREE.Mesh(yJunctionGeo, chromeMaterial);
-    yJunctionMesh.position.set(0, 1.1, 0);
-    stethoscopeGroup.add(yJunctionMesh);
-
-    // Left Tubing Branch
     const tubeLeftPath = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 1.1, 0),
       new THREE.Vector3(-0.5, 1.4, -0.1),
       new THREE.Vector3(-1.0, 1.9, -0.2),
     ]);
-    const tubeLeftGeo = new THREE.TubeGeometry(tubeLeftPath, 32, 0.14, 20, false);
-    const tubeLeftMesh = new THREE.Mesh(tubeLeftGeo, tubingMaterial);
-    tubeLeftMesh.castShadow = true;
-    stethoscopeGroup.add(tubeLeftMesh);
+    stethoscopeGroup.add(new THREE.Mesh(new THREE.TubeGeometry(tubeLeftPath, 32, 0.14, 20, false), tubingMaterial));
 
-    // Right Tubing Branch
     const tubeRightPath = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 1.1, 0),
       new THREE.Vector3(0.5, 1.4, -0.1),
       new THREE.Vector3(1.0, 1.9, -0.2),
     ]);
-    const tubeRightGeo = new THREE.TubeGeometry(tubeRightPath, 32, 0.14, 20, false);
-    const tubeRightMesh = new THREE.Mesh(tubeRightGeo, tubingMaterial);
-    tubeRightMesh.castShadow = true;
-    stethoscopeGroup.add(tubeRightMesh);
+    stethoscopeGroup.add(new THREE.Mesh(new THREE.TubeGeometry(tubeRightPath, 32, 0.14, 20, false), tubingMaterial));
 
-    // --- BINAURAL EAR TUBES (METALLIC SPRINGS) ---
-    // Left Eartube Curve
     const earLeftPath = new THREE.CatmullRomCurve3([
       new THREE.Vector3(-1.0, 1.9, -0.2),
       new THREE.Vector3(-1.3, 2.5, -0.1),
       new THREE.Vector3(-1.1, 3.1, 0.1),
       new THREE.Vector3(-0.6, 3.4, 0.2),
     ]);
-    const earLeftGeo = new THREE.TubeGeometry(earLeftPath, 48, 0.1, 20, false);
-    const earLeftMesh = new THREE.Mesh(earLeftGeo, chromeMaterial);
-    earLeftMesh.castShadow = true;
-    stethoscopeGroup.add(earLeftMesh);
+    stethoscopeGroup.add(new THREE.Mesh(new THREE.TubeGeometry(earLeftPath, 48, 0.1, 20, false), chromeMaterial));
 
-    // Right Eartube Curve
     const earRightPath = new THREE.CatmullRomCurve3([
       new THREE.Vector3(1.0, 1.9, -0.2),
       new THREE.Vector3(1.3, 2.5, -0.1),
       new THREE.Vector3(1.1, 3.1, 0.1),
       new THREE.Vector3(0.6, 3.4, 0.2),
     ]);
-    const earRightGeo = new THREE.TubeGeometry(earRightPath, 48, 0.1, 20, false);
-    const earRightMesh = new THREE.Mesh(earRightGeo, chromeMaterial);
-    earRightMesh.castShadow = true;
-    stethoscopeGroup.add(earRightMesh);
+    stethoscopeGroup.add(new THREE.Mesh(new THREE.TubeGeometry(earRightPath, 48, 0.1, 20, false), chromeMaterial));
 
-    // Binaural Spring Connector Bridge
-    const springBridgeGeo = new THREE.CylinderGeometry(0.06, 0.06, 2.2, 16);
-    const springBridgeMesh = new THREE.Mesh(springBridgeGeo, chromeMaterial);
-    springBridgeMesh.position.set(0, 2.3, -0.15);
-    springBridgeMesh.rotation.z = Math.PI / 2;
-    stethoscopeGroup.add(springBridgeMesh);
-
-    // Ear Tips
-    const tipGeo = new THREE.SphereGeometry(0.2, 24, 24);
-
-    const leftTip = new THREE.Mesh(tipGeo, earTipMaterial);
+    const leftTip = new THREE.Mesh(new THREE.SphereGeometry(0.2, 24, 24), earTipMaterial);
     leftTip.position.set(-0.6, 3.4, 0.2);
     stethoscopeGroup.add(leftTip);
 
-    const rightTip = new THREE.Mesh(tipGeo, earTipMaterial);
+    const rightTip = new THREE.Mesh(new THREE.SphereGeometry(0.2, 24, 24), earTipMaterial);
     rightTip.position.set(0.6, 3.4, 0.2);
     stethoscopeGroup.add(rightTip);
 
-    // Center stethoscope group in scene
+    stethoscopeGroup.add(fallbackGroup);
     stethoscopeGroup.rotation.z = -0.15;
     stethoscopeGroup.scale.set(0.95, 0.95, 0.95);
-    scene.add(stethoscopeGroup);
+
+    // --- 4. LOAD ACTUAL GLTF / GLB ASSET ---
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load(
+      stethoscopeGlbUrl,
+      (gltf) => {
+        const model = gltf.scene;
+
+        // Auto-center & auto-scale GLB asset to fit container viewport
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        if (maxDim > 0) {
+          const desiredScale = 4.2 / maxDim;
+          model.scale.set(desiredScale, desiredScale, desiredScale);
+          model.position.sub(center.multiplyScalar(desiredScale));
+        }
+
+        // Enable shadows & metallic highlights
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) {
+              child.material.envMapIntensity = 1.6;
+              child.material.needsUpdate = true;
+            }
+          }
+        });
+
+        // Swap out fallback mesh for real GLTF model
+        stethoscopeGroup.clear();
+        stethoscopeGroup.add(model);
+        setLoaded(true);
+      },
+      undefined,
+      (error) => {
+        console.warn("GLB load fallback engaged:", error);
+      }
+    );
 
     // 5. Interactive Mouse Rotation State
     let targetRotationX = 0;
@@ -241,7 +220,6 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
         previousMouseX = clientX;
         previousMouseY = clientY;
       } else {
-        // Subtle hover response
         const rect = container.getBoundingClientRect();
         const mouseX = ((clientX - rect.left) / rect.width) * 2 - 1;
         const mouseY = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -269,17 +247,14 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
     const animate = () => {
       const elapsedTime = clock.getElapsedTime();
 
-      // Smooth damp rotation
       stethoscopeGroup.rotation.y += (targetRotationY - stethoscopeGroup.rotation.y) * 0.05;
       stethoscopeGroup.rotation.x += (targetRotationX - stethoscopeGroup.rotation.x) * 0.05;
 
-      // Gentle floating / breathing idle motion
       if (!isDragging) {
         stethoscopeGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.12;
         stethoscopeGroup.rotation.z = -0.15 + Math.cos(elapsedTime * 1.2) * 0.04;
       }
 
-      // Rotate light slightly for dynamic chrome shine
       tealGlowLight.position.x = Math.sin(elapsedTime * 1.2) * 4;
       tealGlowLight.position.z = Math.cos(elapsedTime * 1.2) * 4;
 
@@ -326,10 +301,15 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       {/* Subtle Background Glow Ring */}
       <div className="pointer-events-none absolute size-64 sm:size-80 lg:size-96 rounded-full bg-gradient-to-tr from-[#20C7A7]/20 via-[#1A7D67]/10 to-transparent blur-3xl animate-pulse" />
 
+      {/* FS 60P Style Badge */}
+      <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-[#EBEBEB] text-[#000000] text-[10px] font-mono font-medium border border-zinc-300 shadow-2xs">
+        {loaded ? "Stethoscope.glb · Loaded" : "3D WebGL Engine"}
+      </div>
+
       {/* Interactive Helper Pill */}
       {interactive && (
-        <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#123D35]/80 text-[#20C7A7] text-[11px] font-semibold border border-[#20C7A7]/30 backdrop-blur-md transition-opacity duration-300 pointer-events-none ${
-          hovered ? "opacity-100" : "opacity-60"
+        <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#000000]/80 text-[#FFFFFF] text-[11px] font-medium border border-white/20 backdrop-blur-md transition-opacity duration-300 pointer-events-none ${
+          hovered ? "opacity-100" : "opacity-70"
         }`}>
           ✨ Drag or move cursor to inspect 3D Stethoscope
         </div>
