@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import stethoscopeGlbUrl from "../../assets/Stethoscope.glb?url";
 
 export default function Stethoscope3D({ className = "", interactive = true }) {
   const mountRef = useRef(null);
   const [hovered, setHovered] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [fps, setFps] = useState(60);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -17,8 +19,8 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
 
     // 1. Scene, Camera, Renderer
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 0, 8.5);
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+    camera.position.set(0, 0, 8.2);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -29,48 +31,82 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
     container.appendChild(renderer.domElement);
 
-    // 2. Lighting System
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+    // 2. Studio Room Environment Map (Photorealistic Luxury Reflection Engine)
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+    const roomEnv = new RoomEnvironment(renderer);
+    scene.environment = pmremGenerator.fromScene(roomEnv, 0.04).texture;
+
+    // 3. Studio Lighting System
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
     scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 2.5);
-    mainLight.position.set(5, 8, 5);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 3.2);
+    mainLight.position.set(6, 9, 6);
     mainLight.castShadow = true;
     scene.add(mainLight);
 
-    const tealGlowLight = new THREE.PointLight(0x20c7a7, 3.5, 12);
-    tealGlowLight.position.set(-3, -2, 3);
-    scene.add(tealGlowLight);
+    const cyanSpotLight = new THREE.PointLight(0x20c7a7, 4.5, 14);
+    cyanSpotLight.position.set(-3.5, -2, 4);
+    scene.add(cyanSpotLight);
 
-    const rimLight = new THREE.DirectionalLight(0xa5f3fc, 1.5);
-    rimLight.position.set(-5, -5, -2);
+    const rimLight = new THREE.DirectionalLight(0xa5f3fc, 2.0);
+    rimLight.position.set(-6, -6, -3);
     scene.add(rimLight);
 
-    // 3. Stethoscope 3D Model Group Container
+    // 4. Contact Drop Shadow Floor (Realistic Studio Floor Shadow)
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, "rgba(18, 61, 53, 0.5)");
+    grad.addColorStop(0.4, "rgba(18, 61, 53, 0.2)");
+    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const shadowTex = new THREE.CanvasTexture(canvas);
+    const shadowGeo = new THREE.PlaneGeometry(6, 6);
+    const shadowMat = new THREE.MeshBasicMaterial({
+      map: shadowTex,
+      transparent: true,
+      depthWrite: false,
+    });
+    const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+    shadowMesh.rotation.x = -Math.PI / 2;
+    shadowMesh.position.y = -2.8;
+    scene.add(shadowMesh);
+
+    // 5. Stethoscope 3D Model Group Container
     const stethoscopeGroup = new THREE.Group();
     scene.add(stethoscopeGroup);
 
-    // --- PROCEDURAL PROCEDURAL FALLBACK MESH ---
+    // --- PROCEDURAL FALLBACK MESH ---
     const chromeMaterial = new THREE.MeshStandardMaterial({
       color: 0xe2e8f0,
-      metalness: 0.92,
-      roughness: 0.15,
+      metalness: 0.96,
+      roughness: 0.1,
+      envMapIntensity: 2.0,
     });
     const tubingMaterial = new THREE.MeshStandardMaterial({
       color: 0x123d35,
-      roughness: 0.35,
-      metalness: 0.1,
+      roughness: 0.28,
+      metalness: 0.12,
+      envMapIntensity: 1.2,
     });
     const rimRubberMaterial = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
-      roughness: 0.7,
+      roughness: 0.65,
       metalness: 0.05,
     });
     const earTipMaterial = new THREE.MeshStandardMaterial({
       color: 0x334155,
-      roughness: 0.4,
+      roughness: 0.35,
       metalness: 0.1,
     });
 
@@ -86,7 +122,7 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
 
     const faceMesh = new THREE.Mesh(
       new THREE.CircleGeometry(1.12, 64),
-      new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.3, roughness: 0.1 })
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.4, roughness: 0.08, envMapIntensity: 2.2 })
     );
     faceMesh.position.z = 0.12;
     fallbackGroup.add(faceMesh);
@@ -105,8 +141,7 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       new THREE.Vector3(0, 0.5, 0.2),
       new THREE.Vector3(0, 1.1, 0.0),
     ]);
-    const tubeMainMesh = new THREE.Mesh(new THREE.TubeGeometry(tubePathMain, 64, 0.16, 24, false), tubingMaterial);
-    stethoscopeGroup.add(tubeMainMesh);
+    stethoscopeGroup.add(new THREE.Mesh(new THREE.TubeGeometry(tubePathMain, 64, 0.16, 24, false), tubingMaterial));
 
     const tubeLeftPath = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 1.1, 0),
@@ -150,14 +185,14 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
     stethoscopeGroup.rotation.z = -0.15;
     stethoscopeGroup.scale.set(0.95, 0.95, 0.95);
 
-    // --- 4. LOAD ACTUAL GLTF / GLB ASSET ---
+    // --- 6. LOAD ACTUAL GLTF / GLB ASSET ---
     const gltfLoader = new GLTFLoader();
     gltfLoader.load(
       stethoscopeGlbUrl,
       (gltf) => {
         const model = gltf.scene;
 
-        // Auto-center & auto-scale GLB asset to fit container viewport
+        // Auto-center & auto-scale GLB asset
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -169,19 +204,19 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
           model.position.sub(center.multiplyScalar(desiredScale));
         }
 
-        // Enable shadows & metallic highlights
+        // Apply luxury reflections & shadows to meshes
         model.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
             if (child.material) {
-              child.material.envMapIntensity = 1.6;
+              child.material.envMapIntensity = 2.2;
+              child.material.roughness = Math.min(child.material.roughness, 0.3);
               child.material.needsUpdate = true;
             }
           }
         });
 
-        // Swap out fallback mesh for real GLTF model
         stethoscopeGroup.clear();
         stethoscopeGroup.add(model);
         setLoaded(true);
@@ -192,9 +227,11 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       }
     );
 
-    // 5. Interactive Mouse Rotation State
-    let targetRotationX = 0;
-    let targetRotationY = 0;
+    // 7. Momentum Inertia Drag Physics (Like thewatch.60fps.fr)
+    let currentRotationX = 0;
+    let currentRotationY = 0;
+    let velocityX = 0;
+    let velocityY = 0;
     let isDragging = false;
     let previousMouseX = 0;
     let previousMouseY = 0;
@@ -204,6 +241,8 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       isDragging = true;
       previousMouseX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
       previousMouseY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+      velocityX = 0;
+      velocityY = 0;
     };
 
     const handlePointerMove = (e) => {
@@ -214,18 +253,14 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
         const deltaX = clientX - previousMouseX;
         const deltaY = clientY - previousMouseY;
 
-        targetRotationY += deltaX * 0.008;
-        targetRotationX += deltaY * 0.008;
+        velocityX = deltaX * 0.007;
+        velocityY = deltaY * 0.007;
+
+        currentRotationY += velocityX;
+        currentRotationX += velocityY;
 
         previousMouseX = clientX;
         previousMouseY = clientY;
-      } else {
-        const rect = container.getBoundingClientRect();
-        const mouseX = ((clientX - rect.left) / rect.width) * 2 - 1;
-        const mouseY = -((clientY - rect.top) / rect.height) * 2 + 1;
-
-        targetRotationY = mouseX * 0.35;
-        targetRotationX = -mouseY * 0.25;
       }
     };
 
@@ -240,31 +275,60 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       window.addEventListener("pointerup", handlePointerUp);
     }
 
-    // 6. Animation Loop
+    // 8. Scroll-Driven 3D Rotation
+    let scrollRotationY = 0;
+    const handleScroll = () => {
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      scrollRotationY = scrollY * 0.0015;
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    // 9. Animation Loop (60 FPS Inertia & Floating)
     let clock = new THREE.Clock();
     let animFrameId;
+    let lastFpsCheck = performance.now();
+    let frameCount = 0;
 
     const animate = () => {
       const elapsedTime = clock.getElapsedTime();
 
-      stethoscopeGroup.rotation.y += (targetRotationY - stethoscopeGroup.rotation.y) * 0.05;
-      stethoscopeGroup.rotation.x += (targetRotationX - stethoscopeGroup.rotation.x) * 0.05;
-
+      // Inertia Momentum Decay
       if (!isDragging) {
+        currentRotationY += velocityX;
+        currentRotationX += velocityY;
+        velocityX *= 0.94; // Friction decay
+        velocityY *= 0.94;
+      }
+
+      // Combine user drag + scroll rotation + idle float
+      stethoscopeGroup.rotation.y = currentRotationY + scrollRotationY;
+      stethoscopeGroup.rotation.x = currentRotationX;
+
+      if (!isDragging && Math.abs(velocityX) < 0.0001 && Math.abs(velocityY) < 0.0001) {
         stethoscopeGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.12;
         stethoscopeGroup.rotation.z = -0.15 + Math.cos(elapsedTime * 1.2) * 0.04;
       }
 
-      tealGlowLight.position.x = Math.sin(elapsedTime * 1.2) * 4;
-      tealGlowLight.position.z = Math.cos(elapsedTime * 1.2) * 4;
+      cyanSpotLight.position.x = Math.sin(elapsedTime * 1.2) * 4;
+      cyanSpotLight.position.z = Math.cos(elapsedTime * 1.2) * 4;
 
       renderer.render(scene, camera);
+
+      // FPS Counter
+      frameCount++;
+      const nowTime = performance.now();
+      if (nowTime - lastFpsCheck >= 1000) {
+        setFps(Math.round((frameCount * 1000) / (nowTime - lastFpsCheck)));
+        frameCount = 0;
+        lastFpsCheck = nowTime;
+      }
+
       animFrameId = requestAnimationFrame(animate);
     };
 
     animate();
 
-    // 7. Responsive Resize Handler
+    // 10. Responsive Resize Handler
     const handleResize = () => {
       if (!container) return;
       const newW = container.clientWidth || 400;
@@ -279,11 +343,14 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
     return () => {
       cancelAnimationFrame(animFrameId);
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll);
       if (interactive) {
         domContainer.removeEventListener("pointerdown", handlePointerDown);
         window.removeEventListener("pointermove", handlePointerMove);
         window.removeEventListener("pointerup", handlePointerUp);
       }
+      pmremGenerator.dispose();
+      roomEnv.dispose();
       if (domContainer.contains(renderer.domElement)) {
         domContainer.removeChild(renderer.domElement);
       }
@@ -296,22 +363,25 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       ref={mountRef}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`relative w-full h-[380px] sm:h-[480px] lg:h-[560px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none ${className}`}
+      className={`relative w-full h-[400px] sm:h-[500px] lg:h-[600px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none ${className}`}
     >
-      {/* Subtle Background Glow Ring */}
-      <div className="pointer-events-none absolute size-64 sm:size-80 lg:size-96 rounded-full bg-gradient-to-tr from-[#20C7A7]/20 via-[#1A7D67]/10 to-transparent blur-3xl animate-pulse" />
+      {/* Luxury Background Glow Ring */}
+      <div className="pointer-events-none absolute size-72 sm:size-96 lg:size-[480px] rounded-full bg-gradient-to-tr from-[#20C7A7]/25 via-[#123D35]/15 to-transparent blur-3xl animate-pulse" />
 
-      {/* FS 60P Style Badge */}
-      <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-[#EBEBEB] text-[#000000] text-[10px] font-mono font-medium border border-zinc-300 shadow-2xs">
-        {loaded ? "Stethoscope.glb · Loaded" : "3D WebGL Engine"}
+      {/* FS 60P Studio Style Badge */}
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-[#EBEBEB] text-[#000000] text-[10px] font-mono font-medium border border-zinc-300 shadow-2xs">
+        <span className="size-2 rounded-full bg-[#123D35] animate-ping" />
+        <span>{loaded ? "Stethoscope.glb · Loaded" : "3D WebGL Engine"}</span>
+        <span className="opacity-40">|</span>
+        <span className="text-[#123D35] font-bold">{fps} FPS</span>
       </div>
 
       {/* Interactive Helper Pill */}
       {interactive && (
-        <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#000000]/80 text-[#FFFFFF] text-[11px] font-medium border border-white/20 backdrop-blur-md transition-opacity duration-300 pointer-events-none ${
-          hovered ? "opacity-100" : "opacity-70"
+        <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 px-3.5 py-1.5 rounded-full bg-[#000000]/80 text-[#FFFFFF] text-[11px] font-medium border border-white/20 backdrop-blur-md transition-all duration-300 pointer-events-none ${
+          hovered ? "opacity-100 scale-102" : "opacity-75 scale-100"
         }`}>
-          ✨ Drag or move cursor to inspect 3D Stethoscope
+          ✨ Spin, drag or scroll to inspect 3D Stethoscope
         </div>
       )}
     </div>
