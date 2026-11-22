@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Lenis from "lenis";
 import PublicNavbar from "./PublicNavbar";
+import Stethoscope3D from "./Stethoscope3D";
 import "./landing-theme.css";
 
 // ============================================================================
@@ -122,6 +123,7 @@ export default function LandingScreen({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [heroMounted, setHeroMounted] = useState(false);
+  const [heroView, setHeroView] = useState("doctor");
   const [scrolled, setScrolled] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -361,19 +363,52 @@ export default function LandingScreen({
             </div>
           </div>
 
-          {/* Right Column Physician Image */}
+          {/* Right Column Interactive Hero Graphic (Doctor or 3D Stethoscope) */}
           <div
             style={{ transitionDelay: "300ms" }}
-            className={`flex-1 w-full flex justify-center lg:justify-end items-end self-end z-10 mt-6 lg:mt-0 transform transition-all duration-1000 ease-out ${
+            className={`flex-1 w-full flex flex-col justify-end items-center lg:items-end self-end z-10 mt-6 lg:mt-0 transform transition-all duration-1000 ease-out ${
               heroMounted ? "translate-y-0 opacity-100 scale-100" : "translate-y-12 opacity-0 scale-98"
             }`}
           >
-            <img
-              src="/assets/doctor.png"
-              alt="Physician at Kaizen Care"
-              className="w-auto h-auto max-h-[500px] sm:max-h-[580px] lg:max-h-[660px] xl:max-h-[720px] object-contain object-bottom pointer-events-none select-none drop-shadow-sm transition-transform duration-700 hover:scale-[1.01]"
-              loading="eager"
-            />
+            {/* View Switcher Toggle Pill */}
+            <div className="mb-3 flex items-center gap-1.5 p-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 shadow-xs z-20">
+              <button
+                type="button"
+                onClick={() => setHeroView("doctor")}
+                className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  heroView === "doctor"
+                    ? "bg-white text-[#165849] shadow-xs font-bold"
+                    : "text-white/90 hover:text-white"
+                }`}
+              >
+                Physician View
+              </button>
+              <button
+                type="button"
+                onClick={() => setHeroView("3d")}
+                className={`inline-flex items-center gap-1 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  heroView === "3d"
+                    ? "bg-white text-[#165849] shadow-xs font-bold"
+                    : "text-white/90 hover:text-white"
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">3d_rotation</span>
+                3D Stethoscope
+              </button>
+            </div>
+
+            {heroView === "doctor" ? (
+              <img
+                src="/assets/doctor.png"
+                alt="Physician at Kaizen Care"
+                className="w-auto h-auto max-h-[500px] sm:max-h-[580px] lg:max-h-[660px] xl:max-h-[720px] object-contain object-bottom pointer-events-none select-none drop-shadow-sm transition-transform duration-700 hover:scale-[1.01]"
+                loading="eager"
+              />
+            ) : (
+              <div className="w-full max-w-lg bg-white/10 backdrop-blur-md border border-white/25 rounded-3xl p-4 shadow-xl overflow-hidden">
+                <Stethoscope3D className="w-full h-[400px] sm:h-[480px]" interactive={true} />
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -505,6 +540,75 @@ export default function LandingScreen({
               </div>
             </ScrollReveal>
           ))}
+        </div>
+      </section>
+
+      {/* ========================================================= */}
+      {/* 3D DIAGNOSTIC TECHNOLOGY SHOWCASE SECTION (FS 60P STYLED) */}
+      {/* ========================================================= */}
+      <section
+        id="technology"
+        className="w-full bg-[#EBEBEB] text-[#000000] border-y border-zinc-300/80 py-20 lg:py-28 font-sans transition-all duration-300"
+      >
+        <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20">
+          <ScrollReveal animation="fade-up">
+            <div className="flex flex-col items-center text-center max-w-3xl mx-auto mb-12 space-y-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-zinc-300 text-xs font-semibold text-[#000000] uppercase tracking-wider shadow-2xs">
+                <span>FS 60P Precision Engineering</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[#000000] leading-tight">
+                Interactive 3D Clinical Acoustic System
+              </h2>
+              <p className="text-sm sm:text-base text-zinc-700 max-w-2xl leading-relaxed">
+                Experience crystal-clear remote diagnostics powered by high-fidelity acoustic transmission and 60 FPS real-time WebGL 3D visualization.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Left 3D Canvas Box */}
+            <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-zinc-300 shadow-md relative overflow-hidden group">
+              <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1 bg-[#000000]/5 rounded-full text-xs font-mono font-medium text-zinc-800 border border-zinc-200">
+                <span className="size-2 rounded-full bg-[#165849] animate-ping" />
+                WebGL 3D Engine · 60 FPS
+              </div>
+
+              <Stethoscope3D className="w-full" interactive={true} />
+            </div>
+
+            {/* Right Feature Details */}
+            <div className="lg:col-span-5 space-y-5">
+              {[
+                {
+                  icon: "graphic_eq",
+                  title: "Acoustic Fidelity",
+                  desc: "Precision diaphragm resonance designed to capture subtle heart and lung sound signatures remotely.",
+                },
+                {
+                  icon: "3d_rotation",
+                  title: "Interactive 3D Spatial Rendering",
+                  desc: "Drag or hover the viewport to examine physical component contours from any angle with real-time lighting.",
+                },
+                {
+                  icon: "verified",
+                  title: "Clinical Calibration",
+                  desc: "Built to match medical-grade acoustic impedance standards for telemedicine consultations.",
+                },
+              ].map((feat, idx) => (
+                <ScrollReveal key={idx} animation="fade-left" delay={idx * 150}>
+                  <div className="bg-white p-6 rounded-2xl border border-zinc-300 shadow-xs hover:border-[#165849] transition-all duration-300 flex items-start gap-4 group cursor-default">
+                    <div className="size-11 rounded-xl bg-[#EBEBEB] text-[#000000] group-hover:bg-[#165849] group-hover:text-white flex items-center justify-center shrink-0 transition-colors duration-300">
+                      <span className="material-symbols-outlined text-xl">{feat.icon}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-base text-[#000000]">{feat.title}</h3>
+                      <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed">{feat.desc}</p>
+                    </div>
+                  </div>
+                </ScrollReveal>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
