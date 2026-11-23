@@ -18,9 +18,7 @@ from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.notifications.service import ensure_doctor_appointment_notification, ensure_patient_notification, queue_patient_notification
-from teleconsult.modules.patient_portal.models import Appointment, Doctor
 from teleconsult.modules.patient_portal.appointment_access import expire_pending_payment
-from teleconsult.modules.payments.models import PaymentTransaction
 from teleconsult.modules.payments.schemas import (
     PaymentInitiateRequest,
     PaymentResponse,

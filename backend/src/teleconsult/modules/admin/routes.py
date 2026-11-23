@@ -13,11 +13,6 @@ from pymongo.errors import DuplicateKeyError
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.audit.models import AuditRecord
-from teleconsult.modules.identity.auth_routes import auth_database_session
-from teleconsult.modules.identity.models import UserAccount
-from teleconsult.modules.patient_portal.models import Appointment, Doctor, Patient
-from teleconsult.modules.payments.models import PaymentTransaction
 
 router = APIRouter(
     prefix="/admin",

@@ -10,23 +10,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.audit.models import AuditRecord
-from teleconsult.modules.identity.auth_routes import auth_database_session
 from teleconsult.modules.notifications.service import queue_patient_notification
 from teleconsult.modules.patient_portal.appointment_access import (
     appointment_times,
     expire_pending_payment,
     latest_payment,
     patient_identity_ids,
-)
-from teleconsult.modules.patient_portal.consent import PatientConsent
-from teleconsult.modules.patient_portal.intake import MedicalIntake
-from teleconsult.modules.patient_portal.models import (
-    Appointment,
-    AppointmentEvent,
-    Doctor,
-    DoctorAvailability,
-    Patient,
 )
 import secrets
 from teleconsult.modules.patient_portal.schemas import (

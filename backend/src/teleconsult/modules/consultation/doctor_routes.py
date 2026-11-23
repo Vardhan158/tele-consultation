@@ -10,94 +10,45 @@ from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.services.encryption import decrypt_clinical_text, encrypt_clinical_text
-from teleconsult.modules.audit.models import AuditRecord
-from teleconsult.modules.consultation.clinical_models import ClinicalNote, ClinicalNoteAmendment
-from teleconsult.modules.consultation.video_models import VideoSession
-from teleconsult.modules.identity.auth_routes import auth_database_session
 from teleconsult.modules.patient_portal.appointment_access import appointment_times, expire_pending_payment, latest_payment
-from teleconsult.modules.patient_portal.models import (
-    Appointment,
-    Doctor,
-    DoctorAvailability,
-    Patient,
-)
 
 router = APIRouter(prefix="/doctor", tags=["doctor-portal"])
 
 
-async def _doctor(session: AsyncSession, principal: Principal) -> Doctor:
-    doctor = await session.scalar(select(Doctor).where(
-        Doctor.user_account_id == UUID(principal.user_id), Doctor.tenant_id == UUID(principal.tenant_id)))
-    if doctor is None or doctor.approval_status != "approved" or not doctor.active:
-        raise HTTPException(status_code=403, detail="Approved doctor access is required")
-    return doctor
-
-
 @router.post("/consultations/{appointment_id}/join")
-async def doctor_join_consultation(appointment_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("consultation:admit"))):
-    if get_settings().mongodb_enabled:
-        db = mongo_database.database()
-        await expire_pending_payment(db, tenant_id=principal.tenant_id)
-        doctor_doc = await db["doctors"].find_one({
-            "tenant_id": principal.tenant_id,
-            "$or": [
-                {"id": principal.user_id},
-                {"user_id": principal.user_id},
-                {"user_account_id": principal.user_id},
-            ],
-        })
-        if doctor_doc is None or doctor_doc.get("approval_status") != "approved" or not doctor_doc.get("active"):
-            raise HTTPException(status_code=403, detail="Approved doctor access is required")
+async def doctor_join_consultation(appointment_id: str, principal: Principal = Depends(require("consultation:admit"))):
+    db = mongo_database.database()
+    await expire_pending_payment(db, tenant_id=principal.tenant_id)
+    doctor_doc = await db["doctors"].find_one({
+        "tenant_id": principal.tenant_id,
+        "$or": [
+            {"id": principal.user_id},
+            {"user_id": principal.user_id},
+            {"user_account_id": principal.user_id},
+        ],
+    })
+    if doctor_doc is None or doctor_doc.get("approval_status") != "approved" or not doctor_doc.get("active"):
+        raise HTTPException(status_code=403, detail="Approved doctor access is required")
 
-        appointment = await db["appointments"].find_one({
-            "tenant_id": principal.tenant_id,
-            "$or": [{"id": appointment_id}, {"id": appointment_id.lower()}, {"id": appointment_id.upper()}],
-            "doctor_id": doctor_doc.get("id"),
-            "status": {"$in": ["confirmed", "checked_in", "in_progress"]},
-        })
-        if appointment is None:
-            raise HTTPException(status_code=404, detail="Eligible consultation not found")
-        if str(appointment.get("payment_status", "")).lower() not in {"captured", "success", "not_required", "no_payment_required", "not_needed"}:
-            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment is required before joining the consultation room.")
-
-        now = datetime.now(UTC)
-        raw_token = secrets.token_urlsafe(48)
-        video = await db["video_sessions"].find_one({"tenant_id": principal.tenant_id, "appointment_id": appointment_id})
-        if not video:
-            video = {"id": f"vses-{secrets.token_hex(6)}", "tenant_id": principal.tenant_id, "appointment_id": appointment_id, "patient_id": appointment.get("patient_id"), "room_id": f"teleconsult-{appointment_id}", "provider": "webrtc", "status": "waiting", "created_at": now.isoformat()}
-            await db["video_sessions"].insert_one(dict(video))
-        await db["video_sessions"].update_one({"id": video["id"]}, {"$set": {"doctor_token_hash": hashlib.sha256(raw_token.encode()).hexdigest(), "token_expires_at": (now + timedelta(minutes=15)).isoformat(), "status": video.get("status", "waiting")}})
-        return {"session_id": UUID(int=hash(video["id"]) & 0xffffffffffffffffffffffffffffffff) if len(video["id"]) != 36 else UUID(video["id"]), "room_id": video.get("room_id", f"teleconsult-{appointment_id}"), "room_url": None, "token": raw_token, "status": video.get("status", "waiting")}
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    doctor = await _doctor(session, principal)
-    try:
-        appointment_uuid = UUID(appointment_id)
-    except (ValueError, AttributeError):
-        raise HTTPException(status_code=404, detail="Eligible consultation not found") from None
-    appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id,
-        Appointment.status.in_(["confirmed", "checked_in", "in_progress"])))
+    appointment = await db["appointments"].find_one({
+        "tenant_id": principal.tenant_id,
+        "$or": [{"id": appointment_id}, {"id": appointment_id.lower()}, {"id": appointment_id.upper()}],
+        "doctor_id": doctor_doc.get("id"),
+        "status": {"$in": ["confirmed", "checked_in", "in_progress"]},
+    })
     if appointment is None:
         raise HTTPException(status_code=404, detail="Eligible consultation not found")
-    if appointment.payment_status not in {"captured", "success", "not_required", "no_payment_required", "not_needed"}:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Payment is required before joining the consultation room.",
-        )
+    if str(appointment.get("payment_status", "")).lower() not in {"captured", "success", "not_required", "no_payment_required", "not_needed"}:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment is required before joining the consultation room.")
+
     now = datetime.now(UTC)
-    room_name = f"teleconsult-{appointment.id}"
     raw_token = secrets.token_urlsafe(48)
-    video = await session.scalar(select(VideoSession).where(VideoSession.appointment_id == appointment.id, VideoSession.patient_id == appointment.patient_id))
-    if video is None:
-        video = VideoSession(tenant_id=doctor.tenant_id, appointment_id=appointment.id, patient_id=appointment.patient_id, provider="webrtc", room_id=room_name, status="waiting")
-        session.add(video)
-    video.token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    video.doctor_token_hash = video.token_hash
-    video.token_expires_at = now + timedelta(minutes=15)
-    video.provider = "webrtc"
-    return {"session_id": video.id, "room_id": room_name, "room_url": None, "token": raw_token, "status": video.status}
+    video = await db["video_sessions"].find_one({"tenant_id": principal.tenant_id, "appointment_id": appointment_id})
+    if not video:
+        video = {"id": f"vses-{secrets.token_hex(6)}", "tenant_id": principal.tenant_id, "appointment_id": appointment_id, "patient_id": appointment.get("patient_id"), "room_id": f"teleconsult-{appointment_id}", "provider": "webrtc", "status": "waiting", "created_at": now.isoformat()}
+        await db["video_sessions"].insert_one(dict(video))
+    await db["video_sessions"].update_one({"id": video["id"]}, {"$set": {"doctor_token_hash": hashlib.sha256(raw_token.encode()).hexdigest(), "token_expires_at": (now + timedelta(minutes=15)).isoformat(), "status": video.get("status", "waiting")}})
+    return {"session_id": UUID(int=hash(video["id"]) & 0xffffffffffffffffffffffffffffffff) if len(video["id"]) != 36 else UUID(video["id"]), "room_id": video.get("room_id", f"teleconsult-{appointment_id}"), "room_url": None, "token": raw_token, "status": video.get("status", "waiting")}
 
 
 class DoctorSlot(BaseModel):

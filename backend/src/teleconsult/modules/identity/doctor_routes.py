@@ -19,13 +19,10 @@ from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.identity.auth_routes import (
-    auth_database_session,
     password_hash,
     send_verification_email,
     token_hash,
 )
-from teleconsult.modules.identity.models import RecoveryToken, UserAccount
-from teleconsult.modules.patient_portal.models import Doctor
 
 router = APIRouter(prefix="/doctor", tags=["doctor-onboarding"])
 OTP_EXPIRY_MINUTES = 5
