@@ -161,6 +161,92 @@ export default function DoctorDashboardScreen({ onNavigate }) {
             </div>
           )}
         </div>
+
+        {/* Quick Clinical Actions Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+          <button
+            type="button"
+            onClick={() => onNavigate("doctor-availability")}
+            className="care-card p-5 text-left rounded-2xl bg-white border border-[#577877]/15 hover:border-[#25836F] transition-all group cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#EEF6F3] text-[#25836F] group-hover:bg-[#25836F] group-hover:text-white flex items-center justify-center transition-colors mb-3">
+              <span className="material-symbols-outlined text-xl">schedule</span>
+            </div>
+            <h3 className="font-bold text-sm text-[#162623] group-hover:text-[#25836F] transition-colors">
+              Manage Availability
+            </h3>
+            <p className="text-xs text-[#577877] mt-1">Set consultation shifts &amp; recurring slots</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate("doctor-patients")}
+            className="care-card p-5 text-left rounded-2xl bg-white border border-[#577877]/15 hover:border-[#25836F] transition-all group cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#EEF6F3] text-[#25836F] group-hover:bg-[#25836F] group-hover:text-white flex items-center justify-center transition-colors mb-3">
+              <span className="material-symbols-outlined text-xl">groups</span>
+            </div>
+            <h3 className="font-bold text-sm text-[#162623] group-hover:text-[#25836F] transition-colors">
+              Patient Directory
+            </h3>
+            <p className="text-xs text-[#577877] mt-1">Review medical records &amp; consultation history</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate("doctor-appointments")}
+            className="care-card p-5 text-left rounded-2xl bg-white border border-[#577877]/15 hover:border-[#25836F] transition-all group cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#EEF6F3] text-[#25836F] group-hover:bg-[#25836F] group-hover:text-white flex items-center justify-center transition-colors mb-3">
+              <span className="material-symbols-outlined text-xl">calendar_month</span>
+            </div>
+            <h3 className="font-bold text-sm text-[#162623] group-hover:text-[#25836F] transition-colors">
+              Consultation Schedule
+            </h3>
+            <p className="text-xs text-[#577877] mt-1">Manage upcoming &amp; completed appointments</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate("doctor-settings")}
+            className="care-card p-5 text-left rounded-2xl bg-white border border-[#577877]/15 hover:border-[#25836F] transition-all group cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#EEF6F3] text-[#25836F] group-hover:bg-[#25836F] group-hover:text-white flex items-center justify-center transition-colors mb-3">
+              <span className="material-symbols-outlined text-xl">settings</span>
+            </div>
+            <h3 className="font-bold text-sm text-[#162623] group-hover:text-[#25836F] transition-colors">
+              Clinician Profile &amp; Settings
+            </h3>
+            <p className="text-xs text-[#577877] mt-1">Update fee structure &amp; clinic settings</p>
+          </button>
+        </div>
+
+        {/* Clinical Quality & Practice Highlights Footer Banner */}
+        <div className="rounded-2xl bg-gradient-to-r from-[#185A4D] via-[#1F6E5E] to-[#25836F] text-white p-6 sm:p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
+          <div className="space-y-1 text-center md:text-left">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-white text-[11px] font-semibold tracking-wider uppercase backdrop-blur-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#20C7A7]" />
+              Kaizen Care Clinician Network
+            </span>
+            <h3 className="text-lg sm:text-xl font-bold text-white pt-1">
+              Delivering Exceptional Remote Healthcare
+            </h3>
+            <p className="text-xs sm:text-sm text-[#F0F5F7]/85 max-w-xl">
+              Encrypted video consultations, digital clinical documentation, and instant prescription fulfillment for verified patients across India.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-6 text-center shrink-0 border-t md:border-t-0 md:border-l border-white/20 pt-4 md:pt-0 md:pl-6">
+            <div>
+              <p className="text-xl font-bold text-white">4.9 ★</p>
+              <p className="text-[11px] text-[#F0F5F7]/80">Patient Rating</p>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white">99.2%</p>
+              <p className="text-[11px] text-[#F0F5F7]/80">On-Time Visits</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
