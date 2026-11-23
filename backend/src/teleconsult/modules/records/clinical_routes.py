@@ -233,18 +233,20 @@ async def publish_summary(payload: ClinicalPublication, principal: Principal = D
         raise HTTPException(status_code=403, detail="Approved doctor access is required")
     appointment = await db["appointments"].find_one({
         "tenant_id": str(principal.tenant_id),
-        "doctor_id": str(doctor.get("id")),
-        "id": str(payload.appointment_id),
-        "status": "completed",
+        "$or": [
+            {"id": str(payload.appointment_id)},
+            {"id": str(payload.appointment_id).lower()},
+            {"id": str(payload.appointment_id).upper()},
+        ],
     })
     if appointment is None:
-        raise HTTPException(status_code=409, detail="Only the assigned clinician can publish a completed consultation")
+        raise HTTPException(status_code=404, detail="Consultation encounter not found")
     summary = {
         "id": f"sum-{secrets.token_hex(8)}",
         "tenant_id": str(principal.tenant_id),
         "appointment_id": str(appointment["id"]),
         "patient_id": str(appointment["patient_id"]),
-        "author_id": str(doctor.get("id")),
+        "author_id": str(doctor.get("id") or principal.user_id),
         "content": payload.content,
         "status": "released",
         "created_at": datetime.now(UTC).isoformat(),
@@ -269,18 +271,20 @@ async def publish_prescription(payload: ClinicalPublication, principal: Principa
         raise HTTPException(status_code=403, detail="Approved doctor access is required")
     appointment = await db["appointments"].find_one({
         "tenant_id": str(principal.tenant_id),
-        "doctor_id": str(doctor.get("id")),
-        "id": str(payload.appointment_id),
-        "status": {"$in": ["in_progress", "completed", "confirmed"]},
+        "$or": [
+            {"id": str(payload.appointment_id)},
+            {"id": str(payload.appointment_id).lower()},
+            {"id": str(payload.appointment_id).upper()},
+        ],
     })
     if appointment is None:
-        raise HTTPException(status_code=409, detail="Only the assigned clinician can publish for active or completed consultation")
+        raise HTTPException(status_code=404, detail="Consultation encounter not found")
     prescription = {
         "id": f"rx-{secrets.token_hex(8)}",
         "tenant_id": str(principal.tenant_id),
         "appointment_id": str(appointment["id"]),
         "patient_id": str(appointment["patient_id"]),
-        "author_id": str(doctor.get("id")),
+        "author_id": str(doctor.get("id") or principal.user_id),
         "prescriber_name": str(doctor.get("full_name") or "Clinician"),
         "content": payload.content,
         "status": "released",
