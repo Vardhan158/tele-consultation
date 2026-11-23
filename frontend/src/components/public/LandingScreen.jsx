@@ -193,8 +193,18 @@ export default function LandingScreen({
 
     return () => {
       cancelAnimationFrame(rafId);
-      lenis.destroy();
-      lenisRef.current = null;
+      if (lenisRef.current) {
+        lenisRef.current.destroy();
+        lenisRef.current = null;
+      }
+      document.documentElement.classList.remove("lenis", "lenis-smooth", "lenis-scrolling", "lenis-stopped");
+      document.body.classList.remove("lenis", "lenis-smooth", "lenis-scrolling", "lenis-stopped");
+      document.documentElement.style.scrollBehavior = "";
+      document.body.style.scrollBehavior = "";
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      document.documentElement.style.overflowY = "auto";
+      document.body.style.overflowY = "auto";
     };
   }, []);
 
