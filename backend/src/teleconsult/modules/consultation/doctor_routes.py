@@ -122,102 +122,144 @@ class NotePayload(BaseModel):
 
 @router.get("/dashboard")
 async def dashboard(principal: Principal = Depends(require("doctor:appointment:read"))):
-    if get_settings().mongodb_enabled:
-        db = mongo_database.database()
-        doctor = await _get_doctor(db, principal)
+    try:
+        if get_settings().mongodb_enabled:
+            db = mongo_database.database()
+            doctor = await _get_doctor(db, principal)
 
-        clinic_settings = await db["clinic_settings"].find_one({"tenant_id": principal.tenant_id})
-        tz_name = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
-        try:
-            tz = ZoneInfo(tz_name)
-        except Exception:
-            tz = ZoneInfo("Asia/Kolkata")
+            clinic_settings = await db["clinic_settings"].find_one({"tenant_id": principal.tenant_id})
+            tz_name = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
+            try:
+                tz = ZoneInfo(tz_name)
+            except Exception:
+                tz = ZoneInfo("Asia/Kolkata")
 
-        now_tz = datetime.now(tz)
-        today_iso = now_tz.strftime("%Y-%m-%d")
+            now_tz = datetime.now(tz)
+            today_iso = now_tz.strftime("%Y-%m-%d")
 
-        all_appointments = await db["appointments"].find({
-            "tenant_id": principal.tenant_id,
-            "doctor_id": doctor.get("id"),
-            "status": {"$in": ["confirmed", "requested", "pending_payment", "checked_in", "in_progress", "rescheduled"]},
-        }).sort("starts_at", 1).to_list(200)
+            all_appointments = await db["appointments"].find({
+                "tenant_id": principal.tenant_id,
+                "doctor_id": doctor.get("id"),
+                "status": {"$in": ["confirmed", "requested", "pending_payment", "checked_in", "in_progress", "rescheduled"]},
+            }).sort("starts_at", 1).to_list(200)
 
-        today_count = 0
-        upcoming_count = 0
+            today_count = 0
+            upcoming_count = 0
 
-        for item in all_appointments:
-            starts_raw = item.get("starts_at")
-            if not starts_raw:
-                continue
-
-            if isinstance(starts_raw, datetime):
-                starts_dt = starts_raw.astimezone(tz)
-            else:
+            for item in all_appointments:
                 try:
-                    starts_dt = datetime.fromisoformat(str(starts_raw).replace("Z", "+00:00")).astimezone(tz)
-                except ValueError:
-                    continue
+                    starts_raw = item.get("starts_at")
+                    if not starts_raw:
+                        continue
 
-            item_date_str = starts_dt.strftime("%Y-%m-%d")
-            if item_date_str == today_iso:
-                today_count += 1
+                    if isinstance(starts_raw, datetime):
+                        starts_dt = starts_raw.astimezone(tz)
+                    else:
+                        try:
+                            starts_dt = datetime.fromisoformat(str(starts_raw).replace("Z", "+00:00")).astimezone(tz)
+                        except ValueError:
+                            continue
 
-            if starts_dt.timestamp() + 3600 >= now_tz.timestamp():
-                upcoming_count += 1
+                    item_date_str = starts_dt.strftime("%Y-%m-%d")
+                    if item_date_str == today_iso:
+                        today_count += 1
 
-        completed = await db["appointments"].count_documents({"tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"), "status": "completed"})
-        pending_notes = await db["clinical_notes"].count_documents({"tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"), "status": "draft"})
-        return {
-            "today": today_count,
-            "upcoming": upcoming_count,
-            "completed": completed,
-            "pending_notes": pending_notes,
-        }
-    return {}
+                    if starts_dt.timestamp() + 3600 >= now_tz.timestamp():
+                        upcoming_count += 1
+                except Exception as item_exc:
+                    import logging
+                    logging.getLogger("teleconsult.consultation").warning(f"Error processing appointment item in dashboard: {item_exc}")
+
+            completed = await db["appointments"].count_documents({"tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"), "status": "completed"})
+            pending_notes = await db["clinical_notes"].count_documents({"tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"), "status": "draft"})
+            return {
+                "today": today_count,
+                "upcoming": upcoming_count,
+                "completed": completed,
+                "pending_notes": pending_notes,
+            }
+        return {}
+    except Exception as exc:
+        import logging
+        import traceback
+        logging.getLogger("teleconsult.consultation").error(f"Error in dashboard endpoint: {exc}\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load doctor dashboard: {str(exc)}"
+        ) from exc
 
 
 @router.get("/appointments")
 async def doctor_appointments(principal: Principal = Depends(require("doctor:appointment:read"))):
-    if get_settings().mongodb_enabled:
-        db = mongo_database.database()
-        doctor = await _get_doctor(db, principal)
-        result = await db["appointments"].find({
-            "tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"),
-        }).sort("starts_at", -1).to_list(200)
+    try:
+        if get_settings().mongodb_enabled:
+            db = mongo_database.database()
+            doctor = await _get_doctor(db, principal)
+            result = await db["appointments"].find({
+                "tenant_id": principal.tenant_id, "doctor_id": doctor.get("id"),
+            }).sort("starts_at", -1).to_list(200)
 
-        output = []
-        for item in result:
-            pat_id = item.get("patient_id")
-            patient_doc = await db["patients"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": str(pat_id)}, {"user_id": str(pat_id)}]}) if pat_id else None
-            patient_name = patient_doc.get("full_name") if patient_doc else "Emma Mitchell"
+            output = []
+            for item in result:
+                try:
+                    pat_id = item.get("patient_id")
+                    patient_doc = None
+                    if pat_id:
+                        try:
+                            patient_doc = await db["patients"].find_one({"tenant_id": principal.tenant_id, "$or": [{"id": str(pat_id)}, {"user_id": str(pat_id)}]})
+                        except Exception:
+                            patient_doc = None
+                    patient_name = patient_doc.get("full_name") if patient_doc else (item.get("patient_name") or "Emma Mitchell")
 
-            payment = await latest_payment(db, principal.tenant_id, item.get("id") or str(item.get("_id")))
-            raw_pay = str((payment or {}).get("status") or item.get("payment_status") or "pending").lower()
-            starts_at, ends_at = appointment_times(item)
-            expired_unpaid = item.get("status") == "expired" and raw_pay == "expired"
-            pay_label = (
-                "Payment Expired" if expired_unpaid
-                else "Paid" if raw_pay in {"captured", "success"}
-                else "No Payment Required" if raw_pay in {"not_required", "no_payment_required"}
-                else "Payment Failed" if raw_pay == "failed"
-                else "Refunded" if raw_pay == "refunded"
-                else "Payment Pending"
-            )
+                    payment = None
+                    try:
+                        payment = await latest_payment(db, principal.tenant_id, item.get("id") or str(item.get("_id")))
+                    except Exception:
+                        payment = None
 
-            output.append({
-                "id": item.get("id") or str(item.get("_id")),
-                "patient_id": pat_id,
-                "patient_name": patient_name,
-                "starts_at": starts_at,
-                "ends_at": ends_at,
-                "status": item.get("status", "confirmed"),
-                "payment_status": pay_label,
-                "raw_payment_status": raw_pay,
-                "type": item.get("type", "Follow-up Consultation"),
-                "fee_paise": item.get("fee_paise") or item.get("total_payable_paise"),
-            })
-        return output
-    return []
+                    raw_pay = str((payment or {}).get("status") or item.get("payment_status") or "pending").lower()
+
+                    try:
+                        starts_at, ends_at = appointment_times(item)
+                    except Exception:
+                        starts_at = item.get("starts_at")
+                        ends_at = item.get("ends_at")
+
+                    expired_unpaid = item.get("status") == "expired" and raw_pay == "expired"
+                    pay_label = (
+                        "Payment Expired" if expired_unpaid
+                        else "Paid" if raw_pay in {"captured", "success"}
+                        else "No Payment Required" if raw_pay in {"not_required", "no_payment_required"}
+                        else "Payment Failed" if raw_pay == "failed"
+                        else "Refunded" if raw_pay == "refunded"
+                        else "Payment Pending"
+                    )
+
+                    output.append({
+                        "id": item.get("id") or str(item.get("_id")),
+                        "patient_id": pat_id,
+                        "patient_name": patient_name,
+                        "starts_at": starts_at,
+                        "ends_at": ends_at,
+                        "status": item.get("status", "confirmed"),
+                        "payment_status": pay_label,
+                        "raw_payment_status": raw_pay,
+                        "type": item.get("type", "Follow-up Consultation"),
+                        "fee_paise": item.get("fee_paise") or item.get("total_payable_paise"),
+                    })
+                except Exception as item_exc:
+                    import logging
+                    logging.getLogger("teleconsult.consultation").warning(f"Error processing appointment item in doctor_appointments: {item_exc}")
+            return output
+        return []
+    except Exception as exc:
+        import logging
+        import traceback
+        logging.getLogger("teleconsult.consultation").error(f"Error in doctor_appointments endpoint: {exc}\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load doctor appointments: {str(exc)}"
+        ) from exc
 
 
 @router.get("/availability")
