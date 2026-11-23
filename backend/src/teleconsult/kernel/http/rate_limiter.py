@@ -151,7 +151,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         """Check rate limit using shared MongoDB collection when available, falling back to in-memory."""
         from teleconsult.kernel.mongodb.client import mongo_database
 
-        if mongo_database.enabled and mongo_database.client is not None:
+        if mongo_database.enabled:
             try:
                 db = mongo_database.database()
                 col = db["rate_limit_events"]
