@@ -1,18 +1,22 @@
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from teleconsult.modules.patient_portal.consent import PatientConsent
+from teleconsult.kernel.mongodb.client import mongo_database
 
 
-async def require_active_consent(session: AsyncSession, tenant_id: UUID, patient_id: UUID, consent_types: set[str]) -> None:
-    rows = await session.scalars(select(PatientConsent).where(
-        PatientConsent.tenant_id == tenant_id, PatientConsent.patient_id == patient_id,
-        PatientConsent.consent_type.in_(consent_types), PatientConsent.status == "granted",
-        PatientConsent.withdrawn_at.is_(None),
-    ))
-    active = {row.consent_type for row in rows}
+async def require_active_consent(tenant_id: UUID | str, patient_id: UUID | str, consent_types: set[str]) -> None:
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    cursor = db["consents"].find({
+        "tenant_id": str(tenant_id),
+        "patient_id": str(patient_id),
+        "consent_type": {"$in": list(consent_types)},
+        "status": "granted",
+        "withdrawn_at": {"$exists": False},
+    })
+    rows = await cursor.to_list(100)
+    active = {row.get("consent_type") for row in rows}
     if not consent_types.issubset(active):
         raise HTTPException(status_code=403, detail="Required consent has not been granted or has been withdrawn")

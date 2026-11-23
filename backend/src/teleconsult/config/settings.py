@@ -15,8 +15,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="TELECONSULT_", env_file=".env", extra="ignore")
 
     environment: str = "dev"
-    database_url: str = ""
-    migration_database_url: str = ""
     tenancy_mode: TenancyMode = TenancyMode.POOLED
     default_tenant_id: str = "1"
     auth_method: str = "password"

@@ -4,18 +4,11 @@ import logging
 import secrets
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 import socketio
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from teleconsult.config.settings import get_settings
-from teleconsult.kernel.db.session import get_engine
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.consultation.video_models import VideoSession, VideoSessionEvent
-from teleconsult.modules.identity.models import AuthSession, UserAccount
-from teleconsult.modules.patient_portal.models import Appointment, Doctor
 
 sio = socketio.AsyncServer(
     async_mode="asgi",
@@ -91,124 +84,73 @@ async def _load_context(environ: dict[str, Any], data: dict[str, Any]) -> tuple[
     if not token:
         raise ValueError("Consultation token is required")
 
-    if get_settings().mongodb_enabled:
-        db = mongo_database.database()
-        token_digest = hashlib.sha256(str(token).encode()).hexdigest()
+    if not mongo_database.enabled:
+        raise ValueError("Database unavailable")
+    db = mongo_database.database()
+    token_digest = hashlib.sha256(str(token).encode()).hexdigest()
 
-        # Query video session in MongoDB
-        video_session = await db["video_sessions"].find_one({
-            "$or": [
-                {"token_hash": token_digest},
-                {"patient_token_hash": token_digest},
-                {"doctor_token_hash": token_digest},
-                {"token": str(token)},
-                {"id": str(token)},
-            ]
-        })
+    video_session = await db["video_sessions"].find_one({
+        "$or": [
+            {"token_hash": token_digest},
+            {"patient_token_hash": token_digest},
+            {"doctor_token_hash": token_digest},
+            {"token": str(token)},
+            {"id": str(token)},
+        ]
+    })
 
-        if not video_session:
-            raise ValueError("Consultation token is invalid")
+    if not video_session:
+        raise ValueError("Consultation token is invalid")
 
-        req_apt_id = (data or {}).get("appointmentId") or (data or {}).get("appointment_id")
-        appointment_id = str(video_session.get("appointment_id"))
-        if req_apt_id and str(req_apt_id).lower() != appointment_id.lower():
-            raise ValueError("Appointment does not match consultation token")
-        session_id = video_session.get("id") or str(video_session.get("_id"))
-        tenant_id = video_session.get("tenant_id", get_settings().default_tenant_id)
+    req_apt_id = (data or {}).get("appointmentId") or (data or {}).get("appointment_id")
+    appointment_id = str(video_session.get("appointment_id"))
+    if req_apt_id and str(req_apt_id).lower() != appointment_id.lower():
+        raise ValueError("Appointment does not match consultation token")
+    session_id = video_session.get("id") or str(video_session.get("_id"))
+    tenant_id = video_session.get("tenant_id", get_settings().default_tenant_id)
 
-        # Query appointment in MongoDB
-        apt_doc = await db["appointments"].find_one({
-            "tenant_id": tenant_id,
-            "$or": [{"id": str(appointment_id)}, {"id": str(appointment_id).lower()}],
-        })
-        if not apt_doc:
-            raise ValueError("Appointment not found")
+    apt_doc = await db["appointments"].find_one({
+        "tenant_id": tenant_id,
+        "$or": [{"id": str(appointment_id)}, {"id": str(appointment_id).lower()}],
+    })
+    if not apt_doc:
+        raise ValueError("Appointment not found")
 
-        token_role = "doctor" if video_session.get("doctor_token_hash") == token_digest else "patient"
-        raw_session = await _principal(environ)
-        if not raw_session:
-            raise ValueError("Authentication session is missing")
-        user_id = ""
-        role = token_role
-
-        if raw_session:
-            session_token_digest = hashlib.sha256(raw_session.encode()).hexdigest()
-            auth_session = await db["user_sessions"].find_one({
-                "tenant_id": tenant_id,
-                "token_hash": session_token_digest,
-                "revoked_at": {"$exists": False},
-            })
-            if not auth_session:
-                raise ValueError("Authentication session is invalid or expired")
-            user_id = str(auth_session.get("user_id", ""))
-            user_doc = await db["users"].find_one({"id": user_id})
-            if not user_doc:
-                raise ValueError("Authenticated user was not found")
-            role = user_doc.get("role", role)
-
-        if role != token_role:
-            raise ValueError("Consultation token role does not match authenticated user")
-        if role == "patient" and str(apt_doc.get("patient_id")) != str(user_id):
-            raise ValueError("Patient is not assigned to this appointment")
-        if role == "doctor":
-            doctor_doc = await db["doctors"].find_one({"tenant_id": tenant_id, "$or": [{"id": str(user_id)}, {"user_id": str(user_id)}, {"user_account_id": str(user_id)}]})
-            if not doctor_doc or str(apt_doc.get("doctor_id")) != str(doctor_doc.get("id")):
-                raise ValueError("Doctor is not assigned to this appointment")
-
-        if role not in {"patient", "doctor"}:
-            raise ValueError("Consultation role is not authorized")
-
-        return SessionObj(session_id, appointment_id, tenant_id), AptObj(appointment_id, apt_doc.get("status", "confirmed")), role, user_id
-
-    # SQL Mode
+    token_role = "doctor" if video_session.get("doctor_token_hash") == token_digest else "patient"
     raw_session = await _principal(environ)
-    maker = async_sessionmaker(get_engine(), expire_on_commit=False)
-    async with maker() as db_sql:
-        token_digest = hashlib.sha256(str(token).encode()).hexdigest()
-        session = await db_sql.scalar(
-            select(VideoSession).where(
-                (VideoSession.patient_token_hash == token_digest)
-                | (VideoSession.doctor_token_hash == token_digest)
-                | (VideoSession.token_hash == token_digest)
-            )
-        )
-        if session is None or (
-            session.token_expires_at and session.token_expires_at < datetime.now(UTC)
-        ):
-            raise ValueError("Consultation token is invalid or expired")
-        appointment = await db_sql.get(Appointment, session.appointment_id)
-        if appointment is None or appointment.status not in {
-            "confirmed",
-            "checked_in",
-            "in_progress",
-        }:
-            raise ValueError("Appointment is not eligible")
-        user = None
-        if raw_session:
-            auth = await db_sql.scalar(
-                select(AuthSession).where(
-                    AuthSession.token_hash == hashlib.sha256(raw_session.encode()).hexdigest(),
-                    AuthSession.revoked_at.is_(None),
-                    AuthSession.expires_at > datetime.now(UTC),
-                )
-            )
-            if auth:
-                user = await db_sql.get(UserAccount, auth.user_id)
-        if user is None:
-            raise ValueError("Authentication is required")
-        doctor = await db_sql.scalar(
-            select(Doctor).where(
-                Doctor.user_account_id == user.id, Doctor.id == appointment.doctor_id
-            )
-        )
-        if user.id != appointment.patient_id and doctor is None:
-            raise ValueError("You are not a participant in this appointment")
-        return (
-            session,
-            appointment,
-            ("doctor" if doctor else "patient"),
-            str(user.id),
-        )
+    if not raw_session:
+        raise ValueError("Authentication session is missing")
+    user_id = ""
+    role = token_role
+
+    if raw_session:
+        session_token_digest = hashlib.sha256(raw_session.encode()).hexdigest()
+        auth_session = await db["user_sessions"].find_one({
+            "tenant_id": tenant_id,
+            "token_hash": session_token_digest,
+            "revoked_at": {"$exists": False},
+        })
+        if not auth_session:
+            raise ValueError("Authentication session is invalid or expired")
+        user_id = str(auth_session.get("user_id", ""))
+        user_doc = await db["users"].find_one({"id": user_id})
+        if not user_doc:
+            raise ValueError("Authenticated user was not found")
+        role = user_doc.get("role", role)
+
+    if role != token_role:
+        raise ValueError("Consultation token role does not match authenticated user")
+    if role == "patient" and str(apt_doc.get("patient_id")) != str(user_id):
+        raise ValueError("Patient is not assigned to this appointment")
+    if role == "doctor":
+        doctor_doc = await db["doctors"].find_one({"tenant_id": tenant_id, "$or": [{"id": str(user_id)}, {"user_id": str(user_id)}, {"user_account_id": str(user_id)}]})
+        if not doctor_doc or str(apt_doc.get("doctor_id")) != str(doctor_doc.get("id")):
+            raise ValueError("Doctor is not assigned to this appointment")
+
+    if role not in {"patient", "doctor"}:
+        raise ValueError("Consultation role is not authorized")
+
+    return SessionObj(session_id, appointment_id, tenant_id), AptObj(appointment_id, apt_doc.get("status", "confirmed")), role, user_id
 
 
 @sio.event
@@ -261,7 +203,7 @@ async def join_room(sid: str, data: dict[str, Any], ack: Any = None) -> None:
     _rooms.setdefault(room, set()).add(sid)
     _trace("join_room", sid, ctx, room=room, members=len(_rooms[room]))
 
-    if get_settings().mongodb_enabled:
+    if mongo_database.enabled:
         db = mongo_database.database()
         await db["video_session_events"].insert_one({
             "id": f"event-{secrets.token_hex(6)}",
@@ -273,20 +215,6 @@ async def join_room(sid: str, data: dict[str, Any], ack: Any = None) -> None:
             "metadata_json": {"role": ctx["role"]},
             "created_at": datetime.now(UTC).isoformat(),
         })
-    else:
-        maker = async_sessionmaker(get_engine(), expire_on_commit=False)
-        async with maker() as db_sql:
-            db_sql.add(
-                VideoSessionEvent(
-                    tenant_id=UUID(ctx["tenant_id"]),
-                    session_id=UUID(ctx["session_id"]),
-                    appointment_id=UUID(ctx["appointment_id"]),
-                    actor_id=UUID(ctx["user_id"]),
-                    event_type="room_joined",
-                    metadata_json={"role": ctx["role"]},
-                )
-            )
-            await db_sql.commit()
 
     await sio.emit("status", {"status": "waiting"}, room=room)
     await sio.emit("room_joined", {"appointment_id": ctx["appointment_id"], "room": room, "role": ctx["role"], "members": len(_rooms[room])}, to=sid)
@@ -346,7 +274,7 @@ async def admit_patient(sid: str) -> None:
     if ctx["role"] != "doctor":
         return
 
-    if get_settings().mongodb_enabled:
+    if mongo_database.enabled:
         db = mongo_database.database()
         await db["video_sessions"].update_one(
             {"id": ctx["session_id"]},
@@ -361,25 +289,6 @@ async def admit_patient(sid: str) -> None:
             "event_type": "patient_admitted",
             "created_at": datetime.now(UTC).isoformat(),
         })
-    else:
-        maker = async_sessionmaker(get_engine(), expire_on_commit=False)
-        async with maker() as db_sql:
-            video = await db_sql.get(VideoSession, UUID(ctx["session_id"]))
-            if video and video.status in {"waiting", "connecting"}:
-                video.status = "in_progress"
-                video.connected_at = datetime.now(UTC)
-                await db_sql.commit()
-                db_sql.add(
-                    VideoSessionEvent(
-                        tenant_id=video.tenant_id,
-                        session_id=video.id,
-                        appointment_id=video.appointment_id,
-                        actor_id=UUID(ctx["user_id"]),
-                        event_type="patient_admitted",
-                        metadata_json={},
-                    )
-                )
-                await db_sql.commit()
 
     await sio.emit("status", {"status": "in_progress"}, room=f"consultation:{ctx['appointment_id']}")
 
@@ -394,7 +303,7 @@ async def leave_room(sid: str) -> None:
     _negotiation_started.discard(room)
     _trace("leave_room", sid, ctx, room=room, members=len(_rooms.get(room, set())))
 
-    if get_settings().mongodb_enabled:
+    if mongo_database.enabled:
         db = mongo_database.database()
         await db["video_session_events"].insert_one({
             "id": f"event-{secrets.token_hex(6)}",
@@ -406,20 +315,6 @@ async def leave_room(sid: str) -> None:
             "metadata_json": {"role": ctx["role"]},
             "created_at": datetime.now(UTC).isoformat(),
         })
-    else:
-        maker = async_sessionmaker(get_engine(), expire_on_commit=False)
-        async with maker() as db_sql:
-            db_sql.add(
-                VideoSessionEvent(
-                    tenant_id=UUID(ctx["tenant_id"]),
-                    session_id=UUID(ctx["session_id"]),
-                    appointment_id=UUID(ctx["appointment_id"]),
-                    actor_id=UUID(ctx["user_id"]),
-                    event_type="room_left",
-                    metadata_json={"role": ctx["role"]},
-                )
-            )
-            await db_sql.commit()
 
     await sio.emit("peer_left", room=room, skip_sid=sid)
 
@@ -447,7 +342,7 @@ async def end_consultation(sid: str) -> None:
     if ctx["role"] != "doctor":
         return
 
-    if get_settings().mongodb_enabled:
+    if mongo_database.enabled:
         db = mongo_database.database()
         now_iso = datetime.now(UTC).isoformat()
         await db["video_sessions"].update_one(
@@ -468,27 +363,6 @@ async def end_consultation(sid: str) -> None:
             "metadata_json": {"role": "doctor"},
             "created_at": now_iso,
         })
-    else:
-        maker = async_sessionmaker(get_engine(), expire_on_commit=False)
-        async with maker() as db_sql:
-            video = await db_sql.get(VideoSession, UUID(ctx["session_id"]))
-            if video and video.status in {"waiting", "connecting", "in_progress"}:
-                video.status = "completed"
-                video.ended_at = datetime.now(UTC)
-                appointment = await db_sql.get(Appointment, video.appointment_id)
-                if appointment:
-                    appointment.status = "completed"
-                db_sql.add(
-                    VideoSessionEvent(
-                        tenant_id=video.tenant_id,
-                        session_id=video.id,
-                        appointment_id=video.appointment_id,
-                        actor_id=UUID(ctx["user_id"]),
-                        event_type="consultation_ended",
-                        metadata_json={"role": "doctor"},
-                    )
-                )
-                await db_sql.commit()
 
     await sio.emit("status", {"status": "completed"}, room=f"consultation:{ctx['appointment_id']}")
 

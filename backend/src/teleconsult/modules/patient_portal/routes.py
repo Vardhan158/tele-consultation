@@ -7,13 +7,8 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
-from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.audit.models import AuditRecord
 from teleconsult.modules.identity.auth_routes import auth_database_session
@@ -189,12 +184,12 @@ async def _clinic_blocked_dates() -> set[str]:
     return {row.get("date") for row in rows if row.get("date")}
 
 
-async def patient_session() -> AsyncIterator[AsyncSession | None]:
-    if get_settings().mongodb_enabled:
-        yield None
-        return
-    async for session in tenant_session():
-        yield session
+async def tenant_session():
+    yield None
+
+
+async def patient_session():
+    yield None
 
 
 def public_tenant_id() -> str:

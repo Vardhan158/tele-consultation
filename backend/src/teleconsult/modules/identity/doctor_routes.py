@@ -14,8 +14,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require

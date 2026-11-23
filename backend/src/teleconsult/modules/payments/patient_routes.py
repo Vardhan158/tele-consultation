@@ -13,12 +13,9 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
-from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.notifications.service import ensure_doctor_appointment_notification, ensure_patient_notification, queue_patient_notification
 from teleconsult.modules.patient_portal.models import Appointment, Doctor
@@ -40,12 +37,12 @@ router = APIRouter(prefix="/patient/payments", tags=["payments"])
 logger = logging.getLogger("teleconsult.payments")
 
 
-async def payment_session() -> AsyncIterator[AsyncSession | None]:
-    if get_settings().mongodb_enabled:
-        yield None
-        return
-    async for session in tenant_session():
-        yield session
+async def tenant_session():
+    yield None
+
+
+async def payment_session():
+    yield None
 
 
 def get_razorpay_client():
