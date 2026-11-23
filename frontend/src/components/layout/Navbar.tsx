@@ -112,7 +112,7 @@ export default function Navbar() {
         key={item.label}
         href={item.path}
         onClick={(e) => handleLinkClick(item, e)}
-        className={`px-4 py-2 text-[15px] font-semibold transition-colors duration-200 cursor-pointer ${baseText}`}
+        className={`nav-draw px-4 py-2 text-[15px] font-semibold transition-colors duration-200 cursor-pointer ${baseText}`}
       >
         <span>{item.label}</span>
       </a>
