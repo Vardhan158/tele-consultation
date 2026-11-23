@@ -415,8 +415,8 @@ export default function LandingScreen({
                 loading="eager"
               />
             ) : (
-              <div className="w-full max-w-lg bg-white/10 backdrop-blur-md border border-white/25 rounded-3xl p-4 shadow-xl overflow-hidden">
-                <Stethoscope3D className="w-full h-[400px] sm:h-[480px]" interactive={true} />
+              <div className="w-full max-w-xl h-[450px] sm:h-[550px] lg:h-[620px] flex items-center justify-center relative">
+                <Stethoscope3D className="w-full h-full" interactive={true} />
               </div>
             )}
           </div>
