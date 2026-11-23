@@ -305,8 +305,14 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       stethoscopeGroup.rotation.x = currentRotationX;
 
       if (!isDragging && Math.abs(velocityX) < 0.0001 && Math.abs(velocityY) < 0.0001) {
-        stethoscopeGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.12;
-        stethoscopeGroup.rotation.z = -0.15 + Math.cos(elapsedTime * 1.2) * 0.04;
+        stethoscopeGroup.position.y = Math.sin(elapsedTime * 1.4) * 0.8; // top to bottom movement
+        stethoscopeGroup.position.x = Math.sin(elapsedTime * 0.9) * 0.7; // left right left right combination
+        stethoscopeGroup.rotation.y = currentRotationY + scrollRotationY + Math.sin(elapsedTime * 0.7) * 0.25;
+        stethoscopeGroup.rotation.x = currentRotationX + Math.cos(elapsedTime * 1.1) * 0.2;
+        stethoscopeGroup.rotation.z = -0.15 + Math.sin(elapsedTime * 0.8) * 0.12;
+      } else {
+        stethoscopeGroup.position.x += (0 - stethoscopeGroup.position.x) * 0.05;
+        stethoscopeGroup.position.y += (0 - stethoscopeGroup.position.y) * 0.05;
       }
 
       cyanSpotLight.position.x = Math.sin(elapsedTime * 1.2) * 4;
