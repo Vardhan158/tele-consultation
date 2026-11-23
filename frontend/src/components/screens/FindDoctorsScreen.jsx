@@ -491,7 +491,7 @@ export default function FindDoctorsScreen({
       const options = {
         key: orderRes.key_id,
         amount: orderRes.amount_paise,
-        currency: orderRes.currency,
+        currency: "INR",
         name: "Kaizen Care Telehealth",
         description: `${bookingDoctor.full_name} · ${appointmentType}`,
         order_id: orderRes.order_id,

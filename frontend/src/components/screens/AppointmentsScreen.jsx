@@ -391,7 +391,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
       const options = {
         key: orderRes.key_id,
         amount: orderRes.amount_paise,
-        currency: orderRes.currency,
+        currency: "INR",
         name: "Kaizen Care Telehealth",
         description: `${apt.doctor.name} · ${apt.appointmentType || "Consultation"}`,
         order_id: orderRes.order_id,
