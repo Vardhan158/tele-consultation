@@ -10,7 +10,7 @@
 @layer base {
   html {
     font-family: "Poppins", sans-serif;
-    overflow-x: hidden;
+    overflow-x: clip;
     overflow-y: auto !important;
     max-width: 100vw;
     height: auto;
@@ -19,8 +19,8 @@
 
   body {
     font-family: "Poppins", sans-serif;
-    overflow-x: hidden;
-    overflow-y: auto !important;
+    overflow-x: clip;
+    overflow-y: visible !important;
     max-width: 100vw;
     height: auto;
     min-height: 100vh;

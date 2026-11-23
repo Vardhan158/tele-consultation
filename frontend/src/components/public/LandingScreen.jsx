@@ -250,7 +250,7 @@ export default function LandingScreen({
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-white font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white overflow-x-clip">
       <PublicNavbar />
 
       {/* ========================================================= */}
@@ -553,12 +553,51 @@ export default function LandingScreen({
         </div>
       </section>
 
+      {/* Persistent WebGL scene with a four-screen, scrubbed product story. */}
+      <section
+        id="technology"
+        data-stethoscope-story
+        className="relative w-full bg-[#071713] text-white border-y border-white/10 font-sans"
+      >
+        <div className="sticky top-0 h-screen w-full overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_64%_45%,rgba(32,199,167,0.22),transparent_38%),linear-gradient(135deg,#071713_0%,#0d2b25_58%,#071713_100%)]" />
+          <div className="absolute inset-0 opacity-40 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:64px_64px]" />
+          <Stethoscope3D className="absolute inset-0 !h-full !w-full" interactive={false} cinematic />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#071713]/85 via-transparent to-[#071713]/25 pointer-events-none" />
+          <div className="absolute bottom-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-white/55">
+            <span>Scroll to explore</span>
+            <span className="h-10 w-px bg-gradient-to-b from-white/60 to-transparent" />
+          </div>
+        </div>
+
+        <div className="relative z-10 -mt-[100vh]">
+          {[
+            { eyebrow: "Kaizen Acoustic System · 01", title: "Listen beyond distance.", copy: "A precision clinical instrument, rendered in real time and designed for connected care.", side: "left" },
+            { eyebrow: "Diaphragm · 02", title: "Engineered for subtle signals.", copy: "Scroll becomes a physical camera move, bringing the chestpiece, bell, and reflective surfaces into focus.", side: "right" },
+            { eyebrow: "Spatial inspection · 03", title: "Every contour, continuously rendered.", copy: "One persistent WebGL scene preserves lighting, depth, and orientation while the narrative moves around it.", side: "left" },
+            { eyebrow: "Connected care · 04", title: "A clearer path to consultation.", copy: "The smooth-scroll system synchronizes the model, camera, lighting, and interface copy at 60 FPS.", side: "right" },
+          ].map((chapter) => (
+            <article
+              key={chapter.eyebrow}
+              className={`min-h-screen flex items-center px-6 sm:px-10 lg:px-16 xl:px-24 ${chapter.side === "right" ? "justify-end" : "justify-start"}`}
+            >
+              <div className={`max-w-xl ${chapter.side === "right" ? "text-right items-end" : "text-left items-start"} flex flex-col drop-shadow-2xl`}>
+                <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-[#69E1C7]">{chapter.eyebrow}</p>
+                <h2 className="mt-5 text-4xl sm:text-5xl lg:text-7xl font-semibold tracking-[-0.045em] leading-[0.98] text-white">{chapter.title}</h2>
+                <p className="mt-6 max-w-md text-sm sm:text-base leading-7 text-white/70">{chapter.copy}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* Previous card-based 3D showcase retained for reference, not rendered. */}
       {/* ========================================================= */}
       {/* 3D DIAGNOSTIC TECHNOLOGY SHOWCASE SECTION (FS 60P STYLED) */}
       {/* ========================================================= */}
       <section
-        id="technology"
-        className="w-full bg-[#EBEBEB] text-[#000000] border-y border-zinc-300/80 py-20 lg:py-28 font-sans transition-all duration-300"
+        aria-hidden="true"
+        className="hidden"
       >
         <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20">
           <ScrollReveal animation="fade-up">
@@ -583,7 +622,7 @@ export default function LandingScreen({
                 WebGL 3D Engine · 60 FPS
               </div>
 
-              <Stethoscope3D className="w-full" interactive={true} />
+              <div className="h-[600px]" />
             </div>
 
             {/* Right Feature Details */}

@@ -4,7 +4,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import stethoscopeGlbUrl from "../../assets/Stethoscope.glb?url";
 
-export default function Stethoscope3D({ className = "", interactive = true }) {
+export default function Stethoscope3D({ className = "", interactive = true, cinematic = false }) {
   const mountRef = useRef(null);
   const [hovered, setHovered] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -275,13 +275,26 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       window.addEventListener("pointerup", handlePointerUp);
     }
 
-    // 8. Scroll-Driven 3D Rotation
+    // 8. Scroll-Driven 3D Story
     let scrollRotationY = 0;
+    let cinematicProgress = 0;
+    let cinematicTarget = 0;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const handleScroll = () => {
       const scrollY = window.scrollY || document.documentElement.scrollTop;
       scrollRotationY = scrollY * 0.0015;
+
+      if (cinematic) {
+        const story = container.closest("[data-stethoscope-story]");
+        if (story) {
+          const rect = story.getBoundingClientRect();
+          const distance = Math.max(1, rect.height - window.innerHeight);
+          cinematicTarget = THREE.MathUtils.clamp(-rect.top / distance, 0, 1);
+        }
+      }
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
 
     // 9. Animation Loop (60 FPS Inertia & Floating)
     let clock = new THREE.Clock();
@@ -300,11 +313,31 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
         velocityY *= 0.94;
       }
 
-      // Combine user drag + scroll rotation + idle float
-      stethoscopeGroup.rotation.y = currentRotationY + scrollRotationY;
-      stethoscopeGroup.rotation.x = currentRotationX;
+      // Cinematic mode maps the story's scroll progress to one continuous
+      // camera/model timeline, similar to the persistent scene on The Watch.
+      if (cinematic) {
+        cinematicProgress = reduceMotion
+          ? cinematicTarget
+          : THREE.MathUtils.lerp(cinematicProgress, cinematicTarget, 0.075);
+        const p = cinematicProgress;
+        const orbit = p * Math.PI * 1.35;
+        const focus = Math.sin(Math.min(1, p * 1.7) * Math.PI * 0.5);
 
-      if (!isDragging && Math.abs(velocityX) < 0.0001 && Math.abs(velocityY) < 0.0001) {
+        stethoscopeGroup.rotation.x = -0.18 + Math.sin(p * Math.PI * 2) * 0.32;
+        stethoscopeGroup.rotation.y = -0.55 + orbit;
+        stethoscopeGroup.rotation.z = -0.18 + Math.sin(p * Math.PI) * 0.24;
+        stethoscopeGroup.position.x = Math.sin(p * Math.PI * 2) * 0.72;
+        stethoscopeGroup.position.y = THREE.MathUtils.lerp(-0.15, 0.28, focus) + Math.sin(p * Math.PI * 3) * 0.18;
+        const storyScale = 0.88 + Math.sin(p * Math.PI) * 0.28;
+        stethoscopeGroup.scale.setScalar(storyScale);
+
+        camera.position.z = THREE.MathUtils.lerp(9.4, 7.1, Math.sin(p * Math.PI));
+        camera.position.x = Math.sin(p * Math.PI * 2) * 0.35;
+        camera.lookAt(0, 0, 0);
+        cyanSpotLight.position.x = Math.sin(orbit) * 5;
+        cyanSpotLight.position.z = Math.cos(orbit) * 5;
+        shadowMesh.material.opacity = THREE.MathUtils.lerp(0.35, 0.72, Math.sin(p * Math.PI));
+      } else if (!isDragging && Math.abs(velocityX) < 0.0001 && Math.abs(velocityY) < 0.0001) {
         stethoscopeGroup.position.y = Math.sin(elapsedTime * 1.4) * 0.8; // top to bottom movement
         stethoscopeGroup.position.x = Math.sin(elapsedTime * 0.9) * 0.7; // left right left right combination
         stethoscopeGroup.rotation.y = currentRotationY + scrollRotationY + Math.sin(elapsedTime * 0.7) * 0.25;
@@ -315,8 +348,10 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
         stethoscopeGroup.position.y += (0 - stethoscopeGroup.position.y) * 0.05;
       }
 
-      cyanSpotLight.position.x = Math.sin(elapsedTime * 1.2) * 4;
-      cyanSpotLight.position.z = Math.cos(elapsedTime * 1.2) * 4;
+      if (!cinematic) {
+        cyanSpotLight.position.x = Math.sin(elapsedTime * 1.2) * 4;
+        cyanSpotLight.position.z = Math.cos(elapsedTime * 1.2) * 4;
+      }
 
       renderer.render(scene, camera);
 
@@ -362,25 +397,25 @@ export default function Stethoscope3D({ className = "", interactive = true }) {
       }
       renderer.dispose();
     };
-  }, [interactive]);
+  }, [interactive, cinematic]);
 
   return (
     <div
       ref={mountRef}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`relative w-full h-[400px] sm:h-[500px] lg:h-[600px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none ${className}`}
+      className={`relative w-full h-[400px] sm:h-[500px] lg:h-[600px] flex items-center justify-center ${interactive ? "cursor-grab active:cursor-grabbing" : ""} select-none ${className}`}
     >
       {/* Luxury Background Glow Ring */}
       <div className="pointer-events-none absolute size-72 sm:size-96 lg:size-[480px] rounded-full bg-gradient-to-tr from-[#20C7A7]/25 via-[#123D35]/15 to-transparent blur-3xl animate-pulse" />
 
       {/* FS 60P Studio Style Badge */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-[#EBEBEB] text-[#000000] text-[10px] font-mono font-medium border border-zinc-300 shadow-2xs">
+      {!cinematic && <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-[#EBEBEB] text-[#000000] text-[10px] font-mono font-medium border border-zinc-300 shadow-2xs">
         <span className="size-2 rounded-full bg-[#123D35] animate-ping" />
         <span>{loaded ? "Stethoscope.glb · Loaded" : "3D WebGL Engine"}</span>
         <span className="opacity-40">|</span>
         <span className="text-[#123D35] font-bold">{fps} FPS</span>
-      </div>
+      </div>}
 
       {/* Interactive Helper Pill */}
       {interactive && (
