@@ -61,7 +61,7 @@ async def wipe_mongodb(settings):
             print(f"Successfully dropped {len(collections)} MongoDB collections in database '{db_name}': {collections}")
         else:
             print(f"No MongoDB collections found in database '{db_name}'.")
-        client.close()
+        await client.close()
     except Exception as e:
         print(f"Error wiping MongoDB: {e}")
 
