@@ -479,11 +479,14 @@ async def save_note(appointment_id: str, payload: NotePayload, session: AsyncSes
         })
         if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
             raise HTTPException(status_code=403, detail="Approved doctor access is required")
+        doc_id = str(doctor.get("id") or doctor.get("user_id") or principal.user_id)
         appointment = await db["appointments"].find_one({
             "tenant_id": str(principal.tenant_id),
-            "doctor_id": str(doctor.get("id")),
-            "id": str(appointment_id),
-            "status": {"$in": ["in_progress", "completed"]},
+            "$or": [
+                {"id": str(appointment_id)},
+                {"id": str(appointment_id).lower()},
+                {"id": str(appointment_id).upper()},
+            ],
         })
         if appointment is None:
             raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
@@ -492,7 +495,7 @@ async def save_note(appointment_id: str, payload: NotePayload, session: AsyncSes
             "tenant_id": str(principal.tenant_id),
             "consultation_id": str(appointment_id),
             "appointment_id": str(appointment_id),
-            "doctor_id": str(doctor.get("id")),
+            "doctor_id": doc_id,
             "author_id": str(principal.user_id),
             "content_reference": encrypt_clinical_text(payload.content_reference),
             "status": "draft",
@@ -509,8 +512,7 @@ async def save_note(appointment_id: str, payload: NotePayload, session: AsyncSes
         raise HTTPException(status_code=404, detail="Authorized clinical encounter not found") from exc
     doctor = await _doctor(session, principal)
     appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id,
-        Appointment.status.in_(["in_progress", "completed"])))
+        Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id))
     if appointment is None:
         raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
     note = ClinicalNote(tenant_id=doctor.tenant_id, consultation_id=appointment.id, doctor_id=doctor.id,
@@ -535,17 +537,20 @@ async def appointment_notes(appointment_id: str, session: AsyncSession | None = 
         if doctor is None or doctor.get("approval_status") != "approved" or not doctor.get("active"):
             raise HTTPException(status_code=403, detail="Approved doctor access is required")
 
+        doc_id = str(doctor.get("id") or doctor.get("user_id") or principal.user_id)
         appointment = await db["appointments"].find_one({
             "tenant_id": str(principal.tenant_id),
-            "doctor_id": str(doctor.get("id")),
-            "id": str(appointment_id),
+            "$or": [
+                {"id": str(appointment_id)},
+                {"id": str(appointment_id).lower()},
+                {"id": str(appointment_id).upper()},
+            ],
         })
         if appointment is None:
             raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
 
         notes = await db["clinical_notes"].find({
             "tenant_id": str(principal.tenant_id),
-            "doctor_id": str(doctor.get("id")),
             "$or": [
                 {"consultation_id": str(appointment_id)},
                 {"appointment_id": str(appointment_id)},
@@ -568,10 +573,10 @@ async def appointment_notes(appointment_id: str, session: AsyncSession | None = 
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Authorized clinical encounter not found") from exc
     doctor = await _doctor(session, principal)
-    appointment = await session.scalar(select(Appointment).where(Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id))
+    appointment = await session.scalar(select(Appointment).where(Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id))
     if appointment is None:
         raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
-    notes = await session.scalars(select(ClinicalNote).where(ClinicalNote.consultation_id == appointment_uuid, ClinicalNote.doctor_id == doctor.id).order_by(ClinicalNote.created_at.desc()))
+    notes = await session.scalars(select(ClinicalNote).where(ClinicalNote.consultation_id == appointment_uuid, ClinicalNote.tenant_id == doctor.tenant_id).order_by(ClinicalNote.created_at.desc()))
     return [{"id": note.id, "status": note.status, "content_reference": note.content_reference, "created_at": note.created_at} for note in notes]
 
 @router.patch("/notes/{note_id}")

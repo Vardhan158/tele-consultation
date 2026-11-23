@@ -737,7 +737,7 @@ function SupportDashboardContent({ user, onLogout }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F0F5F7] text-[#172B2B] font-sans flex flex-col lg:flex-row">
+    <div className="h-screen w-full overflow-hidden bg-[#F0F5F7] text-[#172B2B] font-sans flex flex-col lg:flex-row">
       {/* Mobile Top Navigation Header */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#123D35] text-white px-4 py-3 flex items-center justify-between border-b border-[#176354]">
         <div className="flex items-center gap-2.5">
@@ -842,7 +842,7 @@ function SupportDashboardContent({ user, onLogout }) {
       </aside>
 
       {/* Main Screen Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         {/* Desktop Sticky Header */}
         <header className="hidden lg:flex sticky top-0 z-20 bg-white border-b border-[#577877]/15 px-8 py-4 items-center justify-between shadow-xs">
           <div>
