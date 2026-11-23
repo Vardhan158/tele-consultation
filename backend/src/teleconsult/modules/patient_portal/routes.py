@@ -1118,13 +1118,34 @@ async def list_appointments(
                 )
                 payment_status = str((payment or {}).get("status") or appointment.get("payment_status") or "pending")
 
+                apt_status = str(appointment.get("status", "confirmed")).lower()
+                v_session = await database["video_sessions"].find_one({
+                    "tenant_id": str(principal.tenant_id),
+                    "appointment_id": apt_id_str,
+                })
+                c_session = await database["consultation_sessions"].find_one({
+                    "tenant_id": str(principal.tenant_id),
+                    "appointment_id": apt_id_str,
+                })
+
+                if (
+                    (v_session and str(v_session.get("status", "")).lower() in {"completed", "ended"})
+                    or (c_session and str(c_session.get("status", "")).lower() in {"completed", "ended"})
+                ):
+                    apt_status = "completed"
+                    if appointment.get("status") != "completed":
+                        await database["appointments"].update_one(
+                            {"tenant_id": str(principal.tenant_id), "id": apt_id_str},
+                            {"$set": {"status": "completed"}},
+                        )
+
                 results.append(AppointmentResponse(
                     id=apt_id_str,
                     doctor_id=str(doctor_id_raw or principal.user_id),
                     patient_id=str(appointment.get("patient_id") or principal.user_id),
                     starts_at=starts_at_dt,
                     ends_at=ends_at_dt,
-                    status=str(appointment.get("status", "confirmed")).lower(),
+                    status=apt_status,
                     payment_status=payment_status.lower(),
                     join_window_minutes=get_settings().video_join_window_minutes,
                     base_fee_paise=base_fee_paise,

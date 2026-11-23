@@ -5,12 +5,13 @@ export function appointmentCategory(appointment, now = Date.now()) {
   const status = String(appointment.rawStatus ?? appointment.status ?? "").toLowerCase();
   if (status === "cancelled") return "cancelled";
   const end = Date.parse(appointment.ends_at);
-  return status === "completed" || status === "no_show" || end < now ? "past" : "upcoming";
+  return status === "completed" || status === "ended" || status === "no_show" || end < now ? "past" : "upcoming";
 }
 
 export function canJoinAppointment(appointment, now = Date.now()) {
   if (!appointment) return false;
   const status = String(appointment.rawStatus ?? appointment.status ?? "").toLowerCase();
+  if (status === "completed" || status === "ended" || status === "cancelled") return false;
   const payment = String(appointment.rawPaymentStatus ?? appointment.payment_status ?? "").toLowerCase();
   const start = Date.parse(appointment.starts_at);
   const end = Date.parse(appointment.ends_at);

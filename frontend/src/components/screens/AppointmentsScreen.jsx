@@ -1018,24 +1018,32 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                             Join Video Room
                           </button>
                         ) : (
-                          <span className="text-xs text-[#577877]">Joining is available during the consultation window after payment verification.</span>
+                          <span className="text-xs text-[#577877]">
+                            {["completed", "ended"].includes(apt.rawStatus)
+                              ? "Consultation completed."
+                              : "Joining is available during the consultation window after payment verification."}
+                          </span>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenReschedule(apt)}
-                          className="btn-secondary !py-2 !px-3.5 text-xs font-semibold cursor-pointer"
-                        >
-                          Reschedule
-                        </button>
+                        {!apt.isPendingPayment && !["completed", "ended"].includes(apt.rawStatus) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReschedule(apt)}
+                              className="btn-secondary !py-2 !px-3.5 text-xs font-semibold cursor-pointer"
+                            >
+                              Reschedule
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenCancel(apt)}
-                          className="rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 cursor-pointer transition"
-                        >
-                          Cancel Appointment
-                        </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCancel(apt)}
+                              className="rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 cursor-pointer transition"
+                            >
+                              Cancel Appointment
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
