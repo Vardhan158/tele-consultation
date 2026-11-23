@@ -8,6 +8,16 @@ export default function DoctorAvailabilityScreen() {
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  const filteredItems = items.filter((item) => {
+    if (filterStatus === "all") return true;
+    const norm = String(item.status || "available").toLowerCase();
+    if (filterStatus === "available") return norm === "available";
+    if (filterStatus === "booked") return norm === "booked" || norm === "reserved" || item.booked === true;
+    if (filterStatus === "expired") return norm === "expired";
+    return true;
+  });
 
   const load = () => {
     setLoading(true);
@@ -151,26 +161,50 @@ export default function DoctorAvailabilityScreen() {
       </div>
 
       {/* Configured Slots List */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-bold text-[#162623] flex items-center gap-2">
-          <span>Configured Slots</span>
-          <span className="text-xs text-[#577877] font-normal">({items.length} total)</span>
-        </h3>
+      <div className="space-y-4 pb-20 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#577877]/10 pb-3">
+          <h3 className="text-sm font-bold text-[#162623] flex items-center gap-2">
+            <span>Configured Slots</span>
+            <span className="text-xs text-[#577877] font-normal">({filteredItems.length} displayed / {items.length} total)</span>
+          </h3>
+
+          {/* Status Filter Chips */}
+          <div className="flex items-center gap-1.5 text-xs font-semibold flex-wrap">
+            {["all", "available", "booked", "expired"].map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setFilterStatus(st)}
+                className={`px-3 py-1 rounded-full capitalize transition cursor-pointer ${
+                  filterStatus === st
+                    ? "bg-[#185A4D] text-white font-bold shadow-xs"
+                    : "bg-[#EEF6F3] text-[#185A4D] hover:bg-[#185A4D]/10"
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {loading ? (
           <div className="rounded-2xl bg-white p-10 text-center text-[#577877] text-xs font-medium space-y-2 border border-[#577877]/15">
             <span className="material-symbols-outlined animate-spin text-2xl text-[#185A4D]">sync</span>
             <p>Loading schedule availability…</p>
           </div>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="rounded-2xl bg-white p-8 text-center text-[#577877] text-xs font-medium space-y-2 border border-[#577877]/15">
             <span className="material-symbols-outlined text-3xl text-[#185A4D]">event_busy</span>
-            <p className="font-bold text-[#162623]">No Availability Slots Configured</p>
-            <p className="text-[#577877]">Add your available consultation hours above so patients can book appointments with you.</p>
+            <p className="font-bold text-[#162623]">No Availability Slots Match Filter</p>
+            <p className="text-[#577877]">
+              {filterStatus === "all"
+                ? "Add your available consultation hours above so patients can book appointments with you."
+                : `No slots found with status '${filterStatus}'. Try selecting another filter.`}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3">
-            {items.map((item) => {
+            {filteredItems.map((item) => {
               const startObj = new Date(item.starts_at);
               const endObj = new Date(item.ends_at);
               const normalizedStatus = String(item.status || "available").toLowerCase();
