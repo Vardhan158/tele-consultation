@@ -62,7 +62,7 @@ class NotePayload(BaseModel):
 
 
 @router.get("/dashboard")
-async def dashboard(session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:appointment:read"))):
+async def dashboard(principal: Principal = Depends(require("doctor:appointment:read"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({
@@ -119,23 +119,11 @@ async def dashboard(session: AsyncSession | None = Depends(auth_database_session
             "completed": completed,
             "pending_notes": pending_notes,
         }
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    doctor = await _doctor(session, principal)
-    now = datetime.now(UTC)
-    appointments = await session.scalars(select(Appointment).where(
-        Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id,
-        Appointment.starts_at >= now).order_by(Appointment.starts_at).limit(100))
-    items = list(appointments)
-    return {"today": sum(1 for item in items if item.starts_at.date() == now.date()),
-        "upcoming": len(items), "completed": await session.scalar(select(func.count(Appointment.id)).where(
-            Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id, Appointment.status == "completed")),
-        "pending_notes": await session.scalar(select(func.count(ClinicalNote.id)).where(
-            ClinicalNote.tenant_id == doctor.tenant_id, ClinicalNote.doctor_id == doctor.id, ClinicalNote.status == "draft"))}
+    return {}
 
 
 @router.get("/appointments")
-async def doctor_appointments(session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("doctor:appointment:read"))):
+async def doctor_appointments(principal: Principal = Depends(require("doctor:appointment:read"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({
@@ -180,18 +168,11 @@ async def doctor_appointments(session: AsyncSession | None = Depends(auth_databa
                 "fee_paise": item.get("fee_paise") or item.get("total_payable_paise"),
             })
         return output
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    doctor = await _doctor(session, principal)
-    result = await session.scalars(select(Appointment).where(
-        Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id).order_by(Appointment.starts_at.desc()).limit(200))
-    return [{"id": item.id, "patient_id": item.patient_id, "starts_at": item.starts_at, "ends_at": item.ends_at,
-        "status": item.status, "payment_status": item.payment_status} for item in result]
+    return []
 
 
 @router.get("/availability")
 async def doctor_availability(
-    session: AsyncSession | None = Depends(auth_database_session),
     principal: Principal = Depends(require("doctor:availability:read")),
 ):
     if get_settings().mongodb_enabled and mongo_database.enabled:
@@ -234,28 +215,12 @@ async def doctor_availability(
                 "timezone": clinic_timezone,
             })
         return slots
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="Runtime database is unavailable")
-
-    doctor = await _doctor(session, principal)
-    result = await session.scalars(
-        select(DoctorAvailability)
-        .where(
-            DoctorAvailability.tenant_id == doctor.tenant_id,
-            DoctorAvailability.doctor_id == doctor.id,
-        )
-        .order_by(DoctorAvailability.starts_at)
-    )
-    now_utc = datetime.now(UTC)
-    appointments = list(await session.scalars(select(Appointment).where(Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id, Appointment.status.in_(["requested", "pending_payment", "confirmed", "checked_in", "in_progress", "rescheduled"]))))
-    return [{**slot.__dict__, "status": "expired" if slot.ends_at <= now_utc else "booked" if any(item.starts_at < slot.ends_at and item.ends_at > slot.starts_at for item in appointments) or slot.status in {"reserved", "booked"} else "available"} for slot in result]
+    return []
 
 
 @router.post("/availability", status_code=201)
 async def create_availability(
     payload: DoctorSlot,
-    session: AsyncSession | None = Depends(auth_database_session),
     principal: Principal = Depends(require("doctor:availability:write")),
 ):
     if payload.ends_at <= payload.starts_at:
@@ -312,38 +277,12 @@ async def create_availability(
             "status": "available",
             "timezone": clinic_timezone,
         }
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="Runtime database is unavailable")
-
-    doctor = await _doctor(session, principal)
-    conflict = await session.scalar(
-        select(DoctorAvailability.id).where(
-            DoctorAvailability.tenant_id == doctor.tenant_id,
-            DoctorAvailability.doctor_id == doctor.id,
-            DoctorAvailability.starts_at < payload.ends_at,
-            DoctorAvailability.ends_at > payload.starts_at,
-            DoctorAvailability.status.in_(["available", "reserved", "booked"]),
-        )
-    )
-    if conflict:
-        raise HTTPException(status_code=409, detail="Availability overlaps an existing slot")
-
-    slot = DoctorAvailability(
-        tenant_id=doctor.tenant_id,
-        doctor_id=doctor.id,
-        status="available",
-        **payload.model_dump(),
-    )
-    session.add(slot)
-    await session.flush()
-    return slot
+    return {}
 
 
 @router.delete("/availability/{slot_id}")
 async def delete_availability(
     slot_id: str,
-    session: AsyncSession | None = Depends(auth_database_session),
     principal: Principal = Depends(require("doctor:availability:write")),
 ):
     if get_settings().mongodb_enabled and mongo_database.enabled:
@@ -393,28 +332,11 @@ async def delete_availability(
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Availability slot not found")
         return {"status": "deleted", "slot_id": slot_id}
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="Runtime database is unavailable")
-
-    doctor = await _doctor(session, principal)
-    slot = await session.scalar(
-        select(DoctorAvailability).where(
-            DoctorAvailability.id == UUID(slot_id),
-            DoctorAvailability.tenant_id == doctor.tenant_id,
-            DoctorAvailability.doctor_id == doctor.id,
-        )
-    )
-    if slot is None:
-        raise HTTPException(status_code=404, detail="Availability slot not found")
-    if getattr(slot, "is_booked", False) or slot.status in {"booked", "reserved"}:
-        raise HTTPException(status_code=409, detail="Cannot delete an availability slot that is already booked or reserved")
-    await session.delete(slot)
-    return {"status": "deleted", "slot_id": slot_id}
+    return {}
 
 
 @router.post("/appointments/{appointment_id}/notes", status_code=201)
-async def save_note(appointment_id: str, payload: NotePayload, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:write"))):
+async def save_note(appointment_id: str, payload: NotePayload, principal: Principal = Depends(require("clinical:write"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({
@@ -451,27 +373,11 @@ async def save_note(appointment_id: str, payload: NotePayload, session: AsyncSes
         }
         await db["clinical_notes"].insert_one(note)
         return {"id": note["id"], "status": note["status"]}
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    try:
-        appointment_uuid = UUID(appointment_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Authorized clinical encounter not found") from exc
-    doctor = await _doctor(session, principal)
-    appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id))
-    if appointment is None:
-        raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
-    note = ClinicalNote(tenant_id=doctor.tenant_id, consultation_id=appointment.id, doctor_id=doctor.id,
-        content_reference=payload.content_reference, status="draft")
-    session.add(note)
-    await session.flush()
-    return {"id": note.id, "status": note.status}
+    return {}
 
 
 @router.get("/appointments/{appointment_id}/notes")
-async def appointment_notes(appointment_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:read"))):
+async def appointment_notes(appointment_id: str, principal: Principal = Depends(require("clinical:read"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({
@@ -513,22 +419,10 @@ async def appointment_notes(appointment_id: str, session: AsyncSession | None = 
             }
             for item in notes
         ]
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    try:
-        appointment_uuid = UUID(appointment_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Authorized clinical encounter not found") from exc
-    doctor = await _doctor(session, principal)
-    appointment = await session.scalar(select(Appointment).where(Appointment.id == appointment_uuid, Appointment.tenant_id == doctor.tenant_id))
-    if appointment is None:
-        raise HTTPException(status_code=404, detail="Authorized clinical encounter not found")
-    notes = await session.scalars(select(ClinicalNote).where(ClinicalNote.consultation_id == appointment_uuid, ClinicalNote.tenant_id == doctor.tenant_id).order_by(ClinicalNote.created_at.desc()))
-    return [{"id": note.id, "status": note.status, "content_reference": note.content_reference, "created_at": note.created_at} for note in notes]
+    return []
 
 @router.patch("/notes/{note_id}")
-async def update_draft_note(note_id: str, payload: NotePayload, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:write"))):
+async def update_draft_note(note_id: str, payload: NotePayload, principal: Principal = Depends(require("clinical:write"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({"tenant_id": str(principal.tenant_id), "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}, {"user_account_id": str(principal.user_id)}]})
@@ -544,24 +438,11 @@ async def update_draft_note(note_id: str, payload: NotePayload, session: AsyncSe
             {"$set": {"content_reference": encrypt_clinical_text(payload.content_reference)}},
         )
         return {"id": str(note_id), "status": "draft"}
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    try:
-        note_uuid = UUID(note_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Clinical note not found") from exc
-    doctor = await _doctor(session, principal)
-    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_uuid, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
-    if note is None:
-        raise HTTPException(status_code=404, detail="Clinical note not found")
-    if note.status != "draft":
-        raise HTTPException(status_code=409, detail="Finalized notes cannot be edited; create an amendment")
-    note.content_reference = payload.content_reference
-    return {"id": note.id, "status": note.status}
+    return {}
 
 
 @router.get("/patients")
-async def doctor_patients(session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:read"))):
+async def doctor_patients(principal: Principal = Depends(require("clinical:read"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({
@@ -604,26 +485,11 @@ async def doctor_patients(session: AsyncSession | None = Depends(auth_database_s
             })
 
         return patients
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    doctor = await _doctor(session, principal)
-    rows = await session.execute(select(Patient, Appointment).join(Appointment, Appointment.patient_id == Patient.id).where(
-        Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id).distinct())
-    result = []
-    seen = set()
-    for patient, _appointment in rows:
-        if patient.id in seen:
-            continue
-        seen.add(patient.id)
-        session.add(AuditRecord(tenant_id=doctor.tenant_id, actor_id=UUID(principal.user_id), action="patient.list",
-            resource_type="patient", resource_id=patient.id, purpose="authorized clinical relationship", metadata_json={}))
-        result.append({"id": patient.id, "full_name": patient.full_name, "preferred_language": patient.preferred_language})
-    return result
+    return []
 
 
 @router.get("/patients/{patient_id}")
-async def doctor_patient_detail(patient_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:read"))):
+async def doctor_patient_detail(patient_id: str, principal: Principal = Depends(require("clinical:read"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({
@@ -690,30 +556,11 @@ async def doctor_patient_detail(patient_id: str, session: AsyncSession | None = 
                 for item in notes
             ],
         }
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    doctor = await _doctor(session, principal)
-    p_uuid = UUID(patient_id) if len(patient_id) == 36 else UUID(int=hash(patient_id) & 0xffffffffffffffffffffffffffffffff)
-    appointments = list(await session.scalars(select(Appointment).where(
-        Appointment.tenant_id == doctor.tenant_id, Appointment.doctor_id == doctor.id, Appointment.patient_id == p_uuid
-    ).order_by(Appointment.starts_at.desc()).limit(100)))
-    if not appointments:
-        raise HTTPException(status_code=404, detail="Patient is not linked to this doctor")
-    patient = await session.get(Patient, p_uuid)
-    notes = list(await session.scalars(select(ClinicalNote).where(
-        ClinicalNote.tenant_id == doctor.tenant_id, ClinicalNote.doctor_id == doctor.id,
-        ClinicalNote.consultation_id.in_([item.id for item in appointments])
-    ).order_by(ClinicalNote.created_at.desc())))
-    return {
-        "patient": {"id": patient.id, "full_name": patient.full_name, "preferred_language": patient.preferred_language},
-        "appointments": [{"id": item.id, "starts_at": item.starts_at, "ends_at": item.ends_at, "status": item.status, "reason": item.reason} for item in appointments],
-        "notes": [{"id": item.id, "appointment_id": item.consultation_id, "appointment_date": next((appointment.starts_at for appointment in appointments if appointment.id == item.consultation_id), None), "appointment_status": next((appointment.status for appointment in appointments if appointment.id == item.consultation_id), None), "status": item.status, "content_reference": item.content_reference, "created_at": item.created_at, "amendments": []} for item in notes],
-    }
+    return {}
 
 
 @router.post("/appointments/{appointment_id}/notes/{note_id}/finalize")
-async def finalize_note(appointment_id: str, note_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:write"))):
+async def finalize_note(appointment_id: str, note_id: str, principal: Principal = Depends(require("clinical:write"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({
@@ -751,30 +598,11 @@ async def finalize_note(appointment_id: str, note_id: str, session: AsyncSession
             {"$set": {"status": "finalized", "finalized_at": datetime.now(UTC).isoformat()}},
         )
         return {"id": str(note_id), "status": "finalized"}
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    try:
-        appointment_uuid = UUID(appointment_id)
-        note_uuid = UUID(note_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Clinical note not found") from exc
-    doctor = await _doctor(session, principal)
-    note = await session.scalar(select(ClinicalNote).where(
-        ClinicalNote.id == note_uuid, ClinicalNote.consultation_id == appointment_uuid,
-        ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
-    if note is None:
-        raise HTTPException(status_code=404, detail="Clinical note not found")
-    if note.status == "finalized":
-        raise HTTPException(status_code=409, detail="Clinical note is already finalized")
-    note.status = "finalized"
-    session.add(AuditRecord(tenant_id=doctor.tenant_id, actor_id=doctor.user_account_id, action="clinical_note.finalize",
-        resource_type="clinical_note", resource_id=note.id, purpose="clinical documentation", metadata_json={}))
-    return {"id": note.id, "status": note.status}
+    return {}
 
 
 @router.get("/notes/{note_id}/amendments")
-async def note_amendments(note_id: str, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:read"))):
+async def note_amendments(note_id: str, principal: Principal = Depends(require("clinical:read"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({"tenant_id": str(principal.tenant_id), "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}, {"user_account_id": str(principal.user_id)}]})
@@ -793,22 +621,11 @@ async def note_amendments(note_id: str, session: AsyncSession | None = Depends(a
             }
             for row in rows
         ]
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    try:
-        note_uuid = UUID(note_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Clinical note not found") from exc
-    doctor = await _doctor(session, principal)
-    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_uuid, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
-    if note is None:
-        raise HTTPException(status_code=404, detail="Clinical note not found")
-    rows = await session.scalars(select(ClinicalNoteAmendment).where(ClinicalNoteAmendment.note_id == note_uuid, ClinicalNoteAmendment.tenant_id == doctor.tenant_id).order_by(ClinicalNoteAmendment.version))
-    return list(rows)
+    return []
 
 
 @router.post("/notes/{note_id}/amend", status_code=201)
-async def amend_note(note_id: str, payload: NotePayload, session: AsyncSession | None = Depends(auth_database_session), principal: Principal = Depends(require("clinical:write"))):
+async def amend_note(note_id: str, payload: NotePayload, principal: Principal = Depends(require("clinical:write"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await db["doctors"].find_one({"tenant_id": str(principal.tenant_id), "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}, {"user_account_id": str(principal.user_id)}]})
@@ -831,20 +648,4 @@ async def amend_note(note_id: str, payload: NotePayload, session: AsyncSession |
         }
         await db["clinical_note_amendments"].insert_one(amendment)
         return {"id": amendment["id"], "version": version}
-    if session is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL runtime database is not configured")
-    try:
-        note_uuid = UUID(note_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail="Only finalized notes can be amended") from exc
-    doctor = await _doctor(session, principal)
-    note = await session.scalar(select(ClinicalNote).where(ClinicalNote.id == note_uuid, ClinicalNote.doctor_id == doctor.id, ClinicalNote.tenant_id == doctor.tenant_id))
-    if note is None or note.status != "finalized":
-        raise HTTPException(status_code=409, detail="Only finalized notes can be amended")
-    latest = await session.scalar(select(func.max(ClinicalNoteAmendment.version)).where(ClinicalNoteAmendment.note_id == note_uuid))
-    amendment_content = f"Reason:\n{payload.reason.strip()}\n\nChanged information:\n{payload.content_reference}"
-    amendment = ClinicalNoteAmendment(tenant_id=doctor.tenant_id, note_id=note.id, author_id=UUID(principal.user_id), version=(latest or 0) + 1, content_reference=amendment_content)
-    session.add(amendment)
-    session.add(AuditRecord(tenant_id=doctor.tenant_id, actor_id=UUID(principal.user_id), action="clinical_note.amend", resource_type="clinical_note", resource_id=note.id, purpose="clinical documentation amendment", metadata_json={"version": amendment.version}))
-    await session.flush()
-    return {"id": amendment.id, "version": amendment.version}
+    return {}

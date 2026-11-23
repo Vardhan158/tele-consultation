@@ -76,7 +76,6 @@ def _format_activity_timestamp(dt_val: Any) -> str:
 @router.get("/overview")
 async def get_overview(
     request: Request,
-    session: AsyncSession | None = Depends(auth_database_session),
 ) -> dict[str, Any]:
     await _verify_admin(request)
     settings = get_settings()
@@ -197,92 +196,13 @@ async def get_overview(
             "alerts": alerts,
             "recent_activity": recent_activity,
         }
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="No database configured")
-    tenant_id = UUID(settings.default_tenant_id)
-    total_doctors = (
-        await session.scalar(
-            select(func.count(Doctor.id)).where(Doctor.tenant_id == tenant_id)
-        )
-        or 0
-    )
-    pending_approvals = (
-        await session.scalar(
-            select(func.count(Doctor.id)).where(
-                Doctor.tenant_id == tenant_id, Doctor.approval_status == "pending"
-            )
-        )
-        or 0
-    )
-    active_doctors = (
-        await session.scalar(
-            select(func.count(Doctor.id)).where(
-                Doctor.tenant_id == tenant_id,
-                Doctor.approval_status == "approved",
-                Doctor.active.is_(True),
-            )
-        )
-        or 0
-    )
-    total_appointments = (
-        await session.scalar(
-            select(func.count(Appointment.id)).where(
-                Appointment.tenant_id == tenant_id
-            )
-        )
-        or 0
-    )
-    confirmed_appointments = (
-        await session.scalar(
-            select(func.count(Appointment.id)).where(
-                Appointment.tenant_id == tenant_id, Appointment.status == "confirmed"
-            )
-        )
-        or 0
-    )
-    total_revenue_paise = (
-        await session.scalar(
-            select(func.sum(PaymentTransaction.amount_paise)).where(
-                PaymentTransaction.tenant_id == tenant_id,
-                PaymentTransaction.status == "captured",
-            )
-        )
-        or 0
-    )
-    total_revenue = total_revenue_paise / 100.0
-    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
-    completed_consultations = await session.scalar(select(func.count(Appointment.id)).where(Appointment.tenant_id == tenant_id, Appointment.status == "completed")) or 0
-    today_appointments = await session.scalar(select(func.count(Appointment.id)).where(Appointment.tenant_id == tenant_id, Appointment.starts_at >= day_start, Appointment.starts_at < day_end)) or 0
-    audit_records = await session.scalars(select(AuditRecord).where(AuditRecord.tenant_id == tenant_id).order_by(AuditRecord.occurred_at.desc()).limit(10))
-    recent_activity = [{
-        "id": str(event.id),
-        "timestamp": event.occurred_at.isoformat(),
-        "text": event.action.replace(".", " ").replace("_", " ").strip().title(),
-    } for event in audit_records]
-
-    return {
-        "kpis": {
-            "total_doctors": total_doctors,
-            "active_doctors": active_doctors,
-            "pending_approvals": pending_approvals,
-            "total_appointments": total_appointments,
-            "confirmed_appointments": confirmed_appointments,
-            "completed_consultations": completed_consultations,
-            "today_appointments": today_appointments,
-            "total_revenue": total_revenue,
-        },
-        "alerts": ([{"id": "alert-pending-docs", "type": "warning", "message": f"{pending_approvals} doctor credential application(s) awaiting verification."}] if pending_approvals else []),
-        "recent_activity": recent_activity,
-    }
+    return {}
 
 
 # --- 02. Doctor Management ---
 @router.get("/doctors")
 async def get_doctors(
     request: Request,
-    session: AsyncSession | None = Depends(auth_database_session),
 ) -> list[dict[str, Any]]:
     await _verify_admin(request)
     settings = get_settings()
@@ -354,32 +274,7 @@ async def get_doctors(
                 } if u_id in credentials_by_doctor else None),
             })
         return result
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="No database configured")
-    tenant_id = UUID(settings.default_tenant_id)
-    doctors = await session.scalars(select(Doctor).where(Doctor.tenant_id == tenant_id))
-    res = []
-    for d in doctors:
-        u = await session.get(UserAccount, d.user_account_id)
-        res.append({
-            "id": str(d.id),
-            "user_account_id": str(d.user_account_id),
-            "full_name": d.full_name,
-            "email": u.email if u else "",
-            "mobile_number": u.mobile_number if u else "",
-            "specialty": d.specialty,
-            "clinic_name": d.clinic_name,
-            "registration_number": d.registration_number,
-            "experience_years": d.experience_years,
-            "qualifications": d.qualifications,
-            "languages": d.languages,
-            "approval_status": d.approval_status,
-            "active": d.active,
-            "approved_for_consultation": d.approved_for_consultation,
-            "email_verified": bool(u.verified_at) if u else False,
-        })
-    return res
+    return []
 
 
 class ToggleDoctorStatusRequest(BaseModel):
@@ -392,7 +287,6 @@ async def toggle_doctor_status(
     doctor_id: str,
     payload: ToggleDoctorStatusRequest,
     request: Request,
-    session: AsyncSession | None = Depends(auth_database_session),
 ) -> dict[str, Any]:
     principal = await _verify_admin(request)
     settings = get_settings()
@@ -423,21 +317,7 @@ async def toggle_doctor_status(
             metadata={"active": payload.active, "reason": payload.reason},
         )
         return {"status": "success", "doctor_id": doctor_id, "active": payload.active}
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="No database configured")
-    d = await session.scalar(select(Doctor).where(Doctor.id == UUID(doctor_id)))
-    if d is None:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-    d.active = payload.active
-    await _audit_log(
-        principal,
-        action="doctor.status_toggle",
-        resource_type="doctor",
-        resource_id=doctor_id,
-        metadata={"active": payload.active, "reason": payload.reason},
-    )
-    return {"status": "success", "doctor_id": doctor_id, "active": payload.active}
+    return {}
 
 
 # --- 03. Service & Fee Configuration ---
@@ -987,7 +867,6 @@ async def get_appointments(
     request: Request,
     status_filter: str | None = None,
     q: str | None = None,
-    session: AsyncSession | None = Depends(auth_database_session),
 ) -> list[dict[str, Any]]:
     await _verify_admin(request)
     settings = get_settings()
@@ -1034,35 +913,7 @@ async def get_appointments(
                 "created_at": a.get("created_at"),
             })
         return res
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="No database configured")
-    tenant_id = UUID(settings.default_tenant_id)
-    stmt = (
-        select(Appointment)
-        .where(Appointment.tenant_id == tenant_id)
-        .order_by(Appointment.starts_at.desc())
-    )
-    if status_filter and status_filter != "all":
-        stmt = stmt.where(Appointment.status == status_filter)
-    apts = await session.scalars(stmt)
-    res = []
-    for a in apts:
-        d = await session.get(Doctor, a.doctor_id)
-        p = await session.get(Patient, a.patient_id)
-        res.append({
-            "id": str(a.id),
-            "patient_id": str(a.patient_id),
-            "patient_name": p.full_name if p else "Patient",
-            "doctor_id": str(a.doctor_id),
-            "doctor_name": d.full_name if d else "Dr. Clinician",
-            "starts_at": a.starts_at.isoformat() if a.starts_at else "",
-            "duration_minutes": a.duration_minutes,
-            "status": a.status,
-            "type": "Video Consultation",
-            "fee": 500,
-        })
-    return res
+    return []
 
 
 @router.post("/appointments/{appointment_id}/cancel")
@@ -1070,7 +921,6 @@ async def cancel_appointment_admin(
     appointment_id: str,
     payload: CancelAppointmentPayload,
     request: Request,
-    session: AsyncSession | None = Depends(auth_database_session),
 ) -> dict[str, Any]:
     principal = await _verify_admin(request)
     settings = get_settings()
@@ -1097,21 +947,7 @@ async def cancel_appointment_admin(
             metadata={"reason": payload.reason},
         )
         return {"status": "cancelled", "id": appointment_id, "reason": payload.reason}
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="No database configured")
-    apt = await session.scalar(select(Appointment).where(Appointment.id == UUID(appointment_id)))
-    if apt is None:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-    apt.status = "cancelled"
-    await _audit_log(
-        principal,
-        action="appointment.cancel",
-        resource_type="appointment",
-        resource_id=appointment_id,
-        metadata={"reason": payload.reason},
-    )
-    return {"status": "cancelled", "id": appointment_id, "reason": payload.reason}
+    return {}
 
 
 # --- 06. Payment Oversight ---
@@ -1123,7 +959,6 @@ class RefundPayload(BaseModel):
 async def get_payments(
     request: Request,
     status_filter: str | None = None,
-    session: AsyncSession | None = Depends(auth_database_session),
 ) -> list[dict[str, Any]]:
     await _verify_admin(request)
     settings = get_settings()
@@ -1159,29 +994,7 @@ async def get_payments(
             }
             for r in records
         ]
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="No database configured")
-    tenant_id = UUID(settings.default_tenant_id)
-    records = await session.scalars(
-        select(PaymentTransaction)
-        .where(PaymentTransaction.tenant_id == tenant_id)
-        .order_by(PaymentTransaction.created_at.desc())
-    )
-    return [
-        {
-            "id": str(r.id),
-            "appointment_id": str(r.appointment_id),
-            "patient_name": "Patient",
-            "amount": r.amount_paise / 100.0,
-            "currency": r.currency,
-            "status": r.status,
-            "provider": r.provider,
-            "provider_transaction_id": r.provider_transaction_id,
-            "created_at": r.created_at.isoformat() if r.created_at else "",
-        }
-        for r in records
-    ]
+    return []
 
 
 @router.post("/payments/{payment_id}/refund")
@@ -1189,7 +1002,6 @@ async def refund_payment_admin(
     payment_id: str,
     payload: RefundPayload,
     request: Request,
-    session: AsyncSession | None = Depends(auth_database_session),
 ) -> dict[str, Any]:
     principal = await _verify_admin(request)
     settings = get_settings()
@@ -1287,23 +1099,7 @@ async def refund_payment_admin(
             "reason": payload.reason,
             "refunded_at": now_iso,
         }
-
-    if session is None:
-        raise HTTPException(status_code=503, detail="No database configured")
-    rec = await session.scalar(
-        select(PaymentTransaction).where(PaymentTransaction.id == UUID(payment_id))
-    )
-    if rec is None:
-        raise HTTPException(status_code=404, detail="Payment record not found")
-    rec.status = "refunded"
-    await _audit_log(
-        principal,
-        action="payment.refund",
-        resource_type="payment",
-        resource_id=payment_id,
-        metadata={"reason": payload.reason},
-    )
-    return {"status": "refunded", "id": payment_id, "reason": payload.reason}
+    return {}
 
 
 # --- 07. Operational Reports ---
@@ -1311,7 +1107,6 @@ async def refund_payment_admin(
 async def get_reports(
     request: Request,
     time_range: str = "30d",
-    session: AsyncSession | None = Depends(auth_database_session),
 ) -> dict[str, Any]:
     await _verify_admin(request)
     settings = get_settings()
@@ -1358,18 +1153,9 @@ async def get_reports(
             "tenant_id": tenant_id,
         })
     else:
-        if session is None:
-            raise HTTPException(status_code=503, detail="No database configured")
-        tenant_id = UUID(settings.default_tenant_id)
-        raw_appointments = list(await session.scalars(select(Appointment).where(Appointment.tenant_id == tenant_id)))
-        doctors = {
-            str(item.id): {"specialty": item.specialty}
-            for item in await session.scalars(select(Doctor).where(Doctor.tenant_id == tenant_id))
-        }
-        raw_payments = list(await session.scalars(select(PaymentTransaction).where(
-            PaymentTransaction.tenant_id == tenant_id,
-            PaymentTransaction.status.in_(["captured", "success", "paid", "refunded"]),
-        )))
+        raw_appointments = []
+        doctors = {}
+        raw_payments = []
         total_slots_count = 0
 
     appointments = []
