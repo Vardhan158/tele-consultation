@@ -16,44 +16,34 @@ router = APIRouter(prefix="/doctor", tags=["doctor-portal"])
 
 
 async def _get_doctor(db, principal: Principal) -> dict:
-    """Robustly locate, auto-create, or auto-approve the doctor record for the current principal,
-    supporting both UUID and string forms for tenant_id and user_id.
+    """Locate, auto-create, or auto-approve the doctor record for the current principal,
+    using string representations for tenant_id and user_id.
     """
-    tenant_vals = [str(principal.tenant_id)]
-    try:
-        tenant_vals.append(UUID(str(principal.tenant_id)))
-    except (ValueError, TypeError, AttributeError):
-        pass
-
-    user_vals = [str(principal.user_id)]
-    try:
-        user_vals.append(UUID(str(principal.user_id)))
-    except (ValueError, TypeError, AttributeError):
-        pass
+    tenant_id_str = str(principal.tenant_id)
+    user_id_str = str(principal.user_id)
 
     query = {
-        "tenant_id": {"$in": tenant_vals},
+        "tenant_id": tenant_id_str,
         "$or": [
-            {"id": {"$in": user_vals}},
-            {"user_id": {"$in": user_vals}},
-            {"user_account_id": {"$in": user_vals}},
+            {"id": user_id_str},
+            {"user_id": user_id_str},
+            {"user_account_id": user_id_str},
         ],
     }
 
     doctor = await db["doctors"].find_one(query)
     if doctor is None:
-        user_doc = await db["users"].find_one({"id": {"$in": user_vals}}) or await db["users"].find_one({"user_id": {"$in": user_vals}})
+        user_doc = await db["users"].find_one({"id": user_id_str}) or await db["users"].find_one({"user_id": user_id_str})
         full_name = (user_doc or {}).get("full_name") or "Dr. Doctor"
         email = (user_doc or {}).get("email") or "doctor@teleconsult.local"
         phone = (user_doc or {}).get("phone") or (user_doc or {}).get("mobile_number") or "+1 (800) 555-0199"
 
-        doc_id = str(principal.user_id)
         now = datetime.now(UTC)
         new_doctor = {
-            "id": doc_id,
-            "user_id": doc_id,
-            "user_account_id": doc_id,
-            "tenant_id": str(principal.tenant_id),
+            "id": user_id_str,
+            "user_id": user_id_str,
+            "user_account_id": user_id_str,
+            "tenant_id": tenant_id_str,
             "full_name": full_name,
             "email": email,
             "phone": phone,
