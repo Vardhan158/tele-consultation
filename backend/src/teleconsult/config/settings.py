@@ -92,9 +92,6 @@ class Settings(BaseSettings):
                 missing.append("DATABASE_URL or MONGODB_URI")
             if not self.razorpay_key_id.strip() or not self.razorpay_key_secret.strip():
                 missing.append("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET")
-            if not self.clinical_encryption_key.strip():
-                missing.append("CLINICAL_ENCRYPTION_KEY")
-                missing.append("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET")
             if missing:
                 raise RuntimeError(
                     f"Production startup failed: Required production environment credentials missing: {', '.join(missing)}. "

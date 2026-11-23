@@ -36,6 +36,19 @@ def test_production_secrets_pass_when_configured():
     prod_settings.validate_production_configuration()
 
 
+def test_production_startup_does_not_require_clinical_encryption_key():
+    """Encryption remains available, but its key is not a startup dependency."""
+    prod_settings = Settings(
+        environment="production",
+        database_url="postgresql+asyncpg://user:pass@localhost:5432/teleconsult",
+        razorpay_key_id="rzp_live_realKey123",
+        razorpay_key_secret="real_secret_token_abc456",
+        clinical_encryption_key="",
+    )
+
+    prod_settings.validate_production_configuration()
+
+
 def test_dev_environment_permits_local_boot():
     """In dev mode, local boot is permitted without live production credentials."""
     dev_settings = Settings(
