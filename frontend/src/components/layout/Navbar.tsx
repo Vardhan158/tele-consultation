@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import DoctorRegistrationScreen from "../auth/DoctorRegistrationScreen";
 
 const PUBLIC_NAV_LINKS = [
   { label: "Home", path: "/" },
@@ -12,6 +13,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [showDoctorModal, setShowDoctorModal] = useState(false);
   const [activeHash, setActiveHash] = useState("");
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -185,7 +187,7 @@ export default function Navbar() {
           </button>
           <button
             type="button"
-            onClick={() => go("/doctor/register")}
+            onClick={() => setShowDoctorModal(true)}
             className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 sm:px-6 sm:py-2.5 text-sm sm:text-[15px] font-semibold transition-all duration-200 cursor-pointer shadow-xs ${
               useSolidWhiteHeader
                 ? "bg-[#165849] hover:bg-[#124b3e] text-white"
@@ -203,7 +205,7 @@ export default function Navbar() {
               strokeWidth="2.2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-[#162623]"
+              className={useSolidWhiteHeader ? "text-white" : "text-[#162623]"}
             >
               <path d="M5 12h14"></path>
               <path d="m12 5 7 7-7 7"></path>
@@ -260,7 +262,10 @@ export default function Navbar() {
               </button>
               <button
                 type="button"
-                onClick={() => go("/doctor/register")}
+                onClick={() => {
+                  setOpen(false);
+                  setShowDoctorModal(true);
+                }}
                 className={`w-full inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold cursor-pointer ${
                   useSolidWhiteHeader
                     ? "bg-[#165849] text-white"
@@ -273,6 +278,22 @@ export default function Navbar() {
             </div>
           </nav>
         </div>
+      )}
+
+      {/* Doctor Registration Popup Modal with all 3 steps */}
+      {showDoctorModal && (
+        <DoctorRegistrationScreen
+          isModal={true}
+          onClose={() => setShowDoctorModal(false)}
+          onSuccess={(email: string) => {
+            setShowDoctorModal(false);
+            navigate("/doctor/verify-email", { state: { email } });
+          }}
+          onSwitchToPatientAuth={() => {
+            setShowDoctorModal(false);
+            navigate("/login");
+          }}
+        />
       )}
     </header>
   );

@@ -17,7 +17,7 @@ test('doctor registration 3-step story mode renders cleanly with step progressio
   await expect(page.locator('input[name="full_name"]')).toBeVisible();
   await expect(page.locator('input[name="email"]')).toBeVisible();
   await expect(page.locator('input[name="mobile_number"]')).toBeVisible();
-  await expect(page.locator('input[name="state"]')).toBeVisible();
+  await expect(page.locator('select[name="state"]')).toBeVisible();
   await expect(page.locator('input[name="date_of_birth"]')).toBeVisible();
   await expect(page.locator('select[name="gender"]')).toBeVisible();
   await expect(page.getByRole('button', { name: /Continue to Professional Details/i })).toBeVisible();
@@ -33,7 +33,7 @@ test('doctor registration 3-step story mode renders cleanly with step progressio
   await page.locator('input[name="full_name"]').fill('Dr. Harshavardhan');
   await page.locator('input[name="email"]').fill('dr.test@clinic.com');
   await page.locator('input[name="mobile_number"]').fill('9876543210');
-  await page.locator('input[name="state"]').fill('Karnataka');
+  await page.locator('select[name="state"]').selectOption('Karnataka');
   await page.locator('input[name="date_of_birth"]').fill('1990-05-15');
   await page.locator('select[name="gender"]').selectOption('Male');
 
@@ -115,7 +115,7 @@ test('doctor registration form client-side validations across story steps', asyn
   await page.locator('input[name="full_name"]').fill('Dr. Test Doctor');
   await page.locator('input[name="email"]').fill('drtest@clinic.com');
   await page.locator('input[name="mobile_number"]').fill('9876543210');
-  await page.locator('input[name="state"]').fill('Karnataka');
+  await page.locator('select[name="state"]').selectOption('Karnataka');
   await page.locator('input[name="date_of_birth"]').fill('1990-05-15');
   await page.locator('select[name="gender"]').selectOption('Male');
   await page.getByRole('button', { name: /Continue to Professional Details/i }).click();
@@ -197,7 +197,7 @@ test('successful doctor registration submission displays PENDING_VERIFICATION co
   await page.locator('input[name="full_name"]').fill('Dr. Harshavardhan');
   await page.locator('input[name="email"]').fill('dr.test@clinic.com');
   await page.locator('input[name="mobile_number"]').fill('9876543210');
-  await page.locator('input[name="state"]').fill('Karnataka');
+  await page.locator('select[name="state"]').selectOption('Karnataka');
   await page.locator('input[name="date_of_birth"]').fill('1988-11-20');
   await page.locator('select[name="gender"]').selectOption('Male');
   await page.getByRole('button', { name: /Continue to Professional Details/i }).click();
@@ -228,3 +228,61 @@ test('successful doctor registration submission displays PENDING_VERIFICATION co
   await expect(page.locator('text=PENDING_VERIFICATION').first()).toBeVisible();
   await expect(page.getByRole('button', { name: /Proceed to Email Verification/i })).toBeVisible();
 });
+
+test('clicking Doctor Registration in Navbar opens popup modal with all 3 steps', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ json: { authenticated: false } }));
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await page.goto('/');
+
+  // Verify URL is "/"
+  expect(page.url()).not.toContain('/doctor/register');
+
+  // Click "Doctor Registration" in the Navbar
+  const navDoctorBtn = page.getByRole('banner').getByRole('button', { name: /Doctor Registration/i });
+  await expect(navDoctorBtn).toBeVisible();
+  await navDoctorBtn.click();
+
+  // Verify URL did NOT navigate away to /doctor/register
+  expect(page.url()).not.toContain('/doctor/register');
+
+  // Verify popup modal is open with Step 1
+  await expect(page.getByRole('heading', { name: /Doctor Registration/i })).toBeVisible();
+  await expect(page.getByText('Step 1 of 3: Personal Information')).toBeVisible();
+  await expect(page.getByText('1. Personal')).toBeVisible();
+  await expect(page.getByText('2. Credentials')).toBeVisible();
+  await expect(page.getByText('3. Verification')).toBeVisible();
+
+  // Verify close button is present in the modal header
+  const closeBtn = page.getByRole('button', { name: /Close Doctor Registration/i });
+  await expect(closeBtn).toBeVisible();
+
+  // Fill Step 1
+  await page.locator('input[name="full_name"]').fill('Dr. Modal Test');
+  await page.locator('input[name="email"]').fill('dr.modal@clinic.com');
+  await page.locator('input[name="mobile_number"]').fill('9988776655');
+  await page.locator('select[name="state"]').selectOption('Maharashtra');
+  await page.locator('input[name="date_of_birth"]').fill('1988-08-20');
+  await page.locator('select[name="gender"]').selectOption('Female');
+
+  // Advance to Step 2
+  await page.getByRole('button', { name: /Continue to Professional Details/i }).click();
+  await expect(page.getByText('Step 2 of 3: Medical Credentials')).toBeVisible();
+
+  // Fill Step 2
+  await page.locator('select[name="specialty"]').selectOption('General Medicine');
+  await page.locator('input[name="registration_number"]').fill('MCI-99887');
+  await page.locator('input[name="medical_council"]').fill('Maharashtra Medical Council');
+  await page.locator('input[name="qualifications"]').fill('MBBS, MD');
+  await page.locator('input[name="experience_years"]').fill('10');
+  await page.locator('input[name="languages"]').fill('English, Marathi');
+
+  // Advance to Step 3
+  await page.getByRole('button', { name: /Continue to Verification & Security/i }).click();
+  await expect(page.getByText('Step 3 of 3: Verification Documents')).toBeVisible();
+
+  // Verify close button dismisses the popup and restores landing page without URL change
+  await closeBtn.click();
+  await expect(page.getByRole('heading', { name: /Doctor Registration/i })).not.toBeVisible();
+  expect(page.url()).not.toContain('/doctor/register');
+});
+
