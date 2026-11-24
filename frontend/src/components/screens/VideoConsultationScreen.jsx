@@ -16,6 +16,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
   const [patientProfile, setPatientProfile] = useState(null);
   const [vitalsReadings, setVitalsReadings] = useState([]);
   const [attachedRecords, setAttachedRecords] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
   const [roomAuth, setRoomAuth] = useState(null);
   const [roomState, setRoomState] = useState("READINESS"); // 'READINESS' | 'WAITING_ROOM' | 'IN_CALL' | 'ENDED'
   const [errorMessage, setErrorMessage] = useState("");
@@ -60,6 +61,13 @@ export default function VideoConsultationScreen({ onNavigate }) {
       .list()
       .then((recs) => {
         if (Array.isArray(recs)) setAttachedRecords(recs);
+      })
+      .catch(() => {});
+
+    patientApi
+      .prescriptions()
+      .then((items) => {
+        if (Array.isArray(items)) setPrescriptions(items);
       })
       .catch(() => {});
 
@@ -729,9 +737,13 @@ export default function VideoConsultationScreen({ onNavigate }) {
 
         {/* PHASE 3: Live Video Consultation Room with Real WebRTC */}
         {roomState === "IN_CALL" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Video View & Controls (Col 1 & 2) */}
-            <div className="lg:col-span-2 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Side: Video Call & Streaming */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl lg:sticky lg:top-4 space-y-4">
+              <h3 className="text-sm font-bold text-[#162623] mb-3 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#25836F]">videocam</span>
+                Video Streaming
+              </h3>
               <div className="relative aspect-video rounded-2xl bg-[#162623] overflow-hidden border border-[#577877]/20 shadow-2xl flex items-center justify-center">
                 {/* Real Remote Video Track */}
                 <video
@@ -783,14 +795,14 @@ export default function VideoConsultationScreen({ onNavigate }) {
               </div>
 
               {/* Call Controls Dock */}
-              <div className="p-4 rounded-2xl bg-white border border-[#577877]/20 shadow-sm flex items-center justify-center gap-4 flex-wrap">
+              <div className="p-4 rounded-2xl bg-[#F0F5F7] border border-[#577877]/20 shadow-sm flex items-center justify-center gap-4 flex-wrap">
                 <button
                   type="button"
                   onClick={toggleMic}
                   className={`p-3.5 rounded-xl transition cursor-pointer ${
                     muted
                       ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-[#F0F5F7] text-[#25836F] hover:bg-[#25836F] hover:text-white"
+                      : "bg-white text-[#25836F] hover:bg-[#25836F] hover:text-white"
                   }`}
                   title={muted ? "Unmute microphone" : "Mute microphone"}
                 >
@@ -805,7 +817,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   className={`p-3.5 rounded-xl transition cursor-pointer ${
                     cameraOff
                       ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-[#F0F5F7] text-[#25836F] hover:bg-[#25836F] hover:text-white"
+                      : "bg-white text-[#25836F] hover:bg-[#25836F] hover:text-white"
                   }`}
                   title={cameraOff ? "Turn camera on" : "Turn camera off"}
                 >
@@ -827,37 +839,80 @@ export default function VideoConsultationScreen({ onNavigate }) {
               </div>
             </div>
 
-            {/* Right Interactive Drawer (Col 3) */}
-            <div className="care-card flex flex-col h-[520px] overflow-hidden">
-              {/* Drawer Tabs */}
-              <div className="flex border-b border-[#577877]/20 p-2 gap-1 bg-[#F0F5F7]">
+            {/* Right Side: Prescription, clinical chat, vitals, and reports panel */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)] space-y-4">
+              <h3 className="text-sm font-bold text-[#162623] mb-2 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#25836F]">clinical_notes</span>
+                Clinical Panel &amp; Prescription
+              </h3>
+
+              {/* Panel Tabs */}
+              <div className="flex border-b border-[#577877]/20 pb-2 mb-4 gap-1 bg-[#F0F5F7] p-2 rounded-xl">
                 {[
-                  { id: "chat", label: "Clinical Chat", icon: "chat" },
+                  { id: "prescription", label: "Prescription", icon: "medication" },
+                  { id: "chat", label: "Chat", icon: "chat" },
                   { id: "vitals", label: "Vitals", icon: "vital_signs" },
-                  { id: "notes", label: "Reports", icon: "description" },
+                  { id: "reports", label: "Reports", icon: "description" },
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveSideTab(tab.id)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition cursor-pointer ${
                       activeSideTab === tab.id
                         ? "bg-[#25836F] text-white shadow-sm"
-                        : "text-[#577877] hover:text-[#162623]"
+                        : "text-[#577877] hover:text-[#162623] bg-white"
                     }`}
                   >
                     <span className="material-symbols-outlined text-sm">
                       {tab.icon}
                     </span>
-                    <span>{tab.label}</span>
+                    <span className="truncate">{tab.label}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Drawer Content */}
-              <div className="flex-1 p-4 overflow-y-auto">
+              {/* Tab Contents */}
+              <div className="space-y-4">
+                {activeSideTab === "prescription" && (
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#25836F] text-base">medication</span>
+                      Prescriptions &amp; Medications
+                    </h3>
+                    {prescriptions.length > 0 ? (
+                      prescriptions.map((rx) => (
+                        <div key={rx.id || rx._id} className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-xs font-bold text-[#162623]">
+                                {rx.medication_name || rx.title || rx.medication || "Prescription Item"}
+                              </p>
+                              <p className="text-[11px] text-[#577877]">
+                                Dosage: {rx.dosage || rx.instructions || "As directed"}
+                              </p>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
+                              Active
+                            </span>
+                          </div>
+                          {rx.duration && (
+                            <p className="text-[10px] text-[#577877]">Duration: {rx.duration}</p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-6 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-2">
+                        <span className="material-symbols-outlined text-3xl text-[#577877]/60">medication_liquid</span>
+                        <p className="font-semibold text-[#162623]">No Prescriptions Issued Yet</p>
+                        <p>Your doctor will issue or update your electronic prescription during or after this consultation.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {activeSideTab === "chat" && (
-                  <div className="flex flex-col h-full justify-between space-y-3">
+                  <div className="flex flex-col h-[380px] justify-between space-y-3">
                     <div className="space-y-3 overflow-y-auto pr-1 flex-1">
                       {chatMessages.length === 0 ? (
                         <div className="p-4 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877]">
@@ -908,7 +963,8 @@ export default function VideoConsultationScreen({ onNavigate }) {
 
                 {activeSideTab === "vitals" && (
                   <div className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877]">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#25836F] text-base">vital_signs</span>
                       Patient Vitals (Shared with Doctor)
                     </h3>
                     {latestReading ? (
@@ -945,9 +1001,10 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   </div>
                 )}
 
-                {activeSideTab === "notes" && (
+                {(activeSideTab === "reports" || activeSideTab === "notes") && (
                   <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877]">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#25836F] text-base">description</span>
                       Shared Documents for this Visit
                     </h3>
                     {attachedRecords.length > 0 ? (
