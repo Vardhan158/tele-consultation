@@ -42,6 +42,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
   const [cameraOff, setCameraOff] = useState(false);
   const [audioOnlyAvailable, setAudioOnlyAvailable] = useState(false);
   const [remoteMedia, setRemoteMedia] = useState({ audio: false, video: false });
+  const [hasStream, setHasStream] = useState(false);
   const startRef = useRef(null);
   const startingRef = useRef(false);
   const remoteKindsRef = useRef(new Set());
@@ -49,17 +50,19 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
 
   // Re-bind streams when DOM mounts or toggles
   useEffect(() => {
-    if (status === "in_progress" && remoteVideo.current && remoteStreamRef.current) {
+    if ((status === "in_progress" || remoteStreamRef.current) && remoteVideo.current && remoteStreamRef.current) {
       remoteVideo.current.srcObject = remoteStreamRef.current;
       remoteVideo.current.play?.().catch(() => {});
     }
-  }, [status]);
+  }, [status, remoteMedia]);
 
+  // Dedicated useEffect for robust local video binding when streamRef.current is active and cameraOff is false
   useEffect(() => {
     if (!cameraOff && localVideo.current && streamRef.current) {
       localVideo.current.srcObject = streamRef.current;
+      localVideo.current.play?.().catch(() => {});
     }
-  }, [cameraOff]);
+  }, [cameraOff, hasStream, status]);
 
   useEffect(() => {
     let active = true;
@@ -93,6 +96,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
       try {
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+        setHasStream(false);
         const room =
           authorization ||
           (await (role === "doctor"
@@ -124,7 +128,11 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
         setCameraOff(audioOnly);
         setAudioOnlyAvailable(false);
         streamRef.current = stream;
-        if (localVideo.current) localVideo.current.srcObject = stream;
+        setHasStream(true);
+        if (localVideo.current) {
+          localVideo.current.srcObject = stream;
+          localVideo.current.play?.().catch(() => {});
+        }
         const peer = new RTCPeerConnection({
           iceServers: ice.ice_servers || fallbackIceServers,
         });
@@ -391,6 +399,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
       socketRef.current = null;
       peerRef.current = null;
       streamRef.current = null;
+      setHasStream(false);
       startingRef.current = false;
       startRef.current = null;
     };
@@ -414,6 +423,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
     peerRef.current?.close();
     streamRef.current = null;
     peerRef.current = null;
+    setHasStream(false);
     setStatus("ended");
     onEnded?.();
   };
@@ -465,7 +475,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
       <div className={`relative rounded-2xl overflow-hidden bg-[#162623] shadow-lg ${role === "doctor" ? "h-[300px] sm:h-[360px]" : "aspect-16/10"} flex flex-col justify-between`}>
         {/* Remote Doctor Stream or Waiting Overlay */}
         <div className="w-full h-full relative flex items-center justify-center bg-[#162623]">
-          {status === "in_progress" && (remoteMedia.video || remoteMedia.audio) ? (
+          {status === "in_progress" || remoteStreamRef.current ? (
             <video
               ref={remoteVideo}
               autoPlay
