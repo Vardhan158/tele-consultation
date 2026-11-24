@@ -12,7 +12,11 @@ class TenancyMode(StrEnum):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TELECONSULT_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="TELECONSULT_",
+        env_file=(".env", "backend/.env", "../backend/.env"),
+        extra="ignore",
+    )
 
     environment: str = "dev"
     tenancy_mode: TenancyMode = TenancyMode.POOLED
