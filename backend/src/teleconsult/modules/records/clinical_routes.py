@@ -161,13 +161,20 @@ async def download_prescription(prescription_id: str, principal: Principal = Dep
         doctor_name = parsed.get("prescriber_name") or prescription.get("prescriber_name") or "Dr. Evelyn Reed (Cardiology)"
         c.drawString(40, height - 125, f"Prescribing Clinician: {doctor_name}")
 
+        diagnosis = parsed.get("diagnosis") or prescription.get("diagnosis")
+        y_offset = 145
+        if diagnosis:
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(40, height - 145, f"Clinical Diagnosis: {diagnosis}")
+            y_offset = 165
+
         c.setFont("Helvetica-Bold", 11)
-        c.drawString(40, height - 160, "Rx / Prescribed Medications:")
+        c.drawString(40, height - y_offset, "Rx / Prescribed Medications:")
         c.setLineWidth(1)
         c.setStrokeColor(colors.HexColor("#577877"))
-        c.line(40, height - 165, width - 40, height - 165)
+        c.line(40, height - y_offset - 5, width - 40, height - y_offset - 5)
 
-        y = height - 185
+        y = height - y_offset - 25
         c.setFont("Helvetica-Bold", 9)
         c.drawString(50, y, "Medication")
         c.drawString(220, y, "Dosage")
