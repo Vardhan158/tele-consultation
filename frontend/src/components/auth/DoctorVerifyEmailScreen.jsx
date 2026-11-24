@@ -97,6 +97,28 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
   const [resendMessage, setResendMessage] = useState("");
   const inputRefs = useRef([]);
 
+  const verifyCode = async (codeToVerify) => {
+    setErrorMessage("");
+    setResendMessage("");
+    if (!email || !email.trim()) {
+      setErrorMessage("Please provide a valid registered email address.");
+      return;
+    }
+    if (codeToVerify.length !== 6) return;
+
+    setStatus("submitting");
+    try {
+      await authApi.verifyEmail(email.trim().toLowerCase(), codeToVerify);
+      setStatus("success");
+      if (onVerified) {
+        onVerified();
+      }
+    } catch (error) {
+      setStatus("error");
+      setErrorMessage(error.message || "Invalid or expired verification code. Please try again.");
+    }
+  };
+
   const handleDigitChange = (index, value) => {
     const cleaned = value.replace(/\D/g, "");
     if (!cleaned && value !== "") return;
@@ -108,8 +130,11 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
         newDigits[i] = pasted[i] || "";
       }
       setDigits(newDigits);
-      const nextFocus = Math.min(pasted.length, 5);
+      const nextFocus = Math.min(pasted.length - 1, 5);
       inputRefs.current[nextFocus]?.focus();
+      if (newDigits.every((d) => d)) {
+        verifyCode(newDigits.join(""));
+      }
       return;
     }
 
@@ -120,40 +145,15 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
     if (cleaned && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
+
+    if (newDigits.every((d) => d)) {
+      verifyCode(newDigits.join(""));
+    }
   };
 
   const handleKeyDown = (index, event) => {
     if (event.key === "Backspace" && !digits[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerify = async (event) => {
-    event?.preventDefault();
-    setErrorMessage("");
-    setResendMessage("");
-    const code = digits.join("");
-
-    if (!email || !email.trim()) {
-      setErrorMessage("Please provide a valid registered email address.");
-      return;
-    }
-
-    if (code.length !== 6 || digits.some((d) => !d)) {
-      setErrorMessage("Please enter all 6 digits of your verification code.");
-      return;
-    }
-
-    setStatus("submitting");
-    try {
-      await authApi.verifyEmail(email.trim().toLowerCase(), code);
-      setStatus("success");
-      if (onVerified) {
-        onVerified();
-      }
-    } catch (error) {
-      setStatus("error");
-      setErrorMessage(error.message || "Invalid or expired verification code. Please try again.");
     }
   };
 
@@ -199,7 +199,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
             </p>
           </div>
 
-          <form onSubmit={handleVerify} className="space-y-5">
+          <div className="space-y-5">
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-[#162623]">
                 Registered Email
@@ -235,6 +235,12 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
               </div>
             </div>
 
+            {status === "submitting" && (
+              <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs font-bold text-[#25836F] text-center animate-pulse">
+                🔄 Automatically verifying OTP code...
+              </div>
+            )}
+
             {errorMessage && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-600">
                 ⚠️ {errorMessage}
@@ -253,15 +259,7 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
                 {resendMessage}
               </div>
             )}
-
-            <button
-              type="submit"
-              disabled={status === "submitting"}
-              className="w-full rounded-xl bg-[#25836F] py-3 text-xs font-bold text-white shadow transition hover:bg-[#1d6e5d] disabled:opacity-50 cursor-pointer"
-            >
-              {status === "submitting" ? "Verifying OTP…" : "Verify OTP Code"}
-            </button>
-          </form>
+          </div>
 
           <div className="text-center text-xs text-[#577877]">
             Didn't receive the code?{" "}
