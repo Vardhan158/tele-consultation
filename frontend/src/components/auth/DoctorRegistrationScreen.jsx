@@ -5,7 +5,7 @@ function ClinicianHeader({ onBack, isModal = false, onClose }) {
   return (
     <header className="bg-[#25836F] text-white px-4 sm:px-6 py-2.5 flex items-center justify-between shrink-0 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-xl bg-[#F0F5F7] text-[#125747] flex items-center justify-center font-bold shadow-sm">
+        <div className="w-8 h-8 rounded-none bg-[#F0F5F7] text-[#125747] flex items-center justify-center font-bold shadow-sm">
           <svg
             width="20"
             height="24"
@@ -39,7 +39,7 @@ function ClinicianHeader({ onBack, isModal = false, onClose }) {
       </div>
 
       <div className="flex items-center gap-2.5">
-        <span className="font-semibold text-[10px] tracking-wide text-white/90 bg-white/15 px-2.5 py-0.5 rounded-full border border-white/20 uppercase hidden sm:inline-block">
+        <span className="font-semibold text-[10px] tracking-wide text-white/90 bg-white/15 px-2.5 py-0.5 rounded-none border border-white/20 uppercase hidden sm:inline-block">
           Clinician Portal
         </span>
         {isModal && onClose ? (
@@ -47,7 +47,7 @@ function ClinicianHeader({ onBack, isModal = false, onClose }) {
             type="button"
             onClick={onClose}
             aria-label="Close Doctor Registration"
-            className="inline-flex items-center justify-center w-8 h-8 rounded-xl text-white hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 transition cursor-pointer"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-none text-white hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 transition cursor-pointer"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
@@ -55,7 +55,7 @@ function ClinicianHeader({ onBack, isModal = false, onClose }) {
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-xl border border-white/20 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-none border border-white/20 transition cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">
               arrow_back
@@ -562,7 +562,7 @@ export default function DoctorRegistrationScreen({
           </div>
 
           {/* Stepper Progress Indicator */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 bg-white px-3 py-1 rounded-xl border border-[#577877]/15 shadow-2xs self-start md:self-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 bg-white px-3 py-1 rounded-none border border-[#577877]/15 shadow-2xs self-start md:self-auto">
             {/* Step 1 Pill */}
             <button
               type="button"
@@ -582,7 +582,7 @@ export default function DoctorRegistrationScreen({
               }`}
             >
               <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                className={`w-5 h-5 rounded-none flex items-center justify-center text-[10px] font-bold transition-all ${
                   currentStep > 1
                     ? "bg-[#25836F] text-white"
                     : currentStep === 1
@@ -621,7 +621,7 @@ export default function DoctorRegistrationScreen({
               }`}
             >
               <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                className={`w-5 h-5 rounded-none flex items-center justify-center text-[10px] font-bold transition-all ${
                   currentStep > 2
                     ? "bg-[#25836F] text-white"
                     : currentStep === 2
@@ -649,7 +649,7 @@ export default function DoctorRegistrationScreen({
               }`}
             >
               <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                className={`w-5 h-5 rounded-none flex items-center justify-center text-[10px] font-bold transition-all ${
                   currentStep === 3
                     ? "bg-[#25836F] text-white ring-2 ring-[#25836F]/20"
                     : "bg-[#F0F5F7] text-[#577877]"
@@ -663,15 +663,15 @@ export default function DoctorRegistrationScreen({
         </div>
 
         {state === "success" && submittedData ? (
-          <div className="my-auto rounded-2xl border border-[#25836F]/30 bg-white p-5 sm:p-6 shadow-sm space-y-4 animate-in fade-in duration-300 max-w-2xl mx-auto w-full">
+          <div className="my-auto rounded-none border border-[#25836F]/30 bg-white p-5 sm:p-6 shadow-sm space-y-4 animate-in fade-in duration-300 max-w-2xl mx-auto w-full">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#EEF6F3] text-[#25836F] flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-none bg-[#EEF6F3] text-[#25836F] flex items-center justify-center shrink-0">
                 <span className="material-symbols-outlined text-2xl font-bold">check_circle</span>
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300/60 uppercase tracking-wider">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300/60 uppercase tracking-wider">
+                    <span className="h-1.5 w-1.5 rounded-none bg-amber-500 animate-pulse"></span>
                     PENDING_VERIFICATION
                   </span>
                 </div>
@@ -690,7 +690,7 @@ export default function DoctorRegistrationScreen({
               </p>
             </div>
 
-            <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 space-y-2 text-xs text-[#162623]">
+            <div className="rounded-none border border-amber-200/80 bg-amber-50/70 p-3 space-y-2 text-xs text-[#162623]">
               <div className="flex items-start gap-2">
                 <span className="material-symbols-outlined text-amber-700 text-base shrink-0 mt-0.5">
                   lock
@@ -725,7 +725,7 @@ export default function DoctorRegistrationScreen({
                     onSuccess(submittedData.email);
                   }
                 }}
-                className="flex-1 rounded-xl bg-[#25836F] py-2.5 text-xs font-bold text-white shadow transition hover:bg-[#1d6e5d] cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-1 rounded-none bg-[#25836F] py-2.5 text-xs font-bold text-white shadow transition hover:bg-[#1d6e5d] cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <span>Proceed to Email Verification</span>
                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -734,7 +734,7 @@ export default function DoctorRegistrationScreen({
                 <button
                   type="button"
                   onClick={onBack}
-                  className="rounded-xl border border-[#577877]/30 bg-white px-4 py-2.5 text-xs font-semibold text-[#577877] hover:border-[#25836F] hover:text-[#162623] transition cursor-pointer"
+                  className="rounded-none border border-[#577877]/30 bg-white px-4 py-2.5 text-xs font-semibold text-[#577877] hover:border-[#25836F] hover:text-[#162623] transition cursor-pointer"
                 >
                   Return Home
                 </button>
@@ -766,7 +766,7 @@ export default function DoctorRegistrationScreen({
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="Dr. Harshavardhan M V"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.full_name && errors.full_name
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -789,7 +789,7 @@ export default function DoctorRegistrationScreen({
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="doctor@clinic.com"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.email && errors.email
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -815,7 +815,7 @@ export default function DoctorRegistrationScreen({
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="10 digit mobile number"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.mobile_number && errors.mobile_number
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -836,7 +836,7 @@ export default function DoctorRegistrationScreen({
                       value={form.state}
                       onChange={update}
                       onBlur={handleBlur}
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
                         touched.state && errors.state
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -866,7 +866,7 @@ export default function DoctorRegistrationScreen({
                       value={form.date_of_birth}
                       onChange={update}
                       onBlur={handleBlur}
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
                         touched.date_of_birth && errors.date_of_birth
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -888,7 +888,7 @@ export default function DoctorRegistrationScreen({
                       value={form.gender}
                       onChange={update}
                       onBlur={handleBlur}
-                      className="w-full h-8.5 px-3 rounded-lg border border-[#577877]/25 bg-white text-xs text-[#162623] focus:border-[#25836F] focus:outline-none transition shadow-2xs box-border"
+                      className="w-full h-8.5 px-3 rounded-none border border-[#577877]/25 bg-white text-xs text-[#162623] focus:border-[#25836F] focus:outline-none transition shadow-2xs box-border"
                     >
                       <option value="">Select Gender</option>
                       <option value="Male">Male</option>
@@ -922,7 +922,7 @@ export default function DoctorRegistrationScreen({
                       value={form.specialty}
                       onChange={update}
                       onBlur={handleBlur}
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] focus:outline-none transition shadow-2xs box-border ${
                         touched.specialty && errors.specialty
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -958,7 +958,7 @@ export default function DoctorRegistrationScreen({
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="e.g. KMC-123456"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.registration_number && errors.registration_number
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -981,7 +981,7 @@ export default function DoctorRegistrationScreen({
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="e.g. Karnataka Medical Council, NMC"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.medical_council && errors.medical_council
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1004,7 +1004,7 @@ export default function DoctorRegistrationScreen({
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="MBBS, MD, DNB (comma separated)"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.qualifications && errors.qualifications
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1031,7 +1031,7 @@ export default function DoctorRegistrationScreen({
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="e.g. 5"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.experience_years && errors.experience_years
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1054,7 +1054,7 @@ export default function DoctorRegistrationScreen({
                       onChange={update}
                       onBlur={handleBlur}
                       placeholder="English, Hindi (comma separated)"
-                      className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                      className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                         touched.languages && errors.languages
                           ? "border-red-500 focus:border-red-500"
                           : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1088,7 +1088,7 @@ export default function DoctorRegistrationScreen({
                       <span className="material-symbols-outlined text-xs">add_circle</span>
                       <span>Additional Documents (Optional)</span>
                       {optionalDocsCount > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-[#25836F] text-white text-[10px] font-bold">
+                        <span className="px-1.5 py-0.2 rounded-none bg-[#25836F] text-white text-[10px] font-bold">
                           {optionalDocsCount}
                         </span>
                       )}
@@ -1108,7 +1108,7 @@ export default function DoctorRegistrationScreen({
                         accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                         onChange={update}
                         onBlur={handleBlur}
-                        className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
+                        className={`w-full h-8.5 px-2 py-1 rounded-none border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded-none file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
                           touched.credential_document && errors.credential_document
                             ? "border-red-500 focus:border-red-500"
                             : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1131,7 +1131,7 @@ export default function DoctorRegistrationScreen({
                         accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                         onChange={update}
                         onBlur={handleBlur}
-                        className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
+                        className={`w-full h-8.5 px-2 py-1 rounded-none border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded-none file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
                           touched.qualification_certificate && errors.qualification_certificate
                             ? "border-red-500 focus:border-red-500"
                             : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1154,7 +1154,7 @@ export default function DoctorRegistrationScreen({
                         accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                         onChange={update}
                         onBlur={handleBlur}
-                        className={`w-full h-8.5 px-2 py-1 rounded-lg border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
+                        className={`w-full h-8.5 px-2 py-1 rounded-none border bg-white text-[11px] text-[#162623] file:mr-2 file:py-0.5 file:px-2 file:rounded-none file:border-0 file:text-[10px] file:font-semibold file:bg-[#F0F5F7] file:text-[#25836F] hover:file:bg-[#25836F]/10 focus:outline-none transition cursor-pointer box-border ${
                           touched.identity_proof && errors.identity_proof
                             ? "border-red-500 focus:border-red-500"
                             : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1191,7 +1191,7 @@ export default function DoctorRegistrationScreen({
                           onChange={update}
                           onBlur={handleBlur}
                           placeholder="••••••••"
-                          className={`w-full h-8.5 pl-3 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                          className={`w-full h-8.5 pl-3 pr-8 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                             touched.password && errors.password
                               ? "border-red-500 focus:border-red-500"
                               : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1227,7 +1227,7 @@ export default function DoctorRegistrationScreen({
                           onChange={update}
                           onBlur={handleBlur}
                           placeholder="Re-enter password"
-                          className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                          className={`w-full h-8.5 px-3 rounded-none border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                             touched.confirm_password && errors.confirm_password
                               ? "border-red-500 focus:border-red-500"
                               : "border-[#577877]/25 focus:border-[#25836F]"
@@ -1252,7 +1252,7 @@ export default function DoctorRegistrationScreen({
                             checked={form.terms_consent}
                             onChange={update}
                             onBlur={handleBlur}
-                            className="h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
+                            className="h-3.5 w-3.5 rounded-none border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
                           />
                           <span className="text-[#577877] text-[10px] truncate">
                             Agree to{" "}
@@ -1282,7 +1282,7 @@ export default function DoctorRegistrationScreen({
                             checked={form.declaration_consent}
                             onChange={update}
                             onBlur={handleBlur}
-                            className="h-3.5 w-3.5 rounded border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
+                            className="h-3.5 w-3.5 rounded-none border-[#577877]/30 text-[#25836F] accent-[#25836F] shrink-0 cursor-pointer"
                           />
                           <span className="text-[#577877] text-[10px] truncate">
                             Declare credentials authentic under Telehealth Guidelines <span className="text-red-600">*</span>
@@ -1303,7 +1303,7 @@ export default function DoctorRegistrationScreen({
             {/* Error Message if present */}
             {message && (
               <div
-                className={`py-1.5 px-3 rounded-lg border text-[11px] font-medium leading-tight ${
+                className={`py-1.5 px-3 rounded-none border text-[11px] font-medium leading-tight ${
                   state === "error"
                     ? "bg-red-50 text-red-600 border-red-200"
                     : "bg-teal-50 text-[#25836F] border-teal-200"
@@ -1331,7 +1331,7 @@ export default function DoctorRegistrationScreen({
                   <button
                     type="button"
                     onClick={handleNextFromStep1}
-                    className="px-5 h-9 rounded-xl bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] cursor-pointer flex items-center gap-1.5 ml-auto"
+                    className="px-5 h-9 rounded-none bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] cursor-pointer flex items-center gap-1.5 ml-auto"
                   >
                     <span>Continue to Professional Details</span>
                     <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -1347,7 +1347,7 @@ export default function DoctorRegistrationScreen({
                       setCurrentStep(1);
                       setMessage("");
                     }}
-                    className="px-4 h-9 rounded-xl border border-[#577877]/30 bg-white text-xs font-semibold text-[#577877] hover:border-[#25836F] hover:text-[#162623] transition cursor-pointer flex items-center gap-1.5"
+                    className="px-4 h-9 rounded-none border border-[#577877]/30 bg-white text-xs font-semibold text-[#577877] hover:border-[#25836F] hover:text-[#162623] transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span className="material-symbols-outlined text-sm">arrow_back</span>
                     <span>Back to Personal Info</span>
@@ -1355,7 +1355,7 @@ export default function DoctorRegistrationScreen({
                   <button
                     type="button"
                     onClick={handleNextFromStep2}
-                    className="px-5 h-9 rounded-xl bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] cursor-pointer flex items-center gap-1.5"
+                    className="px-5 h-9 rounded-none bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] cursor-pointer flex items-center gap-1.5"
                   >
                     <span>Continue to Verification &amp; Security</span>
                     <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -1371,7 +1371,7 @@ export default function DoctorRegistrationScreen({
                       setCurrentStep(2);
                       setMessage("");
                     }}
-                    className="px-4 h-9 rounded-xl border border-[#577877]/30 bg-white text-xs font-semibold text-[#577877] hover:border-[#25836F] hover:text-[#162623] transition cursor-pointer flex items-center gap-1.5"
+                    className="px-4 h-9 rounded-none border border-[#577877]/30 bg-white text-xs font-semibold text-[#577877] hover:border-[#25836F] hover:text-[#162623] transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span className="material-symbols-outlined text-sm">arrow_back</span>
                     <span>Back to Credentials</span>
@@ -1379,7 +1379,7 @@ export default function DoctorRegistrationScreen({
                   <button
                     type="submit"
                     disabled={state === "loading"}
-                    className="px-6 h-9 rounded-xl bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                    className="px-6 h-9 rounded-none bg-[#25836F] text-xs font-bold text-white shadow-sm transition hover:bg-[#1d6e5d] active:scale-[0.99] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     {state === "loading" ? "Submitting Registration…" : "Submit Doctor Registration"}
                   </button>
@@ -1407,7 +1407,7 @@ export default function DoctorRegistrationScreen({
               <button
                 type="button"
                 onClick={() => setShowAdditionalDocs(false)}
-                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+                className="p-1 rounded-none text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
@@ -1427,7 +1427,7 @@ export default function DoctorRegistrationScreen({
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                   onChange={update}
-                  className="w-full px-2.5 py-1 rounded-lg border border-[#577877]/20 text-xs file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-[#F0F5F7] file:text-[#25836F]"
+                  className="w-full px-2.5 py-1 rounded-none border border-[#577877]/20 text-xs file:mr-2 file:py-0.5 file:px-2 file:rounded-none file:border-0 file:text-[10px] file:bg-[#F0F5F7] file:text-[#25836F]"
                 />
               </div>
 
@@ -1440,7 +1440,7 @@ export default function DoctorRegistrationScreen({
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                   onChange={update}
-                  className="w-full px-2.5 py-1 rounded-lg border border-[#577877]/20 text-xs file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-[#F0F5F7] file:text-[#25836F]"
+                  className="w-full px-2.5 py-1 rounded-none border border-[#577877]/20 text-xs file:mr-2 file:py-0.5 file:px-2 file:rounded-none file:border-0 file:text-[10px] file:bg-[#F0F5F7] file:text-[#25836F]"
                 />
               </div>
 
@@ -1453,7 +1453,7 @@ export default function DoctorRegistrationScreen({
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                   onChange={update}
-                  className="w-full px-2.5 py-1 rounded-lg border border-[#577877]/20 text-xs file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-[#F0F5F7] file:text-[#25836F]"
+                  className="w-full px-2.5 py-1 rounded-none border border-[#577877]/20 text-xs file:mr-2 file:py-0.5 file:px-2 file:rounded-none file:border-0 file:text-[10px] file:bg-[#F0F5F7] file:text-[#25836F]"
                 />
               </div>
 
@@ -1466,7 +1466,7 @@ export default function DoctorRegistrationScreen({
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                   onChange={update}
-                  className="w-full px-2.5 py-1 rounded-lg border border-[#577877]/20 text-xs file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-[#F0F5F7] file:text-[#25836F]"
+                  className="w-full px-2.5 py-1 rounded-none border border-[#577877]/20 text-xs file:mr-2 file:py-0.5 file:px-2 file:rounded-none file:border-0 file:text-[10px] file:bg-[#F0F5F7] file:text-[#25836F]"
                 />
               </div>
             </div>
@@ -1475,7 +1475,7 @@ export default function DoctorRegistrationScreen({
               <button
                 type="button"
                 onClick={() => setShowAdditionalDocs(false)}
-                className="rounded-xl bg-[#25836F] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#1d6e5d] cursor-pointer"
+                className="rounded-none bg-[#25836F] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#1d6e5d] cursor-pointer"
               >
                 Save &amp; Close
               </button>
@@ -1496,7 +1496,7 @@ export default function DoctorRegistrationScreen({
               <button
                 type="button"
                 onClick={() => setShowTermsModal(false)}
-                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+                className="p-1 rounded-none text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
@@ -1516,7 +1516,7 @@ export default function DoctorRegistrationScreen({
               <button
                 type="button"
                 onClick={() => setShowTermsModal(false)}
-                className="rounded-xl bg-[#25836F] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#1d6e5d] cursor-pointer"
+                className="rounded-none bg-[#25836F] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#1d6e5d] cursor-pointer"
               >
                 Close
               </button>
@@ -1537,7 +1537,7 @@ export default function DoctorRegistrationScreen({
               <button
                 type="button"
                 onClick={() => setShowPrivacyModal(false)}
-                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+                className="p-1 rounded-none text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
@@ -1557,7 +1557,7 @@ export default function DoctorRegistrationScreen({
               <button
                 type="button"
                 onClick={() => setShowPrivacyModal(false)}
-                className="rounded-xl bg-[#25836F] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#1d6e5d] cursor-pointer"
+                className="rounded-none bg-[#25836F] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#1d6e5d] cursor-pointer"
               >
                 Close
               </button>
