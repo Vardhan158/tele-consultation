@@ -314,9 +314,9 @@ async def get_profile(
                 "tenant_id": principal.tenant_id,
                 "$or": [{"id": principal.user_id}, {"user_id": principal.user_id}],
             })
-            full_name = user.get("full_name") if user else "Emma Mitchell"
-            email = user.get("email") if user else "patient@teleconsult.local"
-            phone = user.get("mobile_number") if user else "+1 (800) 555-KAIZEN"
+            full_name = user.get("full_name") if user else "Patient"
+            email = user.get("email") if user else ""
+            phone = (user.get("mobile_number") or user.get("phone")) if user else ""
 
             document = {
                 "id": principal.user_id,
@@ -325,10 +325,15 @@ async def get_profile(
                 "full_name": full_name,
                 "email": email,
                 "phone": phone,
-                "date_of_birth": "1994-06-15",
+                "date_of_birth": user.get("date_of_birth") if user else None,
+                "gender": user.get("gender") if user else None,
                 "preferred_language": "English",
-                "address": "742 Medical Center Blvd, San Francisco, CA",
-                "emergency_contact": "John Mitchell (+1 555-0199)",
+                "address": "",
+                "street_address": "",
+                "city": "",
+                "state": "",
+                "zip_code": "",
+                "emergency_contact": "",
                 "created_at": datetime.now(UTC).isoformat(),
             }
             await db["patients"].insert_one(dict(document))
@@ -345,6 +350,24 @@ async def get_profile(
             if intake_doc and intake_doc.get("allergies"):
                 allergies_val = intake_doc.get("allergies")
 
+        street_address = document.get("street_address")
+        city = document.get("city")
+        state = document.get("state")
+        zip_code = document.get("zip_code")
+        if not street_address and not city and not state and not zip_code and document.get("address"):
+            parts = [p.strip() for p in document.get("address", "").split(",") if p.strip()]
+            if len(parts) >= 1:
+                street_address = parts[0]
+            if len(parts) >= 2:
+                city = parts[1]
+            if len(parts) >= 3:
+                rest = parts[2].split()
+                if len(rest) >= 2:
+                    state = " ".join(rest[:-1])
+                    zip_code = rest[-1]
+                else:
+                    state = parts[2]
+
         return PatientResponse(
             id=_to_uuid(document.get("id") or document.get("user_id")),
             full_name=document.get("full_name", "Patient"),
@@ -354,11 +377,17 @@ async def get_profile(
             gender=document.get("gender"),
             preferred_language=document.get("preferred_language", "English"),
             address=document.get("address"),
+            street_address=street_address,
+            city=city,
+            state=state,
+            zip_code=zip_code,
             emergency_contact=document.get("emergency_contact"),
             preferred_pharmacy=document.get("preferred_pharmacy"),
             pharmacy_address=document.get("pharmacy_address"),
             pharmacy_phone=document.get("pharmacy_phone"),
             allergies=allergies_val,
+            created_at=document.get("created_at"),
+            primary_care_provider=document.get("primary_care_provider"),
         )
     raise HTTPException(status_code=503, detail="No application database is configured")
 
@@ -389,11 +418,17 @@ async def update_profile(
             gender=document.get("gender"),
             preferred_language=document.get("preferred_language", "English"),
             address=document.get("address"),
+            street_address=document.get("street_address"),
+            city=document.get("city"),
+            state=document.get("state"),
+            zip_code=document.get("zip_code"),
             emergency_contact=document.get("emergency_contact"),
             preferred_pharmacy=document.get("preferred_pharmacy"),
             pharmacy_address=document.get("pharmacy_address"),
             pharmacy_phone=document.get("pharmacy_phone"),
             allergies=document.get("allergies"),
+            created_at=document.get("created_at"),
+            primary_care_provider=document.get("primary_care_provider"),
         )
     raise HTTPException(status_code=503, detail="No application database is configured")
 

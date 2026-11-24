@@ -80,6 +80,49 @@ export function validateProfileField(field, value) {
   }
 }
 
+export function formatDobAndAge(dobStr) {
+  if (!dobStr) return "Not provided";
+  let dob;
+  const str = String(dobStr).trim();
+  if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
+    const [p1, p2, year] = str.split("-");
+    const m = parseInt(p2, 10);
+    const d = parseInt(p1, 10);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      dob = new Date(parseInt(year, 10), m - 1, d);
+    } else {
+      dob = new Date(str);
+    }
+  } else if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const [year, month, day] = str.slice(0, 10).split("-");
+    dob = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+  } else {
+    dob = new Date(str);
+  }
+  if (isNaN(dob.getTime())) return dobStr;
+
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    age--;
+  }
+
+  const formatted = dob.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${formatted} · ${age >= 0 ? age : 0} years`;
+}
+
+export function formatMemberSince(dateStr) {
+  if (!dateStr) return "Recent Member";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
 export default function ProfileScreen({
   onNavigate,
   initialSection = "personal",
@@ -99,6 +142,27 @@ export default function ProfileScreen({
       .then(([p, c]) => {
         if (!active) return;
         if (p) {
+          const dob = p.date_of_birth || "";
+          const createdAt = p.created_at || null;
+          let streetAddress = p.street_address || "";
+          let city = p.city || "";
+          let state = p.state || "";
+          let zipCode = p.zip_code || "";
+          if (!streetAddress && !city && !state && !zipCode && p.address) {
+            const parts = p.address.split(",").map((s) => s.trim()).filter(Boolean);
+            if (parts.length >= 1) streetAddress = parts[0];
+            if (parts.length >= 2) city = parts[1];
+            if (parts.length >= 3) {
+              const stateZip = parts[2].split(/\s+/);
+              if (stateZip.length >= 2) {
+                state = stateZip.slice(0, -1).join(" ");
+                zipCode = stateZip[stateZip.length - 1];
+              } else {
+                state = parts[2];
+              }
+            }
+          }
+
           setProfile((prev) => ({
             ...prev,
             ...p,
@@ -107,33 +171,35 @@ export default function ProfileScreen({
               : prev.first_name || "",
             last_name: p.full_name
               ? p.full_name.split(" ").slice(1).join(" ")
-              : prev.last_name || "Mitchell",
+              : prev.last_name || "",
             patient_id:
               p.patient_id ||
               (p.id
                 ? `KC-${p.id.toString().slice(0, 5).toUpperCase()}`
                 : prev.patient_id || "KC-20481"),
-            email: p.email || prev.email || "emma.mitchell@example.com",
-            phone: p.phone || prev.phone || "+91 98765 43210",
-            date_of_birth:
-              p.date_of_birth || prev.date_of_birth || "1992-03-14",
-            age_display:
-              p.age_display || prev.age_display || "March 14, 1992 · 34 years",
+            email: p.email || prev.email || "",
+            phone: p.phone || prev.phone || "",
+            date_of_birth: dob || prev.date_of_birth || "",
+            gender: p.gender || prev.gender || "",
+            street_address: streetAddress || prev.street_address || "",
+            city: city || prev.city || "",
+            state: state || prev.state || "",
+            zip_code: zipCode || prev.zip_code || "",
+            age_display: formatDobAndAge(dob || prev.date_of_birth),
             primary_care_provider:
               p.primary_care_provider ||
               prev.primary_care_provider ||
-      "",
-            member_since:
-              p.member_since || prev.member_since || "November 2026",
-            allergies: p.allergies || prev.allergies || "Penicillin · Rash",
+              "",
+            member_since: formatMemberSince(createdAt || p.member_since || prev.member_since),
+            allergies: p.allergies || prev.allergies || "",
             preferred_language:
               p.preferred_language || prev.preferred_language || "English (US)",
             emergency_contact:
               p.emergency_contact ||
               prev.emergency_contact ||
-              "James Mitchell · Spouse (+1 415 555-0199)",
+              "",
             last_reviewed:
-              p.last_reviewed || prev.last_reviewed || "Oct 29, 2026",
+              p.last_reviewed || prev.last_reviewed || "Recently",
           }));
         }
         if (c) setConsents(c);
@@ -154,6 +220,8 @@ export default function ProfileScreen({
         updated.full_name = `${value} ${prev.last_name || ""}`.trim();
       } else if (field === "last_name") {
         updated.full_name = `${prev.first_name || ""} ${value}`.trim();
+      } else if (field === "date_of_birth") {
+        updated.age_display = formatDobAndAge(value);
       }
       return updated;
     });
@@ -208,16 +276,36 @@ export default function ProfileScreen({
     }
 
     try {
-      await patientApi.updateProfile({
+      const fullAddress = [
+        profile.street_address,
+        profile.city,
+        profile.state,
+        profile.zip_code,
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      const updated = await patientApi.updateProfile({
         full_name:
           `${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
         email: profile.email,
         phone: profile.phone,
         date_of_birth: profile.date_of_birth,
         gender: profile.gender,
-        address:
-          `${profile.street_address || ""}, ${profile.city || ""}, ${profile.state || ""} ${profile.zip_code || ""}`.trim(),
+        street_address: profile.street_address,
+        city: profile.city,
+        state: profile.state,
+        zip_code: profile.zip_code,
+        address: fullAddress || profile.address || "",
       });
+      if (updated) {
+        setProfile((prev) => ({
+          ...prev,
+          ...updated,
+          age_display: formatDobAndAge(updated.date_of_birth || profile.date_of_birth),
+          member_since: formatMemberSince(updated.created_at || prev.member_since),
+        }));
+      }
       setIsSaved(true);
       setIsErrorToast(false);
       setSaveMessage("Profile changes saved successfully.");
@@ -388,7 +476,7 @@ export default function ProfileScreen({
                   <h2 className="text-xl font-bold text-[#162623]">
                     {profile.full_name ||
                       `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
-                      "Emma Mitchell"}
+                      "Patient"}
                   </h2>
                   <p className="text-xs text-[#577877] mt-0.5 font-medium">
                     Patient ID · {profile.patient_id || "KC-20481"}
@@ -411,9 +499,7 @@ export default function ProfileScreen({
                     </span>
                     <span className="font-semibold text-[#162623] mt-0.5 block">
                       {profile.age_display ||
-                        (profile.date_of_birth
-                          ? `${profile.date_of_birth} · 34 years`
-                          : "March 14, 1992 · 34 years")}
+                        formatDobAndAge(profile.date_of_birth)}
                     </span>
                   </div>
 
@@ -431,7 +517,7 @@ export default function ProfileScreen({
                       Member since
                     </span>
                     <span className="font-semibold text-[#162623] mt-0.5 block">
-                      {profile.member_since || "November 2026"}
+                      {profile.member_since || "Recent Member"}
                     </span>
                   </div>
                 </div>
@@ -740,7 +826,7 @@ export default function ProfileScreen({
                       Allergies
                     </span>
                     <p className="font-bold text-[#162623] text-sm mt-1">
-                      {profile.allergies || "Penicillin · Rash"}
+                      {profile.allergies || "None reported"}
                     </p>
                   </div>
 
@@ -758,7 +844,7 @@ export default function ProfileScreen({
                       Emergency contact
                     </span>
                     <p className="font-bold text-[#162623] text-sm mt-1">
-                      {profile.emergency_contact || "James Mitchell · Spouse"}
+                      {profile.emergency_contact || "Not provided"}
                     </p>
                   </div>
                 </div>
@@ -766,7 +852,7 @@ export default function ProfileScreen({
                 <div className="pt-4 border-t border-[#577877]/15">
                   <p className="text-[11px] text-[#577877]">
                     Clinical details are reviewed with your care team. Last
-                    reviewed {profile.last_reviewed || "Oct 29, 2026"}.
+                    reviewed {profile.last_reviewed || "Recently"}.
                   </p>
                 </div>
               </div>
