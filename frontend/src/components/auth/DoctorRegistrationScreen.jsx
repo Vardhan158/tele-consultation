@@ -536,7 +536,7 @@ export default function DoctorRegistrationScreen({
     <div
       className={`font-sans flex flex-col text-[#162623] ${
         inModal
-          ? "relative w-full max-w-xl max-h-[92vh] bg-[#F0F5F7] rounded-none shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
+          ? "relative w-full max-w-4xl max-h-[92vh] bg-[#F0F5F7] rounded-none shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
           : "min-h-screen lg:h-screen lg:max-h-screen bg-[#F0F5F7] lg:overflow-hidden"
       }`}
     >
