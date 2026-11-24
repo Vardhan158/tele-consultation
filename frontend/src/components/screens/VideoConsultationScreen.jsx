@@ -83,6 +83,27 @@ export default function VideoConsultationScreen({ onNavigate }) {
       })
       .catch(() => {});
 
+    patientApi
+      .appointments()
+      .then((items) => {
+        if (Array.isArray(items) && items.length > 0) {
+          const found = appointmentId
+            ? items.find((item) => item.id === appointmentId)
+            : items.find((item) =>
+                ["confirmed", "checked_in"].includes(item.status),
+              ) || items[0];
+
+          if (found) {
+            setAppointment(found);
+            if (!appointmentId) {
+              setAppointmentId(found.id);
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, [appointmentId]);
+
   // Real-time polling effect (every 3 seconds) for newly published e-prescriptions matching active appointment ID
   useEffect(() => {
     const targetAptId = appointment?.id || appointmentId;
@@ -130,27 +151,6 @@ export default function VideoConsultationScreen({ onNavigate }) {
     const interval = setInterval(fetchPrescriptions, 3000);
     return () => clearInterval(interval);
   }, [appointment?.id, appointmentId]);
-
-    patientApi
-      .appointments()
-      .then((items) => {
-        if (Array.isArray(items) && items.length > 0) {
-          const found = appointmentId
-            ? items.find((item) => item.id === appointmentId)
-            : items.find((item) =>
-                ["confirmed", "checked_in"].includes(item.status),
-              ) || items[0];
-
-          if (found) {
-            setAppointment(found);
-            if (!appointmentId) {
-              setAppointmentId(found.id);
-            }
-          }
-        }
-      })
-      .catch(() => {});
-  }, [appointmentId]);
 
   // Duration timer when IN_CALL
   useEffect(() => {
