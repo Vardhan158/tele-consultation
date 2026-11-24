@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from "react";
-import { io } from "socket.io-client";
 import {
   API_BASE_URL,
   consultationApi,
@@ -8,6 +7,7 @@ import {
   recordsApi,
   supportApi,
 } from "../../lib/api";
+import WebRtcConsultation from "../consultation/WebRtcConsultation";
 
 export default function VideoConsultationScreen({ onNavigate }) {
   const [appointmentId, setAppointmentId] = useState(
@@ -180,185 +180,22 @@ export default function VideoConsultationScreen({ onNavigate }) {
     }
   };
 
-  // Admit to call and start real WebRTC peer connection
+  // Admit to call and use WebRtcConsultation component
   const handleAdmitToCall = async () => {
-    if (!roomAuth?.token) {
-      setErrorMessage(
-        "Missing consultation authorization token. Please rejoin from Waiting Room.",
-      );
+    if (!targetAptId) {
+      setErrorMessage("No appointment selected for video consultation.");
       return;
     }
     setErrorMessage("");
-    setRoomState("IN_CALL");
-    localStorage.setItem("teleconsult_in_call", "true");
-
     try {
-      // 1. Get real user media stream
-      let localStream = streamRef.current;
-      if (!localStream || !localStream.active) {
-        try {
-          localStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true,
-          });
-          streamRef.current = localStream;
-          setLocalStream(localStream);
-        } catch (mediaErr) {
-          console.warn("getUserMedia error, creating synthetic tracks:", mediaErr);
-          // Fallback in headless environment without physical devices
-          const canvas = document.createElement("canvas");
-          canvas.width = 640;
-          canvas.height = 480;
-          const ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#162623";
-          ctx.fillRect(0, 0, 640, 480);
-          const canvasStream = canvas.captureStream(30);
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const osc = audioCtx.createOscillator();
-          const dst = audioCtx.createMediaStreamDestination();
-          osc.connect(dst);
-          osc.start();
-          const combinedStream = new MediaStream([
-            canvasStream.getVideoTracks()[0],
-            dst.stream.getAudioTracks()[0],
-          ]);
-          localStream = combinedStream;
-          streamRef.current = localStream;
-          setLocalStream(localStream);
-        }
-      } else {
-        setLocalStream(localStream);
-      }
-
-      // 2. Instantiate real WebRTC RTCPeerConnection
-      const iceServers = roomAuth?.ice_servers || [{ urls: "stun:stun.l.google.com:19302" }];
-      const pc = new RTCPeerConnection({ iceServers });
-      peerRef.current = pc;
-      window.__webrtc_peer = pc;
-      window.__webrtc_stream = localStream;
-
-      // Add local tracks
-      if (localStream) {
-        localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
-        if (localPipVideoRef.current) {
-          localPipVideoRef.current.srcObject = localStream;
-        }
-      }
-
-      // Handle remote incoming tracks
-      pc.ontrack = (event) => {
-        if (remoteVideoRef.current && event.streams?.[0]) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      pc.oniceconnectionstatechange = () => {
-        const ice = pc.iceConnectionState;
-        if (ice === "disconnected" || ice === "failed") {
-          setConnectionQuality("Reconnecting…");
-          socketRef.current?.emit("request_ice_restart");
-        } else if (ice === "connected" || ice === "completed") {
-          setConnectionQuality("Connected (WebRTC P2P)");
-          if (remoteVideoRef.current && pc.getReceivers().length > 0) {
-            const remoteStream = new MediaStream(pc.getReceivers().map(r => r.track).filter(Boolean));
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play?.().catch(() => {});
-          }
-        } else {
-          setConnectionQuality(`WebRTC ICE: ${ice}`);
-        }
-      };
-
-      pc.onconnectionstatechange = () => {
-        const conn = pc.connectionState;
-        if (conn === "disconnected" || conn === "failed") {
-          setConnectionQuality("Reconnecting…");
-        } else if (conn === "connected") {
-          setConnectionQuality("Connected (WebRTC P2P)");
-        }
-      };
-
-      // 3. Connect to backend Socket.IO signaling with genuine token
-      const token = roomAuth.token;
-      const sId = roomAuth.session_id || `ses-${targetAptId}`;
-      const socket = io(API_BASE_URL, {
-        withCredentials: true,
-        auth: { consultationToken: token, sessionId: sId },
-        transports: ["websocket"],
-      });
-      socketRef.current = socket;
-      window.__webrtc_socket = socket;
-
-      socket.on("connect", () => {
-        socket.emit("join_room", { appointmentId: targetAptId });
-        socket.emit("signaling_ready");
-        if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-          setConnectionQuality("Reconnecting…");
-          socket.emit("request_ice_restart");
-        }
-      });
-
-      socket.on("reconnect", () => {
-        socket.emit("join_room", { appointmentId: targetAptId });
-        socket.emit("signaling_ready");
-        socket.emit("request_ice_restart");
-      });
-
-      socket.on("disconnect", () => {
-        setConnectionQuality("Reconnecting…");
-      });
-      socket.on("peer_disconnected", () => {
-        setConnectionQuality("Reconnecting…");
-      });
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("ice_candidate", { candidate: event.candidate });
-        }
-      };
-
-      socket.on("offer", async (data) => {
-        try {
-          const offer = data?.offer || data?.sdp || data;
-          if (offer && offer.sdp) {
-            if (pc.signalingState !== "stable") {
-              try {
-                await pc.setLocalDescription({ type: "rollback" });
-              } catch {}
-            }
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            socket.emit("answer", { answer, sdp: pc.localDescription });
-          }
-        } catch (err) {
-          console.warn("Signaling offer handling error:", err);
-        }
-      });
-
-      socket.on("answer", async (data) => {
-        try {
-          const answer = data?.answer || data?.sdp || data;
-          if (answer && answer.sdp && pc.signalingState === "have-local-offer") {
-            await pc.setRemoteDescription(new RTCSessionDescription(answer));
-          }
-        } catch (err) {
-          console.warn("Signaling answer handling error:", err);
-        }
-      });
-
-      socket.on("ice_candidate", async (data) => {
-        try {
-          const candidate = data?.candidate || data;
-          if (candidate) {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
-          }
-        } catch (err) {
-          console.warn("Signaling ICE handling error:", err);
-        }
-      });
-    } catch (webrtcErr) {
-      console.warn("WebRTC startup error:", webrtcErr);
+      const auth = roomAuth || (await consultationApi.join(targetAptId));
+      setRoomAuth(auth);
+      setRoomState("IN_CALL");
+      localStorage.setItem("teleconsult_in_call", "true");
+    } catch (err) {
+      setErrorMessage(
+        err.message || "Unable to authorize consultation session.",
+      );
     }
   };
 
@@ -371,36 +208,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
         // ignore
       }
     }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-    }
-    if (socketRef.current) {
-      socketRef.current.emit("end_call");
-      socketRef.current.disconnect();
-    }
-    if (peerRef.current) {
-      peerRef.current.close();
-    }
-    window.__webrtc_peer = null;
-    window.__webrtc_stream = null;
     setRoomState("ENDED");
-  };
-
-  const toggleMic = () => {
-    const nextMuted = !muted;
-    setMuted(nextMuted);
-    if (streamRef.current) {
-      streamRef.current.getAudioTracks().forEach((t) => (t.enabled = !nextMuted));
-    }
-  };
-
-  const toggleCamera = () => {
-    const nextCamOff = !cameraOff;
-    setCameraOff(nextCamOff);
-    if (streamRef.current) {
-      streamRef.current.getVideoTracks().forEach((t) => (t.enabled = !nextCamOff));
-    }
   };
 
   const doctorName =
@@ -760,7 +568,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
           </div>
         )}
 
-        {/* PHASE 3: Live Video Consultation Room with Real WebRTC */}
+        {/* PHASE 3: Live Video Consultation Room with WebRtcConsultation */}
         {roomState === "IN_CALL" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left Side: Video Call & Streaming */}
@@ -769,99 +577,26 @@ export default function VideoConsultationScreen({ onNavigate }) {
                 <span className="material-symbols-outlined text-[#25836F]">videocam</span>
                 Video Streaming
               </h3>
-              <div className="relative aspect-video rounded-2xl bg-[#162623] overflow-hidden border border-[#577877]/20 shadow-2xl flex items-center justify-center">
-                {/* Real Remote Video Track */}
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
+              {roomAuth ? (
+                <WebRtcConsultation
+                  appointmentId={targetAptId}
+                  authorization={roomAuth}
+                  role="patient"
+                  onEnded={() => {
+                    localStorage.removeItem("teleconsult_in_call");
+                    setRoomState("ENDED");
+                  }}
                 />
-
-                {/* Top Bar Overlay */}
-                <div className="absolute top-4 left-4 right-4 flex items-center justify-between text-xs text-white bg-black/50 backdrop-blur-md px-4 py-2 rounded-xl z-20">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-                    <span className="font-bold">WEBRTC LIVE</span>
-                    <span>· {formatTimer(callDuration)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-emerald-400">
-                      verified_user
-                    </span>
-                    <span className="text-[11px] text-white/90">
-                      {connectionQuality}
-                    </span>
-                  </div>
+              ) : (
+                <div className="p-12 text-center text-[#577877] space-y-3">
+                  <span className="material-symbols-outlined animate-spin text-4xl text-[#25836F]">
+                    sync
+                  </span>
+                  <p className="text-sm font-bold text-[#162623]">
+                    Authorizing video consultation room…
+                  </p>
                 </div>
-
-                {/* Picture-in-Picture Local Patient View */}
-                <div className="absolute bottom-4 right-4 w-36 sm:w-44 aspect-video rounded-xl bg-[#25836F] border-2 border-white/60 shadow-lg overflow-hidden flex items-center justify-center z-20">
-                  {cameraOff ? (
-                    <div className="text-center text-white/70">
-                      <span className="material-symbols-outlined text-lg">
-                        videocam_off
-                      </span>
-                      <p className="text-[9px]">Camera Off</p>
-                    </div>
-                  ) : (
-                    <video
-                      ref={localPipVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  <div className="absolute bottom-1 left-2 text-[9px] text-white/90 bg-black/40 px-1 rounded">
-                    {muted ? "Muted" : "Mic Live"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Call Controls Dock */}
-              <div className="p-4 rounded-2xl bg-[#F0F5F7] border border-[#577877]/20 shadow-sm flex items-center justify-center gap-4 flex-wrap">
-                <button
-                  type="button"
-                  onClick={toggleMic}
-                  className={`p-3.5 rounded-xl transition cursor-pointer ${
-                    muted
-                      ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-white text-[#25836F] hover:bg-[#25836F] hover:text-white"
-                  }`}
-                  title={muted ? "Unmute microphone" : "Mute microphone"}
-                >
-                  <span className="material-symbols-outlined text-xl">
-                    {muted ? "mic_off" : "mic"}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={toggleCamera}
-                  className={`p-3.5 rounded-xl transition cursor-pointer ${
-                    cameraOff
-                      ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-white text-[#25836F] hover:bg-[#25836F] hover:text-white"
-                  }`}
-                  title={cameraOff ? "Turn camera on" : "Turn camera off"}
-                >
-                  <span className="material-symbols-outlined text-xl">
-                    {cameraOff ? "videocam_off" : "videocam"}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleEndCall}
-                  className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs flex items-center gap-2 shadow-sm transition cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-lg">
-                    call_end
-                  </span>
-                  End Call
-                </button>
-              </div>
+              )}
             </div>
 
             {/* Right Side: Prescription, clinical chat, vitals, and reports panel */}
