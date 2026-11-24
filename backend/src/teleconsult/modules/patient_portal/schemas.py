@@ -28,6 +28,7 @@ class PatientResponse(PatientCreate):
     id: UUID
     phone: str | None = None
     date_of_birth: datetime | str | None = None
+    gender: str | None = None
     preferred_language: str | None = None
     address: str | None = None
     emergency_contact: str | dict | None = None
@@ -115,6 +116,7 @@ class ConsentResponse(ConsentCreate):
 class PatientProfileUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=160, pattern=r"^[A-Za-z\s.'-]+$")
     date_of_birth: datetime | str | None = None
+    gender: str | None = Field(default=None, max_length=50)
     phone: str | None = Field(default=None, min_length=8, max_length=32)
     preferred_language: str | None = Field(default=None, min_length=2, max_length=32)
     address: str | None = Field(default=None, max_length=500)

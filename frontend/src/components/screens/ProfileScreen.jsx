@@ -213,6 +213,8 @@ export default function ProfileScreen({
           `${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
         email: profile.email,
         phone: profile.phone,
+        date_of_birth: profile.date_of_birth,
+        gender: profile.gender,
         address:
           `${profile.street_address || ""}, ${profile.city || ""}, ${profile.state || ""} ${profile.zip_code || ""}`.trim(),
       });
@@ -561,18 +563,22 @@ export default function ProfileScreen({
                     )}
                   </div>
 
-                  {/* Pronouns */}
+                  {/* Gender */}
                   <div className="space-y-1.5">
                     <label className="font-medium text-[#162623] block">
-                      Pronouns (optional)
+                      Gender <span className="text-xs text-[#577877] font-normal">(optional)</span>
                     </label>
-                    <input
-                      type="text"
-                      value={profile.pronouns || ""}
-                      onChange={(e) => handleChange("pronouns", e.target.value)}
-                      placeholder="She / her, He / him, etc."
-                      className={getInputClass("pronouns")}
-                    />
+                    <select
+                      value={profile.gender || ""}
+                      onChange={(e) => handleChange("gender", e.target.value)}
+                      className={getInputClass("gender")}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
                   </div>
 
                   {/* Email address */}
