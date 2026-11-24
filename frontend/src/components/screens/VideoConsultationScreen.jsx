@@ -83,12 +83,53 @@ export default function VideoConsultationScreen({ onNavigate }) {
       })
       .catch(() => {});
 
-    clinicalApi
-      .prescriptions()
-      .then((items) => {
-        if (Array.isArray(items)) setPrescriptions(items);
-      })
-      .catch(() => {});
+  // Real-time polling effect (every 3 seconds) for newly published e-prescriptions matching active appointment ID
+  useEffect(() => {
+    const targetAptId = appointment?.id || appointmentId;
+    if (!targetAptId) return;
+
+    const fetchPrescriptions = async () => {
+      try {
+        const items = await clinicalApi.prescriptions();
+        if (Array.isArray(items)) {
+          const matching = items.filter(
+            (rx) => String(rx.appointment_id || rx.appointmentId || "").toLowerCase() === String(targetAptId).toLowerCase()
+          );
+          const relevantRx = matching.length > 0 ? matching : items;
+          setPrescriptions(relevantRx);
+
+          setChatMessages((prev) => {
+            const existingRxIds = new Set(
+              prev.filter((m) => m.type === "prescription").map((m) => m.result?.id || m.result?._id)
+            );
+            const newRxMessages = [];
+            for (const rx of relevantRx) {
+              const rxId = rx.id || rx._id;
+              if (rxId && !existingRxIds.has(rxId)) {
+                const content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
+                newRxMessages.push({
+                  type: "prescription",
+                  result: rx,
+                  payloadContent: content,
+                  time: new Date(rx.released_at || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                });
+              }
+            }
+            if (newRxMessages.length > 0) {
+              return [...prev, ...newRxMessages];
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error("Failed to poll prescriptions:", err);
+      }
+    };
+
+    fetchPrescriptions();
+    const interval = setInterval(fetchPrescriptions, 3000);
+    return () => clearInterval(interval);
+  }, [appointment?.id, appointmentId]);
 
     patientApi
       .appointments()
@@ -586,6 +627,34 @@ export default function VideoConsultationScreen({ onNavigate }) {
                     localStorage.removeItem("teleconsult_in_call");
                     setRoomState("ENDED");
                   }}
+                  onPrescriptionPublished={(data) => {
+                    if (data?.result) {
+                      const rx = data.result;
+                      const content = data.payloadContent || (typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {}));
+                      setPrescriptions((prev) => {
+                        const exists = prev.some((p) => String(p.id || p._id) === String(rx.id || rx._id));
+                        if (!exists) {
+                          return [rx, ...prev];
+                        }
+                        return prev;
+                      });
+                      setChatMessages((prev) => {
+                        const exists = prev.some((m) => m.type === "prescription" && String(m.result?.id || m.result?._id) === String(rx.id || rx._id));
+                        if (!exists) {
+                          return [
+                            ...prev,
+                            {
+                              type: "prescription",
+                              result: rx,
+                              payloadContent: content,
+                              time: new Date(rx.released_at || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                            },
+                          ];
+                        }
+                        return prev;
+                      });
+                    }
+                  }}
                 />
               ) : (
                 <div className="p-12 text-center text-[#577877] space-y-3">
@@ -641,26 +710,87 @@ export default function VideoConsultationScreen({ onNavigate }) {
                       Prescriptions &amp; Medications
                     </h3>
                     {prescriptions.length > 0 ? (
-                      prescriptions.map((rx) => (
-                        <div key={rx.id || rx._id} className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="text-xs font-bold text-[#162623]">
-                                {rx.medication_name || rx.title || rx.medication || "Prescription Item"}
-                              </p>
-                              <p className="text-[11px] text-[#577877]">
-                                Dosage: {rx.dosage || rx.instructions || "As directed"}
-                              </p>
+                      prescriptions.map((rx) => {
+                        const rxId = rx.id || rx._id;
+                        const content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
+                        const meds = content.medicines || (rx.medication_name ? [{ name: rx.medication_name, dosage: rx.dosage, frequency: rx.frequency, duration: rx.duration, instructions: rx.instructions }] : []);
+                        return (
+                          <div key={rxId || Math.random()} className="p-4 rounded-xl bg-white border border-[#577877]/15 space-y-3 shadow-xs">
+                            <div className="flex justify-between items-start border-b border-[#577877]/10 pb-2">
+                              <div>
+                                <p className="text-xs font-bold text-[#162623] flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[#25836F] text-sm">prescriptions</span>
+                                  {rx.title || content.diagnosis || "e-Prescription"}
+                                </p>
+                                <p className="text-[10px] text-[#577877] mt-0.5">
+                                  Issued: {rx.released_at ? new Date(rx.released_at).toLocaleString() : "Recently"}
+                                </p>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
+                                {rx.status || "Active"}
+                              </span>
                             </div>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
-                              Active
-                            </span>
+
+                            {content.diagnosis && (
+                              <p className="text-[11px] text-slate-700">
+                                <strong>Diagnosis:</strong> {content.diagnosis}
+                              </p>
+                            )}
+
+                            {meds.length > 0 && (
+                              <div className="space-y-1.5 bg-[#F0F5F7] p-3 rounded-xl border border-[#577877]/10">
+                                <p className="font-bold text-[11px] text-[#162623]">
+                                  Prescribed Medications:
+                                </p>
+                                {meds.map((m, idx) => (
+                                  <div key={idx} className="text-[11px] text-slate-700 border-b border-slate-200/60 pb-1.5 last:border-b-0">
+                                    <span className="font-semibold">{m.name}</span> {m.dosage ? `(${m.dosage})` : ""} {m.frequency ? `· ${m.frequency}` : ""} {m.duration ? `for ${m.duration}` : ""}
+                                    {m.instructions && (
+                                      <div className="text-[10px] text-[#577877] mt-0.5">
+                                        Instructions: {m.instructions}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {content.instructions && (
+                              <p className="text-[10px] text-slate-600">
+                                <strong>General Instructions:</strong> {content.instructions}
+                              </p>
+                            )}
+
+                            <div className="pt-1 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!rxId) return;
+                                  try {
+                                    const blob = await patientApi.downloadPrescription(rxId);
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement("a");
+                                    a.href = url;
+                                    a.download = `Prescription-${rxId}.pdf`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    window.URL.revokeObjectURL(url);
+                                    document.body.removeChild(a);
+                                  } catch (err) {
+                                    console.error("PDF download failed", err);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] transition cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-sm">
+                                  download
+                                </span>
+                                Download Prescription PDF
+                              </button>
+                            </div>
                           </div>
-                          {rx.duration && (
-                            <p className="text-[10px] text-[#577877]">Duration: {rx.duration}</p>
-                          )}
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="p-6 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-2">
                         <span className="material-symbols-outlined text-3xl text-[#577877]/60">medication_liquid</span>
@@ -679,22 +809,105 @@ export default function VideoConsultationScreen({ onNavigate }) {
                           No messages yet. Send a note to your doctor during the consultation.
                         </div>
                       ) : (
-                        chatMessages.map((msg, i) => (
-                          <div
-                            key={i}
-                            className={`p-3 rounded-xl text-xs space-y-1 ${
-                              msg.sender.includes("You")
-                                ? "bg-[#25836F] text-white ml-6"
-                                : "bg-[#F0F5F7] text-[#162623] mr-6 border border-[#577877]/15"
-                            }`}
-                          >
-                            <div className="flex justify-between text-[10px] opacity-75">
-                              <span className="font-semibold">{msg.sender}</span>
-                              <span>{msg.time}</span>
+                        chatMessages.map((msg, i) => {
+                          if (msg.type === "prescription") {
+                            const rx = msg.result || {};
+                            const content = msg.payloadContent || {};
+                            const meds = content.medicines || [];
+                            const rxId = rx.id || rx._id;
+                            return (
+                              <div
+                                key={i}
+                                className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-[#162623] space-y-3 mr-4 shadow-sm"
+                              >
+                                <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
+                                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                                    <span className="material-symbols-outlined text-[#25836F] text-base">
+                                      prescriptions
+                                    </span>
+                                    <span>e-Prescription Issued</span>
+                                  </div>
+                                  <span className="text-[10px] text-emerald-700 font-semibold">
+                                    {msg.time}
+                                  </span>
+                                </div>
+                                {content.diagnosis && (
+                                  <p className="text-[11px] text-slate-700">
+                                    <strong>Diagnosis:</strong> {content.diagnosis}
+                                  </p>
+                                )}
+                                {meds.length > 0 && (
+                                  <div className="space-y-1.5 bg-white/90 p-3 rounded-xl border border-emerald-100">
+                                    <p className="font-bold text-[11px] text-emerald-900">
+                                      Prescribed Medications:
+                                    </p>
+                                    {meds.map((m, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="text-[11px] text-slate-700 border-b border-slate-100 pb-1.5 last:border-b-0"
+                                      >
+                                        <span className="font-semibold">{m.name}</span> ({m.dosage}) · {m.frequency} for {m.duration}
+                                        {m.instructions && (
+                                          <div className="text-[10px] text-slate-500 mt-0.5">
+                                            Instructions: {m.instructions}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {content.instructions && (
+                                  <p className="text-[10px] text-slate-600">
+                                    <strong>General Instructions:</strong> {content.instructions}
+                                  </p>
+                                )}
+                                <div className="pt-1.5 flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!rxId) return;
+                                      try {
+                                        const blob = await patientApi.downloadPrescription(rxId);
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = `Prescription-${rxId}.pdf`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                        document.body.removeChild(a);
+                                      } catch (err) {
+                                        console.error("PDF download failed", err);
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] transition cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-sm">
+                                      download
+                                    </span>
+                                    Download Prescription PDF
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div
+                              key={i}
+                              className={`p-3 rounded-xl text-xs space-y-1 ${
+                                msg.sender.includes("You")
+                                  ? "bg-[#25836F] text-white ml-6"
+                                  : "bg-[#F0F5F7] text-[#162623] mr-6 border border-[#577877]/15"
+                              }`}
+                            >
+                              <div className="flex justify-between text-[10px] opacity-75">
+                                <span className="font-semibold">{msg.sender}</span>
+                                <span>{msg.time}</span>
+                              </div>
+                              <p className="leading-relaxed">{msg.text}</p>
                             </div>
-                            <p className="leading-relaxed">{msg.text}</p>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
 
