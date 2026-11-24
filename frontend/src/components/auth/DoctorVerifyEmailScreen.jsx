@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { authApi } from "../../lib/api";
 
 function ClinicianBrandPanel({ onBack }) {
@@ -87,7 +88,8 @@ function ClinicianBrandPanel({ onBack }) {
 }
 
 export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onVerified }) {
-  const [email, setEmail] = useState(initialEmail);
+  const location = useLocation();
+  const [email, setEmail] = useState(() => location.state?.email || initialEmail || "");
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const [status, setStatus] = useState("idle");
   const [errorMessage, setErrorMessage] = useState("");
