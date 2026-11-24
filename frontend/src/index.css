@@ -52,6 +52,10 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.font-mono {
+  font-family: "Poppins", sans-serif !important;
+}
+
 /* Premium Card System */
 .care-card {
   background-color: #ffffff;
