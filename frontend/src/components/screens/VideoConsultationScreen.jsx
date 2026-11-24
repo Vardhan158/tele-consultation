@@ -639,7 +639,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                             onClick={async () => {
                               if (!rxId) return;
                               try {
-                                const blob = await patientApi.downloadPrescription(rxId);
+                                const blob = await clinicalApi.downloadPrescription(rxId);
                                 const url = window.URL.createObjectURL(blob);
                                 const a = document.createElement("a");
                                 a.href = url;
