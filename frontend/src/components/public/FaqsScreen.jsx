@@ -1,6 +1,5 @@
 import { useId, useState } from "react";
 import PublicNavbar from "./PublicNavbar";
-import "./landing-theme.css";
 
 const FAQS = [
   ["How do I book an online doctor consultation?", "Browse available medical specialists by specialty or availability, select your preferred date and time slot, and confirm your booking through the patient portal."],

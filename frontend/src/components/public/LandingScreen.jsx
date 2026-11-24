@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Lenis from "lenis";
 import PublicNavbar from "./PublicNavbar";
 import Stethoscope3D from "./Stethoscope3D";
-import "./landing-theme.css";
 
 // ============================================================================
 // Scroll Animation Hooks & Components

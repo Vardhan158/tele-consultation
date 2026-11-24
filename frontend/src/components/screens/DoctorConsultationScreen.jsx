@@ -78,7 +78,7 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
           <div className="rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl">
             {room ? (
               <WebRtcConsultation
-                appointmentId={appointment.id}
+                appointmentId={appointment?.id}
                 authorization={room}
                 role="doctor"
                 onEnded={onBack}
