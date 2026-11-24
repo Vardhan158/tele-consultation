@@ -498,8 +498,12 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-8 space-y-4">
-              <div className="care-card p-6 rounded-2xl bg-white border border-[#577877]/15 shadow-lg">
+            <div className="lg:col-span-6 lg:sticky lg:top-4 space-y-4">
+              <div className="care-card p-4 rounded-2xl bg-white border border-[#577877]/15 shadow-lg">
+                <h3 className="text-sm font-bold text-[#162623] mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#25836F]">videocam</span>
+                  Video Streaming
+                </h3>
                 {consultationRoom?.session_id ? (
                   <WebRtcConsultation
                     appointmentId={apt?.id}
@@ -523,15 +527,24 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
               </div>
             </div>
 
-            <div className="lg:col-span-4 space-y-4">
+            <div className="lg:col-span-6 space-y-4 overflow-y-auto max-h-[calc(100vh-120px)]">
               <div className="care-card p-6 space-y-3">
-                <h3 className="text-sm font-bold text-[#162623]">Consultation Information</h3>
-                <div className="text-xs space-y-1.5 text-[#577877]">
+                <h3 className="text-sm font-bold text-[#162623] flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#25836F]">prescriptions</span>
+                  Consultation Information &amp; Prescriptions
+                </h3>
+                <div className="text-xs space-y-2 text-[#577877]">
                   <p><strong className="text-[#162623]">Doctor:</strong> {apt?.doctor?.name}</p>
                   <p><strong className="text-[#162623]">Specialty:</strong> {apt?.doctor?.specialty}</p>
                   <p><strong className="text-[#162623]">Clinic:</strong> {apt?.doctor?.clinic}</p>
                   <p><strong className="text-[#162623]">Reason:</strong> {apt?.reason}</p>
                   <p><strong className="text-[#162623]">Status:</strong> {apt?.status}</p>
+                </div>
+                <div className="pt-4 border-t border-[#577877]/15 space-y-2">
+                  <p className="text-xs font-bold text-[#162623]">Live Clinical Chat &amp; Notes</p>
+                  <div className="p-4 rounded-xl bg-[#F0F5F7] text-xs text-[#577877] space-y-2">
+                    <p>Your clinician can share prescriptions, notes, and summaries directly during or after this consultation.</p>
+                  </div>
                 </div>
               </div>
             </div>
