@@ -521,112 +521,12 @@ export default function DoctorRegistrationScreen({
           inModal ? "max-h-[calc(96vh-72px)]" : "max-w-4xl lg:overflow-hidden"
         }`}
       >
-        {/* Title & 3-Step Progress Stepper Directly Below */}
-        <div className="w-full pb-4 border-b border-[#577877]/10 flex flex-col gap-3 shrink-0">
+        {/* Title */}
+        <div className="w-full pb-3 border-b border-[#577877]/10 flex flex-col gap-1 shrink-0">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#162623] leading-none">
               Doctor Registration
             </h2>
-          </div>
-
-          {/* Stepper Progress Indicator */}
-          <div className="flex items-center gap-2 sm:gap-3 bg-white px-4 py-2 rounded-xl border border-[#577877]/15 shadow-2xs self-start">
-            {/* Step 1 Pill */}
-            <button
-              type="button"
-              onClick={() => {
-                if (currentStep > 1) {
-                  setCurrentStep(1);
-                  setMessage("");
-                }
-              }}
-              disabled={currentStep === 1}
-              className={`flex items-center gap-2 text-xs font-semibold transition ${
-                currentStep === 1
-                  ? "text-[#25836F] font-bold"
-                  : currentStep > 1
-                  ? "text-[#162623] hover:text-[#25836F] cursor-pointer"
-                  : "text-[#577877]/60 cursor-not-allowed"
-              }`}
-            >
-              <span
-                className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
-                  currentStep > 1
-                    ? "bg-[#25836F] text-white"
-                    : currentStep === 1
-                    ? "bg-[#25836F] text-white ring-2 ring-[#25836F]/20"
-                    : "bg-[#F0F5F7] text-[#577877]"
-                }`}
-              >
-                {currentStep > 1 ? (
-                  <span className="material-symbols-outlined text-sm">check</span>
-                ) : (
-                  "1"
-                )}
-              </span>
-              <span>Personal</span>
-            </button>
-
-            <span className="text-[#577877]/30 text-xs">/</span>
-
-            {/* Step 2 Pill */}
-            <button
-              type="button"
-              onClick={() => {
-                if (currentStep > 2) {
-                  setCurrentStep(2);
-                  setMessage("");
-                } else if (currentStep === 1) {
-                  handleNextFromStep1();
-                }
-              }}
-              className={`flex items-center gap-2 text-xs font-semibold transition ${
-                currentStep === 2
-                  ? "text-[#25836F] font-bold"
-                  : currentStep > 2
-                  ? "text-[#162623] hover:text-[#25836F] cursor-pointer"
-                  : "text-[#577877]/60"
-              }`}
-            >
-              <span
-                className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
-                  currentStep > 2
-                    ? "bg-[#25836F] text-white"
-                    : currentStep === 2
-                    ? "bg-[#25836F] text-white ring-2 ring-[#25836F]/20"
-                    : "bg-[#F0F5F7] text-[#577877]"
-                }`}
-              >
-                {currentStep > 2 ? (
-                  <span className="material-symbols-outlined text-sm">check</span>
-                ) : (
-                  "2"
-                )}
-              </span>
-              <span>Credentials</span>
-            </button>
-
-            <span className="text-[#577877]/30 text-xs">/</span>
-
-            {/* Step 3 Pill */}
-            <div
-              className={`flex items-center gap-2 text-xs font-semibold ${
-                currentStep === 3
-                  ? "text-[#25836F] font-bold"
-                  : "text-[#577877]/60"
-              }`}
-            >
-              <span
-                className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
-                  currentStep === 3
-                    ? "bg-[#25836F] text-white ring-2 ring-[#25836F]/20"
-                    : "bg-[#F0F5F7] text-[#577877]"
-                }`}
-              >
-                3
-              </span>
-              <span>Verification</span>
-            </div>
           </div>
         </div>
 
