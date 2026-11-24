@@ -380,7 +380,7 @@ export default function ProfileScreen({
               {/* Profile Card */}
               <div className="care-card p-8 text-center space-y-4">
                 {/* Large Avatar Badge */}
-                <div className="w-24 h-24 rounded-full bg-[#E4EDF0] text-[#25836F] flex items-center justify-center font-bold text-2xl mx-auto ring-4 ring-[#F0F5F7]">
+                <div className="w-24 h-24 rounded-none bg-[#E4EDF0] text-[#25836F] flex items-center justify-center font-bold text-2xl mx-auto ring-4 ring-[#F0F5F7]">
                   {getInitials()}
                 </div>
 

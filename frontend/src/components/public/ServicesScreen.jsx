@@ -1,6 +1,5 @@
 import PublicNavbar from "./PublicNavbar";
 import { ServicesSection } from "./LandingScreen";
-import "./landing-theme.css";
 
 export default function ServicesScreen() {
   return (

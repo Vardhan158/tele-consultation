@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { doctorApi } from "../../lib/api";
 import WebRtcConsultation from "../consultation/WebRtcConsultation";
 import PrescriptionComposer from "../consultation/PrescriptionComposer";
@@ -6,7 +6,7 @@ import PrescriptionComposer from "../consultation/PrescriptionComposer";
 export default function DoctorConsultationScreen({ appointment, onBack }) {
   const [room, setRoom] = useState(null);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("video"); // "video" | "prescription"
+  const webrtcRef = useRef(null);
 
   useEffect(() => {
     if (appointment?.id)
@@ -19,8 +19,8 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
   }, [appointment]);
 
   return (
-    <div className="min-h-screen bg-[#F0F5F7] p-6 text-[#162623]">
-      <div className="mx-auto max-w-4xl space-y-4">
+    <div className="min-h-screen bg-[#F0F5F7] px-6 lg:px-10 py-3 lg:py-4 text-[#162623]">
+      <div className="mx-auto max-w-7xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
@@ -30,41 +30,15 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
             ← Back to Appointments
           </button>
 
-          <div className="flex items-center gap-2 rounded-xl bg-white p-1 border border-[#577877]/20 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setActiveTab("video")}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === "video"
-                  ? "bg-[#25836F] text-white shadow-xs"
-                  : "text-[#577877] hover:text-[#162623]"
-              }`}
-            >
-              <span className="material-symbols-outlined text-sm">videocam</span>
-              Video Call
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("prescription")}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === "prescription"
-                  ? "bg-[#25836F] text-white shadow-xs"
-                  : "text-[#577877] hover:text-[#162623]"
-              }`}
-            >
-              <span className="material-symbols-outlined text-sm">
-                prescriptions
-              </span>
-              Write Prescription
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-[#162623]">
+              Patient: <span className="text-[#25836F]">{appointment?.patient_name || "Patient"}</span>
+            </span>
           </div>
         </div>
 
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Consultation Room</h1>
-          <div className="text-sm font-semibold text-[#577877]">
-            Patient: {appointment?.patient_name || "Patient"}
-          </div>
         </div>
 
         {error && (
@@ -73,12 +47,18 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
           </div>
         )}
 
-        {/* Video Consultation Tab */}
-        <div className={activeTab === "video" ? "block" : "hidden"}>
-          <div className="rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl">
+        {/* Two-Column Split Layout: Left Video, Right Prescription Composer */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Side: Video Call & Streaming */}
+          <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl lg:sticky lg:top-4">
+            <h3 className="text-sm font-bold text-[#162623] mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#25836F]">videocam</span>
+              Video Streaming
+            </h3>
             {room ? (
               <WebRtcConsultation
-                appointmentId={appointment.id}
+                ref={webrtcRef}
+                appointmentId={appointment?.id}
                 authorization={room}
                 role="doctor"
                 onEnded={onBack}
@@ -94,17 +74,21 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
               </div>
             ) : null}
           </div>
-        </div>
 
-        {/* Prescription Composer Tab / Section */}
-        <div className={activeTab === "prescription" ? "block" : "hidden"}>
-          <PrescriptionComposer
-            appointmentId={appointment?.id}
-            patientName={appointment?.patient_name || "Patient"}
-            onPublished={() => {
-              // Prescription successfully published
-            }}
-          />
+          {/* Right Side: Write Prescription & Send */}
+          <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)]">
+            <h3 className="text-sm font-bold text-[#162623] mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#25836F]">prescriptions</span>
+              Write Prescription &amp; Send
+            </h3>
+            <PrescriptionComposer
+              appointmentId={appointment?.id}
+              patientName={appointment?.patient_name || "Patient"}
+              onPublished={(result, payloadContent) => {
+                webrtcRef.current?.emitPrescriptionPublished(result, payloadContent);
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>

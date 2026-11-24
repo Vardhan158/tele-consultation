@@ -16,8 +16,11 @@ export default function VideoConsultationScreen({ onNavigate }) {
   const [patientProfile, setPatientProfile] = useState(null);
   const [vitalsReadings, setVitalsReadings] = useState([]);
   const [attachedRecords, setAttachedRecords] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
   const [roomAuth, setRoomAuth] = useState(null);
-  const [roomState, setRoomState] = useState("READINESS"); // 'READINESS' | 'WAITING_ROOM' | 'IN_CALL' | 'ENDED'
+  const [roomState, setRoomState] = useState(() => {
+    return localStorage.getItem("teleconsult_in_call") === "true" ? "IN_CALL" : "READINESS";
+  }); // 'READINESS' | 'WAITING_ROOM' | 'IN_CALL' | 'ENDED'
   const [errorMessage, setErrorMessage] = useState("");
   const [devices, setDevices] = useState({
     camera: true,
@@ -41,6 +44,22 @@ export default function VideoConsultationScreen({ onNavigate }) {
   const socketRef = useRef(null);
   const streamRef = useRef(null);
 
+  // Auto-resume call on page reload if active call flag is present
+  useEffect(() => {
+    const targetAptId = appointment?.id || appointmentId;
+    if (localStorage.getItem("teleconsult_in_call") === "true" && targetAptId && roomState === "IN_CALL" && !roomAuth) {
+      consultationApi.join(targetAptId)
+        .then((auth) => {
+          setRoomAuth(auth);
+          setRoomState("IN_CALL");
+        })
+        .catch(() => {
+          localStorage.removeItem("teleconsult_in_call");
+          setRoomState("READINESS");
+        });
+    }
+  }, [appointment, appointmentId, roomState, roomAuth]);
+
   useEffect(() => {
     patientApi
       .profile()
@@ -60,6 +79,13 @@ export default function VideoConsultationScreen({ onNavigate }) {
       .list()
       .then((recs) => {
         if (Array.isArray(recs)) setAttachedRecords(recs);
+      })
+      .catch(() => {});
+
+    patientApi
+      .prescriptions()
+      .then((items) => {
+        if (Array.isArray(items)) setPrescriptions(items);
       })
       .catch(() => {});
 
@@ -163,6 +189,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
     }
     setErrorMessage("");
     setRoomState("IN_CALL");
+    localStorage.setItem("teleconsult_in_call", "true");
 
     try {
       // 1. Get real user media stream
@@ -325,12 +352,26 @@ export default function VideoConsultationScreen({ onNavigate }) {
           console.warn("Signaling ICE handling error:", err);
         }
       });
+
+      socket.on("prescription_published", (data) => {
+        const result = data?.result || data;
+        const payloadContent = data?.payloadContent || (typeof data?.content === "string" ? JSON.parse(data.content || "{}") : data?.content) || {};
+        const rxMsg = {
+          sender: "Dr. " + (doctorName || "Clinician") + " (e-Prescription)",
+          type: "prescription",
+          result: result,
+          payloadContent: payloadContent,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setChatMessages((prev) => [...prev, rxMsg]);
+      });
     } catch (webrtcErr) {
       console.warn("WebRTC startup error:", webrtcErr);
     }
   };
 
   const handleEndCall = async () => {
+    localStorage.removeItem("teleconsult_in_call");
     if (roomAuth?.session_id) {
       try {
         await consultationApi.disconnected(roomAuth.session_id);
@@ -488,8 +529,9 @@ export default function VideoConsultationScreen({ onNavigate }) {
 
         {/* PHASE 1: Device Readiness & Diagnostics */}
         {(appointment || targetAptId) && roomState === "READINESS" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 care-card p-6 sm:p-8 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Side: Video Preview & Hardware Check */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl lg:sticky lg:top-4 space-y-4">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
                   Hardware &amp; Network Check
@@ -579,7 +621,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                 ))}
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={handleTestDevices}
@@ -603,8 +645,8 @@ export default function VideoConsultationScreen({ onNavigate }) {
               </div>
             </div>
 
-            {/* Appointment Details Card */}
-            <div className="care-card p-6 sm:p-7 space-y-6">
+            {/* Right Side: Consultation Info Card */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)] space-y-6">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
                   Consultation Info
@@ -672,66 +714,145 @@ export default function VideoConsultationScreen({ onNavigate }) {
 
         {/* PHASE 2: Waiting Room Admission */}
         {roomState === "WAITING_ROOM" && (
-          <div className="care-card p-8 sm:p-12 max-w-2xl mx-auto text-center space-y-6">
-            <div className="w-16 h-16 rounded-full bg-[#F0F5F7] border border-[#25836F]/30 flex items-center justify-center mx-auto animate-pulse">
-              <span className="material-symbols-outlined !text-[#25836F] text-4xl">
-                hourglass_top
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#F0F5F7] text-[#25836F] uppercase tracking-wider">
-                Private Waiting Room Active
-              </span>
-              <h2 className="text-2xl font-bold text-[#162623]">
-                {doctorName} has been notified
-              </h2>
-              <p className="text-xs sm:text-sm text-[#577877] max-w-md mx-auto leading-relaxed">
-                You are in the consultation queue. The doctor is reviewing your latest
-                records and will admit you into the live room momentarily.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#F0F5F7] max-w-md mx-auto text-xs text-left space-y-2 border border-[#577877]/15">
-              <div className="flex items-center justify-between">
-                <span className="text-[#577877]">Queue Status:</span>
-                <span className="font-bold text-[#162623]">Checked In</span>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Side: Video Preview & Waiting Controls */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl lg:sticky lg:top-4 space-y-4">
+              <h3 className="text-sm font-bold text-[#162623] mb-3 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#25836F]">videocam</span>
+                Waiting Room Stream &amp; Preview
+              </h3>
+              <div className="relative aspect-video rounded-2xl bg-[#162623] overflow-hidden flex items-center justify-center border border-[#577877]/20 shadow-inner">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white space-y-2 bg-gradient-to-tr from-[#162623] to-[#25836F]">
+                  <div className="w-20 h-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mx-auto text-2xl font-bold animate-pulse">
+                    {patientInitials}
+                  </div>
+                  <p className="text-xs font-medium text-[#F0F5F7]">
+                    {patientName} · In Waiting Room
+                  </p>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 font-mono">
+                    Waiting for Clinician Admission
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#577877]">Room Encryption:</span>
-                <span className="font-semibold text-[#162623]">
-                  DISHA / HIPAA Standard (WebRTC P2P)
-                </span>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRoomState("READINESS")}
+                  className="btn-secondary text-xs cursor-pointer"
+                >
+                  Return to Device Check
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAdmitToCall}
+                  className="btn-primary flex-1 text-xs font-semibold py-3 cursor-pointer shadow-md"
+                >
+                  <span className="material-symbols-outlined !text-white text-base">
+                    videocam
+                  </span>
+                  Doctor Ready · Enter Live Room
+                </button>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setRoomState("READINESS")}
-                className="btn-secondary text-xs cursor-pointer"
-              >
-                Return to Device Check
-              </button>
-              <button
-                type="button"
-                onClick={handleAdmitToCall}
-                className="btn-primary text-xs font-semibold py-3 px-6 shadow-md cursor-pointer"
-              >
-                <span className="material-symbols-outlined !text-white text-base">
-                  videocam
-                </span>
-                Doctor Ready · Enter Live Room
-              </button>
+            {/* Right Side: Consultation Info Card & Waiting Room Status */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)] space-y-6">
+              {/* Waiting Room Status Card */}
+              <div className="p-5 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider">
+                    Private Waiting Room Active
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                <h4 className="text-base font-bold text-[#162623]">
+                  {doctorName} has been notified
+                </h4>
+                <p className="text-xs text-[#577877] leading-relaxed">
+                  You are in the consultation queue. The doctor is reviewing your latest
+                  records and will admit you into the live room momentarily.
+                </p>
+                <div className="pt-2 border-t border-[#577877]/15 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#577877]">Queue Status:</span>
+                    <span className="font-bold text-[#162623]">Checked In</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#577877]">Room Encryption:</span>
+                    <span className="font-semibold text-[#162623]">
+                      DISHA / HIPAA Standard (WebRTC P2P)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Consultation Info Card */}
+              <div className="space-y-4 pt-2 border-t border-[#577877]/15">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
+                    Consultation Info
+                  </span>
+                  <h3 className="text-lg font-bold text-[#162623] mt-1">
+                    {doctorName}
+                  </h3>
+                  <p className="text-xs text-[#577877]">
+                    {doctorSpecialty}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Scheduled Date:</span>
+                    <span className="font-semibold text-[#162623]">
+                      {appointment?.starts_at
+                        ? new Date(appointment.starts_at).toLocaleDateString("en-IN", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "Today"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Reason:</span>
+                    <span className="font-semibold text-[#162623] truncate max-w-[180px]">
+                      {appointment?.reason || "Clinical consultation"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Duration:</span>
+                    <span className="font-semibold text-[#162623]">
+                      30 Minutes
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Consultation Mode:</span>
+                    <span className="font-semibold text-[#25836F]">
+                      WebRTC Peer-to-Peer Encrypted
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Hospital / Clinic:</span>
+                    <span className="font-semibold text-[#162623]">
+                      {clinicName}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* PHASE 3: Live Video Consultation Room with Real WebRTC */}
         {roomState === "IN_CALL" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Video View & Controls (Col 1 & 2) */}
-            <div className="lg:col-span-2 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Side: Video Call & Streaming */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl lg:sticky lg:top-4 space-y-4">
+              <h3 className="text-sm font-bold text-[#162623] mb-3 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#25836F]">videocam</span>
+                Video Streaming
+              </h3>
               <div className="relative aspect-video rounded-2xl bg-[#162623] overflow-hidden border border-[#577877]/20 shadow-2xl flex items-center justify-center">
                 {/* Real Remote Video Track */}
                 <video
@@ -783,14 +904,14 @@ export default function VideoConsultationScreen({ onNavigate }) {
               </div>
 
               {/* Call Controls Dock */}
-              <div className="p-4 rounded-2xl bg-white border border-[#577877]/20 shadow-sm flex items-center justify-center gap-4 flex-wrap">
+              <div className="p-4 rounded-2xl bg-[#F0F5F7] border border-[#577877]/20 shadow-sm flex items-center justify-center gap-4 flex-wrap">
                 <button
                   type="button"
                   onClick={toggleMic}
                   className={`p-3.5 rounded-xl transition cursor-pointer ${
                     muted
                       ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-[#F0F5F7] text-[#25836F] hover:bg-[#25836F] hover:text-white"
+                      : "bg-white text-[#25836F] hover:bg-[#25836F] hover:text-white"
                   }`}
                   title={muted ? "Unmute microphone" : "Mute microphone"}
                 >
@@ -805,7 +926,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   className={`p-3.5 rounded-xl transition cursor-pointer ${
                     cameraOff
                       ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-[#F0F5F7] text-[#25836F] hover:bg-[#25836F] hover:text-white"
+                      : "bg-white text-[#25836F] hover:bg-[#25836F] hover:text-white"
                   }`}
                   title={cameraOff ? "Turn camera on" : "Turn camera off"}
                 >
@@ -827,59 +948,185 @@ export default function VideoConsultationScreen({ onNavigate }) {
               </div>
             </div>
 
-            {/* Right Interactive Drawer (Col 3) */}
-            <div className="care-card flex flex-col h-[520px] overflow-hidden">
-              {/* Drawer Tabs */}
-              <div className="flex border-b border-[#577877]/20 p-2 gap-1 bg-[#F0F5F7]">
+            {/* Right Side: Prescription, clinical chat, vitals, and reports panel */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)] space-y-4">
+              <h3 className="text-sm font-bold text-[#162623] mb-2 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#25836F]">clinical_notes</span>
+                Clinical Panel &amp; Prescription
+              </h3>
+
+              {/* Panel Tabs */}
+              <div className="flex border-b border-[#577877]/20 pb-2 mb-4 gap-1 bg-[#F0F5F7] p-2 rounded-xl">
                 {[
-                  { id: "chat", label: "Clinical Chat", icon: "chat" },
+                  { id: "prescription", label: "Prescription", icon: "medication" },
+                  { id: "chat", label: "Chat", icon: "chat" },
                   { id: "vitals", label: "Vitals", icon: "vital_signs" },
-                  { id: "notes", label: "Reports", icon: "description" },
+                  { id: "reports", label: "Reports", icon: "description" },
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveSideTab(tab.id)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition cursor-pointer ${
                       activeSideTab === tab.id
                         ? "bg-[#25836F] text-white shadow-sm"
-                        : "text-[#577877] hover:text-[#162623]"
+                        : "text-[#577877] hover:text-[#162623] bg-white"
                     }`}
                   >
                     <span className="material-symbols-outlined text-sm">
                       {tab.icon}
                     </span>
-                    <span>{tab.label}</span>
+                    <span className="truncate">{tab.label}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Drawer Content */}
-              <div className="flex-1 p-4 overflow-y-auto">
+              {/* Tab Contents */}
+              <div className="space-y-4">
+                {activeSideTab === "prescription" && (
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#25836F] text-base">medication</span>
+                      Prescriptions &amp; Medications
+                    </h3>
+                    {prescriptions.length > 0 ? (
+                      prescriptions.map((rx) => (
+                        <div key={rx.id || rx._id} className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-xs font-bold text-[#162623]">
+                                {rx.medication_name || rx.title || rx.medication || "Prescription Item"}
+                              </p>
+                              <p className="text-[11px] text-[#577877]">
+                                Dosage: {rx.dosage || rx.instructions || "As directed"}
+                              </p>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
+                              Active
+                            </span>
+                          </div>
+                          {rx.duration && (
+                            <p className="text-[10px] text-[#577877]">Duration: {rx.duration}</p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-6 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-2">
+                        <span className="material-symbols-outlined text-3xl text-[#577877]/60">medication_liquid</span>
+                        <p className="font-semibold text-[#162623]">No Prescriptions Issued Yet</p>
+                        <p>Your doctor will issue or update your electronic prescription during or after this consultation.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {activeSideTab === "chat" && (
-                  <div className="flex flex-col h-full justify-between space-y-3">
+                  <div className="flex flex-col h-[380px] justify-between space-y-3">
                     <div className="space-y-3 overflow-y-auto pr-1 flex-1">
                       {chatMessages.length === 0 ? (
                         <div className="p-4 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877]">
                           No messages yet. Send a note to your doctor during the consultation.
                         </div>
                       ) : (
-                        chatMessages.map((msg, i) => (
-                          <div
-                            key={i}
-                            className={`p-3 rounded-xl text-xs space-y-1 ${
-                              msg.sender.includes("You")
-                                ? "bg-[#25836F] text-white ml-6"
-                                : "bg-[#F0F5F7] text-[#162623] mr-6 border border-[#577877]/15"
-                            }`}
-                          >
-                            <div className="flex justify-between text-[10px] opacity-75">
-                              <span className="font-semibold">{msg.sender}</span>
-                              <span>{msg.time}</span>
+                        chatMessages.map((msg, i) => {
+                          if (msg.type === "prescription") {
+                            const rx = msg.result || {};
+                            const content = msg.payloadContent || {};
+                            const meds = content.medicines || [];
+                            return (
+                              <div
+                                key={i}
+                                className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-[#162623] space-y-3 mr-6 shadow-sm"
+                              >
+                                <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
+                                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                                    <span className="material-symbols-outlined text-[#25836F] text-base">
+                                      prescriptions
+                                    </span>
+                                    <span>e-Prescription Issued</span>
+                                  </div>
+                                  <span className="text-[10px] text-emerald-700 font-semibold">
+                                    {msg.time}
+                                  </span>
+                                </div>
+                                {content.diagnosis && (
+                                  <p className="text-[11px] text-slate-700">
+                                    <strong>Diagnosis:</strong> {content.diagnosis}
+                                  </p>
+                                )}
+                                {meds.length > 0 && (
+                                  <div className="space-y-1.5 bg-white/90 p-3 rounded-xl border border-emerald-100">
+                                    <p className="font-bold text-[11px] text-emerald-900">
+                                      Prescribed Medications:
+                                    </p>
+                                    {meds.map((m, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="text-[11px] text-slate-700 border-b border-slate-100 pb-1.5 last:border-b-0"
+                                      >
+                                        <span className="font-semibold">{m.name}</span> ({m.dosage}) · {m.frequency} for {m.duration}
+                                        {m.instructions && (
+                                          <div className="text-[10px] text-slate-500 mt-0.5">
+                                            Instructions: {m.instructions}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {content.instructions && (
+                                  <p className="text-[10px] text-slate-600">
+                                    <strong>General Instructions:</strong> {content.instructions}
+                                  </p>
+                                )}
+                                <div className="pt-1.5 flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const rxId = rx.id || rx._id;
+                                      if (!rxId) return;
+                                      try {
+                                        const blob = await patientApi.downloadPrescription(rxId);
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = `Prescription-${rxId}.pdf`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                        document.body.removeChild(a);
+                                      } catch (err) {
+                                        console.error("PDF download failed", err);
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] transition cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-sm">
+                                      download
+                                    </span>
+                                    Download PDF
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div
+                              key={i}
+                              className={`p-3 rounded-xl text-xs space-y-1 ${
+                                msg.sender.includes("You")
+                                  ? "bg-[#25836F] text-white ml-6"
+                                  : "bg-[#F0F5F7] text-[#162623] mr-6 border border-[#577877]/15"
+                              }`}
+                            >
+                              <div className="flex justify-between text-[10px] opacity-75">
+                                <span className="font-semibold">{msg.sender}</span>
+                                <span>{msg.time}</span>
+                              </div>
+                              <p className="leading-relaxed">{msg.text}</p>
                             </div>
-                            <p className="leading-relaxed">{msg.text}</p>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
 
@@ -908,7 +1155,8 @@ export default function VideoConsultationScreen({ onNavigate }) {
 
                 {activeSideTab === "vitals" && (
                   <div className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877]">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#25836F] text-base">vital_signs</span>
                       Patient Vitals (Shared with Doctor)
                     </h3>
                     {latestReading ? (
@@ -945,9 +1193,10 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   </div>
                 )}
 
-                {activeSideTab === "notes" && (
+                {(activeSideTab === "reports" || activeSideTab === "notes") && (
                   <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877]">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#25836F] text-base">description</span>
                       Shared Documents for this Visit
                     </h3>
                     {attachedRecords.length > 0 ? (

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Lenis from "lenis";
 import PublicNavbar from "./PublicNavbar";
-import "./landing-theme.css";
+import Stethoscope3D from "./Stethoscope3D";
 
 // ============================================================================
 // Scroll Animation Hooks & Components
@@ -122,6 +122,7 @@ export default function LandingScreen({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [heroMounted, setHeroMounted] = useState(false);
+  const [heroView, setHeroView] = useState("doctor");
   const [scrolled, setScrolled] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -191,8 +192,18 @@ export default function LandingScreen({
 
     return () => {
       cancelAnimationFrame(rafId);
-      lenis.destroy();
-      lenisRef.current = null;
+      if (lenisRef.current) {
+        lenisRef.current.destroy();
+        lenisRef.current = null;
+      }
+      document.documentElement.classList.remove("lenis", "lenis-smooth", "lenis-scrolling", "lenis-stopped");
+      document.body.classList.remove("lenis", "lenis-smooth", "lenis-scrolling", "lenis-stopped");
+      document.documentElement.style.scrollBehavior = "";
+      document.body.style.scrollBehavior = "";
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      document.documentElement.style.overflowY = "auto";
+      document.body.style.overflowY = "auto";
     };
   }, []);
 
@@ -238,7 +249,7 @@ export default function LandingScreen({
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-white font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white overflow-x-clip">
       <PublicNavbar />
 
       {/* ========================================================= */}
@@ -361,19 +372,52 @@ export default function LandingScreen({
             </div>
           </div>
 
-          {/* Right Column Physician Image */}
+          {/* Right Column Interactive Hero Graphic (Doctor or 3D Stethoscope) */}
           <div
             style={{ transitionDelay: "300ms" }}
-            className={`flex-1 w-full flex justify-center lg:justify-end items-end self-end z-10 mt-6 lg:mt-0 transform transition-all duration-1000 ease-out ${
+            className={`flex-1 w-full flex flex-col justify-end items-center lg:items-end self-end z-10 mt-6 lg:mt-0 transform transition-all duration-1000 ease-out ${
               heroMounted ? "translate-y-0 opacity-100 scale-100" : "translate-y-12 opacity-0 scale-98"
             }`}
           >
-            <img
-              src="/assets/doctor.png"
-              alt="Physician at Kaizen Care"
-              className="w-auto h-auto max-h-[500px] sm:max-h-[580px] lg:max-h-[660px] xl:max-h-[720px] object-contain object-bottom pointer-events-none select-none drop-shadow-sm transition-transform duration-700 hover:scale-[1.01]"
-              loading="eager"
-            />
+            {/* View Switcher Toggle Pill */}
+            <div className="mb-3 flex items-center gap-1.5 p-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 shadow-xs z-20">
+              <button
+                type="button"
+                onClick={() => setHeroView("doctor")}
+                className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  heroView === "doctor"
+                    ? "bg-white text-[#165849] shadow-xs font-bold"
+                    : "text-white/90 hover:text-white"
+                }`}
+              >
+                Physician View
+              </button>
+              <button
+                type="button"
+                onClick={() => setHeroView("3d")}
+                className={`inline-flex items-center gap-1 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  heroView === "3d"
+                    ? "bg-white text-[#165849] shadow-xs font-bold"
+                    : "text-white/90 hover:text-white"
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">3d_rotation</span>
+                3D Stethoscope
+              </button>
+            </div>
+
+            {heroView === "doctor" ? (
+              <img
+                src="/assets/doctor.png"
+                alt="Physician at Kaizen Care"
+                className="w-auto h-auto max-h-[500px] sm:max-h-[580px] lg:max-h-[660px] xl:max-h-[720px] object-contain object-bottom pointer-events-none select-none drop-shadow-sm transition-transform duration-700 hover:scale-[1.01]"
+                loading="eager"
+              />
+            ) : (
+              <div className="w-full max-w-xl h-[450px] sm:h-[550px] lg:h-[620px] flex items-center justify-center relative">
+                <Stethoscope3D className="w-full h-full" interactive={true} />
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -505,6 +549,114 @@ export default function LandingScreen({
               </div>
             </ScrollReveal>
           ))}
+        </div>
+      </section>
+
+      {/* Persistent WebGL scene with a four-screen, scrubbed product story. */}
+      <section
+        id="technology"
+        data-stethoscope-story
+        className="relative w-full bg-[#071713] text-white border-y border-white/10 font-sans"
+      >
+        <div className="sticky top-0 h-screen w-full overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_64%_45%,rgba(32,199,167,0.22),transparent_38%),linear-gradient(135deg,#071713_0%,#0d2b25_58%,#071713_100%)]" />
+          <div className="absolute inset-0 opacity-40 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:64px_64px]" />
+          <Stethoscope3D className="absolute inset-0 !h-full !w-full" interactive={false} cinematic />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#071713]/85 via-transparent to-[#071713]/25 pointer-events-none" />
+          <div className="absolute bottom-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-white/55">
+            <span>Scroll to explore</span>
+            <span className="h-10 w-px bg-gradient-to-b from-white/60 to-transparent" />
+          </div>
+        </div>
+
+        <div className="relative z-10 -mt-[100vh]">
+          {[
+            { eyebrow: "Kaizen Acoustic System · 01", title: "Listen beyond distance.", copy: "A precision clinical instrument, rendered in real time and designed for connected care.", side: "left" },
+            { eyebrow: "Diaphragm · 02", title: "Engineered for subtle signals.", copy: "Scroll becomes a physical camera move, bringing the chestpiece, bell, and reflective surfaces into focus.", side: "right" },
+            { eyebrow: "Spatial inspection · 03", title: "Every contour, continuously rendered.", copy: "One persistent WebGL scene preserves lighting, depth, and orientation while the narrative moves around it.", side: "left" },
+            { eyebrow: "Connected care · 04", title: "A clearer path to consultation.", copy: "The smooth-scroll system synchronizes the model, camera, lighting, and interface copy at 60 FPS.", side: "right" },
+          ].map((chapter) => (
+            <article
+              key={chapter.eyebrow}
+              className={`min-h-screen flex items-center px-6 sm:px-10 lg:px-16 xl:px-24 ${chapter.side === "right" ? "justify-end" : "justify-start"}`}
+            >
+              <div className={`max-w-xl ${chapter.side === "right" ? "text-right items-end" : "text-left items-start"} flex flex-col drop-shadow-2xl`}>
+                <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-[#69E1C7]">{chapter.eyebrow}</p>
+                <h2 className="mt-5 text-4xl sm:text-5xl lg:text-7xl font-semibold tracking-[-0.045em] leading-[0.98] text-white">{chapter.title}</h2>
+                <p className="mt-6 max-w-md text-sm sm:text-base leading-7 text-white/70">{chapter.copy}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* Previous card-based 3D showcase retained for reference, not rendered. */}
+      {/* ========================================================= */}
+      {/* 3D DIAGNOSTIC TECHNOLOGY SHOWCASE SECTION (FS 60P STYLED) */}
+      {/* ========================================================= */}
+      <section
+        aria-hidden="true"
+        className="hidden"
+      >
+        <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20">
+          <ScrollReveal animation="fade-up">
+            <div className="flex flex-col items-center text-center max-w-3xl mx-auto mb-12 space-y-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-zinc-300 text-xs font-semibold text-[#000000] uppercase tracking-wider shadow-2xs">
+                <span>FS 60P Precision Engineering</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[#000000] leading-tight">
+                Interactive 3D Clinical Acoustic System
+              </h2>
+              <p className="text-sm sm:text-base text-zinc-700 max-w-2xl leading-relaxed">
+                Experience crystal-clear remote diagnostics powered by high-fidelity acoustic transmission and 60 FPS real-time WebGL 3D visualization.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Left 3D Canvas Box */}
+            <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-zinc-300 shadow-md relative overflow-hidden group">
+              <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1 bg-[#000000]/5 rounded-full text-xs font-mono font-medium text-zinc-800 border border-zinc-200">
+                <span className="size-2 rounded-full bg-[#165849] animate-ping" />
+                WebGL 3D Engine · 60 FPS
+              </div>
+
+              <div className="h-[600px]" />
+            </div>
+
+            {/* Right Feature Details */}
+            <div className="lg:col-span-5 space-y-5">
+              {[
+                {
+                  icon: "graphic_eq",
+                  title: "Acoustic Fidelity",
+                  desc: "Precision diaphragm resonance designed to capture subtle heart and lung sound signatures remotely.",
+                },
+                {
+                  icon: "3d_rotation",
+                  title: "Interactive 3D Spatial Rendering",
+                  desc: "Drag or hover the viewport to examine physical component contours from any angle with real-time lighting.",
+                },
+                {
+                  icon: "verified",
+                  title: "Clinical Calibration",
+                  desc: "Built to match medical-grade acoustic impedance standards for telemedicine consultations.",
+                },
+              ].map((feat, idx) => (
+                <ScrollReveal key={idx} animation="fade-left" delay={idx * 150}>
+                  <div className="bg-white p-6 rounded-2xl border border-zinc-300 shadow-xs hover:border-[#165849] transition-all duration-300 flex items-start gap-4 group cursor-default">
+                    <div className="size-11 rounded-xl bg-[#EBEBEB] text-[#000000] group-hover:bg-[#165849] group-hover:text-white flex items-center justify-center shrink-0 transition-colors duration-300">
+                      <span className="material-symbols-outlined text-xl">{feat.icon}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-base text-[#000000]">{feat.title}</h3>
+                      <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed">{feat.desc}</p>
+                    </div>
+                  </div>
+                </ScrollReveal>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

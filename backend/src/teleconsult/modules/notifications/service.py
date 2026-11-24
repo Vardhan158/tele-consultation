@@ -3,9 +3,6 @@ from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from teleconsult.modules.notifications.models import Notification
 from teleconsult.kernel.mongodb.client import mongo_database
 
 
@@ -21,15 +18,19 @@ def format_appointment_message(body: str, patient_display_name: str, starts_at) 
         return body
 
 
-def queue_patient_notification(
-    session: AsyncSession, *, tenant_id: UUID, patient_id: UUID, event_type: str,
-    subject: str, body: str, channel: str = "in_app",
-) -> Notification:
-    """Queue an operational notification; delivery is deliberately independent of core state."""
-    notification = Notification(tenant_id=tenant_id, patient_id=patient_id, event_type=event_type,
-        subject=subject, body=body, channel=channel, status="queued")
-    session.add(notification)
-    return notification
+async def queue_patient_notification(
+    *args, tenant_id: UUID | str, patient_id: UUID | str, event_type: str,
+    subject: str, body: str, channel: str = "in_app", **kwargs
+) -> None:
+    """Queue an operational notification using MongoDB."""
+    await ensure_patient_notification(
+        tenant_id=str(tenant_id),
+        patient_id=str(patient_id),
+        event_type=event_type,
+        subject=subject,
+        body=body,
+        channel=channel,
+    )
 
 
 async def ensure_patient_notification(
@@ -50,7 +51,6 @@ async def ensure_patient_notification(
     p_id_str = str(patient_id)
     now_dt = datetime.now(UTC)
 
-    # Idempotency check: query if notification already exists for tenant & event/appointment
     query: dict[str, Any] = {
         "tenant_id": t_id_str,
         "event_type": event_type,
@@ -63,7 +63,7 @@ async def ensure_patient_notification(
 
     existing = await database["notifications"].find_one(query)
     if existing:
-        return  # Notification already exists (read or unread). Do NOT recreate!
+        return
 
     notification_id = str(uuid4())
     doc = {

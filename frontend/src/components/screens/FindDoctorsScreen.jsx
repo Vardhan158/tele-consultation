@@ -491,7 +491,7 @@ export default function FindDoctorsScreen({
       const options = {
         key: orderRes.key_id,
         amount: orderRes.amount_paise,
-        currency: orderRes.currency,
+        currency: "INR",
         name: "Kaizen Care Telehealth",
         description: `${bookingDoctor.full_name} · ${appointmentType}`,
         order_id: orderRes.order_id,
@@ -834,7 +834,7 @@ export default function FindDoctorsScreen({
                 <div className="space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-14 h-14 rounded-2xl bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center text-lg font-bold transition-colors duration-300 shadow-xs shrink-0 select-none">
+                      <div className="w-14 h-14 rounded-none bg-[#EEF6F3] text-[#1A7D67] group-hover:bg-[#1A7D67] group-hover:text-white flex items-center justify-center text-lg font-bold transition-colors duration-300 shadow-xs shrink-0 select-none">
                         {initials}
                       </div>
                       <div className="min-w-0">
@@ -992,7 +992,7 @@ export default function FindDoctorsScreen({
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-[#577877]/15 pb-4">
               <div className="flex items-start gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-[#185A4D] text-white flex items-center justify-center text-xl font-bold shadow-xs shrink-0 select-none">
+                <div className="w-16 h-16 rounded-none bg-[#185A4D] text-white flex items-center justify-center text-xl font-bold shadow-xs shrink-0 select-none">
                   {(selectedProfileDoctor.fullName || "MD")
                     .split(/\s+/)
                     .filter(Boolean)

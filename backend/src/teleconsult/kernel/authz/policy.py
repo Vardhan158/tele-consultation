@@ -4,13 +4,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from teleconsult.config.settings import get_settings
-from teleconsult.kernel.db.session import get_engine
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.identity.models import AuthSession, UserAccount
 
 
 @dataclass(frozen=True)
@@ -29,9 +25,10 @@ async def get_principal(request: Request) -> Principal:
     load roles/permissions, and bind the tenant. Fails closed until implemented.
     """
     raw_token = request.cookies.get("teleconsult_session")
-    if get_settings().mongodb_enabled:
-        if not raw_token or not mongo_database.enabled:
+    if not raw_token or not mongo_database.enabled:
+        if get_settings().environment not in {"dev", "local"}:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    else:
         import hashlib
         database = mongo_database.database()
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -47,57 +44,29 @@ async def get_principal(request: Request) -> Principal:
             ],
         })
         user = await database["users"].find_one({"id": auth_session["user_id"]}) if auth_session else None
-        if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-        role = user.get("role", "patient")
-        if role == "clinic_admin":
-            permissions = {"clinic:admin", "clinic:doctor:read", "clinic:doctor:approve"}
-        elif role == "doctor":
-            permissions = {
-                "doctor:profile:read", "doctor:profile:write", "doctor:availability:read",
-                "doctor:availability:write", "doctor:appointment:read", "doctor:appointment:write",
-                "consultation:join", "consultation:admit", "consultation:complete", "clinical:read",
-                "clinical:write", "clinical:publish", "records:read", "prescription:read", "notification:read",
-            }
-        else:
-            permissions = {
-                "notification:read", "notification:retry", "patient:profile:read", "patient:profile:write",
-                "patient:intake:write", "appointment:read", "appointment:create", "appointment:write",
-                "records:read", "records:upload", "prescription:read", "followup:read", "support:read",
-                "support:create", "payment:read", "payment:create", "payment:verify", "payment:refund",
-                "directory:read", "consultation:join",
-            }
-        return Principal(
-            user_id=user["id"], tenant_id=user["tenant_id"], roles=frozenset({role}),
-            permissions=frozenset(permissions), mfa_verified=bool(auth_session.get("mfa_verified")),
-        )
-    if raw_token:
-        import hashlib
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        maker = async_sessionmaker(get_engine(), expire_on_commit=False)
-        async with maker() as session:
-            auth_session = await session.scalar(select(AuthSession).where(
-                AuthSession.token_hash == token_hash,
-                AuthSession.revoked_at.is_(None),
-                AuthSession.expires_at > datetime.now(UTC),
-            ))
-            if auth_session:
-                user = await session.get(UserAccount, auth_session.user_id)
-                if user and (not user.restricted_until or user.restricted_until <= datetime.now(UTC)):
-                    if user.role == "doctor":
-                        doctor_permissions = frozenset({
-                            "doctor:profile:read", "doctor:profile:write", "doctor:availability:read",
-                            "doctor:availability:write", "doctor:appointment:read", "doctor:appointment:write",
-                            "consultation:join", "consultation:admit", "consultation:complete", "clinical:read", "clinical:write",
-                            "clinical:publish", "records:read", "prescription:read", "notification:read",
-                        }) if user.role == "doctor" else frozenset()
-                        return Principal(user_id=str(user.id), tenant_id=str(user.tenant_id), roles=frozenset({"doctor"}), permissions=doctor_permissions, mfa_verified=bool(auth_session.mfa_verified))
-                    if user.role == "clinic_admin":
-                        return Principal(user_id=str(user.id), tenant_id=str(user.tenant_id), roles=frozenset({"clinic_admin"}), permissions=frozenset({"clinic:admin", "clinic:doctor:read", "clinic:doctor:approve"}), mfa_verified=bool(auth_session.mfa_verified))
-                    return Principal(
-                        user_id=str(user.id), tenant_id=str(user.tenant_id), roles=frozenset({"patient"}),
-                        permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read"}),
-                    )
+        if user:
+            role = user.get("role", "patient")
+            if role == "clinic_admin":
+                permissions = {"clinic:admin", "clinic:doctor:read", "clinic:doctor:approve"}
+            elif role == "doctor":
+                permissions = {
+                    "doctor:profile:read", "doctor:profile:write", "doctor:availability:read",
+                    "doctor:availability:write", "doctor:appointment:read", "doctor:appointment:write",
+                    "consultation:join", "consultation:admit", "consultation:complete", "clinical:read",
+                    "clinical:write", "clinical:publish", "records:read", "prescription:read", "notification:read",
+                }
+            else:
+                permissions = {
+                    "notification:read", "notification:retry", "patient:profile:read", "patient:profile:write",
+                    "patient:intake:write", "appointment:read", "appointment:create", "appointment:write",
+                    "records:read", "records:upload", "prescription:read", "followup:read", "support:read",
+                    "support:create", "payment:read", "payment:create", "payment:verify", "payment:refund",
+                    "directory:read", "consultation:join",
+                }
+            return Principal(
+                user_id=user["id"], tenant_id=user["tenant_id"], roles=frozenset({role}),
+                permissions=frozenset(permissions), mfa_verified=bool(auth_session.get("mfa_verified")),
+            )
 
     # Local-only fixture authentication. Production must use the OIDC adapter.
     if get_settings().environment in {"dev", "local"}:

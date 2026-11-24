@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import logging
 import os
 import re
 import secrets
@@ -12,17 +13,12 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
-from teleconsult.kernel.db.session import tenant_session
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.notifications.service import ensure_doctor_appointment_notification, ensure_patient_notification, queue_patient_notification
-from teleconsult.modules.patient_portal.models import Appointment, Doctor
 from teleconsult.modules.patient_portal.appointment_access import expire_pending_payment
-from teleconsult.modules.payments.models import PaymentTransaction
 from teleconsult.modules.payments.schemas import (
     PaymentInitiateRequest,
     PaymentResponse,
@@ -36,14 +32,15 @@ except ModuleNotFoundError:
     razorpay = None
 
 router = APIRouter(prefix="/patient/payments", tags=["payments"])
+logger = logging.getLogger("teleconsult.payments")
 
 
-async def payment_session() -> AsyncIterator[AsyncSession | None]:
-    if get_settings().mongodb_enabled:
-        yield None
-        return
-    async for session in tenant_session():
-        yield session
+async def tenant_session():
+    yield None
+
+
+async def payment_session():
+    yield None
 
 
 def get_razorpay_client():
@@ -342,7 +339,8 @@ async def create_payment_order(
     base_fee_paise = pricing["base_fee_paise"]
     platform_fee_paise = pricing["platform_fee_paise"]
     total_payable_paise = pricing["total_payable_paise"]
-    currency = pricing["currency"]
+    # Force INR currency for Razorpay checkout processing
+    currency = "INR"
 
     # 2. Check if doctor availability slot exists and is available
     slot = await db["doctor_availability"].find_one({
@@ -434,21 +432,32 @@ async def create_payment_order(
         payment_id = existing_pay["id"]
         order_id = existing_pay["razorpay_order_id"]
     else:
-        order_id = None
-        if razorpay and key_id and key_secret:
-            try:
-                rzp_client = razorpay.Client(auth=(key_id, key_secret))
-                rzp_order = rzp_client.order.create({
-                    "amount": total_payable_paise,
-                    "currency": currency,
-                    "receipt": appointment_id[:40],
-                    "notes": {"appointment_id": appointment_id, "patient_id": principal.user_id},
-                })
-                order_id = rzp_order["id"]
-            except Exception:
-                order_id = f"order_{secrets.token_hex(10)}"
-        else:
-            order_id = f"order_{secrets.token_hex(10)}"
+        rzp_client = get_razorpay_client()
+        if rzp_client is None:
+            raise HTTPException(status_code=503, detail="Razorpay credentials are not configured")
+
+        try:
+            rzp_order = rzp_client.order.create({
+                "amount": total_payable_paise,
+                "currency": currency,
+                "receipt": appointment_id[:40],
+                "notes": {"appointment_id": appointment_id, "patient_id": principal.user_id},
+            })
+            order_id = rzp_order["id"]
+        except Exception as exc:
+            logger.exception(
+                "Razorpay order creation failed for appointment %s (%s %s)",
+                appointment_id,
+                currency,
+                total_payable_paise,
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "Razorpay rejected the payment order. Verify that the configured API keys "
+                    f"and {currency} payments are enabled for the account."
+                ),
+            ) from exc
 
         payment_id = f"pay-{secrets.token_hex(6)}"
         payment_doc = {

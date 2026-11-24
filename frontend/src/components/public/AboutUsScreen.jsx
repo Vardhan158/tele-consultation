@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import PublicNavbar from "./PublicNavbar";
-import "./landing-theme.css";
 
 export default function AboutUsScreen() {
   const navigate = useNavigate();

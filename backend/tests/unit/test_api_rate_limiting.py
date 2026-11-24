@@ -147,16 +147,17 @@ def test_test_harness_bypass_header():
 @pytest.mark.asyncio
 async def test_rate_limiter_falls_back_when_mongodb_fails():
     """When MongoDB fails or drops connection, rate limiter must fall back gracefully to in-memory store."""
+    from types import SimpleNamespace
     from unittest.mock import MagicMock, patch
     from teleconsult.kernel.http.rate_limiter import RateLimiterMiddleware, SlidingWindowRateLimiter
 
     limiter = SlidingWindowRateLimiter(window_seconds=60)
     middleware = RateLimiterMiddleware(app=MagicMock(), limiter=limiter)
 
-    mock_db = MagicMock()
-    mock_db.enabled = True
-    mock_db.client = MagicMock()
-    mock_db.database.side_effect = Exception("DB connection dropped")
+    def disconnected_database():
+        raise RuntimeError("MongoDB is not connected")
+
+    mock_db = SimpleNamespace(enabled=True, database=disconnected_database)
 
     with patch("teleconsult.kernel.mongodb.client.mongo_database", mock_db):
         # Must fall back gracefully and allow request via in-memory store

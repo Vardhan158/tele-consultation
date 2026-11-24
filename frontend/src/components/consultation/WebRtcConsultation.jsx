@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { io } from "socket.io-client";
 import { API_BASE_URL, consultationApi, doctorApi } from "../../lib/api";
 
@@ -17,18 +17,25 @@ const fallbackIceServers = [
     : []),
 ];
 
-export default function WebRtcConsultation({
+const WebRtcConsultation = forwardRef(function WebRtcConsultation({
   appointmentId,
   authorization,
   role = "patient",
   onEnded,
-}) {
+  onPrescriptionPublished,
+}, ref) {
   const localVideo = useRef(null);
   const remoteVideo = useRef(null);
   const streamRef = useRef(null);
   const peerRef = useRef(null);
   const socketRef = useRef(null);
   const pendingIceRef = useRef([]);
+
+  useImperativeHandle(ref, () => ({
+    emitPrescriptionPublished: (result, payloadContent) => {
+      socketRef.current?.emit("prescription_published", { result, payloadContent });
+    },
+  }));
   const [status, setStatus] = useState("connecting");
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
@@ -258,6 +265,10 @@ export default function WebRtcConsultation({
           }
         });
         socket.on("room_joined", (info) => diagnostic("room-joined", info));
+        socket.on("prescription_published", (data) => {
+          diagnostic("prescription_published-received", data);
+          onPrescriptionPublished?.(data);
+        });
         socket.on("peer_presence", (info) => { diagnostic("peer-presence", info); if (active && status !== "in_progress") setStatus("connecting"); });
         socket.on("signaling_error", (info) => { diagnostic("signaling-error", info); if (active) { setError("Consultation room authorization failed."); setStatus("error"); } });
         socket.on("reconnect", () => {
@@ -451,7 +462,7 @@ export default function WebRtcConsultation({
       </div>
 
       {/* Main Video View Container */}
-      <div className="relative rounded-2xl overflow-hidden bg-[#162623] shadow-lg aspect-16/10 flex flex-col justify-between">
+      <div className={`relative rounded-2xl overflow-hidden bg-[#162623] shadow-lg ${role === "doctor" ? "h-[300px] sm:h-[360px]" : "aspect-16/10"} flex flex-col justify-between`}>
         {/* Remote Doctor Stream or Waiting Overlay */}
         <div className="w-full h-full relative flex items-center justify-center bg-[#162623]">
           {status === "in_progress" && (remoteMedia.video || remoteMedia.audio) ? (
@@ -571,4 +582,6 @@ export default function WebRtcConsultation({
       </div>
     </div>
   );
-}
+})
+
+export default WebRtcConsultation;

@@ -15,8 +15,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="TELECONSULT_", env_file=".env", extra="ignore")
 
     environment: str = "dev"
-    database_url: str = ""
-    migration_database_url: str = ""
     tenancy_mode: TenancyMode = TenancyMode.POOLED
     default_tenant_id: str = "1"
     auth_method: str = "password"
@@ -65,15 +63,15 @@ class Settings(BaseSettings):
     webrtc_turn_username: str = ""
     webrtc_turn_credential: str = ""
 
-    # MongoDB foundation. Disabled by default until a validated cutover.
-    mongodb_enabled: bool = Field(default=False, validation_alias="MONGODB_ENABLED")
+    # MongoDB foundation (Primary & Exclusive Data Store)
+    mongodb_enabled: bool = Field(default=True, validation_alias="MONGODB_ENABLED")
     mongodb_uri: str = Field(default="", validation_alias="MONGODB_URI")
     mongodb_database: str = Field(default="kaizentrix_care", validation_alias="MONGODB_DATABASE")
     mongodb_server_selection_timeout_ms: int = Field(default=15000, validation_alias="MONGODB_SERVER_SELECTION_TIMEOUT_MS")
     mongodb_connect_timeout_ms: int = Field(default=15000, validation_alias="MONGODB_CONNECT_TIMEOUT_MS")
     mongodb_max_pool_size: int = Field(default=50, validation_alias="MONGODB_MAX_POOL_SIZE")
     mongodb_min_pool_size: int = Field(default=0, validation_alias="MONGODB_MIN_POOL_SIZE")
-    mongodb_repositories_enabled: bool = Field(default=False, validation_alias="MONGODB_REPOSITORIES_ENABLED")
+    mongodb_repositories_enabled: bool = Field(default=True, validation_alias="MONGODB_REPOSITORIES_ENABLED")
 
     # API Security & Rate Limiting (BE-07, SEC-04, GAP-04)
     rate_limiting_enabled: bool = Field(default=True, validation_alias="RATE_LIMITING_ENABLED")
@@ -88,12 +86,9 @@ class Settings(BaseSettings):
         """
         if self.environment.lower() in ("prod", "production", "staging"):
             missing: list[str] = []
-            if not self.database_url.strip() and not (self.mongodb_enabled and self.mongodb_uri.strip()):
-                missing.append("DATABASE_URL or MONGODB_URI")
+            if not self.mongodb_enabled or not self.mongodb_uri.strip():
+                missing.append("MONGODB_URI")
             if not self.razorpay_key_id.strip() or not self.razorpay_key_secret.strip():
-                missing.append("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET")
-            if not self.clinical_encryption_key.strip():
-                missing.append("CLINICAL_ENCRYPTION_KEY")
                 missing.append("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET")
             if missing:
                 raise RuntimeError(
