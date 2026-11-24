@@ -4,6 +4,7 @@ import {
   API_BASE_URL,
   consultationApi,
   patientApi,
+  clinicalApi,
   recordsApi,
   supportApi,
 } from "../../lib/api";
@@ -82,7 +83,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
       })
       .catch(() => {});
 
-    patientApi
+    clinicalApi
       .prescriptions()
       .then((items) => {
         if (Array.isArray(items)) setPrescriptions(items);
