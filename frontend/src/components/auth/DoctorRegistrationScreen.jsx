@@ -945,6 +945,19 @@ export default function DoctorRegistrationScreen({
                         Documents (PDF, JPG, PNG · Max 10 MB)
                       </h3>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdditionalDocs(true)}
+                      className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-sm">add_circle</span>
+                      <span>Documents</span>
+                      {optionalDocsCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-lg bg-[#25836F] text-white text-[10px] font-bold">
+                          {optionalDocsCount}
+                        </span>
+                      )}
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
