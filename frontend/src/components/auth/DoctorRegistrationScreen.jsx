@@ -171,7 +171,6 @@ export default function DoctorRegistrationScreen({
   });
 
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showAdditionalDocs, setShowAdditionalDocs] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -1222,28 +1221,18 @@ export default function DoctorRegistrationScreen({
                       <div className="relative">
                         <input
                           name="confirm_password"
-                          type={showConfirmPassword ? "text" : "password"}
+                          type={showPassword ? "text" : "password"}
                           autoComplete="new-password"
                           value={form.confirm_password}
                           onChange={update}
                           onBlur={handleBlur}
                           placeholder="Re-enter password"
-                          className={`w-full h-8.5 pl-3 pr-8 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                          className={`w-full h-8.5 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                             touched.confirm_password && errors.confirm_password
                               ? "border-red-500 focus:border-red-500"
                               : "border-[#577877]/25 focus:border-[#25836F]"
                           }`}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-sm">
-                            {showConfirmPassword ? "visibility_off" : "visibility"}
-                          </span>
-                        </button>
                       </div>
                       {touched.confirm_password && errors.confirm_password && (
                         <p className="text-[10px] text-red-600 font-medium leading-none mt-0.5 truncate">{errors.confirm_password}</p>
