@@ -207,10 +207,10 @@ export default function DoctorVerifyEmailScreen({ initialEmail = "", onBack, onV
               <input
                 type="email"
                 required
+                readOnly
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="doctor@clinic.com"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#577877]/25 bg-[#F0F5F7] text-xs text-[#577877] cursor-not-allowed focus:outline-none"
               />
             </div>
 
