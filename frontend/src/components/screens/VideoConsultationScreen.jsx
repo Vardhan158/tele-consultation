@@ -18,7 +18,9 @@ export default function VideoConsultationScreen({ onNavigate }) {
   const [attachedRecords, setAttachedRecords] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
   const [roomAuth, setRoomAuth] = useState(null);
-  const [roomState, setRoomState] = useState("READINESS"); // 'READINESS' | 'WAITING_ROOM' | 'IN_CALL' | 'ENDED'
+  const [roomState, setRoomState] = useState(() => {
+    return localStorage.getItem("teleconsult_in_call") === "true" ? "IN_CALL" : "READINESS";
+  }); // 'READINESS' | 'WAITING_ROOM' | 'IN_CALL' | 'ENDED'
   const [errorMessage, setErrorMessage] = useState("");
   const [devices, setDevices] = useState({
     camera: true,
@@ -41,6 +43,22 @@ export default function VideoConsultationScreen({ onNavigate }) {
   const peerRef = useRef(null);
   const socketRef = useRef(null);
   const streamRef = useRef(null);
+
+  // Auto-resume call on page reload if active call flag is present
+  useEffect(() => {
+    const targetAptId = appointment?.id || appointmentId;
+    if (localStorage.getItem("teleconsult_in_call") === "true" && targetAptId && roomState === "IN_CALL" && !roomAuth) {
+      consultationApi.join(targetAptId)
+        .then((auth) => {
+          setRoomAuth(auth);
+          setRoomState("IN_CALL");
+        })
+        .catch(() => {
+          localStorage.removeItem("teleconsult_in_call");
+          setRoomState("READINESS");
+        });
+    }
+  }, [appointment, appointmentId, roomState, roomAuth]);
 
   useEffect(() => {
     patientApi
@@ -171,6 +189,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
     }
     setErrorMessage("");
     setRoomState("IN_CALL");
+    localStorage.setItem("teleconsult_in_call", "true");
 
     try {
       // 1. Get real user media stream
@@ -339,6 +358,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
   };
 
   const handleEndCall = async () => {
+    localStorage.removeItem("teleconsult_in_call");
     if (roomAuth?.session_id) {
       try {
         await consultationApi.disconnected(roomAuth.session_id);
