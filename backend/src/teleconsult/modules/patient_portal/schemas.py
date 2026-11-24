@@ -28,13 +28,21 @@ class PatientResponse(PatientCreate):
     id: UUID
     phone: str | None = None
     date_of_birth: datetime | str | None = None
+    gender: str | None = None
     preferred_language: str | None = None
     address: str | None = None
+    street_address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    zip_code: str | None = None
     emergency_contact: str | dict | None = None
     preferred_pharmacy: str | None = None
     pharmacy_address: str | None = None
     pharmacy_phone: str | None = None
     allergies: str | list | None = None
+    created_at: datetime | str | None = None
+    primary_care_provider: str | None = None
+    avatar_url: str | None = None
 
 
 class DoctorResponse(BaseModel):
@@ -115,14 +123,20 @@ class ConsentResponse(ConsentCreate):
 class PatientProfileUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=160, pattern=r"^[A-Za-z\s.'-]+$")
     date_of_birth: datetime | str | None = None
+    gender: str | None = Field(default=None, max_length=50)
     phone: str | None = Field(default=None, min_length=8, max_length=32)
     preferred_language: str | None = Field(default=None, min_length=2, max_length=32)
     address: str | None = Field(default=None, max_length=500)
+    street_address: str | None = Field(default=None, max_length=120)
+    city: str | None = Field(default=None, max_length=100)
+    state: str | None = Field(default=None, max_length=100)
+    zip_code: str | None = Field(default=None, max_length=32)
     emergency_contact: str | None = Field(default=None, max_length=160)
     preferred_pharmacy: str | None = Field(default=None, max_length=160)
     pharmacy_address: str | None = Field(default=None, max_length=500)
     pharmacy_phone: str | None = Field(default=None, max_length=32)
     allergies: str | None = Field(default=None, max_length=2000)
+    avatar_url: str | None = Field(default=None, max_length=1000)
 
     @field_validator("phone")
     @classmethod

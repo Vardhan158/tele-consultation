@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
@@ -314,9 +314,9 @@ async def get_profile(
                 "tenant_id": principal.tenant_id,
                 "$or": [{"id": principal.user_id}, {"user_id": principal.user_id}],
             })
-            full_name = user.get("full_name") if user else "Emma Mitchell"
-            email = user.get("email") if user else "patient@teleconsult.local"
-            phone = user.get("mobile_number") if user else "+1 (800) 555-KAIZEN"
+            full_name = user.get("full_name") if user else "Patient"
+            email = user.get("email") if user else ""
+            phone = (user.get("mobile_number") or user.get("phone")) if user else ""
 
             document = {
                 "id": principal.user_id,
@@ -325,10 +325,15 @@ async def get_profile(
                 "full_name": full_name,
                 "email": email,
                 "phone": phone,
-                "date_of_birth": "1994-06-15",
+                "date_of_birth": user.get("date_of_birth") if user else None,
+                "gender": user.get("gender") if user else None,
                 "preferred_language": "English",
-                "address": "742 Medical Center Blvd, San Francisco, CA",
-                "emergency_contact": "John Mitchell (+1 555-0199)",
+                "address": "",
+                "street_address": "",
+                "city": "",
+                "state": "",
+                "zip_code": "",
+                "emergency_contact": "",
                 "created_at": datetime.now(UTC).isoformat(),
             }
             await db["patients"].insert_one(dict(document))
@@ -345,19 +350,45 @@ async def get_profile(
             if intake_doc and intake_doc.get("allergies"):
                 allergies_val = intake_doc.get("allergies")
 
+        street_address = document.get("street_address")
+        city = document.get("city")
+        state = document.get("state")
+        zip_code = document.get("zip_code")
+        if not street_address and not city and not state and not zip_code and document.get("address"):
+            parts = [p.strip() for p in document.get("address", "").split(",") if p.strip()]
+            if len(parts) >= 1:
+                street_address = parts[0]
+            if len(parts) >= 2:
+                city = parts[1]
+            if len(parts) >= 3:
+                rest = parts[2].split()
+                if len(rest) >= 2:
+                    state = " ".join(rest[:-1])
+                    zip_code = rest[-1]
+                else:
+                    state = parts[2]
+
         return PatientResponse(
             id=_to_uuid(document.get("id") or document.get("user_id")),
             full_name=document.get("full_name", "Patient"),
             email=document.get("email", ""),
             phone=document.get("phone", ""),
             date_of_birth=document.get("date_of_birth"),
+            gender=document.get("gender"),
             preferred_language=document.get("preferred_language", "English"),
             address=document.get("address"),
+            street_address=street_address,
+            city=city,
+            state=state,
+            zip_code=zip_code,
             emergency_contact=document.get("emergency_contact"),
             preferred_pharmacy=document.get("preferred_pharmacy"),
             pharmacy_address=document.get("pharmacy_address"),
             pharmacy_phone=document.get("pharmacy_phone"),
             allergies=allergies_val,
+            created_at=document.get("created_at"),
+            primary_care_provider=document.get("primary_care_provider"),
+            avatar_url=document.get("avatar_url"),
         )
     raise HTTPException(status_code=503, detail="No application database is configured")
 
@@ -385,14 +416,118 @@ async def update_profile(
             email=document.get("email", ""),
             phone=document.get("phone", ""),
             date_of_birth=document.get("date_of_birth"),
+            gender=document.get("gender"),
             preferred_language=document.get("preferred_language", "English"),
             address=document.get("address"),
+            street_address=document.get("street_address"),
+            city=document.get("city"),
+            state=document.get("state"),
+            zip_code=document.get("zip_code"),
             emergency_contact=document.get("emergency_contact"),
             preferred_pharmacy=document.get("preferred_pharmacy"),
             pharmacy_address=document.get("pharmacy_address"),
             pharmacy_phone=document.get("pharmacy_phone"),
             allergies=document.get("allergies"),
+            created_at=document.get("created_at"),
+            primary_care_provider=document.get("primary_care_provider"),
+            avatar_url=document.get("avatar_url"),
         )
+    raise HTTPException(status_code=503, detail="No application database is configured")
+
+
+async def _upload_to_cloudinary(file_bytes: bytes, filename: str, content_type: str) -> str:
+    settings = get_settings()
+    cloud_name, api_key, api_secret = settings.get_cloudinary_credentials()
+    if not cloud_name or not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Cloudinary is not configured on the server. Please provide CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY.",
+        )
+
+    import time
+    timestamp = int(time.time())
+    folder = "patient_profiles"
+
+    params_to_sign = f"folder={folder}&timestamp={timestamp}"
+    signature = ""
+    if api_secret:
+        to_hash = f"{params_to_sign}{api_secret}"
+        signature = hashlib.sha1(to_hash.encode("utf-8")).hexdigest()
+
+    data = {
+        "api_key": api_key,
+        "timestamp": str(timestamp),
+        "folder": folder,
+    }
+    if signature:
+        data["signature"] = signature
+
+    import aiohttp
+    upload_url = f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload"
+
+    form_data = aiohttp.FormData()
+    for k, v in data.items():
+        form_data.add_field(k, v)
+    form_data.add_field(
+        "file",
+        file_bytes,
+        filename=filename,
+        content_type=content_type,
+    )
+
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.post(upload_url, data=form_data) as resp:
+            try:
+                resp_json = await resp.json()
+            except Exception:
+                resp_json = {}
+            if resp.status != 200:
+                err_msg = resp_json.get("error", {}).get("message", f"HTTP {resp.status}")
+                raise HTTPException(status_code=502, detail=f"Cloudinary upload failed: {err_msg}")
+            secure_url = resp_json.get("secure_url") or resp_json.get("url")
+            if not secure_url:
+                raise HTTPException(status_code=502, detail="Cloudinary did not return a valid secure image URL")
+            return secure_url
+
+
+@router.post("/profile/photo")
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(require("patient:profile:write")),
+) -> dict[str, str]:
+    if not get_settings().mongodb_enabled:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
+    content_type = (file.content_type or "").lower()
+    if content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image format. Allowed formats are JPEG, PNG, and WebP.",
+        )
+
+    file_bytes = await file.read()
+    if len(file_bytes) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image size exceeds maximum limit of 5 MB.")
+
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    secure_url = await _upload_to_cloudinary(
+        file_bytes=file_bytes,
+        filename=file.filename or "profile.jpg",
+        content_type=content_type,
+    )
+
+    db = mongo_database.database()
+    await db["patients"].update_one(
+        {"tenant_id": principal.tenant_id, "$or": [{"user_id": principal.user_id}, {"id": principal.user_id}]},
+        {"$set": {"avatar_url": secure_url}},
+        upsert=True,
+    )
+
+    return {"avatar_url": secure_url, "message": "Profile photo updated successfully"}
     raise HTTPException(status_code=503, detail="No application database is configured")
 
 
@@ -400,7 +535,7 @@ async def update_profile(
 async def submit_intake(
     payload: MedicalIntakeCreate,
     principal: Principal = Depends(require("patient:intake:write")),
-) -> MedicalIntake:
+) -> MedicalIntakeResponse:
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         intake_id = str(uuid4())
@@ -421,13 +556,6 @@ async def submit_intake(
             **payload.model_dump(),
         )
     raise HTTPException(status_code=503, detail="Database not available")
-
-
-async def audit(session: AsyncSession, principal: Principal, action: str, resource_id: UUID) -> None:
-    session.add(AuditRecord(
-        tenant_id=UUID(principal.tenant_id), actor_id=UUID(principal.user_id), action=action,
-        resource_type="appointment", resource_id=resource_id, purpose="patient journey", metadata_json={}
-    ))
 
 
 @router.post("/consents", response_model=ConsentResponse, status_code=status.HTTP_201_CREATED)
@@ -468,22 +596,7 @@ async def grant_consent(
             status="granted",
             granted_at=now,
         )
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    consent = PatientConsent(tenant_id=UUID(principal.tenant_id), patient_id=UUID(principal.user_id),
-        ends_at=datetime(9999, 12, 31, tzinfo=UTC), **payload.model_dump())
-    session.add(consent)
-    await session.flush()
-    session.add(AuditRecord(tenant_id=consent.tenant_id, actor_id=consent.patient_id, action="consent.grant",
-        resource_type="patient_consent", resource_id=consent.id, purpose=consent.consent_type,
-        metadata_json={"version": consent.version, "status": consent.status}))
-    return ConsentResponse(
-        id=consent.id,
-        consent_type=consent.consent_type,
-        version=consent.version,
-        status=consent.status,
-        granted_at=consent.granted_at,
-    )
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 @router.get("/consents", response_model=list[ConsentResponse])
@@ -572,7 +685,7 @@ async def withdraw_consent(
 async def create_profile(
     payload: PatientCreate,
     principal: Principal = Depends(require("patient:profile:write")),
-) -> Patient:
+) -> PatientResponse:
     raise HTTPException(status_code=503, detail="Database session not available")
 
 
@@ -663,7 +776,7 @@ async def book_appointment(
     payload: AppointmentCreate,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(require("appointment:create")),
-) -> Appointment:
+) -> Any:
     settings = get_settings()
     if settings.mongodb_enabled:
         db = mongo_database.database()
@@ -772,70 +885,7 @@ async def book_appointment(
                 raise HTTPException(status_code=409, detail="Selected appointment slot is no longer available") from exc
             raise
         return appointment
-    tenant_id = UUID(principal.tenant_id)
-    patient_id = UUID(principal.user_id)
-    if idempotency_key:
-        existing = await session.scalar(select(Appointment).where(
-            Appointment.tenant_id == tenant_id, Appointment.patient_id == patient_id,
-            Appointment.idempotency_key == idempotency_key
-        ))
-        if existing:
-            return existing
-    if session is None:
-        raise HTTPException(status_code=503, detail="Application database is unavailable")
-    doctor = await session.scalar(select(Doctor).where(Doctor.id == payload.doctor_id, Doctor.tenant_id == tenant_id, Doctor.active.is_(True)))
-    if doctor is None:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-    now_utc = datetime.now(UTC)
-    if payload.starts_at <= now_utc:
-        raise HTTPException(status_code=409, detail="Selected appointment slot has expired")
-    slot = await session.scalar(select(DoctorAvailability).where(
-        DoctorAvailability.tenant_id == tenant_id, DoctorAvailability.doctor_id == payload.doctor_id,
-        DoctorAvailability.starts_at == payload.starts_at, DoctorAvailability.ends_at > now_utc, DoctorAvailability.status == "available"
-    ).with_for_update())
-    if slot is None:
-        raise HTTPException(status_code=409, detail="Selected appointment slot is no longer available")
-    ends_at = slot.ends_at
-    conflict = await session.scalar(select(Appointment.id).where(
-        Appointment.tenant_id == tenant_id,
-        Appointment.doctor_id == payload.doctor_id,
-        Appointment.status.in_(["requested", "confirmed", "checked_in"]),
-        Appointment.starts_at < ends_at,
-        Appointment.ends_at > payload.starts_at,
-    ).limit(1))
-    if conflict:
-        raise HTTPException(status_code=409, detail="Doctor is not available for this time")
-    if not payload.appointment_type or not payload.visit_format:
-        raise HTTPException(status_code=422, detail="Appointment type and visit format are required")
-    requires_payment = doctor.fee_paise > 0
-    appointment = Appointment(tenant_id=tenant_id, patient_id=patient_id, ends_at=ends_at,
-        status="pending_payment" if requires_payment else "confirmed",
-        payment_status="pending" if requires_payment else "not_required",
-        idempotency_key=idempotency_key,
-        **payload.model_dump(exclude={"duration_minutes", "intake_id", "reason", "notes", "appointment_type", "visit_format"}))
-    slot.status = "reserved"
-    session.add(appointment)
-    try:
-        await session.flush()
-    except IntegrityError as exc:
-        raise HTTPException(status_code=409, detail="Appointment conflicts with an existing booking") from exc
-    await audit(session, principal, "appointment.create", appointment.id)
-    session.add(AppointmentEvent(tenant_id=tenant_id, appointment_id=appointment.id, actor_id=patient_id,
-        from_status="draft", to_status=appointment.status))
-    queue_patient_notification(session, tenant_id=tenant_id, patient_id=patient_id,
-        event_type="appointment_created", subject="Appointment booking update",
-        body="Your appointment request has been received. Check the portal for the current payment and confirmation status.")
-    doc_resp = DoctorResponse.model_validate(doctor) if doctor else None
-    return AppointmentResponse(
-        id=appointment.id,
-        doctor_id=appointment.doctor_id,
-        patient_id=appointment.patient_id,
-        starts_at=appointment.starts_at,
-        ends_at=appointment.ends_at,
-        status=appointment.status,
-        payment_status=appointment.payment_status,
-        doctor=doc_resp,
-    )
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 def _to_int(val: Any) -> int | None:
@@ -1012,30 +1062,6 @@ async def list_appointments(
 
         return results
     return []
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    appointments = list(await session.scalars(select(Appointment).where(
-        Appointment.tenant_id == UUID(principal.tenant_id), Appointment.patient_id == UUID(principal.user_id)
-    ).order_by(Appointment.starts_at.desc())))
-    doctor_ids = {a.doctor_id for a in appointments}
-    doctors_map = {}
-    if doctor_ids:
-        docs = await session.scalars(select(Doctor).where(Doctor.id.in_(doctor_ids)))
-        doctors_map = {d.id: d for d in docs}
-    return [
-        AppointmentResponse(
-            id=a.id,
-            doctor_id=a.doctor_id,
-            patient_id=a.patient_id,
-            starts_at=a.starts_at,
-            ends_at=a.ends_at,
-            status=a.status,
-            payment_status=a.payment_status,
-            join_window_minutes=get_settings().video_join_window_minutes,
-            doctor=DoctorResponse.model_validate(doctors_map[a.doctor_id]) if a.doctor_id in doctors_map else None,
-        )
-        for a in appointments
-    ]
 
 
 @router.post("/appointments/{appointment_id}/cancel", response_model=AppointmentResponse)
@@ -1410,53 +1436,6 @@ async def reschedule_appointment(
             doctor=doctor_response,
         )
 
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == UUID(appointment_id), Appointment.tenant_id == UUID(principal.tenant_id),
-        Appointment.patient_id == UUID(principal.user_id)
-    ))
-    if appointment is None:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-    if appointment.status in {"completed", "cancelled"}:
-        raise HTTPException(status_code=409, detail="Appointment cannot be rescheduled")
-    if payload.starts_at is None:
-        raise HTTPException(status_code=400, detail="starts_at is required")
-    new_end = payload.starts_at + (appointment.ends_at - appointment.starts_at)
-    new_slot = await session.scalar(select(DoctorAvailability).where(
-        DoctorAvailability.tenant_id == UUID(principal.tenant_id), DoctorAvailability.doctor_id == appointment.doctor_id,
-        DoctorAvailability.starts_at == payload.starts_at, DoctorAvailability.status == "available"
-    ).with_for_update())
-    if new_slot is None:
-        raise HTTPException(status_code=409, detail="Selected slot is no longer available")
-    conflict = await session.scalar(select(Appointment.id).where(
-        Appointment.id != appointment.id, Appointment.doctor_id == appointment.doctor_id,
-        Appointment.status.in_(["requested", "confirmed", "checked_in"]),
-        Appointment.starts_at < new_end, Appointment.ends_at > payload.starts_at
-    ).limit(1))
-    if conflict:
-        raise HTTPException(status_code=409, detail="Doctor is not available for this time")
-    old_slot = await session.scalar(select(DoctorAvailability).where(
-        DoctorAvailability.doctor_id == appointment.doctor_id, DoctorAvailability.starts_at == appointment.starts_at
-    ).with_for_update())
-    if old_slot:
-        old_slot.status = "available"
-    new_slot.status = "reserved"
-    previous_status = appointment.status
-    appointment.starts_at, appointment.ends_at, appointment.status = payload.starts_at, new_end, "rescheduled"
-    session.add(AppointmentEvent(tenant_id=appointment.tenant_id, appointment_id=appointment.id, actor_id=UUID(principal.user_id),
-        from_status=previous_status, to_status="rescheduled"))
-    await audit(session, principal, "appointment.reschedule", appointment.id)
-    queue_patient_notification(session, tenant_id=appointment.tenant_id, patient_id=appointment.patient_id,
-        event_type="appointment_rescheduled", subject="Appointment rescheduled", body="Your appointment time has been updated.")
-    return AppointmentResponse(
-        id=appointment.id,
-        doctor_id=appointment.doctor_id,
-        patient_id=appointment.patient_id,
-        starts_at=appointment.starts_at,
-        ends_at=appointment.ends_at,
-        status=appointment.status,
-        payment_status=appointment.payment_status,
-        join_window_minutes=get_settings().video_join_window_minutes,
-    )
+    raise HTTPException(status_code=503, detail="No application database is configured")
+
 

@@ -12,7 +12,11 @@ class TenancyMode(StrEnum):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TELECONSULT_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="TELECONSULT_",
+        env_file=(".env", "backend/.env", "../backend/.env"),
+        extra="ignore",
+    )
 
     environment: str = "dev"
     tenancy_mode: TenancyMode = TenancyMode.POOLED
@@ -79,6 +83,28 @@ class Settings(BaseSettings):
     # Sensitive Health Data Encryption (DB-07, SEC-08, GAP-11)
     clinical_encryption_key: str = Field(default="", validation_alias="CLINICAL_ENCRYPTION_KEY")
 
+    # Cloudinary Image Storage (Profile Avatars)
+    cloudinary_cloud_name: str = Field(default="", validation_alias="CLOUDINARY_CLOUD_NAME")
+    cloudinary_api_key: str = Field(default="", validation_alias="CLOUDINARY_API_KEY")
+    cloudinary_api_secret: str = Field(default="", validation_alias="CLOUDINARY_API_SECRET")
+    cloudinary_url: str = Field(default="", validation_alias="CLOUDINARY_URL")
+
+    def get_cloudinary_credentials(self) -> tuple[str, str, str]:
+        """Return (cloud_name, api_key, api_secret) parsed from settings or CLOUDINARY_URL."""
+        cloud_name = self.cloudinary_cloud_name
+        api_key = self.cloudinary_api_key
+        api_secret = self.cloudinary_api_secret
+
+        if self.cloudinary_url and (not cloud_name or not api_key or not api_secret):
+            import urllib.parse
+            parsed = urllib.parse.urlparse(self.cloudinary_url)
+            if parsed.scheme == "cloudinary":
+                api_key = api_key or (parsed.username or "")
+                api_secret = api_secret or (parsed.password or "")
+                cloud_name = cloud_name or (parsed.hostname or "")
+
+        return cloud_name, api_key, api_secret
+
     def validate_production_configuration(self) -> None:
         """Enforce fail-fast configuration validation when running in production/staging (AUD-09, GAP-02).
 
@@ -112,6 +138,10 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5173",
             "http://localhost:5174",
             "http://127.0.0.1:5174",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
         ]
 
         return list(dict.fromkeys(configured + always_allow))
