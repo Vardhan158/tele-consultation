@@ -516,8 +516,9 @@ export default function VideoConsultationScreen({ onNavigate }) {
 
         {/* PHASE 1: Device Readiness & Diagnostics */}
         {(appointment || targetAptId) && roomState === "READINESS" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 care-card p-6 sm:p-8 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Side: Video Preview & Hardware Check */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl lg:sticky lg:top-4 space-y-4">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
                   Hardware &amp; Network Check
@@ -607,7 +608,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                 ))}
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={handleTestDevices}
@@ -631,8 +632,8 @@ export default function VideoConsultationScreen({ onNavigate }) {
               </div>
             </div>
 
-            {/* Appointment Details Card */}
-            <div className="care-card p-6 sm:p-7 space-y-6">
+            {/* Right Side: Consultation Info Card */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)] space-y-6">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
                   Consultation Info
@@ -700,57 +701,132 @@ export default function VideoConsultationScreen({ onNavigate }) {
 
         {/* PHASE 2: Waiting Room Admission */}
         {roomState === "WAITING_ROOM" && (
-          <div className="care-card p-8 sm:p-12 max-w-2xl mx-auto text-center space-y-6">
-            <div className="w-16 h-16 rounded-full bg-[#F0F5F7] border border-[#25836F]/30 flex items-center justify-center mx-auto animate-pulse">
-              <span className="material-symbols-outlined !text-[#25836F] text-4xl">
-                hourglass_top
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#F0F5F7] text-[#25836F] uppercase tracking-wider">
-                Private Waiting Room Active
-              </span>
-              <h2 className="text-2xl font-bold text-[#162623]">
-                {doctorName} has been notified
-              </h2>
-              <p className="text-xs sm:text-sm text-[#577877] max-w-md mx-auto leading-relaxed">
-                You are in the consultation queue. The doctor is reviewing your latest
-                records and will admit you into the live room momentarily.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#F0F5F7] max-w-md mx-auto text-xs text-left space-y-2 border border-[#577877]/15">
-              <div className="flex items-center justify-between">
-                <span className="text-[#577877]">Queue Status:</span>
-                <span className="font-bold text-[#162623]">Checked In</span>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Side: Video Preview & Waiting Controls */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl lg:sticky lg:top-4 space-y-4">
+              <h3 className="text-sm font-bold text-[#162623] mb-3 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#25836F]">videocam</span>
+                Waiting Room Stream &amp; Preview
+              </h3>
+              <div className="relative aspect-video rounded-2xl bg-[#162623] overflow-hidden flex items-center justify-center border border-[#577877]/20 shadow-inner">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white space-y-2 bg-gradient-to-tr from-[#162623] to-[#25836F]">
+                  <div className="w-20 h-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mx-auto text-2xl font-bold animate-pulse">
+                    {patientInitials}
+                  </div>
+                  <p className="text-xs font-medium text-[#F0F5F7]">
+                    {patientName} · In Waiting Room
+                  </p>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 font-mono">
+                    Waiting for Clinician Admission
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#577877]">Room Encryption:</span>
-                <span className="font-semibold text-[#162623]">
-                  DISHA / HIPAA Standard (WebRTC P2P)
-                </span>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRoomState("READINESS")}
+                  className="btn-secondary text-xs cursor-pointer"
+                >
+                  Return to Device Check
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAdmitToCall}
+                  className="btn-primary flex-1 text-xs font-semibold py-3 cursor-pointer shadow-md"
+                >
+                  <span className="material-symbols-outlined !text-white text-base">
+                    videocam
+                  </span>
+                  Doctor Ready · Enter Live Room
+                </button>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setRoomState("READINESS")}
-                className="btn-secondary text-xs cursor-pointer"
-              >
-                Return to Device Check
-              </button>
-              <button
-                type="button"
-                onClick={handleAdmitToCall}
-                className="btn-primary text-xs font-semibold py-3 px-6 shadow-md cursor-pointer"
-              >
-                <span className="material-symbols-outlined !text-white text-base">
-                  videocam
-                </span>
-                Doctor Ready · Enter Live Room
-              </button>
+            {/* Right Side: Consultation Info Card & Waiting Room Status */}
+            <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)] space-y-6">
+              {/* Waiting Room Status Card */}
+              <div className="p-5 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider">
+                    Private Waiting Room Active
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                <h4 className="text-base font-bold text-[#162623]">
+                  {doctorName} has been notified
+                </h4>
+                <p className="text-xs text-[#577877] leading-relaxed">
+                  You are in the consultation queue. The doctor is reviewing your latest
+                  records and will admit you into the live room momentarily.
+                </p>
+                <div className="pt-2 border-t border-[#577877]/15 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#577877]">Queue Status:</span>
+                    <span className="font-bold text-[#162623]">Checked In</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#577877]">Room Encryption:</span>
+                    <span className="font-semibold text-[#162623]">
+                      DISHA / HIPAA Standard (WebRTC P2P)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Consultation Info Card */}
+              <div className="space-y-4 pt-2 border-t border-[#577877]/15">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
+                    Consultation Info
+                  </span>
+                  <h3 className="text-lg font-bold text-[#162623] mt-1">
+                    {doctorName}
+                  </h3>
+                  <p className="text-xs text-[#577877]">
+                    {doctorSpecialty}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Scheduled Date:</span>
+                    <span className="font-semibold text-[#162623]">
+                      {appointment?.starts_at
+                        ? new Date(appointment.starts_at).toLocaleDateString("en-IN", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "Today"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Reason:</span>
+                    <span className="font-semibold text-[#162623] truncate max-w-[180px]">
+                      {appointment?.reason || "Clinical consultation"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Duration:</span>
+                    <span className="font-semibold text-[#162623]">
+                      30 Minutes
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Consultation Mode:</span>
+                    <span className="font-semibold text-[#25836F]">
+                      WebRTC Peer-to-Peer Encrypted
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#577877]">Hospital / Clinic:</span>
+                    <span className="font-semibold text-[#162623]">
+                      {clinicName}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
