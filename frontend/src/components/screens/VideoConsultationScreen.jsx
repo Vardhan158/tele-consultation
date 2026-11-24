@@ -202,6 +202,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
             audio: true,
           });
           streamRef.current = localStream;
+          setLocalStream(localStream);
         } catch (mediaErr) {
           console.warn("getUserMedia error, creating synthetic tracks:", mediaErr);
           // Fallback in headless environment without physical devices
@@ -223,7 +224,10 @@ export default function VideoConsultationScreen({ onNavigate }) {
           ]);
           localStream = combinedStream;
           streamRef.current = localStream;
+          setLocalStream(localStream);
         }
+      } else {
+        setLocalStream(localStream);
       }
 
       // 2. Instantiate real WebRTC RTCPeerConnection
