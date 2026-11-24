@@ -942,22 +942,9 @@ export default function DoctorRegistrationScreen({
                     <div className="flex items-center gap-2">
                       <span className="material-symbols-outlined text-[#25836F] text-base">attachment</span>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[#162623]">
-                        Document Uploads (PDF, JPG, PNG · Max 10 MB)
+                        Documents (PDF, JPG, PNG · Max 10 MB)
                       </h3>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowAdditionalDocs(true)}
-                      className="text-xs font-semibold text-[#25836F] hover:underline cursor-pointer flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-sm">add_circle</span>
-                      <span>Additional Documents (Optional)</span>
-                      {optionalDocsCount > 0 && (
-                        <span className="px-2 py-0.5 rounded-lg bg-[#25836F] text-white text-[10px] font-bold">
-                          {optionalDocsCount}
-                        </span>
-                      )}
-                    </button>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
