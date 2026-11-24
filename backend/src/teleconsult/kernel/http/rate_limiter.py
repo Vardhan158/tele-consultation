@@ -151,8 +151,8 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         """Check rate limit using shared MongoDB collection when available, falling back to in-memory."""
         from teleconsult.kernel.mongodb.client import mongo_database
 
-        if mongo_database.enabled and mongo_database.client is not None:
-            try:
+        try:
+            if mongo_database.enabled and getattr(mongo_database, "_client", None) is not None:
                 db = mongo_database.database()
                 col = db["rate_limit_events"]
                 now = time.time()
@@ -180,13 +180,17 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 })
                 remaining = max(0, max_allowed - (len(recent_events) + 1))
                 return True, remaining, 0
-            except Exception as exc:
-                logger.debug("Shared MongoDB rate limiter check failed, falling back to in-memory: %s", exc)
+        except Exception as exc:
+            logger.debug("Shared MongoDB rate limiter check failed, falling back to in-memory: %s", exc)
 
         # Fallback to local in-memory sliding window
         return self.limiter.check_rate_limit(client_ip, tier)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Preflight requests must NEVER be throttled, blocked, or intercepted
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         settings = get_settings()
 
         # Check if rate limiting is globally enabled
@@ -229,6 +233,10 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             response.headers["X-RateLimit-Limit"] = str(max_limit)
             response.headers["X-RateLimit-Remaining"] = "0"
             response.headers["X-RateLimit-Reset"] = str(retry_after)
+            origin = request.headers.get("origin")
+            if origin:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
 
         # Proceed with request

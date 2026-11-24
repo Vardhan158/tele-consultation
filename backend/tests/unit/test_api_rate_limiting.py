@@ -164,3 +164,47 @@ async def test_rate_limiter_falls_back_when_mongodb_fails():
         assert allowed is True
         assert remaining == 4
         assert retry_after == 0
+
+
+def test_cors_preflight_options_bypasses_rate_limiting():
+    """Browser preflight OPTIONS requests must never consume rate limit quota and must return 200 with CORS headers."""
+    app = create_app()
+    client = TestClient(app)
+
+    # Send 10 consecutive preflight requests from the frontend origin
+    for _ in range(10):
+        resp = client.options(
+            "/auth/register",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "POST",
+                "X-Forwarded-For": "203.0.113.88",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("access-control-allow-origin") == "http://localhost:5173"
+        assert resp.headers.get("access-control-allow-credentials") == "true"
+
+
+def test_cors_headers_retained_when_rate_limited():
+    """When a POST request is throttled with HTTP 429, CORS headers must still be preserved for the frontend."""
+    app = create_app()
+    client = TestClient(app)
+    ip = "203.0.113.123"
+
+    for _ in range(5):
+        client.post(
+            "/auth/register",
+            json={"email": "cors_test@example.com"},
+            headers={"Origin": "http://localhost:5173", "X-Forwarded-For": ip},
+        )
+
+    # 6th request triggers rate limit
+    resp = client.post(
+        "/auth/register",
+        json={"email": "cors_test@example.com"},
+        headers={"Origin": "http://localhost:5173", "X-Forwarded-For": ip},
+    )
+    assert resp.status_code == 429
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:5173"
+

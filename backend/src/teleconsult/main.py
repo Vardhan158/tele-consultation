@@ -116,14 +116,6 @@ def create_app() -> FastAPI:
         response.headers["X-Request-ID"] = corr_id
         return response
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=allowed_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
     @app.middleware("http")
     async def request_observability(request: Request, call_next: Any) -> Response:
         raw_corr_id = request.headers.get("X-Correlation-ID") or request.headers.get("X-Request-ID")
@@ -141,8 +133,17 @@ def create_app() -> FastAPI:
         response.headers["X-Correlation-ID"] = correlation_id
         response.headers["X-Request-ID"] = correlation_id
         return response
+
     app.add_middleware(RateLimiterMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.mount("/socket.io", socket_app)
 
     @app.get("/health")
