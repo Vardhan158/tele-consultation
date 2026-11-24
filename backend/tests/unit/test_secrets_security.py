@@ -26,7 +26,8 @@ def test_production_secrets_pass_when_configured():
     """In production, when all required credentials are provided, validation passes without error."""
     prod_settings = Settings(
         environment="production",
-        database_url="postgresql+asyncpg://user:pass@localhost:5432/teleconsult",
+        mongodb_enabled=True,
+        mongodb_uri="mongodb+srv://user:pass@atlas.example.com",
         razorpay_key_id="rzp_live_realKey123",
         razorpay_key_secret="real_secret_token_abc456",
         clinical_encryption_key="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -40,7 +41,8 @@ def test_production_startup_does_not_require_clinical_encryption_key():
     """Encryption remains available, but its key is not a startup dependency."""
     prod_settings = Settings(
         environment="production",
-        database_url="postgresql+asyncpg://user:pass@localhost:5432/teleconsult",
+        mongodb_enabled=True,
+        mongodb_uri="mongodb+srv://user:pass@atlas.example.com",
         razorpay_key_id="rzp_live_realKey123",
         razorpay_key_secret="real_secret_token_abc456",
         clinical_encryption_key="",

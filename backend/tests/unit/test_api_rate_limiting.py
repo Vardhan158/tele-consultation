@@ -14,8 +14,23 @@ def reset_limiter():
     """Reset the rate limiter state before each test."""
     limiter = get_rate_limiter()
     limiter.reset()
-    yield
-    limiter.reset()
+    from unittest.mock import AsyncMock, MagicMock
+    from teleconsult.kernel.mongodb.client import mongo_database
+
+    mock_db = {
+        "users": AsyncMock(find_one=AsyncMock(return_value=None)),
+        "recovery_tokens": AsyncMock(insert_one=AsyncMock(return_value=None)),
+    }
+    orig_client = mongo_database._client
+    mongo_database._client = MagicMock()
+    orig_db = mongo_database.database
+    mongo_database.database = lambda: mock_db
+    try:
+        yield
+    finally:
+        limiter.reset()
+        mongo_database._client = orig_client
+        mongo_database.database = orig_db
 
 
 def test_rate_limiter_allows_requests_within_limit():

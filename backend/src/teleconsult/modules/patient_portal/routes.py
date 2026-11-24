@@ -402,7 +402,7 @@ async def update_profile(
 async def submit_intake(
     payload: MedicalIntakeCreate,
     principal: Principal = Depends(require("patient:intake:write")),
-) -> MedicalIntake:
+) -> MedicalIntakeResponse:
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         intake_id = str(uuid4())
@@ -423,13 +423,6 @@ async def submit_intake(
             **payload.model_dump(),
         )
     raise HTTPException(status_code=503, detail="Database not available")
-
-
-async def audit(session: AsyncSession, principal: Principal, action: str, resource_id: UUID) -> None:
-    session.add(AuditRecord(
-        tenant_id=UUID(principal.tenant_id), actor_id=UUID(principal.user_id), action=action,
-        resource_type="appointment", resource_id=resource_id, purpose="patient journey", metadata_json={}
-    ))
 
 
 @router.post("/consents", response_model=ConsentResponse, status_code=status.HTTP_201_CREATED)
@@ -470,22 +463,7 @@ async def grant_consent(
             status="granted",
             granted_at=now,
         )
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    consent = PatientConsent(tenant_id=UUID(principal.tenant_id), patient_id=UUID(principal.user_id),
-        ends_at=datetime(9999, 12, 31, tzinfo=UTC), **payload.model_dump())
-    session.add(consent)
-    await session.flush()
-    session.add(AuditRecord(tenant_id=consent.tenant_id, actor_id=consent.patient_id, action="consent.grant",
-        resource_type="patient_consent", resource_id=consent.id, purpose=consent.consent_type,
-        metadata_json={"version": consent.version, "status": consent.status}))
-    return ConsentResponse(
-        id=consent.id,
-        consent_type=consent.consent_type,
-        version=consent.version,
-        status=consent.status,
-        granted_at=consent.granted_at,
-    )
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 @router.get("/consents", response_model=list[ConsentResponse])
@@ -574,7 +552,7 @@ async def withdraw_consent(
 async def create_profile(
     payload: PatientCreate,
     principal: Principal = Depends(require("patient:profile:write")),
-) -> Patient:
+) -> PatientResponse:
     raise HTTPException(status_code=503, detail="Database session not available")
 
 
@@ -665,7 +643,7 @@ async def book_appointment(
     payload: AppointmentCreate,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(require("appointment:create")),
-) -> Appointment:
+) -> Any:
     settings = get_settings()
     if settings.mongodb_enabled:
         db = mongo_database.database()
@@ -774,70 +752,7 @@ async def book_appointment(
                 raise HTTPException(status_code=409, detail="Selected appointment slot is no longer available") from exc
             raise
         return appointment
-    tenant_id = UUID(principal.tenant_id)
-    patient_id = UUID(principal.user_id)
-    if idempotency_key:
-        existing = await session.scalar(select(Appointment).where(
-            Appointment.tenant_id == tenant_id, Appointment.patient_id == patient_id,
-            Appointment.idempotency_key == idempotency_key
-        ))
-        if existing:
-            return existing
-    if session is None:
-        raise HTTPException(status_code=503, detail="Application database is unavailable")
-    doctor = await session.scalar(select(Doctor).where(Doctor.id == payload.doctor_id, Doctor.tenant_id == tenant_id, Doctor.active.is_(True)))
-    if doctor is None:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-    now_utc = datetime.now(UTC)
-    if payload.starts_at <= now_utc:
-        raise HTTPException(status_code=409, detail="Selected appointment slot has expired")
-    slot = await session.scalar(select(DoctorAvailability).where(
-        DoctorAvailability.tenant_id == tenant_id, DoctorAvailability.doctor_id == payload.doctor_id,
-        DoctorAvailability.starts_at == payload.starts_at, DoctorAvailability.ends_at > now_utc, DoctorAvailability.status == "available"
-    ).with_for_update())
-    if slot is None:
-        raise HTTPException(status_code=409, detail="Selected appointment slot is no longer available")
-    ends_at = slot.ends_at
-    conflict = await session.scalar(select(Appointment.id).where(
-        Appointment.tenant_id == tenant_id,
-        Appointment.doctor_id == payload.doctor_id,
-        Appointment.status.in_(["requested", "confirmed", "checked_in"]),
-        Appointment.starts_at < ends_at,
-        Appointment.ends_at > payload.starts_at,
-    ).limit(1))
-    if conflict:
-        raise HTTPException(status_code=409, detail="Doctor is not available for this time")
-    if not payload.appointment_type or not payload.visit_format:
-        raise HTTPException(status_code=422, detail="Appointment type and visit format are required")
-    requires_payment = doctor.fee_paise > 0
-    appointment = Appointment(tenant_id=tenant_id, patient_id=patient_id, ends_at=ends_at,
-        status="pending_payment" if requires_payment else "confirmed",
-        payment_status="pending" if requires_payment else "not_required",
-        idempotency_key=idempotency_key,
-        **payload.model_dump(exclude={"duration_minutes", "intake_id", "reason", "notes", "appointment_type", "visit_format"}))
-    slot.status = "reserved"
-    session.add(appointment)
-    try:
-        await session.flush()
-    except IntegrityError as exc:
-        raise HTTPException(status_code=409, detail="Appointment conflicts with an existing booking") from exc
-    await audit(session, principal, "appointment.create", appointment.id)
-    session.add(AppointmentEvent(tenant_id=tenant_id, appointment_id=appointment.id, actor_id=patient_id,
-        from_status="draft", to_status=appointment.status))
-    queue_patient_notification(session, tenant_id=tenant_id, patient_id=patient_id,
-        event_type="appointment_created", subject="Appointment booking update",
-        body="Your appointment request has been received. Check the portal for the current payment and confirmation status.")
-    doc_resp = DoctorResponse.model_validate(doctor) if doctor else None
-    return AppointmentResponse(
-        id=appointment.id,
-        doctor_id=appointment.doctor_id,
-        patient_id=appointment.patient_id,
-        starts_at=appointment.starts_at,
-        ends_at=appointment.ends_at,
-        status=appointment.status,
-        payment_status=appointment.payment_status,
-        doctor=doc_resp,
-    )
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 def _to_int(val: Any) -> int | None:
@@ -1014,30 +929,6 @@ async def list_appointments(
 
         return results
     return []
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    appointments = list(await session.scalars(select(Appointment).where(
-        Appointment.tenant_id == UUID(principal.tenant_id), Appointment.patient_id == UUID(principal.user_id)
-    ).order_by(Appointment.starts_at.desc())))
-    doctor_ids = {a.doctor_id for a in appointments}
-    doctors_map = {}
-    if doctor_ids:
-        docs = await session.scalars(select(Doctor).where(Doctor.id.in_(doctor_ids)))
-        doctors_map = {d.id: d for d in docs}
-    return [
-        AppointmentResponse(
-            id=a.id,
-            doctor_id=a.doctor_id,
-            patient_id=a.patient_id,
-            starts_at=a.starts_at,
-            ends_at=a.ends_at,
-            status=a.status,
-            payment_status=a.payment_status,
-            join_window_minutes=get_settings().video_join_window_minutes,
-            doctor=DoctorResponse.model_validate(doctors_map[a.doctor_id]) if a.doctor_id in doctors_map else None,
-        )
-        for a in appointments
-    ]
 
 
 @router.post("/appointments/{appointment_id}/cancel", response_model=AppointmentResponse)
@@ -1412,53 +1303,6 @@ async def reschedule_appointment(
             doctor=doctor_response,
         )
 
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    appointment = await session.scalar(select(Appointment).where(
-        Appointment.id == UUID(appointment_id), Appointment.tenant_id == UUID(principal.tenant_id),
-        Appointment.patient_id == UUID(principal.user_id)
-    ))
-    if appointment is None:
-        raise HTTPException(status_code=404, detail="Appointment not found")
-    if appointment.status in {"completed", "cancelled"}:
-        raise HTTPException(status_code=409, detail="Appointment cannot be rescheduled")
-    if payload.starts_at is None:
-        raise HTTPException(status_code=400, detail="starts_at is required")
-    new_end = payload.starts_at + (appointment.ends_at - appointment.starts_at)
-    new_slot = await session.scalar(select(DoctorAvailability).where(
-        DoctorAvailability.tenant_id == UUID(principal.tenant_id), DoctorAvailability.doctor_id == appointment.doctor_id,
-        DoctorAvailability.starts_at == payload.starts_at, DoctorAvailability.status == "available"
-    ).with_for_update())
-    if new_slot is None:
-        raise HTTPException(status_code=409, detail="Selected slot is no longer available")
-    conflict = await session.scalar(select(Appointment.id).where(
-        Appointment.id != appointment.id, Appointment.doctor_id == appointment.doctor_id,
-        Appointment.status.in_(["requested", "confirmed", "checked_in"]),
-        Appointment.starts_at < new_end, Appointment.ends_at > payload.starts_at
-    ).limit(1))
-    if conflict:
-        raise HTTPException(status_code=409, detail="Doctor is not available for this time")
-    old_slot = await session.scalar(select(DoctorAvailability).where(
-        DoctorAvailability.doctor_id == appointment.doctor_id, DoctorAvailability.starts_at == appointment.starts_at
-    ).with_for_update())
-    if old_slot:
-        old_slot.status = "available"
-    new_slot.status = "reserved"
-    previous_status = appointment.status
-    appointment.starts_at, appointment.ends_at, appointment.status = payload.starts_at, new_end, "rescheduled"
-    session.add(AppointmentEvent(tenant_id=appointment.tenant_id, appointment_id=appointment.id, actor_id=UUID(principal.user_id),
-        from_status=previous_status, to_status="rescheduled"))
-    await audit(session, principal, "appointment.reschedule", appointment.id)
-    queue_patient_notification(session, tenant_id=appointment.tenant_id, patient_id=appointment.patient_id,
-        event_type="appointment_rescheduled", subject="Appointment rescheduled", body="Your appointment time has been updated.")
-    return AppointmentResponse(
-        id=appointment.id,
-        doctor_id=appointment.doctor_id,
-        patient_id=appointment.patient_id,
-        starts_at=appointment.starts_at,
-        ends_at=appointment.ends_at,
-        status=appointment.status,
-        payment_status=appointment.payment_status,
-        join_window_minutes=get_settings().video_join_window_minutes,
-    )
+    raise HTTPException(status_code=503, detail="No application database is configured")
+
 
