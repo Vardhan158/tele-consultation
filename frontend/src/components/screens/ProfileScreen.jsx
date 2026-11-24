@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { patientApi } from "../../lib/api";
 
 // Shared validator is intentionally exported for form tests and validation reuse.
@@ -135,6 +135,45 @@ export default function ProfileScreen({
   const [consents, setConsents] = useState([]);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handlePhotoSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setIsErrorToast(true);
+      setSaveMessage("Please select a valid image file (JPEG, PNG, or WebP).");
+      setTimeout(() => setSaveMessage(""), 4000);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setIsErrorToast(true);
+      setSaveMessage("Image size cannot exceed 5 MB.");
+      setTimeout(() => setSaveMessage(""), 4000);
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const res = await patientApi.uploadPhoto(file);
+      if (res?.avatar_url) {
+        setProfile((prev) => ({ ...prev, avatar_url: res.avatar_url }));
+        setIsErrorToast(false);
+        setSaveMessage("Profile photo uploaded successfully!");
+        setTimeout(() => setSaveMessage(""), 4000);
+      }
+    } catch (err) {
+      setIsErrorToast(true);
+      setSaveMessage(err?.message || "Failed to upload photo. Please check Cloudinary configuration.");
+      setTimeout(() => setSaveMessage(""), 5000);
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -468,9 +507,17 @@ export default function ProfileScreen({
               {/* Profile Card */}
               <div className="care-card p-8 text-center space-y-4">
                 {/* Large Avatar Badge */}
-                <div className="w-24 h-24 rounded-none bg-[#E4EDF0] text-[#25836F] flex items-center justify-center font-bold text-2xl mx-auto ring-4 ring-[#F0F5F7]">
-                  {getInitials()}
-                </div>
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.full_name || "Profile avatar"}
+                    className="w-24 h-24 rounded-full object-cover mx-auto ring-4 ring-[#F0F5F7] shadow-sm"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-[#E4EDF0] text-[#25836F] flex items-center justify-center font-bold text-2xl mx-auto ring-4 ring-[#F0F5F7]">
+                    {getInitials()}
+                  </div>
+                )}
 
                 <div>
                   <h2 className="text-xl font-bold text-[#162623]">
@@ -523,12 +570,34 @@ export default function ProfileScreen({
                 </div>
 
                 <div className="pt-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handlePhotoSelect}
+                    accept="image/png,image/jpeg,image/webp,image/jpg"
+                    className="hidden"
+                  />
                   <button
                     type="button"
-                    onClick={() => alert("Photo upload dialog opened.")}
-                    className="btn-secondary w-full text-xs font-semibold !py-2.5 rounded-xl cursor-pointer"
+                    disabled={isUploadingPhoto}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn-secondary w-full text-xs font-semibold !py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    Change photo
+                    {isUploadingPhoto ? (
+                      <>
+                        <span className="material-symbols-outlined text-sm animate-spin">
+                          progress_activity
+                        </span>
+                        <span>Uploading photo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-sm">
+                          photo_camera
+                        </span>
+                        <span>Change photo</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

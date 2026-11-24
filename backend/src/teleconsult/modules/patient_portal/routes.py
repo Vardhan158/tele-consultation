@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
@@ -388,6 +388,7 @@ async def get_profile(
             allergies=allergies_val,
             created_at=document.get("created_at"),
             primary_care_provider=document.get("primary_care_provider"),
+            avatar_url=document.get("avatar_url"),
         )
     raise HTTPException(status_code=503, detail="No application database is configured")
 
@@ -429,7 +430,104 @@ async def update_profile(
             allergies=document.get("allergies"),
             created_at=document.get("created_at"),
             primary_care_provider=document.get("primary_care_provider"),
+            avatar_url=document.get("avatar_url"),
         )
+    raise HTTPException(status_code=503, detail="No application database is configured")
+
+
+async def _upload_to_cloudinary(file_bytes: bytes, filename: str, content_type: str) -> str:
+    settings = get_settings()
+    cloud_name, api_key, api_secret = settings.get_cloudinary_credentials()
+    if not cloud_name or not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Cloudinary is not configured on the server. Please provide CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY.",
+        )
+
+    import time
+    timestamp = int(time.time())
+    folder = "patient_profiles"
+
+    params_to_sign = f"folder={folder}&timestamp={timestamp}"
+    signature = ""
+    if api_secret:
+        to_hash = f"{params_to_sign}{api_secret}"
+        signature = hashlib.sha1(to_hash.encode("utf-8")).hexdigest()
+
+    data = {
+        "api_key": api_key,
+        "timestamp": str(timestamp),
+        "folder": folder,
+    }
+    if signature:
+        data["signature"] = signature
+
+    import aiohttp
+    upload_url = f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload"
+
+    form_data = aiohttp.FormData()
+    for k, v in data.items():
+        form_data.add_field(k, v)
+    form_data.add_field(
+        "file",
+        file_bytes,
+        filename=filename,
+        content_type=content_type,
+    )
+
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.post(upload_url, data=form_data) as resp:
+            try:
+                resp_json = await resp.json()
+            except Exception:
+                resp_json = {}
+            if resp.status != 200:
+                err_msg = resp_json.get("error", {}).get("message", f"HTTP {resp.status}")
+                raise HTTPException(status_code=502, detail=f"Cloudinary upload failed: {err_msg}")
+            secure_url = resp_json.get("secure_url") or resp_json.get("url")
+            if not secure_url:
+                raise HTTPException(status_code=502, detail="Cloudinary did not return a valid secure image URL")
+            return secure_url
+
+
+@router.post("/profile/photo")
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(require("patient:profile:write")),
+) -> dict[str, str]:
+    if not get_settings().mongodb_enabled:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
+    content_type = (file.content_type or "").lower()
+    if content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image format. Allowed formats are JPEG, PNG, and WebP.",
+        )
+
+    file_bytes = await file.read()
+    if len(file_bytes) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image size exceeds maximum limit of 5 MB.")
+
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    secure_url = await _upload_to_cloudinary(
+        file_bytes=file_bytes,
+        filename=file.filename or "profile.jpg",
+        content_type=content_type,
+    )
+
+    db = mongo_database.database()
+    await db["patients"].update_one(
+        {"tenant_id": principal.tenant_id, "$or": [{"user_id": principal.user_id}, {"id": principal.user_id}]},
+        {"$set": {"avatar_url": secure_url}},
+        upsert=True,
+    )
+
+    return {"avatar_url": secure_url, "message": "Profile photo updated successfully"}
     raise HTTPException(status_code=503, detail="No application database is configured")
 
 

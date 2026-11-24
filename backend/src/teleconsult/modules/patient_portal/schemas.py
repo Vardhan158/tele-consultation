@@ -42,6 +42,7 @@ class PatientResponse(PatientCreate):
     allergies: str | list | None = None
     created_at: datetime | str | None = None
     primary_care_provider: str | None = None
+    avatar_url: str | None = None
 
 
 class DoctorResponse(BaseModel):
@@ -135,6 +136,7 @@ class PatientProfileUpdate(BaseModel):
     pharmacy_address: str | None = Field(default=None, max_length=500)
     pharmacy_phone: str | None = Field(default=None, max_length=32)
     allergies: str | None = Field(default=None, max_length=2000)
+    avatar_url: str | None = Field(default=None, max_length=1000)
 
     @field_validator("phone")
     @classmethod

@@ -75,6 +75,14 @@ export const patientApi = {
       method: "PATCH",
       body: JSON.stringify(profile),
     }),
+  uploadPhoto: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiRequest("/patient/profile/photo", {
+      method: "POST",
+      body: formData,
+    });
+  },
   submitIntake: (intake) =>
     apiRequest("/patient/intake", {
       method: "POST",
