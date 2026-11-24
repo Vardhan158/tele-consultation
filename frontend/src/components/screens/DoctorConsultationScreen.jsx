@@ -18,8 +18,8 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
   }, [appointment]);
 
   return (
-    <div className="min-h-screen bg-[#F0F5F7] p-6 lg:p-10 text-[#162623]">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen bg-[#F0F5F7] px-6 lg:px-10 py-3 lg:py-4 text-[#162623]">
+      <div className="mx-auto max-w-7xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
