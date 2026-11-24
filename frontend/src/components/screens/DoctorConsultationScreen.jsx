@@ -49,7 +49,7 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
         {/* Two-Column Split Layout: Left Video, Right Prescription Composer */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Side: Video Call & Streaming */}
-          <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl">
+          <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-4 shadow-xl lg:sticky lg:top-4">
             <h3 className="text-sm font-bold text-[#162623] mb-3 flex items-center gap-2">
               <span className="material-symbols-outlined text-[#25836F]">videocam</span>
               Video Streaming
@@ -74,7 +74,7 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
           </div>
 
           {/* Right Side: Write Prescription & Send */}
-          <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl">
+          <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)]">
             <h3 className="text-sm font-bold text-[#162623] mb-4 flex items-center gap-2">
               <span className="material-symbols-outlined text-[#25836F]">prescriptions</span>
               Write Prescription &amp; Send
