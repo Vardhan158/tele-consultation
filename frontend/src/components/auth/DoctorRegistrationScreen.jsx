@@ -537,7 +537,7 @@ export default function DoctorRegistrationScreen({
     <div
       className={`font-sans flex flex-col text-[#162623] ${
         inModal
-          ? "relative w-full max-w-5xl max-h-[92vh] bg-[#F0F5F7] rounded-2xl shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
+          ? "relative w-full max-w-5xl max-h-[92vh] bg-[#F0F5F7] rounded-none shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
           : "min-h-screen lg:h-screen lg:max-h-screen bg-[#F0F5F7] lg:overflow-hidden"
       }`}
     >
@@ -1409,7 +1409,7 @@ export default function DoctorRegistrationScreen({
       {/* Additional Documents Modal (Preserves single page view without vertical scrolling) */}
       {showAdditionalDocs && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-5 shadow-2xl space-y-3">
+          <div className="w-full max-w-lg rounded-none bg-white border border-[#577877]/20 p-5 shadow-2xl space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#25836F] text-xl">folder_open</span>
@@ -1498,7 +1498,7 @@ export default function DoctorRegistrationScreen({
       {/* Terms of Service Modal */}
       {showTermsModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-5 sm:p-6 shadow-2xl space-y-3">
+          <div className="w-full max-w-lg rounded-none bg-white border border-[#577877]/20 p-5 sm:p-6 shadow-2xl space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#25836F] text-xl">gavel</span>
@@ -1539,7 +1539,7 @@ export default function DoctorRegistrationScreen({
       {/* Privacy Policy Modal */}
       {showPrivacyModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-5 sm:p-6 shadow-2xl space-y-3">
+          <div className="w-full max-w-lg rounded-none bg-white border border-[#577877]/20 p-5 sm:p-6 shadow-2xl space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#25836F] text-xl">policy</span>
