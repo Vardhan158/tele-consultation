@@ -521,17 +521,12 @@ export default function DoctorRegistrationScreen({
           inModal ? "max-h-[calc(96vh-72px)]" : "max-w-4xl lg:overflow-hidden"
         }`}
       >
-        {/* Title, Subtitle & 3-Step Progress Stepper Directly Below */}
+        {/* Title & 3-Step Progress Stepper Directly Below */}
         <div className="w-full pb-4 border-b border-[#577877]/10 flex flex-col gap-3 shrink-0">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#162623] leading-none">
               Doctor Registration
             </h2>
-            <p className="text-xs text-[#577877] mt-1">
-              {currentStep === 1 && "Step 1 of 3: Personal Information & Contact Details"}
-              {currentStep === 2 && "Step 2 of 3: Medical Credentials & Specialization"}
-              {currentStep === 3 && "Step 3 of 3: Verification Documents & Account Security"}
-            </p>
           </div>
 
           {/* Stepper Progress Indicator */}
