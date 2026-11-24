@@ -830,7 +830,7 @@ export default function PrescriptionsScreen({
               </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-2 text-xs">
+            <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-3 text-xs max-h-[380px] overflow-y-auto">
               <div className="flex justify-between">
                 <span className="text-[#577877]">Rx ID:</span>
                 <span className="font-semibold text-[#162623]">
@@ -849,19 +849,38 @@ export default function PrescriptionsScreen({
                   {selectedRx.issuedDate}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Instructions:</span>
-                <span className="font-semibold text-[#162623]">
-                  {selectedRx.instructions}
-                </span>
+
+              {selectedRx.diagnosis && (
+                <div className="pt-2 border-t border-[#577877]/15">
+                  <span className="text-[#577877] block font-semibold mb-0.5">Clinical Diagnosis:</span>
+                  <p className="font-bold text-[#162623]">{selectedRx.diagnosis}</p>
+                </div>
+              )}
+
+              {selectedRx.medicines && selectedRx.medicines.length > 0 && (
+                <div className="pt-2 border-t border-[#577877]/15 space-y-1.5">
+                  <span className="text-[#577877] block font-semibold">Prescribed Medications:</span>
+                  {selectedRx.medicines.map((m, idx) => (
+                    <div key={idx} className="bg-white p-2.5 rounded-lg border border-[#577877]/10 text-slate-700">
+                      <span className="font-bold text-[#162623]">{m.name}</span> {m.dosage ? `(${m.dosage})` : ""} {m.frequency ? `· ${m.frequency}` : ""} {m.duration ? `for ${m.duration}` : ""}
+                      {m.instructions && <div className="text-[10px] text-[#577877] mt-0.5">Instructions: {m.instructions}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-[#577877]/15">
+                <span className="text-[#577877] block font-semibold mb-0.5">General Instructions / Dietary Advice:</span>
+                <p className="font-medium text-[#162623]">{selectedRx.instructions}</p>
               </div>
-              <div className="flex justify-between">
+
+              <div className="flex justify-between pt-2 border-t border-[#577877]/15">
                 <span className="text-[#577877]">Pharmacy:</span>
                 <span className="font-semibold text-[#25836F]">
                   {pharmacy.name || "No preferred pharmacy selected"}
                 </span>
               </div>
-              <div className="flex justify-between pt-1 border-t border-[#577877]/15">
+              <div className="flex justify-between">
                 <span className="text-[#577877]">Refills Status:</span>
                 <span className="font-bold text-[#162623]">
                   {selectedRx.refills}
