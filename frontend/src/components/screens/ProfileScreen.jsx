@@ -813,49 +813,6 @@ export default function ProfileScreen({
                   </div>
                 </div>
               </div>
-
-              {/* Form Card 2: Care essentials */}
-              <div className="care-card p-7 sm:p-8 space-y-5">
-                <h3 className="text-lg font-bold text-[#162623]">
-                  Care essentials
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs">
-                  <div>
-                    <span className="text-[#577877] block text-[11px]">
-                      Allergies
-                    </span>
-                    <p className="font-bold text-[#162623] text-sm mt-1">
-                      {profile.allergies || "None reported"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-[#577877] block text-[11px]">
-                      Preferred language
-                    </span>
-                    <p className="font-bold text-[#162623] text-sm mt-1">
-                      {profile.preferred_language || "English (US)"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-[#577877] block text-[11px]">
-                      Emergency contact
-                    </span>
-                    <p className="font-bold text-[#162623] text-sm mt-1">
-                      {profile.emergency_contact || "Not provided"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-[#577877]/15">
-                  <p className="text-[11px] text-[#577877]">
-                    Clinical details are reviewed with your care team. Last
-                    reviewed {profile.last_reviewed || "Recently"}.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         )}
