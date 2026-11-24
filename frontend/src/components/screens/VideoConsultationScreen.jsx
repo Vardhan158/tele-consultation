@@ -44,6 +44,34 @@ export default function VideoConsultationScreen({ onNavigate }) {
   const peerRef = useRef(null);
   const socketRef = useRef(null);
   const streamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+
+  // Robust video stream binding and re-binding for local preview and PIP camera view
+  useEffect(() => {
+    const localStream = streamRef.current;
+    if (localStream) {
+      if (previewVideoRef.current && previewVideoRef.current.srcObject !== localStream) {
+        previewVideoRef.current.srcObject = localStream;
+        previewVideoRef.current.play?.().catch(() => {});
+      }
+      if (localPipVideoRef.current && localPipVideoRef.current.srcObject !== localStream) {
+        localPipVideoRef.current.srcObject = localStream;
+        localPipVideoRef.current.play?.().catch(() => {});
+      }
+    }
+  }, [roomState, cameraOff]);
+
+  // Robust video stream binding and re-binding for remote doctor video view
+  useEffect(() => {
+    const stream = remoteStreamRef.current || remoteStream;
+    if (stream && remoteVideoRef.current) {
+      if (remoteVideoRef.current.srcObject !== stream) {
+        remoteVideoRef.current.srcObject = stream;
+      }
+      remoteVideoRef.current.play?.().catch(() => {});
+    }
+  }, [roomState, remoteStream]);
 
   // Auto-resume call on page reload if active call flag is present
   useEffect(() => {
@@ -142,6 +170,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
         streamRef.current = stream;
         if (previewVideoRef.current) {
           previewVideoRef.current.srcObject = stream;
+          previewVideoRef.current.play?.().catch(() => {});
         }
       }
       setDevices({
@@ -238,13 +267,20 @@ export default function VideoConsultationScreen({ onNavigate }) {
         localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
         if (localPipVideoRef.current) {
           localPipVideoRef.current.srcObject = localStream;
+          localPipVideoRef.current.play?.().catch(() => {});
         }
       }
 
       // Handle remote incoming tracks
       pc.ontrack = (event) => {
-        if (remoteVideoRef.current && event.streams?.[0]) {
-          remoteVideoRef.current.srcObject = event.streams[0];
+        if (event.streams?.[0]) {
+          const rStream = event.streams[0];
+          remoteStreamRef.current = rStream;
+          setRemoteStream(rStream);
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = rStream;
+            remoteVideoRef.current.play?.().catch(() => {});
+          }
         }
       };
 
@@ -255,10 +291,17 @@ export default function VideoConsultationScreen({ onNavigate }) {
           socketRef.current?.emit("request_ice_restart");
         } else if (ice === "connected" || ice === "completed") {
           setConnectionQuality("Connected (WebRTC P2P)");
-          if (remoteVideoRef.current && pc.getReceivers().length > 0) {
-            const remoteStream = new MediaStream(pc.getReceivers().map(r => r.track).filter(Boolean));
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play?.().catch(() => {});
+          if (pc.getReceivers().length > 0) {
+            const tracks = pc.getReceivers().map(r => r.track).filter(Boolean);
+            if (tracks.length > 0) {
+              const rStream = remoteStreamRef.current || new MediaStream(tracks);
+              remoteStreamRef.current = rStream;
+              setRemoteStream(rStream);
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = rStream;
+                remoteVideoRef.current.play?.().catch(() => {});
+              }
+            }
           }
         } else {
           setConnectionQuality(`WebRTC ICE: ${ice}`);
@@ -384,6 +427,8 @@ export default function VideoConsultationScreen({ onNavigate }) {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
     }
+    remoteStreamRef.current = null;
+    setRemoteStream(null);
     if (socketRef.current) {
       socketRef.current.emit("end_call");
       socketRef.current.disconnect();
@@ -862,6 +907,16 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   playsInline
                   className="w-full h-full object-cover"
                 />
+                {(!remoteStream && !remoteStreamRef.current) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white/80 space-y-2 bg-[#162623]/90 z-10">
+                    <span className="material-symbols-outlined text-3xl animate-spin text-[#25836F]">
+                      sync
+                    </span>
+                    <p className="text-xs font-medium text-[#F0F5F7]">
+                      Connecting to {doctorName}’s video feed…
+                    </p>
+                  </div>
+                )}
 
                 {/* Top Bar Overlay */}
                 <div className="absolute top-4 left-4 right-4 flex items-center justify-between text-xs text-white bg-black/50 backdrop-blur-md px-4 py-2 rounded-xl z-20">
