@@ -965,7 +965,6 @@ export default function DoctorRegistrationScreen({
                     <div className="space-y-1">
                       <label className="flex items-center justify-between text-xs font-semibold text-[#162623]">
                         <span>1. Council Certificate <span className="text-red-600">*</span></span>
-                        <span className="font-normal text-[11px] text-[#577877]">(Mandatory)</span>
                       </label>
                       <input
                         name="credential_document"
@@ -988,7 +987,6 @@ export default function DoctorRegistrationScreen({
                     <div className="space-y-1">
                       <label className="flex items-center justify-between text-xs font-semibold text-[#162623]">
                         <span>2. Qualification Certificate</span>
-                        <span className="font-normal text-[11px] text-[#577877]">(MBBS / Primary)</span>
                       </label>
                       <input
                         name="qualification_certificate"
