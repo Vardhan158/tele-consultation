@@ -457,12 +457,15 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   };
 
   const handleEnterConsultation = async () => {
-    if (!consultationRoom?.session_id) {
-      setToastMessage("Preparing video consultation room...");
-      return;
+    const apt = detailAppointment || activeApt;
+    if (apt?.id) {
+      localStorage.setItem("teleconsult_appointment_id", apt.id);
+      localStorage.setItem("teleconsult_in_call", "true");
+      if (onNavigate) {
+        onNavigate("video-consultation");
+        return;
+      }
     }
-    if (!canJoinAppointment(activeApt)) return;
-    setConnectionStatus("Connected");
     setView("consultation");
   };
 
