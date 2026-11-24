@@ -231,12 +231,12 @@ export default function PrescriptionsScreen({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `prescription-${prescription.id}.txt`;
+      link.download = `Prescription-${prescription.id}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
-      setToastMessage(`Prescription for ${prescription.name} downloaded.`);
+      setToastMessage(`Prescription PDF for ${prescription.name} downloaded.`);
     } catch (err) {
-      setToastMessage(err.message);
+      setToastMessage(err.message || "Unable to download prescription PDF.");
     }
     setTimeout(() => setToastMessage(""), 3500);
   };
