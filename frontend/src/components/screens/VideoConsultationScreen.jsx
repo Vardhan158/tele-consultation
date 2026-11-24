@@ -4,8 +4,6 @@ import {
   consultationApi,
   patientApi,
   clinicalApi,
-  recordsApi,
-  supportApi,
 } from "../../lib/api";
 import WebRtcConsultation from "../consultation/WebRtcConsultation";
 
@@ -15,8 +13,6 @@ export default function VideoConsultationScreen({ onNavigate }) {
   );
   const [appointment, setAppointment] = useState(null);
   const [patientProfile, setPatientProfile] = useState(null);
-  const [vitalsReadings, setVitalsReadings] = useState([]);
-  const [attachedRecords, setAttachedRecords] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
   const [roomAuth, setRoomAuth] = useState(null);
   const [roomState, setRoomState] = useState(() => {
@@ -29,20 +25,11 @@ export default function VideoConsultationScreen({ onNavigate }) {
     network: true,
     speaker: true,
   });
-  const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
-  const [activeSideTab, setActiveSideTab] = useState("chat");
   const [callDuration, setCallDuration] = useState(0);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [connectionQuality, setConnectionQuality] = useState("Connected (WebRTC P2P)");
 
   const timerRef = useRef(null);
   const previewVideoRef = useRef(null);
-  const localPipVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const peerRef = useRef(null);
-  const socketRef = useRef(null);
   const streamRef = useRef(null);
 
   // Auto-resume call on page reload if active call flag is present
@@ -66,20 +53,6 @@ export default function VideoConsultationScreen({ onNavigate }) {
       .profile()
       .then((p) => {
         if (p) setPatientProfile(p);
-      })
-      .catch(() => {});
-
-    supportApi
-      .bpReadings()
-      .then((readings) => {
-        if (Array.isArray(readings)) setVitalsReadings(readings);
-      })
-      .catch(() => {});
-
-    recordsApi
-      .list()
-      .then((recs) => {
-        if (Array.isArray(recs)) setAttachedRecords(recs);
       })
       .catch(() => {});
 
@@ -118,29 +91,6 @@ export default function VideoConsultationScreen({ onNavigate }) {
           );
           const relevantRx = matching.length > 0 ? matching : items;
           setPrescriptions(relevantRx);
-
-          setChatMessages((prev) => {
-            const existingRxIds = new Set(
-              prev.filter((m) => m.type === "prescription").map((m) => m.result?.id || m.result?._id)
-            );
-            const newRxMessages = [];
-            for (const rx of relevantRx) {
-              const rxId = rx.id || rx._id;
-              if (rxId && !existingRxIds.has(rxId)) {
-                const content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
-                newRxMessages.push({
-                  type: "prescription",
-                  result: rx,
-                  payloadContent: content,
-                  time: new Date(rx.released_at || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                });
-              }
-            }
-            if (newRxMessages.length > 0) {
-              return [...prev, ...newRxMessages];
-            }
-            return prev;
-          });
         }
       } catch (err) {
         console.error("Failed to poll prescriptions:", err);
@@ -240,18 +190,6 @@ export default function VideoConsultationScreen({ onNavigate }) {
     }
   };
 
-  const handleEndCall = async () => {
-    localStorage.removeItem("teleconsult_in_call");
-    if (roomAuth?.session_id) {
-      try {
-        await consultationApi.disconnected(roomAuth.session_id);
-      } catch {
-        // ignore
-      }
-    }
-    setRoomState("ENDED");
-  };
-
   const doctorName =
     appointment?.doctor?.full_name ||
     appointment?.doctor?.name ||
@@ -279,23 +217,6 @@ export default function VideoConsultationScreen({ onNavigate }) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputMessage.trim()) return;
-    const newMsg = {
-      sender: `${patientName} (You)`,
-      text: inputMessage,
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-    setChatMessages((prev) => [...prev, newMsg]);
-    setInputMessage("");
-  };
-
-  const latestReading = vitalsReadings.length > 0 ? vitalsReadings[vitalsReadings.length - 1] : null;
 
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 max-w-full overflow-x-hidden font-sans">
@@ -630,26 +551,10 @@ export default function VideoConsultationScreen({ onNavigate }) {
                   onPrescriptionPublished={(data) => {
                     if (data?.result) {
                       const rx = data.result;
-                      const content = data.payloadContent || (typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {}));
                       setPrescriptions((prev) => {
                         const exists = prev.some((p) => String(p.id || p._id) === String(rx.id || rx._id));
                         if (!exists) {
                           return [rx, ...prev];
-                        }
-                        return prev;
-                      });
-                      setChatMessages((prev) => {
-                        const exists = prev.some((m) => m.type === "prescription" && String(m.result?.id || m.result?._id) === String(rx.id || rx._id));
-                        if (!exists) {
-                          return [
-                            ...prev,
-                            {
-                              type: "prescription",
-                              result: rx,
-                              payloadContent: content,
-                              time: new Date(rx.released_at || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                            },
-                          ];
                         }
                         return prev;
                       });
@@ -668,334 +573,101 @@ export default function VideoConsultationScreen({ onNavigate }) {
               )}
             </div>
 
-            {/* Right Side: Prescription, clinical chat, vitals, and reports panel */}
+            {/* Right Side: e-Prescriptions & Medications Panel */}
             <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)] space-y-4">
               <h3 className="text-sm font-bold text-[#162623] mb-2 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#25836F]">clinical_notes</span>
-                Clinical Panel &amp; Prescription
+                <span className="material-symbols-outlined text-[#25836F]">medication</span>
+                e-Prescriptions &amp; Medications
               </h3>
 
-              {/* Panel Tabs */}
-              <div className="flex border-b border-[#577877]/20 pb-2 mb-4 gap-1 bg-[#F0F5F7] p-2 rounded-xl">
-                {[
-                  { id: "prescription", label: "Prescription", icon: "medication" },
-                  { id: "chat", label: "Chat", icon: "chat" },
-                  { id: "vitals", label: "Vitals", icon: "vital_signs" },
-                  { id: "reports", label: "Reports", icon: "description" },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveSideTab(tab.id)}
-                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition cursor-pointer ${
-                      activeSideTab === tab.id
-                        ? "bg-[#25836F] text-white shadow-sm"
-                        : "text-[#577877] hover:text-[#162623] bg-white"
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-sm">
-                      {tab.icon}
-                    </span>
-                    <span className="truncate">{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab Contents */}
               <div className="space-y-4">
-                {activeSideTab === "prescription" && (
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#25836F] text-base">medication</span>
-                      Prescriptions &amp; Medications
-                    </h3>
-                    {prescriptions.length > 0 ? (
-                      prescriptions.map((rx) => {
-                        const rxId = rx.id || rx._id;
-                        const content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
-                        const meds = content.medicines || (rx.medication_name ? [{ name: rx.medication_name, dosage: rx.dosage, frequency: rx.frequency, duration: rx.duration, instructions: rx.instructions }] : []);
-                        return (
-                          <div key={rxId || Math.random()} className="p-4 rounded-xl bg-white border border-[#577877]/15 space-y-3 shadow-xs">
-                            <div className="flex justify-between items-start border-b border-[#577877]/10 pb-2">
-                              <div>
-                                <p className="text-xs font-bold text-[#162623] flex items-center gap-1.5">
-                                  <span className="material-symbols-outlined text-[#25836F] text-sm">prescriptions</span>
-                                  {rx.title || content.diagnosis || "e-Prescription"}
-                                </p>
-                                <p className="text-[10px] text-[#577877] mt-0.5">
-                                  Issued: {rx.released_at ? new Date(rx.released_at).toLocaleString() : "Recently"}
-                                </p>
-                              </div>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
-                                {rx.status || "Active"}
-                              </span>
-                            </div>
-
-                            {content.diagnosis && (
-                              <p className="text-[11px] text-slate-700">
-                                <strong>Diagnosis:</strong> {content.diagnosis}
-                              </p>
-                            )}
-
-                            {meds.length > 0 && (
-                              <div className="space-y-1.5 bg-[#F0F5F7] p-3 rounded-xl border border-[#577877]/10">
-                                <p className="font-bold text-[11px] text-[#162623]">
-                                  Prescribed Medications:
-                                </p>
-                                {meds.map((m, idx) => (
-                                  <div key={idx} className="text-[11px] text-slate-700 border-b border-slate-200/60 pb-1.5 last:border-b-0">
-                                    <span className="font-semibold">{m.name}</span> {m.dosage ? `(${m.dosage})` : ""} {m.frequency ? `· ${m.frequency}` : ""} {m.duration ? `for ${m.duration}` : ""}
-                                    {m.instructions && (
-                                      <div className="text-[10px] text-[#577877] mt-0.5">
-                                        Instructions: {m.instructions}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {content.instructions && (
-                              <p className="text-[10px] text-slate-600">
-                                <strong>General Instructions:</strong> {content.instructions}
-                              </p>
-                            )}
-
-                            <div className="pt-1 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!rxId) return;
-                                  try {
-                                    const blob = await patientApi.downloadPrescription(rxId);
-                                    const url = window.URL.createObjectURL(blob);
-                                    const a = document.createElement("a");
-                                    a.href = url;
-                                    a.download = `Prescription-${rxId}.pdf`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    window.URL.revokeObjectURL(url);
-                                    document.body.removeChild(a);
-                                  } catch (err) {
-                                    console.error("PDF download failed", err);
-                                  }
-                                }}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] transition cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-sm">
-                                  download
-                                </span>
-                                Download Prescription PDF
-                              </button>
-                            </div>
+                {prescriptions.length > 0 ? (
+                  prescriptions.map((rx) => {
+                    const rxId = rx.id || rx._id;
+                    const content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
+                    const meds = content.medicines || (rx.medication_name ? [{ name: rx.medication_name, dosage: rx.dosage, frequency: rx.frequency, duration: rx.duration, instructions: rx.instructions }] : []);
+                    return (
+                      <div key={rxId || Math.random()} className="p-4 rounded-xl bg-white border border-[#577877]/15 space-y-3 shadow-xs">
+                        <div className="flex justify-between items-start border-b border-[#577877]/10 pb-2">
+                          <div>
+                            <p className="text-xs font-bold text-[#162623] flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[#25836F] text-sm">prescriptions</span>
+                              {rx.title || content.diagnosis || "e-Prescription"}
+                            </p>
+                            <p className="text-[10px] text-[#577877] mt-0.5">
+                              Issued: {rx.released_at ? new Date(rx.released_at).toLocaleString() : "Recently"}
+                            </p>
                           </div>
-                        );
-                      })
-                    ) : (
-                      <div className="p-6 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-2">
-                        <span className="material-symbols-outlined text-3xl text-[#577877]/60">medication_liquid</span>
-                        <p className="font-semibold text-[#162623]">No Prescriptions Issued Yet</p>
-                        <p>Your doctor will issue or update your electronic prescription during or after this consultation.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeSideTab === "chat" && (
-                  <div className="flex flex-col h-[380px] justify-between space-y-3">
-                    <div className="space-y-3 overflow-y-auto pr-1 flex-1">
-                      {chatMessages.length === 0 ? (
-                        <div className="p-4 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877]">
-                          No messages yet. Send a note to your doctor during the consultation.
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
+                            {rx.status || "Active"}
+                          </span>
                         </div>
-                      ) : (
-                        chatMessages.map((msg, i) => {
-                          if (msg.type === "prescription") {
-                            const rx = msg.result || {};
-                            const content = msg.payloadContent || {};
-                            const meds = content.medicines || [];
-                            const rxId = rx.id || rx._id;
-                            return (
-                              <div
-                                key={i}
-                                className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-[#162623] space-y-3 mr-4 shadow-sm"
-                              >
-                                <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
-                                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
-                                    <span className="material-symbols-outlined text-[#25836F] text-base">
-                                      prescriptions
-                                    </span>
-                                    <span>e-Prescription Issued</span>
-                                  </div>
-                                  <span className="text-[10px] text-emerald-700 font-semibold">
-                                    {msg.time}
-                                  </span>
-                                </div>
-                                {content.diagnosis && (
-                                  <p className="text-[11px] text-slate-700">
-                                    <strong>Diagnosis:</strong> {content.diagnosis}
-                                  </p>
-                                )}
-                                {meds.length > 0 && (
-                                  <div className="space-y-1.5 bg-white/90 p-3 rounded-xl border border-emerald-100">
-                                    <p className="font-bold text-[11px] text-emerald-900">
-                                      Prescribed Medications:
-                                    </p>
-                                    {meds.map((m, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="text-[11px] text-slate-700 border-b border-slate-100 pb-1.5 last:border-b-0"
-                                      >
-                                        <span className="font-semibold">{m.name}</span> ({m.dosage}) · {m.frequency} for {m.duration}
-                                        {m.instructions && (
-                                          <div className="text-[10px] text-slate-500 mt-0.5">
-                                            Instructions: {m.instructions}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
+
+                        {content.diagnosis && (
+                          <p className="text-[11px] text-slate-700">
+                            <strong>Diagnosis:</strong> {content.diagnosis}
+                          </p>
+                        )}
+
+                        {meds.length > 0 && (
+                          <div className="space-y-1.5 bg-[#F0F5F7] p-3 rounded-xl border border-[#577877]/10">
+                            <p className="font-bold text-[11px] text-[#162623]">
+                              Prescribed Medications:
+                            </p>
+                            {meds.map((m, idx) => (
+                              <div key={idx} className="text-[11px] text-slate-700 border-b border-slate-200/60 pb-1.5 last:border-b-0">
+                                <span className="font-semibold">{m.name}</span> {m.dosage ? `(${m.dosage})` : ""} {m.frequency ? `· ${m.frequency}` : ""} {m.duration ? `for ${m.duration}` : ""}
+                                {m.instructions && (
+                                  <div className="text-[10px] text-[#577877] mt-0.5">
+                                    Instructions: {m.instructions}
                                   </div>
                                 )}
-                                {content.instructions && (
-                                  <p className="text-[10px] text-slate-600">
-                                    <strong>General Instructions:</strong> {content.instructions}
-                                  </p>
-                                )}
-                                <div className="pt-1.5 flex justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      if (!rxId) return;
-                                      try {
-                                        const blob = await patientApi.downloadPrescription(rxId);
-                                        const url = window.URL.createObjectURL(blob);
-                                        const a = document.createElement("a");
-                                        a.href = url;
-                                        a.download = `Prescription-${rxId}.pdf`;
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        window.URL.revokeObjectURL(url);
-                                        document.body.removeChild(a);
-                                      } catch (err) {
-                                        console.error("PDF download failed", err);
-                                      }
-                                    }}
-                                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] transition cursor-pointer"
-                                  >
-                                    <span className="material-symbols-outlined text-sm">
-                                      download
-                                    </span>
-                                    Download Prescription PDF
-                                  </button>
-                                </div>
                               </div>
-                            );
-                          }
-                          return (
-                            <div
-                              key={i}
-                              className={`p-3 rounded-xl text-xs space-y-1 ${
-                                msg.sender.includes("You")
-                                  ? "bg-[#25836F] text-white ml-6"
-                                  : "bg-[#F0F5F7] text-[#162623] mr-6 border border-[#577877]/15"
-                              }`}
-                            >
-                              <div className="flex justify-between text-[10px] opacity-75">
-                                <span className="font-semibold">{msg.sender}</span>
-                                <span>{msg.time}</span>
-                              </div>
-                              <p className="leading-relaxed">{msg.text}</p>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
+                            ))}
+                          </div>
+                        )}
 
-                    <form
-                      onSubmit={handleSendMessage}
-                      className="flex gap-2 pt-2 border-t border-[#577877]/15"
-                    >
-                      <input
-                        type="text"
-                        value={inputMessage}
-                        onChange={(e) => setInputMessage(e.target.value)}
-                        placeholder="Type a clinical question…"
-                        className="flex-1 px-3 py-2 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
-                      />
-                      <button
-                        type="submit"
-                        className="btn-primary !p-2 text-xs cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-base">
-                          send
-                        </span>
-                      </button>
-                    </form>
-                  </div>
-                )}
-
-                {activeSideTab === "vitals" && (
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#25836F] text-base">vital_signs</span>
-                      Patient Vitals (Shared with Doctor)
-                    </h3>
-                    {latestReading ? (
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <div className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15">
-                          <span className="text-[10px] text-[#577877] block">
-                            Blood Pressure
-                          </span>
-                          <span className="text-sm font-bold text-[#162623]">
-                            {latestReading.systolic}/{latestReading.diastolic} mmHg
-                          </span>
-                          <span className="text-[9px] text-[#25836F] block mt-0.5 font-medium">
-                            Latest recorded
-                          </span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15">
-                          <span className="text-[10px] text-[#577877] block">
-                            Pulse / Heart Rate
-                          </span>
-                          <span className="text-sm font-bold text-[#162623]">
-                            {latestReading.pulse ? `${latestReading.pulse} bpm` : "Not recorded"}
-                          </span>
-                          <span className="text-[9px] text-[#25836F] block mt-0.5 font-medium">
-                            Resting pulse
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-1">
-                        <p className="font-semibold text-[#162623]">No Vitals Recorded Yet</p>
-                        <p>Log your blood pressure and pulse in Follow-Up Care to share them with your clinician.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(activeSideTab === "reports" || activeSideTab === "notes") && (
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#25836F] text-base">description</span>
-                      Shared Documents for this Visit
-                    </h3>
-                    {attachedRecords.length > 0 ? (
-                      attachedRecords.slice(0, 3).map((rec) => (
-                        <div key={rec.id} className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-1">
-                          <p className="text-xs font-bold text-[#162623] truncate">
-                            {rec.file_name || rec.title || "Clinical document.pdf"}
+                        {content.instructions && (
+                          <p className="text-[10px] text-slate-600">
+                            <strong>General Instructions:</strong> {content.instructions}
                           </p>
-                          <p className="text-[10px] text-[#577877]">
-                            {rec.category || "Clinical Record"} · Verified
-                          </p>
+                        )}
+
+                        <div className="pt-1 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!rxId) return;
+                              try {
+                                const blob = await patientApi.downloadPrescription(rxId);
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `Prescription-${rxId}.pdf`;
+                                document.body.appendChild(a);
+                                a.click();
+                                window.URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                              } catch (err) {
+                                console.error("PDF download failed", err);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] transition cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-sm">
+                              download
+                            </span>
+                            Download Prescription PDF
+                          </button>
                         </div>
-                      ))
-                    ) : (
-                      <div className="p-4 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877]">
-                        No medical records uploaded yet. Upload records from the Medical Records screen.
                       </div>
-                    )}
+                    );
+                  })
+                ) : (
+                  <div className="p-6 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-2">
+                    <span className="material-symbols-outlined text-3xl text-[#577877]/60">medication_liquid</span>
+                    <p className="font-semibold text-[#162623]">No Prescriptions Issued Yet</p>
+                    <p>Your doctor will issue or update your electronic prescription during or after this consultation.</p>
                   </div>
                 )}
               </div>
