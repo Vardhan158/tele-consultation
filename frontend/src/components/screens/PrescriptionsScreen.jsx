@@ -55,11 +55,20 @@ export default function PrescriptionsScreen({
               rx.status === "completed" ||
               rx.status === "expired" ||
               rx.status === "inactive";
+            let content = {};
+            try {
+              content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
+            } catch {
+              content = { diagnosis: "Clinical Consultation", instructions: rx.content };
+            }
+            const meds = content.medicines || rx.medicines || (rx.medication_name ? [{ name: rx.medication_name, dosage: rx.dosage, frequency: rx.frequency, duration: rx.duration, instructions: rx.instructions }] : []);
             return {
               id: rx.id,
-              name: rx.medication_name || rx.title || "Prescription",
-              strength: rx.dosage || "As directed",
-              instructions: rx.instructions || "Follow prescription guidelines.",
+              name: meds[0]?.name || rx.medication_name || rx.title || "Prescription",
+              strength: meds[0]?.dosage || rx.dosage || "As directed",
+              instructions: content.instructions || rx.instructions || "Follow prescription guidelines.",
+              diagnosis: content.diagnosis || "",
+              medicines: meds,
               prescriber: rx.prescriber_name || rx.doctor_name || "Authorized Clinician",
               issuedDate: rx.released_at
                 ? new Date(rx.released_at).toLocaleDateString("en-US", {
@@ -72,17 +81,6 @@ export default function PrescriptionsScreen({
               statusBadge: rx.status ? rx.status.charAt(0).toUpperCase() + rx.status.slice(1) : "Active",
               statusType: isCompletedOrExpired ? "neutral" : "active",
               isCompleted: isCompletedOrExpired,
-              quantity:
-                rx.medicines
-                  ?.map((m) => m.quantity)
-                  .filter(Boolean)
-                  .join(", ") || "See details",
-              daysSupply:
-                rx.medicines
-                  ?.map((m) => m.duration)
-                  .filter(Boolean)
-                  .join(", ") || "See details",
-              medicines: rx.medicines || [],
             };
           }),
         );
@@ -432,8 +430,26 @@ export default function PrescriptionsScreen({
                       </div>
 
                       <div>
+                        {med.diagnosis && (
+                          <p className="text-xs text-slate-700 mb-2">
+                            <strong>Diagnosis:</strong> {med.diagnosis}
+                          </p>
+                        )}
+
+                        {med.medicines && med.medicines.length > 0 && (
+                          <div className="space-y-1.5 bg-[#F0F5F7] p-3 rounded-xl border border-[#577877]/10 text-xs mb-2">
+                            <p className="font-bold text-[#162623]">Prescribed Medications:</p>
+                            {med.medicines.map((m, idx) => (
+                              <div key={idx} className="border-b border-slate-200/60 pb-1.5 last:border-b-0 text-slate-700">
+                                <span className="font-semibold">{m.name}</span> {m.dosage ? `(${m.dosage})` : ""} {m.frequency ? `· ${m.frequency}` : ""} {m.duration ? `for ${m.duration}` : ""}
+                                {m.instructions && <div className="text-[11px] text-[#577877] mt-0.5">Instructions: {m.instructions}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         <p className="text-xs font-semibold text-[#162623]">
-                          {med.instructions}
+                          <strong>General Instructions / Dietary Advice:</strong> {med.instructions}
                         </p>
                       </div>
 
