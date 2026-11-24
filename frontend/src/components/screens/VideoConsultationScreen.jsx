@@ -44,23 +44,24 @@ export default function VideoConsultationScreen({ onNavigate }) {
   const peerRef = useRef(null);
   const socketRef = useRef(null);
   const streamRef = useRef(null);
+  const [localStream, setLocalStream] = useState(null);
   const remoteStreamRef = useRef(null);
   const [remoteStream, setRemoteStream] = useState(null);
 
   // Robust video stream binding and re-binding for local preview and PIP camera view
   useEffect(() => {
-    const localStream = streamRef.current;
-    if (localStream) {
-      if (previewVideoRef.current && previewVideoRef.current.srcObject !== localStream) {
-        previewVideoRef.current.srcObject = localStream;
+    const stream = streamRef.current || localStream;
+    if (stream) {
+      if (previewVideoRef.current && previewVideoRef.current.srcObject !== stream) {
+        previewVideoRef.current.srcObject = stream;
         previewVideoRef.current.play?.().catch(() => {});
       }
-      if (localPipVideoRef.current && localPipVideoRef.current.srcObject !== localStream) {
-        localPipVideoRef.current.srcObject = localStream;
+      if (localPipVideoRef.current && localPipVideoRef.current.srcObject !== stream) {
+        localPipVideoRef.current.srcObject = stream;
         localPipVideoRef.current.play?.().catch(() => {});
       }
     }
-  }, [roomState, cameraOff]);
+  }, [roomState, cameraOff, localStream]);
 
   // Robust video stream binding and re-binding for remote doctor video view
   useEffect(() => {
@@ -168,6 +169,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
           audio: true,
         });
         streamRef.current = stream;
+        setLocalStream(stream);
         if (previewVideoRef.current) {
           previewVideoRef.current.srcObject = stream;
           previewVideoRef.current.play?.().catch(() => {});
@@ -231,6 +233,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
             audio: true,
           });
           streamRef.current = localStream;
+          setLocalStream(localStream);
         } catch (mediaErr) {
           console.warn("getUserMedia error, creating synthetic tracks:", mediaErr);
           // Fallback in headless environment without physical devices
@@ -252,6 +255,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
           ]);
           localStream = combinedStream;
           streamRef.current = localStream;
+          setLocalStream(localStream);
         }
       }
 
@@ -427,6 +431,8 @@ export default function VideoConsultationScreen({ onNavigate }) {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
     }
+    streamRef.current = null;
+    setLocalStream(null);
     remoteStreamRef.current = null;
     setRemoteStream(null);
     if (socketRef.current) {
