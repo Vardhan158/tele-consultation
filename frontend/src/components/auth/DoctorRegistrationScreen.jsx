@@ -536,7 +536,7 @@ export default function DoctorRegistrationScreen({
     <div
       className={`font-sans flex flex-col text-[#162623] ${
         inModal
-          ? "relative w-full max-w-4xl max-h-[92vh] bg-[#F0F5F7] rounded-none shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
+          ? "relative w-full max-w-4xl max-h-[96vh] bg-[#F0F5F7] rounded-none shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
           : "min-h-screen lg:h-screen lg:max-h-screen bg-[#F0F5F7] lg:overflow-hidden"
       }`}
     >
@@ -545,7 +545,7 @@ export default function DoctorRegistrationScreen({
 
       <main
         className={`flex-1 flex flex-col justify-between p-3.5 sm:p-4 lg:p-4.5 xl:p-5 max-w-6xl w-full mx-auto overflow-y-auto ${
-          inModal ? "max-h-[calc(92vh-52px)]" : "lg:overflow-hidden"
+          inModal ? "max-h-[calc(96vh-52px)]" : "lg:overflow-hidden"
         }`}
       >
         {/* Title & 3-Step Story Stepper */}
