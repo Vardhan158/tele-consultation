@@ -90,14 +90,52 @@ class Settings(BaseSettings):
     cloudinary_url: str = Field(default="", validation_alias="CLOUDINARY_URL")
 
     def get_cloudinary_credentials(self) -> tuple[str, str, str]:
-        """Return (cloud_name, api_key, api_secret) parsed from settings or CLOUDINARY_URL."""
-        cloud_name = self.cloudinary_cloud_name
-        api_key = self.cloudinary_api_key
-        api_secret = self.cloudinary_api_secret
+        """Return (cloud_name, api_key, api_secret) parsed from settings, environment, or .env."""
+        import os
+        from pathlib import Path
+        import urllib.parse
 
-        if self.cloudinary_url and (not cloud_name or not api_key or not api_secret):
-            import urllib.parse
-            parsed = urllib.parse.urlparse(self.cloudinary_url)
+        cloud_name = self.cloudinary_cloud_name or os.environ.get("CLOUDINARY_CLOUD_NAME") or os.environ.get("TELECONSULT_CLOUDINARY_CLOUD_NAME") or ""
+        api_key = self.cloudinary_api_key or os.environ.get("CLOUDINARY_API_KEY") or os.environ.get("TELECONSULT_CLOUDINARY_API_KEY") or ""
+        api_secret = self.cloudinary_api_secret or os.environ.get("CLOUDINARY_API_SECRET") or os.environ.get("TELECONSULT_CLOUDINARY_API_SECRET") or ""
+        c_url = self.cloudinary_url or os.environ.get("CLOUDINARY_URL") or os.environ.get("TELECONSULT_CLOUDINARY_URL") or ""
+
+        if not cloud_name or not api_key:
+            # Check .env files directly on disk in case settings was cached before .env was updated
+            cur_file = Path(__file__).resolve()
+            search_paths = [
+                Path(".env"),
+                Path("backend/.env"),
+                Path("../backend/.env"),
+                cur_file.parents[4] / ".env",
+                cur_file.parents[3] / ".env",
+                cur_file.parents[2] / ".env",
+            ]
+            for env_path in search_paths:
+                if env_path.is_file():
+                    try:
+                        with open(env_path, "r", encoding="utf-8") as f:
+                            for line in f:
+                                line = line.strip()
+                                if not line or line.startswith("#") or "=" not in line:
+                                    continue
+                                k, v = line.split("=", 1)
+                                k, v = k.strip(), v.strip().strip("'\"")
+                                if k in ("CLOUDINARY_CLOUD_NAME", "TELECONSULT_CLOUDINARY_CLOUD_NAME") and not cloud_name:
+                                    cloud_name = v
+                                elif k in ("CLOUDINARY_API_KEY", "TELECONSULT_CLOUDINARY_API_KEY") and not api_key:
+                                    api_key = v
+                                elif k in ("CLOUDINARY_API_SECRET", "TELECONSULT_CLOUDINARY_API_SECRET") and not api_secret:
+                                    api_secret = v
+                                elif k in ("CLOUDINARY_URL", "TELECONSULT_CLOUDINARY_URL") and not c_url:
+                                    c_url = v
+                    except Exception:
+                        pass
+                if cloud_name and api_key and (api_secret or c_url):
+                    break
+
+        if c_url and (not cloud_name or not api_key or not api_secret):
+            parsed = urllib.parse.urlparse(c_url)
             if parsed.scheme == "cloudinary":
                 api_key = api_key or (parsed.username or "")
                 api_secret = api_secret or (parsed.password or "")
@@ -148,5 +186,11 @@ class Settings(BaseSettings):
 
 
 @lru_cache
-def get_settings() -> Settings:
+def _cached_settings() -> Settings:
     return Settings()
+
+
+def get_settings(fresh: bool = False) -> Settings:
+    if fresh:
+        _cached_settings.cache_clear()
+    return _cached_settings()

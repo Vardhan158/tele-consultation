@@ -439,9 +439,13 @@ async def _upload_to_cloudinary(file_bytes: bytes, filename: str, content_type: 
     settings = get_settings()
     cloud_name, api_key, api_secret = settings.get_cloudinary_credentials()
     if not cloud_name or not api_key:
+        settings = get_settings(fresh=True)
+        cloud_name, api_key, api_secret = settings.get_cloudinary_credentials()
+
+    if not cloud_name or not api_key:
         raise HTTPException(
             status_code=503,
-            detail="Cloudinary is not configured on the server. Please provide CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY.",
+            detail=f"Cloudinary is not configured on the server. Missing: {'cloud_name ' if not cloud_name else ''}{'api_key' if not api_key else ''}.",
         )
 
     import time
@@ -499,13 +503,17 @@ async def upload_profile_photo(
     if not get_settings().mongodb_enabled:
         raise HTTPException(status_code=503, detail="No application database is configured")
 
-    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/jpg", "image/gif"}
     content_type = (file.content_type or "").lower()
+    ext = (file.filename or "").split(".")[-1].lower() if "." in (file.filename or "") else ""
     if content_type not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid image format. Allowed formats are JPEG, PNG, and WebP.",
-        )
+        if ext in ("jpg", "jpeg", "png", "webp", "gif"):
+            content_type = f"image/{'jpeg' if ext in ('jpg', 'jpeg') else ext}"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid image format '{content_type}'. Allowed formats are JPEG, PNG, and WebP.",
+            )
 
     file_bytes = await file.read()
     if len(file_bytes) > 5 * 1024 * 1024:
@@ -521,14 +529,42 @@ async def upload_profile_photo(
     )
 
     db = mongo_database.database()
-    await db["patients"].update_one(
-        {"tenant_id": principal.tenant_id, "$or": [{"user_id": principal.user_id}, {"id": principal.user_id}]},
+    user_id_str = str(principal.user_id)
+    tenant_id_str = str(principal.tenant_id or get_settings().default_tenant_id)
+
+    patient_doc = await db["patients"].find_one({
+        "$or": [
+            {"user_id": user_id_str},
+            {"id": user_id_str},
+        ]
+    })
+
+    if patient_doc:
+        await db["patients"].update_one(
+            {"_id": patient_doc["_id"]},
+            {"$set": {"avatar_url": secure_url}},
+        )
+    else:
+        await db["patients"].update_one(
+            {"user_id": user_id_str},
+            {
+                "$set": {"avatar_url": secure_url},
+                "$setOnInsert": {
+                    "id": user_id_str,
+                    "user_id": user_id_str,
+                    "tenant_id": tenant_id_str,
+                    "created_at": datetime.now(UTC).isoformat(),
+                },
+            },
+            upsert=True,
+        )
+
+    await db["users"].update_one(
+        {"$or": [{"id": user_id_str}, {"user_id": user_id_str}]},
         {"$set": {"avatar_url": secure_url}},
-        upsert=True,
     )
 
     return {"avatar_url": secure_url, "message": "Profile photo updated successfully"}
-    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 @router.post("/intake", response_model=MedicalIntakeResponse, status_code=status.HTTP_201_CREATED)
