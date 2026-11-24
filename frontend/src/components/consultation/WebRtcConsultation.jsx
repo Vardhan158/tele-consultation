@@ -451,7 +451,7 @@ export default function WebRtcConsultation({
       </div>
 
       {/* Main Video View Container */}
-      <div className="relative rounded-2xl overflow-hidden bg-[#162623] shadow-lg aspect-16/10 flex flex-col justify-between">
+      <div className={`relative rounded-2xl overflow-hidden bg-[#162623] shadow-lg ${role === "doctor" ? "h-[300px] sm:h-[360px]" : "aspect-16/10"} flex flex-col justify-between`}>
         {/* Remote Doctor Stream or Waiting Overlay */}
         <div className="w-full h-full relative flex items-center justify-center bg-[#162623]">
           {status === "in_progress" && (remoteMedia.video || remoteMedia.audio) ? (
