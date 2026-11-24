@@ -39,9 +39,6 @@ function ClinicianHeader({ onBack, isModal = false, onClose }) {
       </div>
 
       <div className="flex items-center gap-2.5">
-        <span className="font-semibold text-xs tracking-wide text-white/90 bg-white/15 px-3 py-1 rounded-lg border border-white/20 uppercase hidden sm:inline-block">
-          Clinician Portal
-        </span>
         {isModal && onClose ? (
           <button
             type="button"
