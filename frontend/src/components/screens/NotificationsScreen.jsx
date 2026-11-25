@@ -111,33 +111,36 @@ export default function NotificationsScreen({ onNavigate }) {
   });
 
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
-      <div className="mx-auto max-w-6xl space-y-6">
-        {/* Page Header matching Screenshot 1:1 */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
-              Your care updates
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              The things that matter, without the noise.
-            </p>
+    <div className="w-full space-y-6 font-sans text-[#162623]">
+      {/* Compact Heading Banner matching Portal Brand System */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Care Alerts &amp; Portal Updates
           </div>
-
-          <button
-            type="button"
-            onClick={handleMarkAllAsRead}
-            disabled={unreadCount === 0}
-            className={`self-start sm:self-auto border border-[#577877]/30 bg-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-2xs transition flex items-center gap-2 ${
-              unreadCount > 0
-                ? "text-[#162623] hover:bg-[#F0F5F7] cursor-pointer"
-                : "text-[#577877]/60 cursor-not-allowed opacity-75"
-            }`}
-          >
-            <span className="material-symbols-outlined text-base">check</span>
-            <span>Mark all as read</span>
-          </button>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Notifications
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            Stay updated with appointment confirmations, clinical notes, prescriptions, and billing receipts.
+          </p>
         </div>
+
+        <button
+          type="button"
+          onClick={handleMarkAllAsRead}
+          disabled={unreadCount === 0}
+          className={`px-4 py-2 rounded-xl font-semibold text-xs transition flex items-center gap-1.5 shadow-xs shrink-0 self-start sm:self-center ${
+            unreadCount > 0
+              ? "bg-white text-[#185A4D] hover:bg-[#F0F5F7] cursor-pointer"
+              : "bg-white/40 text-white/70 cursor-not-allowed"
+          }`}
+        >
+          <span className="material-symbols-outlined text-base">check</span>
+          <span>Mark All as Read</span>
+        </button>
+      </div>
 
         {/* Main 2-Column Layout matching Screenshot */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -337,7 +340,6 @@ export default function NotificationsScreen({ onNavigate }) {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Preferences Modal */}
       {showPreferencesModal && (

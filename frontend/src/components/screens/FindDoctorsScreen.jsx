@@ -544,13 +544,48 @@ export default function FindDoctorsScreen({
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#F9FBFA] font-sans text-zinc-800 antialiased selection:bg-[#1A7D67] selection:text-white">
-      {!authenticated && <PublicNavbar />}
+  const mainContent = (
+    <div className="w-full space-y-6 font-sans text-[#162623]">
+      {/* Compact Heading Banner matching Portal Brand System */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Verified Clinicians &amp; Specialists
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Find Doctors
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            Search certified medical specialists, check available schedules, and book online video consultations.
+          </p>
+        </div>
 
-      <div className={`max-w-7xl mx-auto px-5 py-6 lg:px-10 space-y-6 ${!authenticated ? "pt-16 sm:pt-20" : ""}`}>
+        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center">
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="px-4 py-2 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base !text-[#185A4D]">filter_alt_off</span>
+              <span>Reset Filters</span>
+            </button>
+          )}
+          {authenticated && (
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate("appointments")}
+              className="px-4 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base !text-[#185A4D]">calendar_month</span>
+              <span>My Appointments</span>
+            </button>
+          )}
+        </div>
+      </div>
 
-        {/* Mobile Filter Toggle Header (Visible only on < lg screens) */}
+      {/* Mobile Filter Toggle Header (Visible only on < lg screens) */}
         <div className="lg:hidden flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs">
           <div className="flex items-center gap-2 text-xs font-semibold text-zinc-800">
             <span className="material-symbols-outlined text-[#1A7D67] text-xl">tune</span>
@@ -1466,6 +1501,18 @@ export default function FindDoctorsScreen({
           </div>
         </div>
       )}
+    </div>
+  );
+
+  if (authenticated) {
+    return mainContent;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white">
+      <PublicNavbar />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 pt-20 sm:pt-24">
+        {mainContent}
       </div>
     </div>
   );

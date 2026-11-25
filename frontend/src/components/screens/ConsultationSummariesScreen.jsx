@@ -121,52 +121,55 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
   };
 
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-      <div className="mx-auto max-w-7xl space-y-6">
-        {/* Toast */}
-        {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
-            <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">
-                check_circle
-              </span>
-              {toastMessage}
+    <div className="w-full space-y-6 font-sans text-[#162623]">
+      {/* Toast */}
+      {toastMessage && (
+        <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
+          <span className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">
+              check_circle
             </span>
-            <button
-              type="button"
-              onClick={() => setToastMessage("")}
-              className="text-[#577877] hover:text-[#162623]"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
-          </div>
-        )}
-
-        {/* Header & Top Action Row matching Screenshot */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-              The next steps, made clear
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              Review your doctor's notes and care plan after every consultation.
-            </p>
-          </div>
-
+            {toastMessage}
+          </span>
           <button
             type="button"
-            onClick={handleAuthorizedDownload}
-            className="bg-white border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer self-start sm:self-auto"
+            onClick={() => setToastMessage("")}
+            className="text-[#577877] hover:text-[#162623]"
           >
-            <span className="material-symbols-outlined !text-[#25836F] text-base">
-              download
-            </span>
-            <span>Download summary</span>
+            <span className="material-symbols-outlined text-sm">close</span>
           </button>
         </div>
+      )}
 
-        {/* Main 2-Column Content Layout matching Screenshot */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Compact Heading Banner matching Portal Brand System */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Post-Visit Clinical Summaries
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Consultation Summaries
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            Review your doctor's clinical notes, diagnoses, and care plans after every teleconsultation.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleAuthorizedDownload}
+          className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0 self-start sm:self-center"
+        >
+          <span className="material-symbols-outlined text-base !text-[#185A4D]">
+            download
+          </span>
+          <span>Download Summary</span>
+        </button>
+      </div>
+
+      {/* Main 2-Column Content Layout matching Screenshot */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column (4 cols): Consultations Navigation List matching Screenshot */}
           <div className="lg:col-span-4 space-y-3">
             <span className="text-[10px] font-bold text-[#577877] uppercase tracking-wider block">
@@ -386,7 +389,6 @@ export default function ConsultationSummariesScreen({ onNavigate }) {
             </span>
           </div>
         </div>
-      </div>
 
       {/* Follow-up Plan Modal */}
       {showPlanModal && (

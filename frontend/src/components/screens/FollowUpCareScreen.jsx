@@ -143,55 +143,66 @@ export default function FollowUpCareScreen({ onNavigate }) {
   };
 
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-      <div className="mx-auto max-w-6xl space-y-6">
-        {/* Toast */}
-        {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
-            <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">info</span>
-              {toastMessage}
-            </span>
-            <button
-              type="button"
-              onClick={() => setToastMessage("")}
-              className="text-[#577877] hover:text-[#162623]"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
-          </div>
-        )}
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#162623] tracking-tight">
-              Small steps. Steadier care.
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              {followUpPlan
-                ? `Your follow-up plan from ${followUpPlan.doctor_name || "your clinician"}`
-                : "Your personalized care log and vitals history."}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => onNavigate && onNavigate("summaries")}
-              className="border border-[#577877]/30 bg-white hover:bg-[#F0F5F7] text-[#162623] px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-2xs transition cursor-pointer"
-            >
-              View consultation summary
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate && onNavigate("find-doctors")}
-              className="btn-primary text-xs sm:text-sm cursor-pointer"
-            >
-              Book follow-up appointment
-            </button>
-          </div>
+    <div className="w-full space-y-6 font-sans text-[#162623]">
+      {/* Toast */}
+      {toastMessage && (
+        <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
+          <span className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">info</span>
+            {toastMessage}
+          </span>
+          <button
+            type="button"
+            onClick={() => setToastMessage("")}
+            className="text-[#577877] hover:text-[#162623]"
+          >
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
         </div>
+      )}
+
+     {/* Compact Heading Banner matching Portal Brand System */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Continuous Care &amp; Health Monitoring
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Follow-up Care
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            {followUpPlan
+              ? `Your personalized follow-up care plan from ${followUpPlan.doctor_name || "your clinician"}.`
+              : "Track your recovery milestones, vitals history, and ongoing treatment routines."}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-center">
+          <button
+            type="button"
+            onClick={() => onNavigate && onNavigate("summaries")}
+            className="px-4 py-2 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] shadow-xs transition cursor-pointer"
+          >
+            View Consultation Summary
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCheckinModal(true)}
+            className="px-4 py-2 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] shadow-xs transition cursor-pointer flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-base !text-[#185A4D]">add_circle</span>
+            <span>Log Check-in</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate && onNavigate("find-doctors")}
+            className="px-4 py-2 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] shadow-xs transition cursor-pointer"
+          >
+            Book Appointment
+          </button>
+        </div>
+      </div>
 
         {/* Doctor's Follow-up Plan Banner - Displayed ONLY when a genuine plan exists */}
         {followUpPlan && followUpPlan.advice && (
@@ -557,6 +568,5 @@ export default function FollowUpCareScreen({ onNavigate }) {
           </div>
         </div>
       </div>
-    </div>
   );
 }
