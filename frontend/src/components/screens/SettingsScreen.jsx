@@ -283,18 +283,6 @@ export default function SettingsScreen({ onNavigate }) {
 
           <button
             type="button"
-            onClick={() => setActiveTab("accessibility")}
-            className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
-              activeTab === "accessibility"
-                ? "text-[#25836F] border-b-2 border-[#25836F]"
-                : "text-[#577877] hover:text-[#162623]"
-            }`}
-          >
-            Accessibility
-          </button>
-
-          <button
-            type="button"
             onClick={() =>
               onNavigate ? onNavigate("consent") : setActiveTab("privacy")
             }
