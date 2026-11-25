@@ -409,6 +409,18 @@ async def update_profile(
             {"$set": changes},
             upsert=True,
         )
+        user_sync = {}
+        if "avatar_url" in changes:
+            user_sync["avatar_url"] = changes["avatar_url"]
+        if "full_name" in changes:
+            user_sync["full_name"] = changes["full_name"]
+        if "phone" in changes:
+            user_sync["mobile_number"] = changes["phone"]
+        if user_sync:
+            await db["users"].update_many(
+                {"$or": [{"id": principal.user_id}, {"user_id": principal.user_id}]},
+                {"$set": user_sync},
+            )
         document = await db["patients"].find_one({
             "tenant_id": principal.tenant_id,
             "$or": [{"user_id": principal.user_id}, {"id": principal.user_id}],
