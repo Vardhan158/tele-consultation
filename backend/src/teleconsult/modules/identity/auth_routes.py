@@ -364,6 +364,17 @@ async def get_me(request: Request) -> dict[str, object]:
             })
             approval_status = doc.get("approval_status", "pending") if doc else "pending"
             rejection_reason = doc.get("rejection_reason") if doc else None
+
+        avatar_url = user.get("avatar_url")
+        if not avatar_url:
+            patient_doc = await database["patients"].find_one({
+                "$or": [{"user_id": user["id"]}, {"id": user["id"]}]
+            })
+            if patient_doc and patient_doc.get("avatar_url"):
+                avatar_url = patient_doc.get("avatar_url")
+            elif doc and doc.get("avatar_url"):
+                avatar_url = doc.get("avatar_url")
+
         return {
             "authenticated": True, "user_id": user["id"],
             "tenant_id": user["tenant_id"], "full_name": user.get("full_name"),
@@ -374,6 +385,7 @@ async def get_me(request: Request) -> dict[str, object]:
             "approval_status": approval_status,
             "rejection_reason": rejection_reason,
             "email_verified": bool(user.get("verified_at")),
+            "avatar_url": avatar_url,
         }
     except Exception:
         return {"authenticated": False}

@@ -125,6 +125,7 @@ export function formatMemberSince(dateStr) {
 
 export default function ProfileScreen({
   onNavigate,
+  onUserUpdate,
   initialSection = "personal",
 }) {
   const [profile, setProfile] = useState({});
@@ -161,6 +162,9 @@ export default function ProfileScreen({
       const res = await patientApi.uploadPhoto(file);
       if (res?.avatar_url) {
         setProfile((prev) => ({ ...prev, avatar_url: res.avatar_url }));
+        if (typeof onUserUpdate === "function") {
+          onUserUpdate({ avatar_url: res.avatar_url });
+        }
         setIsErrorToast(false);
         setSaveMessage("Profile photo uploaded successfully!");
         setTimeout(() => setSaveMessage(""), 4000);
@@ -181,6 +185,9 @@ export default function ProfileScreen({
       .then(([p, c]) => {
         if (!active) return;
         if (p) {
+          if (p.avatar_url && typeof onUserUpdate === "function") {
+            onUserUpdate({ avatar_url: p.avatar_url });
+          }
           const dob = p.date_of_birth || "";
           const createdAt = p.created_at || null;
           let streetAddress = p.street_address || "";

@@ -321,7 +321,12 @@ export default function App() {
       case "settings":
         return <SettingsScreen onNavigate={handleNavigate} />;
       case "profile":
-        return <ProfileScreen onNavigate={handleNavigate} />;
+        return (
+          <ProfileScreen
+            onNavigate={handleNavigate}
+            onUserUpdate={(updates) => setPatient((prev) => (prev ? { ...prev, ...updates } : prev))}
+          />
+        );
       case "consent":
         return <ConsentScreen onNavigate={handleNavigate} />;
       case "support":
