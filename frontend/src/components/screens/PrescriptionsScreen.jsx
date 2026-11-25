@@ -326,68 +326,69 @@ export default function PrescriptionsScreen({
   };
 
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-      <div className="mx-auto max-w-7xl space-y-6">
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
-            <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">
-                check_circle
-              </span>
-              {toastMessage}
+    <div className="w-full space-y-6 font-sans text-[#162623]">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
+          <span className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">
+              check_circle
             </span>
-            <button
-              type="button"
-              onClick={() => setToastMessage("")}
-              className="text-[#577877] hover:text-[#162623]"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
-          </div>
-        )}
+            {toastMessage}
+          </span>
+          <button
+            type="button"
+            onClick={() => setToastMessage("")}
+            className="text-[#577877] hover:text-[#162623]"
+          >
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+      )}
 
-        {/* Page Heading & Top Action Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-              {currentMode === "summaries"
-                ? "Consultation summaries"
-                : "Your prescriptions"}
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              {currentMode === "summaries"
-                ? "Clinical notes and care plans from your past visits."
-                : "A clear view of your medications, instructions, and refill information."}
-            </p>
+      {/* Compact Heading Banner matching Portal Brand System */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Doctor-Issued Rx &amp; Medications
           </div>
-
-          {currentMode === "prescriptions" ? (
-            <button
-              type="button"
-              onClick={handleDownloadMedList}
-              className="bg-white border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer self-start sm:self-auto"
-            >
-              <span className="material-symbols-outlined !text-[#25836F] text-base">
-                download
-              </span>
-              <span>Download medication list</span>
-            </button>
-          ) : summariesList.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => handleDownloadSummary(summariesList[0])}
-              className="bg-white border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition cursor-pointer self-start sm:self-auto"
-            >
-              <span className="material-symbols-outlined !text-[#25836F] text-base">
-                download
-              </span>
-              <span>Download summary</span>
-            </button>
-          ) : null}
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            {currentMode === "summaries" ? "Consultation Summaries" : "Your Prescriptions"}
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            {currentMode === "summaries"
+              ? "Review clinical notes, care plans, and summaries from your past visits."
+              : "A clear view of your active medications, dosage instructions, and refill management."}
+          </p>
         </div>
 
-        {/* Top Safety Banner - Prescriptions Mode Only */}
+        {currentMode === "prescriptions" ? (
+          <button
+            type="button"
+            onClick={handleDownloadMedList}
+            className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0 self-start sm:self-center"
+          >
+            <span className="material-symbols-outlined text-base !text-[#185A4D]">
+              download
+            </span>
+            <span>Download Medication List</span>
+          </button>
+        ) : summariesList.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => handleDownloadSummary(summariesList[0])}
+            className="px-5 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0 self-start sm:self-center"
+          >
+            <span className="material-symbols-outlined text-base !text-[#185A4D]">
+              download
+            </span>
+            <span>Download Summary</span>
+          </button>
+        ) : null}
+      </div>
+
+      {/* Top Safety Banner - Prescriptions Mode Only */}
         {currentMode === "prescriptions" && (
           <div className="p-4 sm:p-5 rounded-2xl bg-[#E8F3F3] border border-[#577877]/20 flex items-start gap-3.5">
             <span className="material-symbols-outlined !text-[#25836F] text-xl shrink-0 mt-0.5">
@@ -940,7 +941,6 @@ export default function PrescriptionsScreen({
             </span>
           </div>
         </div>
-      </div>
 
       {/* Prescription Detail Modal */}
       {selectedRx && (

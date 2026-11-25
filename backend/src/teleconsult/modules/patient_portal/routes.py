@@ -28,6 +28,9 @@ from teleconsult.modules.patient_portal.schemas import (
     AppointmentResponse,
     AvailabilityResponse,
     ConsentCreate,
+    ConsentDocumentDefinition,
+    ConsentDocumentSection,
+    ConsentHistoryItem,
     ConsentResponse,
     DoctorResponse,
     FamilyMemberCreate,
@@ -412,6 +415,18 @@ async def update_profile(
             {"$set": changes},
             upsert=True,
         )
+        user_sync = {}
+        if "avatar_url" in changes:
+            user_sync["avatar_url"] = changes["avatar_url"]
+        if "full_name" in changes:
+            user_sync["full_name"] = changes["full_name"]
+        if "phone" in changes:
+            user_sync["mobile_number"] = changes["phone"]
+        if user_sync:
+            await db["users"].update_many(
+                {"$or": [{"id": principal.user_id}, {"user_id": principal.user_id}]},
+                {"$set": user_sync},
+            )
         document = await db["patients"].find_one({
             "tenant_id": principal.tenant_id,
             "$or": [{"user_id": principal.user_id}, {"id": principal.user_id}],
@@ -600,8 +615,207 @@ async def submit_intake(
     raise HTTPException(status_code=503, detail="Database not available")
 
 
-async def audit(session: Any, principal: Principal, action: str, resource_id: UUID) -> None:
-    pass
+CONSENT_DOCUMENTS: list[dict[str, Any]] = [
+    {
+        "id": "teleconsultation",
+        "consent_type": "teleconsultation",
+        "title": "Teleconsultation Consent",
+        "category": "essential",
+        "required": True,
+        "version": "v2.1",
+        "effective_date": "2026-01-01",
+        "summary": "Consent to receive clinical care and medical evaluation through secure real-time audio and video consultations.",
+        "sections": [
+            {
+                "heading": "1. Understanding Teleconsultation",
+                "body": "Teleconsultation enables licensed doctors to review your medical history, discuss symptoms, assess non-urgent health conditions, formulate clinical impressions, and provide digital prescriptions or care recommendations over secure audio/video channels.",
+            },
+            {
+                "heading": "2. Clinical Limitations & In-Person Care",
+                "body": "Teleconsultations do not provide direct physical examinations (such as palpation, auscultation, or hands-on clinical assessment). If your physician determines that your symptoms or clinical condition require direct hands-on examination, diagnostic testing, or specialized evaluation, they will advise you to consult an in-person healthcare provider or clinic.",
+            },
+            {
+                "heading": "3. Medical Emergencies Protocol",
+                "body": "Teleconsultation services are strictly intended for non-emergency healthcare needs. In any acute medical emergency—such as severe chest pain, sudden difficulty breathing, profuse bleeding, symptoms of stroke, or severe trauma—you must call your local emergency services immediately or go to the nearest hospital emergency department.",
+            },
+            {
+                "heading": "4. Consultation Conduct & Privacy",
+                "body": "All video and audio consultations take place in private, real-time sessions. Consultations are never recorded without explicit, advance notice and consent from all participants. You are expected to join the consultation from a private, safe, and well-lit space.",
+            },
+            {
+                "heading": "5. Acceptance & Right to Withdraw",
+                "body": "By granting this consent, you acknowledge the nature and limitations of remote clinical consultations. You may withdraw this consent at any time; however, an active teleconsultation consent is required to participate in scheduled video appointments.",
+            },
+        ],
+    },
+    {
+        "id": "health_data_privacy",
+        "consent_type": "health_data_privacy",
+        "title": "Health Data Privacy Consent",
+        "category": "essential",
+        "required": True,
+        "version": "v2.1",
+        "effective_date": "2026-01-01",
+        "summary": "Consent for collection, storage, and clinical processing of personal health data strictly necessary for your diagnosis, consultations, and digital prescriptions.",
+        "sections": [
+            {
+                "heading": "1. Health Information Collected",
+                "body": "We collect necessary identity details (full name, contact number, date of birth, gender), intake details, relevant medical history, past allergies, symptoms, consultation summaries, and issued digital prescriptions.",
+            },
+            {
+                "heading": "2. Purpose of Clinical Data Processing",
+                "body": "Your health information is used exclusively to facilitate accurate medical diagnosis, issue legitimate digital prescriptions, maintain treatment continuity across appointments, and fulfill clinical standards of practice.",
+            },
+            {
+                "heading": "3. Access Controls & Confidentiality",
+                "body": "Access to your medical records is strictly restricted to you and the licensed clinicians who directly evaluate or manage your care. We do not sell, rent, or disclose personal health data to advertising or marketing third parties.",
+            },
+            {
+                "heading": "4. Clinical Record Retention",
+                "body": "In compliance with health record retention regulations, medical consultation notes, doctor orders, and digital prescriptions must be retained for the statutory minimum clinical retention period to support patient safety and continuity of care.",
+            },
+            {
+                "heading": "5. Your Data Rights",
+                "body": "You have the right to access and review your medical records, download consultation summaries, request corrections to personal profile details, and inspect your consent audit trail at any time.",
+            },
+        ],
+    },
+    {
+        "id": "medical_record_sharing",
+        "consent_type": "medical_record_sharing",
+        "title": "Medical Record Sharing Consent",
+        "category": "optional",
+        "required": False,
+        "version": "v2.1",
+        "effective_date": "2026-01-01",
+        "summary": "Optional authorization allowing treating physicians and consulting specialists to access past diagnostic reports, laboratory panels, and visit records.",
+        "sections": [
+            {
+                "heading": "1. Scope of Record Sharing",
+                "body": "When enabled, this authorization permits treating physicians and specialists within your care team to view diagnostic documents, laboratory test results, imaging reports, and previous visit records you have uploaded or authorized.",
+            },
+            {
+                "heading": "2. Independent from Essential Care",
+                "body": "This consent is completely optional. Choosing not to share historical diagnostic reports or previous records does not affect your ability to schedule appointments, consult with doctors, or receive valid medical prescriptions.",
+            },
+            {
+                "heading": "3. Care Team Coordination",
+                "body": "Enabling record sharing helps consulting specialists understand your past clinical background, avoid redundant lab tests, and provide more coordinated treatment recommendations.",
+            },
+            {
+                "heading": "4. Right of Immediate Revocation",
+                "body": "You may grant or withdraw this record sharing consent at any time through the patient portal. Withdrawing takes immediate effect for subsequent record access requests and does not penalize or alter your ongoing care.",
+            },
+        ],
+    },
+]
+
+
+@router.get("/consents/documents", response_model=list[ConsentDocumentDefinition])
+async def get_consent_documents(
+    principal: Principal = Depends(require("patient:profile:read")),
+) -> list[ConsentDocumentDefinition]:
+    """Retrieve full dynamic consent document definitions with versions, patient-friendly explanations, and sections."""
+    return [ConsentDocumentDefinition(**doc) for doc in CONSENT_DOCUMENTS]
+
+
+@router.get("/consents/history", response_model=list[ConsentHistoryItem])
+async def get_consent_history(
+    principal: Principal = Depends(require("patient:profile:read")),
+) -> list[ConsentHistoryItem]:
+    """Retrieve dynamic audit history of consent events from MongoDB."""
+    if not get_settings().mongodb_enabled:
+        return []
+    db = mongo_database.database()
+    patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+
+    # Fetch audit logs related to patient consents
+    audit_docs = await db["audit_logs"].find({
+        "tenant_id": str(principal.tenant_id),
+        "resource_type": "patient_consent",
+        "$or": [
+            {"actor_id": {"$in": patient_ids}},
+            {"resource_id": {"$in": patient_ids}},
+        ],
+    }).sort("occurred_at", -1).to_list(100)
+
+    title_map = {
+        "teleconsultation": "Teleconsultation Consent",
+        "telehealth": "Teleconsultation Consent",
+        "treatment": "Teleconsultation Consent",
+        "health_data_privacy": "Health Data Privacy Consent",
+        "medical_record_sharing": "Medical Record Sharing Consent",
+        "reminders": "Appointment Reminders",
+        "communication_preferences": "Communication Preferences & Updates",
+        "research": "Optional Health Research",
+    }
+
+    results: list[ConsentHistoryItem] = []
+    seen_ids: set[str] = set()
+
+    for item in audit_docs:
+        c_type = item.get("purpose") or "teleconsultation"
+        action_raw = item.get("action", "")
+        action = "Granted" if "grant" in action_raw.lower() else "Withdrawn"
+        occ_val = item.get("occurred_at") or datetime.now(UTC)
+        if isinstance(occ_val, str):
+            try:
+                occ_dt = datetime.fromisoformat(occ_val.replace("Z", "+00:00"))
+            except ValueError:
+                occ_dt = datetime.now(UTC)
+        elif isinstance(occ_val, datetime):
+            occ_dt = occ_val
+        else:
+            occ_dt = datetime.now(UTC)
+
+        item_id = str(item.get("id") or item.get("_id"))
+        if item_id in seen_ids:
+            continue
+        seen_ids.add(item_id)
+
+        results.append(ConsentHistoryItem(
+            id=item_id,
+            consent_type=c_type,
+            title=title_map.get(c_type, c_type.replace("_", " ").title()),
+            version=item.get("version", "v2.1"),
+            action=action,
+            occurred_at=occ_dt,
+            source="Patient portal",
+        ))
+
+    # Also check consents collection for entries with timestamps if audit logs empty
+    if not results:
+        consents_docs = await db["consents"].find({
+            "tenant_id": str(principal.tenant_id),
+            "patient_id": {"$in": patient_ids},
+        }).sort("granted_at", -1).to_list(100)
+        for doc in consents_docs:
+            c_type = doc.get("consent_type", "teleconsultation")
+            dt_val = doc.get("withdrawn_at") or doc.get("granted_at") or doc.get("created_at")
+            if isinstance(dt_val, str):
+                try:
+                    dt = datetime.fromisoformat(dt_val.replace("Z", "+00:00"))
+                except ValueError:
+                    dt = datetime.now(UTC)
+            elif isinstance(dt_val, datetime):
+                dt = dt_val
+            else:
+                dt = datetime.now(UTC)
+            act = "Withdrawn" if doc.get("status") == "withdrawn" else "Granted"
+            doc_id = str(doc.get("id") or doc.get("_id"))
+            results.append(ConsentHistoryItem(
+                id=doc_id,
+                consent_type=c_type,
+                title=title_map.get(c_type, c_type.replace("_", " ").title()),
+                version=doc.get("version", "v2.1"),
+                action=act,
+                occurred_at=dt,
+                source="Patient portal",
+            ))
+
+    return results
+
+
 @router.post("/consents", response_model=ConsentResponse, status_code=status.HTTP_201_CREATED)
 async def grant_consent(
     payload: ConsentCreate,
@@ -611,17 +825,40 @@ async def grant_consent(
         db = mongo_database.database()
         consent_id = str(uuid4())
         now = datetime.now(UTC)
+        patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+
+        canonical_type = payload.consent_type
+        if canonical_type in ("telehealth", "treatment"):
+            canonical_type = "teleconsultation"
+
+        version_val = payload.version or "v2.1"
+
+        # Supersede any active existing consents of this canonical or alias type
+        type_family = [canonical_type]
+        if canonical_type == "teleconsultation":
+            type_family.extend(["telehealth", "treatment"])
+        await db["consents"].update_many(
+            {
+                "tenant_id": str(principal.tenant_id),
+                "patient_id": {"$in": patient_ids},
+                "consent_type": {"$in": type_family},
+                "status": "granted",
+            },
+            {"$set": {"status": "superseded", "superseded_at": now.isoformat()}},
+        )
+
         doc = {
             "id": consent_id,
             "tenant_id": str(principal.tenant_id),
             "patient_id": str(principal.user_id),
-            "consent_type": payload.consent_type,
-            "version": payload.version,
+            "consent_type": canonical_type,
+            "version": version_val,
             "status": "granted",
             "granted_at": now.isoformat(),
             "created_at": now.isoformat(),
         }
         await db["consents"].insert_one(dict(doc))
+
         audit_doc = {
             "id": str(uuid4()),
             "tenant_id": str(principal.tenant_id),
@@ -629,16 +866,27 @@ async def grant_consent(
             "action": "consent.grant",
             "resource_type": "patient_consent",
             "resource_id": consent_id,
-            "purpose": payload.consent_type,
+            "purpose": canonical_type,
+            "version": version_val,
             "occurred_at": now.isoformat(),
         }
         await db["audit_logs"].insert_one(dict(audit_doc))
+
+        title_map = {
+            "teleconsultation": "Teleconsultation Consent",
+            "health_data_privacy": "Health Data Privacy Consent",
+            "medical_record_sharing": "Medical Record Sharing Consent",
+        }
+
         return ConsentResponse(
             id=_to_uuid(consent_id),
-            consent_type=payload.consent_type,
-            version=payload.version,
+            consent_type=canonical_type,
+            version=version_val,
             status="granted",
             granted_at=now,
+            document_title=title_map.get(canonical_type, canonical_type.replace("_", " ").title()),
+            category="optional" if canonical_type == "medical_record_sharing" else "essential",
+            required=canonical_type != "medical_record_sharing",
         )
     raise HTTPException(status_code=503, detail="No application database is configured")
 
@@ -656,6 +904,17 @@ async def list_consents(
             "patient_id": {"$in": patient_ids},
         }).sort("granted_at", -1).to_list(500)
 
+        title_map = {
+            "teleconsultation": "Teleconsultation Consent",
+            "telehealth": "Teleconsultation Consent",
+            "treatment": "Teleconsultation Consent",
+            "health_data_privacy": "Health Data Privacy Consent",
+            "medical_record_sharing": "Medical Record Sharing Consent",
+            "reminders": "Appointment Reminders",
+            "communication_preferences": "Communication Preferences & Updates",
+            "research": "Optional Health Research",
+        }
+
         results = []
         for document in documents:
             dt_val = document.get("granted_at") or document.get("created_at")
@@ -669,12 +928,30 @@ async def list_consents(
             else:
                 dt = datetime.now(UTC)
 
+            withdrawn_dt = None
+            w_val = document.get("withdrawn_at")
+            if w_val:
+                if isinstance(w_val, str):
+                    try:
+                        withdrawn_dt = datetime.fromisoformat(w_val.replace("Z", "+00:00"))
+                    except ValueError:
+                        withdrawn_dt = None
+                elif isinstance(w_val, datetime):
+                    withdrawn_dt = w_val
+
+            raw_type = document.get("consent_type", "general")
+            c_type = "teleconsultation" if raw_type in ("treatment", "telehealth") else raw_type
+
             results.append(ConsentResponse(
                 id=_to_uuid(document.get("id") or document.get("_id")),
-                consent_type=document.get("consent_type", "general"),
-                version=document.get("version", "v1.0"),
+                consent_type=c_type,
+                version=document.get("version", "v2.1"),
                 status=document.get("status", "granted"),
                 granted_at=dt,
+                withdrawn_at=withdrawn_dt,
+                document_title=title_map.get(c_type, c_type.replace("_", " ").title()),
+                category="optional" if c_type == "medical_record_sharing" else "essential",
+                required=c_type != "medical_record_sharing",
             ))
         return results
     return []
@@ -690,18 +967,50 @@ async def withdraw_consent(
         patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
         now = datetime.now(UTC)
 
+        type_aliases = [str(consent_id), str(consent_id).lower()]
+        if consent_id in ("teleconsultation", "telehealth", "treatment"):
+            type_aliases.extend(["teleconsultation", "telehealth", "treatment"])
+
         doc = await db["consents"].find_one({
             "tenant_id": str(principal.tenant_id),
             "patient_id": {"$in": patient_ids},
-            "$or": [{"id": str(consent_id)}, {"id": str(consent_id).lower()}],
-        })
-        if not doc:
-            raise HTTPException(status_code=404, detail="Consent record not found")
+            "$or": [
+                {"id": str(consent_id)},
+                {"id": str(consent_id).lower()},
+                {"consent_type": {"$in": type_aliases}, "status": "granted"},
+            ],
+        }, sort=[("granted_at", -1)])
 
-        await db["consents"].update_one(
-            {"_id": doc["_id"]},
-            {"$set": {"status": "withdrawn", "withdrawn_at": now.isoformat()}},
-        )
+        if not doc:
+            # Create an explicit withdrawn record if no active record was stored yet
+            c_type = consent_id if consent_id in ("teleconsultation", "health_data_privacy", "medical_record_sharing") else "medical_record_sharing"
+            if c_type in ("telehealth", "treatment"):
+                c_type = "teleconsultation"
+            c_id = str(uuid4())
+            doc = {
+                "id": c_id,
+                "tenant_id": str(principal.tenant_id),
+                "patient_id": str(principal.user_id),
+                "consent_type": c_type,
+                "version": "v2.1",
+                "status": "withdrawn",
+                "granted_at": now.isoformat(),
+                "withdrawn_at": now.isoformat(),
+                "created_at": now.isoformat(),
+            }
+            await db["consents"].insert_one(dict(doc))
+        else:
+            await db["consents"].update_many(
+                {
+                    "tenant_id": str(principal.tenant_id),
+                    "patient_id": {"$in": patient_ids},
+                    "$or": [
+                        {"_id": doc["_id"]} if "_id" in doc else {"id": doc["id"]},
+                        {"consent_type": doc.get("consent_type"), "status": "granted"},
+                    ],
+                },
+                {"$set": {"status": "withdrawn", "withdrawn_at": now.isoformat()}},
+            )
 
         audit_doc = {
             "id": str(uuid4()),
@@ -711,16 +1020,31 @@ async def withdraw_consent(
             "resource_type": "patient_consent",
             "resource_id": str(doc["id"]),
             "purpose": doc.get("consent_type", "general"),
+            "version": doc.get("version", "v2.1"),
             "occurred_at": now.isoformat(),
         }
         await db["audit_logs"].insert_one(dict(audit_doc))
 
+        title_map = {
+            "teleconsultation": "Teleconsultation Consent",
+            "telehealth": "Teleconsultation Consent",
+            "treatment": "Teleconsultation Consent",
+            "health_data_privacy": "Health Data Privacy Consent",
+            "medical_record_sharing": "Medical Record Sharing Consent",
+        }
+        c_type = doc.get("consent_type", "general")
+        canonical_type = "teleconsultation" if c_type in ("treatment", "telehealth") else c_type
+
         return ConsentResponse(
             id=_to_uuid(doc["id"]),
-            consent_type=doc.get("consent_type", "general"),
-            version=doc.get("version", "v1.0"),
+            consent_type=canonical_type,
+            version=doc.get("version", "v2.1"),
             status="withdrawn",
             granted_at=now,
+            withdrawn_at=now,
+            document_title=title_map.get(canonical_type, canonical_type.replace("_", " ").title()),
+            category="optional" if canonical_type == "medical_record_sharing" else "essential",
+            required=canonical_type != "medical_record_sharing",
         )
     return {}
 

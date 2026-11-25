@@ -1,6 +1,23 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { authApi } from "./lib/api";
+import Layout from "./components/layout/Layout";
+import DashboardScreen from "./components/screens/DashboardScreen";
+import FindDoctorsScreen from "./components/screens/FindDoctorsScreen";
+import AppointmentsScreen from "./components/screens/AppointmentsScreen";
+import VideoConsultationScreen from "./components/screens/VideoConsultationScreen";
+import MedicalRecordsScreen from "./components/screens/MedicalRecordsScreen";
+import PrescriptionsScreen from "./components/screens/PrescriptionsScreen";
+import ConsultationSummariesScreen from "./components/screens/ConsultationSummariesScreen";
+import FollowUpCareScreen from "./components/screens/FollowUpCareScreen";
+import PaymentsScreen from "./components/screens/PaymentsScreen";
+import NotificationsScreen from "./components/screens/NotificationsScreen";
+import SettingsScreen from "./components/screens/SettingsScreen";
+import ProfileScreen from "./components/screens/ProfileScreen";
+import SupportScreen from "./components/screens/SupportScreen";
+import ConsentScreen from "./components/screens/ConsentScreen";
+import AuthScreen from "./components/auth/AuthScreen";
+import { authApi, patientApi } from "./lib/api";
+import ServicesScreen from "./components/public/ServicesScreen";
 import LandingScreen from "./components/public/LandingScreen";
 
 const Layout = lazy(() => import("./components/layout/Layout"));
@@ -111,19 +128,40 @@ function AppContent() {
   const [patient, setPatient] = useState(null);
   const [registeredDoctorEmail, setRegisteredDoctorEmail] = useState("");
 
-  const refreshUser = () =>
-    authApi
-      .me()
-      .then((result) => {
-        setAuthenticated(Boolean(result?.authenticated));
-        if (result?.authenticated) setPatient(result);
-        return result;
-      })
-      .catch(() => {
+  const refreshUser = async () => {
+    try {
+      const result = await authApi.me();
+      if (result?.authenticated) {
+        setAuthenticated(true);
+        let userState = { ...result };
+        if (result.role === "patient") {
+          try {
+            const profile = await patientApi.getProfile();
+            if (profile) {
+              userState = {
+                ...userState,
+                ...profile,
+                avatar_url: profile.avatar_url || result.avatar_url,
+                full_name: profile.full_name || result.full_name,
+              };
+            }
+          } catch {
+            // fallback to authApi.me result
+          }
+        }
+        setPatient(userState);
+        return userState;
+      } else {
         setAuthenticated(false);
         setPatient(null);
         return null;
-      });
+      }
+    } catch {
+      setAuthenticated(false);
+      setPatient(null);
+      return null;
+    }
+  };
 
   useEffect(() => {
     refreshUser().finally(() => setAuthChecking(false));
@@ -327,7 +365,12 @@ function AppContent() {
       case "settings":
         return <SettingsScreen onNavigate={handleNavigate} />;
       case "profile":
-        return <ProfileScreen onNavigate={handleNavigate} />;
+        return (
+          <ProfileScreen
+            onNavigate={handleNavigate}
+            onUserUpdate={(updates) => setPatient((prev) => (prev ? { ...prev, ...updates } : prev))}
+          />
+        );
       case "consent":
         return <ConsentScreen onNavigate={handleNavigate} />;
       case "support":

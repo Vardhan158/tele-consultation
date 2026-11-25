@@ -3,7 +3,7 @@ import { doctorApi } from "../../lib/api";
 
 function ClinicianHeader({ onBack, isModal = false, onClose }) {
   return (
-    <header className="bg-[#25836F] text-white px-6 py-3.5 flex items-center justify-between shrink-0 shadow-sm rounded-t-[24px]">
+    <header className="bg-[#25836F] text-white px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between shrink-0 shadow-sm rounded-t-[24px]">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-[#F0F5F7] text-[#125747] flex items-center justify-center font-bold shadow-sm">
           <svg

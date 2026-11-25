@@ -280,32 +280,6 @@ export default function SettingsScreen({ onNavigate }) {
           >
             Account &amp; security
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("accessibility")}
-            className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
-              activeTab === "accessibility"
-                ? "text-[#25836F] border-b-2 border-[#25836F]"
-                : "text-[#577877] hover:text-[#162623]"
-            }`}
-          >
-            Accessibility
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              onNavigate ? onNavigate("consent") : setActiveTab("privacy")
-            }
-            className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
-              activeTab === "privacy"
-                ? "text-[#25836F] border-b-2 border-[#25836F]"
-                : "text-[#577877] hover:text-[#162623]"
-            }`}
-          >
-            Privacy &amp; Consent Directives
-          </button>
         </div>
 
         {/* Main 2-Column Content Layout */}
@@ -536,67 +510,6 @@ export default function SettingsScreen({ onNavigate }) {
                   Essential service and safety messages are sent regardless of
                   optional preferences.
                 </p>
-              </div>
-            </div>
-
-            {/* CARD 3: Regional preferences */}
-            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-4">
-              <h2 className="text-base sm:text-lg font-bold text-[#162623]">
-                Regional preferences
-              </h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div>
-                  <label className="text-xs font-semibold text-[#162623] block mb-1.5">
-                    Language
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={language}
-                      onChange={(e) => {
-                        setLanguage(e.target.value);
-                        handleSavePreferences({ language: e.target.value });
-                      }}
-                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F] cursor-pointer pr-8"
-                    >
-                      <option value="English (US)">English (US)</option>
-                      <option value="Spanish (Español)">Spanish (Español)</option>
-                      <option value="French (Français)">French (Français)</option>
-                      <option value="Hindi (हिन्दी)">Hindi (हिन्दी)</option>
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-3 text-[#577877] text-base pointer-events-none">
-                      expand_more
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-[#162623] block mb-1.5">
-                    Time zone
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={timeZone}
-                      onChange={(e) => {
-                        setTimeZone(e.target.value);
-                        handleSavePreferences({ time_zone: e.target.value });
-                      }}
-                      className="w-full appearance-none px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs sm:text-sm text-[#162623] bg-white focus:outline-none focus:border-[#25836F] cursor-pointer pr-8"
-                    >
-                      <option value="Asia/Kolkata (IST)">Asia/Kolkata (IST, GMT+5:30)</option>
-                      <option value="Asia/Dubai (GST)">Asia/Dubai (GST, GMT+4:00)</option>
-                      <option value="Europe/London (GMT)">Europe/London (GMT/BST)</option>
-                      <option value="America/New_York (EST)">America/New_York (EST/EDT)</option>
-                      <option value="America/Chicago (CST)">America/Chicago (CST/CDT)</option>
-                      <option value="America/Denver (MST)">America/Denver (MST/MDT)</option>
-                      <option value="America/Los_Angeles (PST)">America/Los_Angeles (PST/PDT)</option>
-                      <option value="UTC / Greenwich Mean Time">UTC / Greenwich Mean Time</option>
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-3 text-[#577877] text-base pointer-events-none">
-                      expand_more
-                    </span>
-                  </div>
-                </div>
               </div>
             </div>
           </div>

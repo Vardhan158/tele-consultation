@@ -370,9 +370,35 @@ async def get_me(request: Request) -> dict[str, object]:
             })
             approval_status = doc.get("approval_status", "pending") if doc else "pending"
             rejection_reason = doc.get("rejection_reason") if doc else None
+
+        avatar_url = None
+        patient_doc = None
+        if user.get("role") == "doctor":
+            if doc and doc.get("avatar_url"):
+                avatar_url = doc.get("avatar_url")
+        else:
+            patient_doc = await database["patients"].find_one({
+                "$or": [{"user_id": user["id"]}, {"id": user["id"]}]
+            })
+            if patient_doc and patient_doc.get("avatar_url"):
+                avatar_url = patient_doc.get("avatar_url")
+
+        if not avatar_url:
+            avatar_url = user.get("avatar_url")
+        elif user.get("avatar_url") != avatar_url:
+            try:
+                await database["users"].update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"avatar_url": avatar_url}}
+                )
+            except Exception:
+                pass
+
+        full_name = (patient_doc.get("full_name") if patient_doc and patient_doc.get("full_name") else None) or user.get("full_name")
+
         return {
             "authenticated": True, "user_id": user["id"],
-            "tenant_id": user["tenant_id"], "full_name": user.get("full_name"),
+            "tenant_id": user["tenant_id"], "full_name": full_name,
             "email": user.get("email"), "phone": user.get("mobile_number"),
             "date_of_birth": user.get("date_of_birth") or (doc.get("date_of_birth") if user.get("role") == "doctor" and doc else None),
             "gender": user.get("gender") or (doc.get("gender") if user.get("role") == "doctor" and doc else None),
@@ -380,6 +406,7 @@ async def get_me(request: Request) -> dict[str, object]:
             "approval_status": approval_status,
             "rejection_reason": rejection_reason,
             "email_verified": bool(user.get("verified_at")),
+            "avatar_url": avatar_url,
         }
     except Exception:
         return {"authenticated": False}

@@ -181,9 +181,8 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
     const isPaid = currentReceiptData?.isPaid;
 
     return (
-      <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-        <div className="mx-auto max-w-7xl space-y-6">
-          {/* Toast Notification */}
+      <div className="w-full space-y-6 font-sans text-[#162623]">
+        {/* Toast Notification */}
           {toastMessage && (
             <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
               <span className="flex items-center gap-2">
@@ -487,7 +486,6 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
             </div>
           </div>
         </div>
-      </div>
     );
   }
 
@@ -495,69 +493,71 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
   // VIEW 2: PAYMENTS & BILLING OVERVIEW
   // ========================================================
   return (
-    <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
-      <div className="mx-auto max-w-7xl space-y-6">
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
-            <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">
-                check_circle
-              </span>
-              {toastMessage}
+    <div className="w-full space-y-6 font-sans text-[#162623]">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="p-3.5 rounded-xl bg-white border border-[#25836F]/30 shadow-sm flex items-center justify-between text-xs text-[#25836F] font-semibold">
+          <span className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">
+              check_circle
             </span>
-            <button
-              type="button"
-              onClick={() => setToastMessage("")}
-              className="text-[#577877] hover:text-[#162623]"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
-          </div>
-        )}
-
-        {/* Page Heading & Top Action Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-              Payments &amp; billing
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[#577877]">
-              Simple, transparent payments. Your receipts are always here when
-              you need them.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {dbTransactions.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  const paid = dbTransactions.find((t) => t.isPaid) || dbTransactions[0];
-                  setSelectedReceipt(paid);
-                  setView("receipt");
-                }}
-                className="btn-primary !px-4 !py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs cursor-pointer"
-              >
-                <span className="material-symbols-outlined !text-white text-base">
-                  receipt_long
-                </span>
-                <span>Latest receipt</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={handleDownloadStatement}
-              className="btn-secondary !px-4 !py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs shrink-0 cursor-pointer"
-            >
-              <span className="material-symbols-outlined !text-[#25836F] text-base">
-                download
-              </span>
-              <span>Download statement</span>
-            </button>
-          </div>
+            {toastMessage}
+          </span>
+          <button
+            type="button"
+            onClick={() => setToastMessage("")}
+            className="text-[#577877] hover:text-[#162623]"
+          >
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
         </div>
+      )}
+
+      {/* Compact Heading Banner matching Portal Brand System */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Billing, Invoices &amp; Transaction Receipts
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Payments &amp; Billing
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            Simple, transparent payments. Your consultation invoices and payment receipts are always accessible.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center">
+          {dbTransactions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const paid = dbTransactions.find((t) => t.isPaid) || dbTransactions[0];
+                setSelectedReceipt(paid);
+                setView("receipt");
+              }}
+              className="px-4 py-2 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base !text-[#185A4D]">
+                receipt_long
+              </span>
+              <span>Latest Receipt</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleDownloadStatement}
+            className="px-4 py-2 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base !text-[#185A4D]">
+              download
+            </span>
+            <span>Download Statement</span>
+          </button>
+        </div>
+      </div>
 
         {/* 3 Metric Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -777,7 +777,6 @@ export default function PaymentsScreen({ onNavigate, navParams }) {
           </div>
         </div>
       </div>
-    </div>
   );
 }
 
