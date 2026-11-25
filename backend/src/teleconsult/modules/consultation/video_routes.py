@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -58,12 +61,13 @@ async def consultation_status(
 @router.post("/{appointment_id}/join", response_model=VideoJoinResponse)
 async def join_waiting_room(
     appointment_id: str,
+    session: Any | None = None,
     principal: Principal = Depends(require("consultation:join")),
 ) -> VideoJoinResponse:
     now = datetime.now(UTC)
     settings = get_settings()
 
-    if not mongo_database.enabled:
+    if not settings.mongodb_enabled and not mongo_database.enabled:
         raise HTTPException(status_code=503, detail="Database unavailable")
     db = mongo_database.database()
     patient_ids = await patient_identity_ids(db, principal)

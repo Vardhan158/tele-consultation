@@ -268,6 +268,26 @@ async def relay_ice_restart(sid: str, data: dict[str, Any] | None = None) -> Non
     await _relay(sid, "request_ice_restart", data or {})
 
 
+@sio.on("chat_message")
+async def handle_chat_message(sid: str, data: dict[str, Any]) -> None:
+    try:
+        ctx = await sio.get_session(sid)
+    except KeyError:
+        return
+    room = f"consultation:{ctx.get('appointment_id', '')}"
+    message = {
+        "id": f"msg-{secrets.token_hex(6)}",
+        "sender_role": ctx.get("role", "patient"),
+        "sender_id": str(ctx.get("user_id", "")),
+        "sender_name": "Doctor" if ctx.get("role") == "doctor" else "Patient",
+        "text": str(data.get("text", "")).strip()[:4000],
+        "file_attachment": data.get("file_attachment"),
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+    _trace("chat_message", sid, ctx, room=room)
+    await sio.emit("chat_message", message, room=room)
+
+
 @sio.on("admit_patient")
 async def admit_patient(sid: str) -> None:
     ctx = await sio.get_session(sid)

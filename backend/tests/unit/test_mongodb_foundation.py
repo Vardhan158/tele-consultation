@@ -41,7 +41,11 @@ def test_foundation_schema_has_expected_collections_and_indexes() -> None:
 
 
 def test_postgresql_url_has_no_implicit_fallback(monkeypatch) -> None:
-    from teleconsult.kernel.db import session as db_session
+    try:
+        from teleconsult.kernel.db import session as db_session
+    except ModuleNotFoundError:
+        pytest.skip("PostgreSQL kernel.db has been retired in favor of MongoDB")
+        return
 
     class MissingDatabaseSettings:
         database_url = ""

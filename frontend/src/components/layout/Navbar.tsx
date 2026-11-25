@@ -465,7 +465,7 @@ export default function Navbar() {
           aria-expanded={open}
           aria-controls="public-mobile-navigation"
           onClick={() => setOpen((prev) => !prev)}
-          className={`rounded-lg p-2 transition md:hidden cursor-pointer ${
+          className={`rounded-lg p-2 transition lg:hidden cursor-pointer ${
             useSolidWhiteHeader
               ? "text-[#165849] hover:bg-[#EEF6F3]"
               : "text-white hover:bg-white/10"
@@ -481,7 +481,7 @@ export default function Navbar() {
       {open && (
         <div
           id="public-mobile-navigation"
-          className={`border-t px-6 py-4 md:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+          className={`border-t px-6 py-4 lg:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
             useSolidWhiteHeader
               ? "border-white/40 bg-[#F0F5F7]/95 backdrop-blur-xl text-[#162623]"
               : "border-white/10 bg-[#165849]/95 backdrop-blur-xl text-white"
@@ -579,7 +579,7 @@ export default function Navbar() {
 
       {/* Doctor Registration Popup Modal with all 3 steps */}
       {showDoctorModal && (
-        <DoctorRegistrationScreen
+        <Suspense fallback={null}><DoctorRegistrationScreen
           isModal={true}
           onClose={() => setShowDoctorModal(false)}
           onSuccess={(email: string) => {
@@ -590,7 +590,7 @@ export default function Navbar() {
             setShowDoctorModal(false);
             navigate("/login");
           }}
-        />
+        /></Suspense>
       )}
     </header>
   );

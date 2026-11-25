@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import binascii
 import hashlib
@@ -7,6 +9,7 @@ import struct
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from uuid import UUID, uuid4
 
 import re
@@ -345,43 +348,7 @@ async def register_doctor(
             raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in.") from None
         return {"status": "verification_required", "user_id": user_id, "email": email, "approval_status": "pending"}
 
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    if uploaded_docs:
-        raise HTTPException(status_code=503, detail="Credential storage is unavailable for this database backend")
-    existing_user = await session.scalar(select(UserAccount).where(UserAccount.email == email))
-    if existing_user:
-        if existing_user.verified_at is None:
-            code = generate_verification_otp()
-            session.add(RecoveryToken(
-                user_id=existing_user.id,
-                token_hash=token_hash(code),
-                expires_at=otp_expiry(datetime.now(UTC)),
-            ))
-            await send_verification_email(existing_user.email, code)
-            return {
-                "status": "verification_required",
-                "user_id": str(existing_user.id),
-                "email": email,
-                "approval_status": "pending",
-            }
-        raise HTTPException(status_code=409, detail="An account with this email already exists. Please sign in.")
-
-    tenant_id = UUID(get_settings().default_tenant_id)
-    user = UserAccount(tenant_id=tenant_id, full_name=payload.full_name.strip(), email=email,
-        mobile_number=payload.mobile_number, password_hash=password_hash(payload.password),
-        terms_version="doctor-terms-current", terms_accepted_at=datetime.now(UTC), role="doctor")
-    session.add(user)
-    await session.flush()
-    session.add(Doctor(tenant_id=tenant_id, user_account_id=user.id, full_name=user.full_name,
-        specialty=payload.specialty, clinic_name=payload.clinic_name, registration_number=payload.registration_number,
-        qualifications=payload.qualifications, experience_years=payload.experience_years,
-        languages=payload.languages, supported_languages=payload.languages, active=False,
-        approved_for_consultation=False, approval_status="pending"))
-    code = generate_verification_otp()
-    session.add(RecoveryToken(user_id=user.id, token_hash=token_hash(code), expires_at=otp_expiry(datetime.now(UTC)), attempts=0))
-    await send_verification_email(user.email, code)
-    return {"status": "verification_required", "user_id": str(user.id), "email": email, "approval_status": "pending"}
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 @router.post("/{doctor_id}/approve")
@@ -451,17 +418,7 @@ async def approve_doctor(
         )
         return {"status": "approved", "doctor_id": str(doctor_id)}
 
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    doctor = await session.scalar(
-        select(Doctor).where(
-            Doctor.id == UUID(doctor_id), Doctor.tenant_id == UUID(principal.tenant_id)
-        )
-    )
-    if doctor is None:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-    doctor.approval_status, doctor.active, doctor.approved_for_consultation = "approved", True, True
-    return {"status": doctor.approval_status, "doctor_id": str(doctor.id)}
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 @router.post("/{doctor_id}/reject")
@@ -530,17 +487,7 @@ async def reject_doctor(
         )
         return {"status": "rejected", "doctor_id": str(doctor_id), "reason": reason}
 
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    doctor = await session.scalar(
-        select(Doctor).where(
-            Doctor.id == UUID(doctor_id), Doctor.tenant_id == UUID(principal.tenant_id)
-        )
-    )
-    if doctor is None:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-    doctor.approval_status, doctor.active, doctor.approved_for_consultation = "rejected", False, False
-    return {"status": doctor.approval_status, "doctor_id": str(doctor.id)}
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 @router.get("/pending")
@@ -570,24 +517,7 @@ async def pending_doctors(
             for doc in doctors
         ]
 
-    if session is None:
-        raise HTTPException(status_code=503, detail="No application database is configured")
-    rows = await session.scalars(
-        select(Doctor).where(
-            Doctor.tenant_id == UUID(principal.tenant_id),
-            Doctor.approval_status == "pending",
-        )
-    )
-    return [
-        {
-            "id": str(row.id),
-            "full_name": row.full_name,
-            "specialty": row.specialty,
-            "clinic_name": row.clinic_name,
-            "registration_number": row.registration_number,
-        }
-        for row in rows
-    ]
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 @router.get("/{doctor_id}/documents")
@@ -839,7 +769,7 @@ async def upload_doctor_credentials(doctor_id: str, request: Request):
 
 
 @router.post("/mfa/enroll")
-async def enroll_mfa(response: Response, principal: Principal = Depends(require("doctor:profile:write"))):
+async def enroll_mfa(response: Response, session: Any | None = None, principal: Principal = Depends(require("doctor:profile:write"))):
     response.headers["Cache-Control"] = "no-store"
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
@@ -853,7 +783,7 @@ async def enroll_mfa(response: Response, principal: Principal = Depends(require(
 
 
 @router.post("/mfa/verify")
-async def verify_mfa(payload: MfaCode, response: Response, principal: Principal = Depends(require("doctor:profile:write"))):
+async def verify_mfa(payload: MfaCode, response: Response, session: Any | None = None, principal: Principal = Depends(require("doctor:profile:write"))):
     response.headers["Cache-Control"] = "no-store"
     if get_settings().mongodb_enabled:
         db = mongo_database.database()

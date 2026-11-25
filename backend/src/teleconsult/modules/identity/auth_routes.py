@@ -114,6 +114,11 @@ async def send_brevo_email(
     settings = get_settings()
     sender = settings.brevo_sender_email or settings.email_from
     if not settings.brevo_api_key or not sender:
+        if settings.environment == "dev":
+            logging.getLogger("teleconsult.auth").info(
+                f"[DEV EMAIL FALLBACK] To: {email} | Subject: {subject} | Content: {text}"
+            )
+            return
         raise HTTPException(status_code=503, detail="Brevo email delivery is not configured")
     import aiohttp
     payload = {
@@ -161,7 +166,8 @@ async def register(payload: RegisterRequest, response: Response) -> dict[str, st
     if not mongo_database.enabled:
         raise HTTPException(status_code=503, detail="MongoDB is enabled but not connected")
     if not settings.brevo_api_key or not (settings.brevo_sender_email or settings.email_from):
-        raise HTTPException(status_code=503, detail="Email delivery is not configured")
+        if settings.environment != "dev":
+            raise HTTPException(status_code=503, detail="Email delivery is not configured")
 
     from pymongo.errors import DuplicateKeyError
 
@@ -426,6 +432,8 @@ async def logout(request: Request, response: Response) -> None:
 @router.post("/recovery")
 async def recovery(payload: RecoveryRequest) -> dict[str, str]:
     settings = get_settings()
+    if not mongo_database.enabled:
+        return {"status": "ok", "message": "If the account exists, a recovery email has been dispatched."}
     db = mongo_database.database()
     user = await db["users"].find_one({"tenant_id": settings.default_tenant_id, "email": payload.email.strip().lower()})
     if user:

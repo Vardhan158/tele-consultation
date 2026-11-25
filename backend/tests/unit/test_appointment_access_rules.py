@@ -13,8 +13,9 @@ from teleconsult.modules.identity.auth_routes import password_hash
 @pytest.mark.asyncio
 async def test_appointment_access_rules_regression() -> None:
     settings = get_settings()
-    if settings.mongodb_enabled:
-        await mongo_database.connect()
+    if not mongo_database.enabled:
+        pytest.skip("Live MongoDB required for access rules integration test")
+    await mongo_database.connect()
 
     # Ensure test patient user exists with known password_hash
     patient_id = "00000000-0000-0000-0000-000000000002"

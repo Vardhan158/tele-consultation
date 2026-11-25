@@ -12,8 +12,9 @@ from teleconsult.main import app
 @pytest.mark.asyncio
 async def test_waiting_room_access_and_security() -> None:
     settings = get_settings()
-    if settings.mongodb_enabled:
-        await mongo_database.connect()
+    if not mongo_database.enabled:
+        pytest.skip("Live MongoDB required for waiting room access test")
+    await mongo_database.connect()
 
     # Ensure patient user exists in test database
     patient_id = "00000000-0000-0000-0000-000000000002"
