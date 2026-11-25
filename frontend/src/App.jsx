@@ -67,6 +67,7 @@ const PATH_TO_TAB = {
   "/clinic/appointments": "clinic-appointments",
   "/clinic/payments": "clinic-payments",
   "/clinic/reports": "clinic-reports",
+  "/clinic/audit": "clinic-audit",
   "/clinic/support-staff": "clinic-support-staff",
   "/clinic/secops": "clinic-secops",
   "/clinic/settings": "clinic-settings",

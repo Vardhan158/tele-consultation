@@ -8,6 +8,7 @@ import PaymentOversightTab from "./tabs/PaymentOversightTab";
 import OperationalReportsTab from "./tabs/OperationalReportsTab";
 import ClinicSettingsTab from "./tabs/ClinicSettingsTab";
 import SupportStaffManagementTab from "./tabs/SupportStaffManagementTab";
+import AuditLogsTab from "./tabs/AuditLogsTab";
 import SupportScreen from "../screens/SupportScreen";
 import SecOpsDashboardScreen from "../secops/SecOpsDashboardScreen";
 
@@ -36,6 +37,9 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
       case "reports":
       case "clinic-reports":
         return "reports";
+      case "audit":
+      case "clinic-audit":
+        return "audit";
       case "support-staff":
       case "clinic-support-staff":
         return "support-staff";
@@ -71,6 +75,8 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
         return <PaymentOversightTab />;
       case "reports":
         return <OperationalReportsTab />;
+      case "audit":
+        return <AuditLogsTab />;
       case "support-staff":
         return <SupportStaffManagementTab />;
       case "secops":

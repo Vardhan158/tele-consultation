@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { API_BASE_URL, consultationApi, doctorApi } from "../../lib/api";
+import InCallChat from "./InCallChat";
 
 const fallbackIceServers = [
   ...(import.meta.env.VITE_STUN_URL
@@ -35,6 +36,8 @@ export default function WebRtcConsultation({
   const [cameraOff, setCameraOff] = useState(false);
   const [audioOnlyAvailable, setAudioOnlyAvailable] = useState(false);
   const [remoteMedia, setRemoteMedia] = useState({ audio: false, video: false });
+  const [showChat, setShowChat] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const startRef = useRef(null);
   const startingRef = useRef(false);
   const remoteKindsRef = useRef(new Set());
@@ -256,6 +259,12 @@ export default function WebRtcConsultation({
           } else if (active && status !== "in_progress") {
             setStatus("waiting");
           }
+        });
+        socket.on("chat_message", () => {
+          setShowChat((currentShow) => {
+            if (!currentShow) setUnreadCount((c) => c + 1);
+            return currentShow;
+          });
         });
         socket.on("room_joined", (info) => diagnostic("room-joined", info));
         socket.on("peer_presence", (info) => { diagnostic("peer-presence", info); if (active && status !== "in_progress") setStatus("connecting"); });
@@ -550,6 +559,27 @@ export default function WebRtcConsultation({
             {!cameraOff ? "Camera On" : "Camera Off"}
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setShowChat(!showChat);
+              if (!showChat) setUnreadCount(0);
+            }}
+            className={`relative px-4 py-2 rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1.5 ${
+              showChat
+                ? "bg-[#25836F] text-white"
+                : "border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7]"
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">chat</span>
+            <span>Chat &amp; Files</span>
+            {unreadCount > 0 && !showChat && (
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
           {role === "doctor" && status === "waiting" && (
             <button
               type="button"
@@ -569,6 +599,17 @@ export default function WebRtcConsultation({
           {role === "doctor" ? "End Consultation" : "Leave Call"}
         </button>
       </div>
+
+      {showChat && (
+        <div className="mt-3">
+          <InCallChat
+            socket={socketRef.current}
+            role={role}
+            appointmentId={appointmentId}
+            onClose={() => setShowChat(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

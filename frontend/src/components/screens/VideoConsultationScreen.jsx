@@ -7,6 +7,7 @@ import {
   recordsApi,
   supportApi,
 } from "../../lib/api";
+import InCallChat from "../consultation/InCallChat";
 
 export default function VideoConsultationScreen({ onNavigate }) {
   const [appointmentId, setAppointmentId] = useState(
@@ -912,52 +913,12 @@ export default function VideoConsultationScreen({ onNavigate }) {
                 )}
 
                 {activeSideTab === "chat" && (
-                  <div className="flex flex-col h-[380px] justify-between space-y-3">
-                    <div className="space-y-3 overflow-y-auto pr-1 flex-1">
-                      {chatMessages.length === 0 ? (
-                        <div className="p-4 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877]">
-                          No messages yet. Send a note to your doctor during the consultation.
-                        </div>
-                      ) : (
-                        chatMessages.map((msg, i) => (
-                          <div
-                            key={i}
-                            className={`p-3 rounded-xl text-xs space-y-1 ${
-                              msg.sender.includes("You")
-                                ? "bg-[#25836F] text-white ml-6"
-                                : "bg-[#F0F5F7] text-[#162623] mr-6 border border-[#577877]/15"
-                            }`}
-                          >
-                            <div className="flex justify-between text-[10px] opacity-75">
-                              <span className="font-semibold">{msg.sender}</span>
-                              <span>{msg.time}</span>
-                            </div>
-                            <p className="leading-relaxed">{msg.text}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <form
-                      onSubmit={handleSendMessage}
-                      className="flex gap-2 pt-2 border-t border-[#577877]/15"
-                    >
-                      <input
-                        type="text"
-                        value={inputMessage}
-                        onChange={(e) => setInputMessage(e.target.value)}
-                        placeholder="Type a clinical question…"
-                        className="flex-1 px-3 py-2 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
-                      />
-                      <button
-                        type="submit"
-                        className="btn-primary !p-2 text-xs cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-base">
-                          send
-                        </span>
-                      </button>
-                    </form>
+                  <div className="h-[460px]">
+                    <InCallChat
+                      socket={socketRef.current}
+                      role="patient"
+                      appointmentId={appointmentId}
+                    />
                   </div>
                 )}
 

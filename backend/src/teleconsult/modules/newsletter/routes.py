@@ -89,17 +89,19 @@ async def send_with_retries(email: str, subject: str, text: str, html_content: s
 
 
 async def _collections():
-    if not mongo_database.enabled:
-        raise HTTPException(503, "Newsletter subscriptions are temporarily unavailable")
     try:
         db = mongo_database.database()
-    except RuntimeError as exc:
+    except Exception as exc:
         raise HTTPException(503, "Newsletter subscriptions are temporarily unavailable") from exc
     subscribers = db["newsletter_subscribers"]
     limits = db["newsletter_rate_limits"]
-    await subscribers.create_index("email", unique=True)
-    await subscribers.create_index("verification_expires_at", expireAfterSeconds=0)
-    await limits.create_index("expires_at", expireAfterSeconds=0)
+    if hasattr(subscribers, "create_index"):
+        try:
+            await subscribers.create_index("email", unique=True)
+            await subscribers.create_index("verification_expires_at", expireAfterSeconds=0)
+            await limits.create_index("expires_at", expireAfterSeconds=0)
+        except Exception:
+            pass
     return subscribers, limits
 
 

@@ -17,6 +17,19 @@ export default function DoctorSettingsScreen() {
   const [ticketSubmitting, setTicketSubmitting] = useState(false);
   const [ticketMsg, setTicketMsg] = useState("");
 
+  // Section 194J Doctor Earnings & TDS Ledger
+  const [payoutData, setPayoutData] = useState(null);
+  const [loadingPayouts, setLoadingPayouts] = useState(false);
+
+  useEffect(() => {
+    setLoadingPayouts(true);
+    doctorApi
+      .payouts()
+      .then((data) => setPayoutData(data))
+      .catch(() => {})
+      .finally(() => setLoadingPayouts(false));
+  }, []);
+
   const handleSupportTicketSubmit = async (e) => {
     e.preventDefault();
     if (!ticketSubject || !ticketDescription) return;
@@ -74,8 +87,106 @@ export default function DoctorSettingsScreen() {
     }
   };
   return (
-    <div className="p-6 lg:p-10 max-w-3xl mx-auto space-y-5">
-      <h1 className="text-3xl font-bold">Doctor settings</h1>
+    <div className="p-6 lg:p-10 max-w-4xl mx-auto space-y-6 font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#577877]/15 pb-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#162623]">Doctor Settings &amp; Financials</h1>
+          <p className="text-xs text-[#577877] mt-1">Manage security, Section 194J payout ledger, and support requests.</p>
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+          <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+          <span>Statutory Tax Compliance: Section 194J</span>
+        </div>
+      </div>
+
+      {/* SECTION 194J PAYOUT & EARNINGS LEDGER */}
+      <div className="rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#577877]/15 pb-3">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-[#185A4D] flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-base">account_balance_wallet</span>
+              <span>Consultation Earnings &amp; Section 194J TDS Ledger</span>
+            </h2>
+            <p className="text-xs text-[#577877] mt-0.5">
+              Financial Year: {payoutData?.financial_year || "2026-2027"} · Indian Income Tax Act (1961)
+            </p>
+          </div>
+          <span className="text-[11px] font-bold text-[#25836F] bg-[#EEF6F3] px-2.5 py-1 rounded-full">
+            10% TDS Automatically Withheld
+          </span>
+        </div>
+
+        {/* 4 Summary Stat Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="p-3.5 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-1">
+            <span className="text-[#577877] block font-medium">Gross Consultation</span>
+            <span className="text-base font-bold text-[#162623] block">
+              ₹{(payoutData?.total_gross_inr || 0).toFixed(2)}
+            </span>
+            <span className="text-[10px] text-[#577877]">Total patient payments</span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-1">
+            <span className="text-[#577877] block font-medium">Platform Fee (15%)</span>
+            <span className="text-base font-bold text-amber-700 block">
+              -₹{(payoutData?.total_platform_commission_inr || 0).toFixed(2)}
+            </span>
+            <span className="text-[10px] text-[#577877]">Technology infra</span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 space-y-1">
+            <span className="text-amber-800 block font-bold">TDS Section 194J (10%)</span>
+            <span className="text-base font-bold text-amber-900 block">
+              -₹{(payoutData?.total_tds_withheld_inr || 0).toFixed(2)}
+            </span>
+            <span className="text-[10px] text-amber-700">Form 26AS Tax Credit</span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
+            <span className="text-emerald-800 block font-bold">Net Payout</span>
+            <span className="text-base font-bold text-emerald-900 block">
+              ₹{(payoutData?.total_net_payable_inr || 0).toFixed(2)}
+            </span>
+            <span className="text-[10px] text-emerald-700">Disbursed to doctor</span>
+          </div>
+        </div>
+
+        {/* Detailed Transactions List */}
+        {payoutData?.entries?.length > 0 ? (
+          <div className="space-y-2 pt-2">
+            <h4 className="text-xs font-bold text-[#162623] uppercase tracking-wider">Settlement Ledger</h4>
+            <div className="max-h-60 overflow-y-auto space-y-1.5 border border-[#577877]/15 rounded-xl p-2 bg-[#F9FBFA]">
+              {payoutData.entries.map((entry) => (
+                <div key={entry.id} className="p-2.5 rounded-lg bg-white border border-[#577877]/10 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-bold text-[#162623]">Consultation {entry.appointment_id.slice(0, 8)}</span>
+                    <span className="text-[#577877] text-[10px] block">
+                      {entry.created_at ? new Date(entry.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "Recent"}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-emerald-800">Net: ₹{entry.net_payable_inr.toFixed(2)}</span>
+                    <span className="text-[10px] text-[#577877] block">
+                      Gross: ₹{entry.gross_amount_inr.toFixed(2)} · TDS: ₹{entry.tds_withheld_inr.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 flex items-start gap-3 text-xs text-[#577877]">
+            <span className="material-symbols-outlined text-[#25836F] text-xl shrink-0 mt-0.5">account_balance</span>
+            <div className="space-y-1">
+              <p className="font-bold text-[#162623]">Statutory Payout Transparency</p>
+              <p className="leading-relaxed">
+                As consultations are booked and completed, Section 194J 10% tax withholding and net earnings will automatically ledger here with zero discrepancy. All withheld taxes are reconciled for your Form 16A quarterly TDS certificates.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="rounded-2xl bg-white border border-[#577877]/15 p-6 space-y-4">
         <h2 className="font-bold">Two-step verification</h2>
         <p className="text-sm text-[#577877]">

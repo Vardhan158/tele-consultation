@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { supportApi } from "../../lib/api";
+import { patientApi, supportApi } from "../../lib/api";
 
 const getDefaultLocalDateTime = () => {
   const now = new Date();
@@ -16,6 +16,12 @@ export default function FollowUpCareScreen({ onNavigate }) {
   const [followUpPlan, setFollowUpPlan] = useState(null);
   const [readings, setReadings] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // 72-Hour Post-Consultation Follow-Up State
+  const [activeFollowUp, setActiveFollowUp] = useState(null);
+  const [followUpInput, setFollowUpInput] = useState("");
+  const [sendingFollowUp, setSendingFollowUp] = useState(false);
+  const [followUpError, setFollowUpError] = useState("");
 
   // Form State
   const [dateTime, setDateTime] = useState(getDefaultLocalDateTime());
@@ -78,9 +84,54 @@ export default function FollowUpCareScreen({ onNavigate }) {
     }
   };
 
+  const loadFollowUpThread = async () => {
+    try {
+      const apts = await patientApi.appointments().catch(() => []);
+      if (!Array.isArray(apts) || apts.length === 0) return;
+      const sorted = [...apts].sort(
+        (a, b) => new Date(b.starts_at) - new Date(a.starts_at),
+      );
+      for (const apt of sorted) {
+        try {
+          const thread = await patientApi.getFollowUpThread(apt.id);
+          if (thread) {
+            setActiveFollowUp(thread);
+            break;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSendFollowUp = async (e) => {
+    e.preventDefault();
+    if (!followUpInput.trim() || !activeFollowUp?.appointment_id || sendingFollowUp) return;
+    setSendingFollowUp(true);
+    setFollowUpError("");
+    try {
+      const sent = await patientApi.sendFollowUpMessage(
+        activeFollowUp.appointment_id,
+        followUpInput.trim(),
+      );
+      setActiveFollowUp((prev) => ({
+        ...prev,
+        messages: [...(prev?.messages || []), sent],
+      }));
+      setFollowUpInput("");
+    } catch (err) {
+      setFollowUpError(err.message || "Unable to send follow-up message.");
+    } finally {
+      setSendingFollowUp(false);
+    }
+  };
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadFollowUpData(), loadBpReadings()]).finally(() =>
+    Promise.all([loadFollowUpData(), loadBpReadings(), loadFollowUpThread()]).finally(() =>
       setLoading(false),
     );
   }, []);
@@ -216,6 +267,106 @@ export default function FollowUpCareScreen({ onNavigate }) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column (7 cols): Next steps & BP log */}
           <div className="lg:col-span-7 space-y-6">
+            {/* 72-Hour Post-Consultation Doctor Window */}
+            <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#577877]/15 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#25836F] text-lg">forum</span>
+                    <h2 className="text-base font-bold text-[#162623]">
+                      72-Hour Post-Consultation Care Window
+                    </h2>
+                  </div>
+                  <p className="text-xs text-[#577877] mt-0.5">
+                    {activeFollowUp?.doctor_name
+                      ? `Attending: ${activeFollowUp.doctor_name} (${activeFollowUp.doctor_specialty || "Specialist"})`
+                      : "Direct query thread with your doctor following any completed visit."}
+                  </p>
+                </div>
+
+                {activeFollowUp?.eligible ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                    Active · {activeFollowUp.hours_remaining} hrs left
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F0F5F7] text-[#577877] text-xs font-semibold">
+                    <span className="material-symbols-outlined text-xs">schedule</span>
+                    72-Hr Policy Active
+                  </span>
+                )}
+              </div>
+
+              {activeFollowUp?.eligible ? (
+                <div className="space-y-3">
+                  <div className="max-h-60 overflow-y-auto space-y-2 p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15">
+                    {activeFollowUp.messages?.length > 0 ? (
+                      activeFollowUp.messages.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`p-3 rounded-xl text-xs space-y-1 ${
+                            m.sender_role === "patient"
+                              ? "bg-[#25836F] text-white ml-6"
+                              : "bg-white text-[#162623] mr-6 border border-[#577877]/20"
+                          }`}
+                        >
+                          <div className="flex justify-between text-[10px] opacity-75 font-semibold">
+                            <span>{m.sender_name} ({m.sender_role === "patient" ? "You" : "Doctor"})</span>
+                            <span>
+                              {m.created_at
+                                ? new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                                : ""}
+                            </span>
+                          </div>
+                          <p className="leading-relaxed">{m.message}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-xs text-[#577877] space-y-1">
+                        <span className="material-symbols-outlined text-2xl text-[#25836F]">chat</span>
+                        <p className="font-semibold text-[#162623]">No follow-up questions sent yet.</p>
+                        <p>Have doubts about your prescription, dosage, or recovery symptoms? Message your doctor below.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {followUpError && (
+                    <div className="text-xs text-red-600 font-semibold p-2 rounded-lg bg-red-50 border border-red-200">
+                      {followUpError}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSendFollowUp} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={followUpInput}
+                      onChange={(e) => setFollowUpInput(e.target.value)}
+                      placeholder="Ask a follow-up question about your treatment…"
+                      className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#577877]/25 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sendingFollowUp || !followUpInput.trim()}
+                      className="btn-primary !px-4 text-xs font-semibold cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <span>{sendingFollowUp ? "Sending..." : "Send"}</span>
+                      <span className="material-symbols-outlined text-sm">send</span>
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 flex items-start gap-3 text-xs text-[#577877]">
+                  <span className="material-symbols-outlined text-[#25836F] text-xl shrink-0 mt-0.5">verified_user</span>
+                  <div className="space-y-1">
+                    <p className="font-bold text-[#162623]">Zero-Cost Post-Consultation Window</p>
+                    <p className="leading-relaxed">
+                      Every completed teleconsultation automatically unlocks 72 hours of free follow-up messaging with your clinician to clarify prescriptions, discuss laboratory findings, or report mild medication reactions.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* CARD 1: Your next steps */}
             <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-5">
               <div className="flex items-center justify-between">

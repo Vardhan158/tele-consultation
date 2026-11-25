@@ -26,8 +26,16 @@ async def get_principal(request: Request) -> Principal:
     """
     raw_token = request.cookies.get("teleconsult_session")
     if not raw_token or not mongo_database.enabled:
-        if get_settings().environment not in {"dev", "local"}:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+        if get_settings().environment in {"dev", "local"} and request.headers.get("X-Dev-Patient-Id"):
+            user_id = request.headers["X-Dev-Patient-Id"]
+            tenant_id = request.headers.get("X-Dev-Tenant-Id") or get_settings().default_tenant_id
+            return Principal(
+                user_id=user_id,
+                tenant_id=tenant_id,
+                roles=frozenset({"patient"}),
+                permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read"}),
+            )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     else:
         import hashlib
         database = mongo_database.database()

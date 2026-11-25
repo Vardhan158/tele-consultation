@@ -32,11 +32,25 @@ export default function DoctorDashboardScreen({ onNavigate }) {
   const [appointments, setAppointments] = useState([]);
   const [error, setError] = useState("");
 
+  // Urgent Care On-Demand State (Phase 3.3)
+  const [urgentDuty, setUrgentDuty] = useState(false);
+  const [urgentQueue, setUrgentQueue] = useState([]);
+  const [togglingDuty, setTogglingDuty] = useState(false);
+  const [claimingTicketId, setClaimingTicketId] = useState(null);
+
   useEffect(() => {
-    Promise.all([doctorApi.dashboard(), doctorApi.appointments()])
-      .then(([summary, items]) => {
+    Promise.all([
+      doctorApi.dashboard(),
+      doctorApi.appointments(),
+      doctorApi.getUrgentCareQueue().catch(() => null),
+    ])
+      .then(([summary, items, qData]) => {
         setDashboard(summary);
         setAppointments(Array.isArray(items) ? items : []);
+        if (qData) {
+          setUrgentDuty(Boolean(qData.doctor_on_duty));
+          setUrgentQueue(Array.isArray(qData.waiting_patients) ? qData.waiting_patients : []);
+        }
         setState("ready");
       })
       .catch((err) => {
@@ -44,6 +58,54 @@ export default function DoctorDashboardScreen({ onNavigate }) {
         setState("error");
       });
   }, []);
+
+  // Poll urgent care queue when on duty
+  useEffect(() => {
+    if (!urgentDuty) return;
+    const interval = setInterval(() => {
+      doctorApi
+        .getUrgentCareQueue()
+        .then((qData) => {
+          if (qData) {
+            setUrgentDuty(Boolean(qData.doctor_on_duty));
+            setUrgentQueue(Array.isArray(qData.waiting_patients) ? qData.waiting_patients : []);
+          }
+        })
+        .catch(() => {});
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [urgentDuty]);
+
+  const handleToggleDuty = async () => {
+    setTogglingDuty(true);
+    const nextState = !urgentDuty;
+    try {
+      await doctorApi.toggleUrgentCareDuty(nextState);
+      setUrgentDuty(nextState);
+      if (nextState) {
+        const qData = await doctorApi.getUrgentCareQueue().catch(() => null);
+        if (qData) setUrgentQueue(qData.waiting_patients || []);
+      }
+    } catch {
+      // Revert if failed
+    } finally {
+      setTogglingDuty(false);
+    }
+  };
+
+  const handleClaimUrgentCare = async (ticketId) => {
+    setClaimingTicketId(ticketId);
+    try {
+      const res = await doctorApi.claimUrgentCareTicket(ticketId);
+      if (res?.appointment_id) {
+        onNavigate("video-consultation", { appointmentId: res.appointment_id });
+      }
+    } catch (err) {
+      alert(err.message || "Failed to claim urgent care ticket.");
+    } finally {
+      setClaimingTicketId(null);
+    }
+  };
 
   if (state === "loading")
     return (
@@ -90,14 +152,103 @@ export default function DoctorDashboardScreen({ onNavigate }) {
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 font-sans text-[#162623]">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
-            Clinician workspace
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
-            Doctor Dashboard
-          </h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
+              Clinician workspace
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#162623]">
+              Doctor Dashboard
+            </h1>
+          </div>
+
+          {/* Urgent Care Duty Switch */}
+          <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-[#577877]/15 shadow-2xs self-start sm:self-auto">
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${urgentDuty ? "bg-emerald-500 animate-pulse" : "bg-zinc-300"}`} />
+              <span className="text-xs font-bold text-[#162623]">
+                Express Urgent Care: {urgentDuty ? "ON DUTY" : "OFF DUTY"}
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={togglingDuty}
+              onClick={handleToggleDuty}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                urgentDuty
+                  ? "bg-rose-100 hover:bg-rose-200 text-rose-800"
+                  : "bg-[#25836F] hover:bg-[#1E6B5A] text-white"
+              }`}
+            >
+              {urgentDuty ? "Go Off-Duty" : "Go On-Duty"}
+            </button>
+          </div>
         </div>
+
+        {/* Live Urgent Care Queue (When On-Duty) */}
+        {urgentDuty && (
+          <div className="care-card p-6 sm:p-7 rounded-2xl bg-gradient-to-br from-emerald-50/90 to-teal-50/50 border border-emerald-300/60 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-emerald-200/60 pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-2xl text-[#185A4D]">bolt</span>
+                <div>
+                  <h2 className="font-bold text-base text-[#185A4D]">
+                    Incoming Urgent Care Queue ({urgentQueue.length})
+                  </h2>
+                  <p className="text-xs text-[#577877]">Instant 5-minute consultation requests waiting for clinician claim</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-600 text-white font-bold text-xs animate-pulse">
+                Live Dispatch
+              </span>
+            </div>
+
+            {urgentQueue.length === 0 ? (
+              <div className="py-6 text-center space-y-1">
+                <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
+                <p className="font-bold text-xs text-[#162623]">Queue is currently clear</p>
+                <p className="text-[11px] text-[#577877]">You are on duty. Incoming patients will appear here instantly.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {urgentQueue.map((patient) => (
+                  <div
+                    key={patient.ticket_id}
+                    className="p-4 rounded-xl bg-white border border-emerald-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase">
+                          Queue #{patient.queue_position}
+                        </span>
+                        <span className="font-bold text-sm text-[#162623]">{patient.patient_name}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px] uppercase">
+                          {patient.urgency_level}
+                        </span>
+                      </div>
+                      <p className="text-[#577877]">
+                        <span className="font-semibold text-[#162623]">Complaint:</span> {patient.chief_complaint}
+                      </p>
+                      <p className="text-[11px] text-[#577877]">
+                        Requested: {new Date(patient.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={claimingTicketId === patient.ticket_id}
+                      onClick={() => handleClaimUrgentCare(patient.ticket_id)}
+                      className="bg-[#185A4D] hover:bg-[#12443A] text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base">videocam</span>
+                      <span>{claimingTicketId === patient.ticket_id ? "Claiming…" : "Claim & Start Video Consult"}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {cards.map(([label, value]) => (

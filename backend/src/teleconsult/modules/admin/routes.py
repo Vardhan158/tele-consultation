@@ -76,6 +76,7 @@ def _format_activity_timestamp(dt_val: Any) -> str:
 @router.get("/overview")
 async def get_overview(
     request: Request,
+    session: Any | None = None,
 ) -> dict[str, Any]:
     await _verify_admin(request)
     settings = get_settings()
@@ -1002,6 +1003,7 @@ async def refund_payment_admin(
     payment_id: str,
     payload: RefundPayload,
     request: Request,
+    session: Any | None = None,
 ) -> dict[str, Any]:
     principal = await _verify_admin(request)
     settings = get_settings()
@@ -1107,6 +1109,7 @@ async def refund_payment_admin(
 async def get_reports(
     request: Request,
     time_range: str = "30d",
+    session: Any | None = None,
 ) -> dict[str, Any]:
     await _verify_admin(request)
     settings = get_settings()
@@ -1346,3 +1349,188 @@ async def update_clinic_settings(
         metadata={"clinic_name": payload.clinic_name, "timezone": payload.timezone},
     )
     return data
+
+
+# =============================================================================
+# CLINIC APPOINTMENT REASSIGNMENT & STATUTORY TDS LEDGER (Phase 2.2 / 2.3)
+# =============================================================================
+
+class ReassignAppointmentPayload(BaseModel):
+    new_doctor_id: str
+    reason: str = ""
+
+
+@router.post("/appointments/{appointment_id}/reassign")
+async def reassign_appointment_admin(
+    appointment_id: str,
+    payload: ReassignAppointmentPayload,
+    request: Request,
+):
+    principal = await _verify_admin(request)
+    settings = get_settings()
+    tenant_id = settings.default_tenant_id
+
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+
+    new_doctor = await db["doctors"].find_one({
+        "tenant_id": tenant_id,
+        "$or": [{"id": payload.new_doctor_id}, {"id": str(payload.new_doctor_id).lower()}],
+        "active": True,
+    })
+    if not new_doctor:
+        raise HTTPException(status_code=404, detail="Target reassignment doctor not found")
+
+    appointment = await db["appointments"].find_one({
+        "tenant_id": tenant_id,
+        "$or": [{"id": appointment_id}, {"id": str(appointment_id).lower()}],
+    })
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    old_doctor_id = appointment.get("doctor_id")
+
+    await db["appointments"].update_one(
+        {"tenant_id": tenant_id, "id": str(appointment["id"])},
+        {
+            "$set": {
+                "doctor_id": str(new_doctor["id"]),
+                "reassigned_from": old_doctor_id,
+                "reassignment_reason": payload.reason,
+                "reassigned_at": datetime.now(UTC).isoformat(),
+                "reassigned_by": str(principal.user_id),
+            }
+        },
+    )
+
+    doc_name = new_doctor.get("full_name") or "Specialist"
+    await db["notifications"].insert_one({
+        "id": f"notif-{secrets.token_hex(6)}",
+        "tenant_id": tenant_id,
+        "patient_id": str(appointment.get("patient_id")),
+        "recipient_id": str(appointment.get("patient_id")),
+        "event_type": "doctor_reassigned",
+        "subject": "Treating Clinician Updated",
+        "body": f"Your consultation has been reassigned to Dr. {doc_name}. Reason: {payload.reason or 'Clinical schedule rebalancing'}",
+        "channel": "in_app",
+        "status": "queued",
+        "created_at": datetime.now(UTC).isoformat(),
+    })
+
+    await _audit_log(
+        principal,
+        action="appointment.reassign",
+        resource_type="appointment",
+        resource_id=appointment_id,
+        metadata={"from_doctor": old_doctor_id, "to_doctor": payload.new_doctor_id, "reason": payload.reason},
+    )
+
+    return {
+        "status": "reassigned",
+        "appointment_id": appointment_id,
+        "doctor_id": str(new_doctor["id"]),
+        "doctor_name": new_doctor.get("full_name"),
+    }
+
+
+@router.get("/payout-ledger")
+async def get_clinic_payout_ledger(request: Request):
+    await _verify_admin(request)
+    settings = get_settings()
+    tenant_id = settings.default_tenant_id
+
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+
+    cursor = db["doctor_payout_ledger"].find({"tenant_id": tenant_id}).sort("created_at", -1)
+
+    entries = []
+    total_gross_paise = 0
+    total_platform_paise = 0
+    total_tds_paise = 0
+    total_net_paise = 0
+
+    async for doc in cursor:
+        gross = doc.get("gross_amount_paise", 0)
+        plat = doc.get("platform_fee_paise", 0)
+        tds = doc.get("tds_withheld_paise", 0)
+        net = doc.get("net_payable_paise", 0)
+
+        total_gross_paise += gross
+        total_platform_paise += plat
+        total_tds_paise += tds
+        total_net_paise += net
+
+        entries.append({
+            "id": doc.get("id", str(doc.get("_id"))),
+            "doctor_id": doc.get("doctor_id"),
+            "appointment_id": doc.get("appointment_id"),
+            "payment_id": doc.get("payment_id"),
+            "gross_amount_inr": gross / 100.0,
+            "platform_commission_inr": plat / 100.0,
+            "tds_rate": doc.get("tds_rate", 0.10),
+            "tds_withheld_inr": tds / 100.0,
+            "net_payable_inr": net / 100.0,
+            "status": doc.get("status", "recorded"),
+            "financial_year": doc.get("financial_year", "2026-2027"),
+            "created_at": doc.get("created_at"),
+        })
+
+    return {
+        "total_gross_inr": total_gross_paise / 100.0,
+        "total_platform_commission_inr": total_platform_paise / 100.0,
+        "total_tds_withheld_inr": total_tds_paise / 100.0,
+        "total_net_payable_inr": total_net_paise / 100.0,
+        "total_transactions": len(entries),
+        "entries": entries,
+    }
+
+
+# =============================================================================
+# CLINIC AUDIT TRAIL EXPLORER (Phase 4.3)
+# =============================================================================
+
+@router.get("/audit-logs")
+async def get_clinic_audit_logs(
+    request: Request,
+    action: str | None = None,
+    limit: int = 50,
+    skip: int = 0,
+):
+    await _verify_admin(request)
+    settings = get_settings()
+    tenant_id = settings.default_tenant_id
+
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+
+    query: dict[str, Any] = {"tenant_id": tenant_id}
+    if action and action.strip():
+        query["action"] = action.strip()
+
+    total = await db["audit_logs"].count_documents(query)
+    cursor = db["audit_logs"].find(query).sort("created_at", -1).skip(skip).limit(limit)
+
+    logs = []
+    async for item in cursor:
+        logs.append({
+            "id": item.get("id", str(item.get("_id"))),
+            "actor_id": str(item.get("actor_id", "System")),
+            "action": item.get("action", "unknown"),
+            "resource_type": item.get("resource_type", "general"),
+            "resource_id": str(item.get("resource_id", "")),
+            "metadata": item.get("metadata", {}),
+            "occurred_at": item.get("occurred_at") or item.get("created_at"),
+        })
+
+    return {
+        "total": total,
+        "limit": limit,
+        "skip": skip,
+        "logs": logs,
+    }
+
+
