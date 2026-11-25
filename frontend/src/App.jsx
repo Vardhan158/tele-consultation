@@ -1,40 +1,41 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Layout from "./components/layout/Layout";
-import DashboardScreen from "./components/screens/DashboardScreen";
-import FindDoctorsScreen from "./components/screens/FindDoctorsScreen";
-import AppointmentsScreen from "./components/screens/AppointmentsScreen";
-import VideoConsultationScreen from "./components/screens/VideoConsultationScreen";
-import MedicalRecordsScreen from "./components/screens/MedicalRecordsScreen";
-import PrescriptionsScreen from "./components/screens/PrescriptionsScreen";
-import ConsultationSummariesScreen from "./components/screens/ConsultationSummariesScreen";
-import FollowUpCareScreen from "./components/screens/FollowUpCareScreen";
-import PaymentsScreen from "./components/screens/PaymentsScreen";
-import NotificationsScreen from "./components/screens/NotificationsScreen";
-import SettingsScreen from "./components/screens/SettingsScreen";
-import ProfileScreen from "./components/screens/ProfileScreen";
-import SupportScreen from "./components/screens/SupportScreen";
-import ConsentScreen from "./components/screens/ConsentScreen";
-import AuthScreen from "./components/auth/AuthScreen";
 import { authApi } from "./lib/api";
-import ServicesScreen from "./components/public/ServicesScreen";
 import LandingScreen from "./components/public/LandingScreen";
-import AboutUsScreen from "./components/public/AboutUsScreen";
-import FaqsScreen from "./components/public/FaqsScreen";
-import ContactScreen from "./components/public/ContactScreen";
-import DoctorDashboardScreen from "./components/screens/DoctorDashboardScreen";
-import DoctorRegistrationScreen from "./components/auth/DoctorRegistrationScreen";
-import DoctorVerifyEmailScreen from "./components/auth/DoctorVerifyEmailScreen";
-import DoctorPendingApprovalScreen from "./components/auth/DoctorPendingApprovalScreen";
-import DoctorAppointmentsScreen from "./components/screens/DoctorAppointmentsScreen";
-import DoctorPatientsScreen from "./components/screens/DoctorPatientsScreen";
-import DoctorAvailabilityScreen from "./components/screens/DoctorAvailabilityScreen";
-import DoctorSettingsScreen from "./components/screens/DoctorSettingsScreen";
-import DoctorConsultationScreen from "./components/screens/DoctorConsultationScreen";
-import DoctorNotificationsScreen from "./components/screens/DoctorNotificationsScreen";
-import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
-import SupportDashboardScreen from "./components/support/SupportDashboardScreen";
-import SecOpsDashboardScreen from "./components/secops/SecOpsDashboardScreen";
+
+const Layout = lazy(() => import("./components/layout/Layout"));
+const DashboardScreen = lazy(() => import("./components/screens/DashboardScreen"));
+const FindDoctorsScreen = lazy(() => import("./components/screens/FindDoctorsScreen"));
+const AppointmentsScreen = lazy(() => import("./components/screens/AppointmentsScreen"));
+const VideoConsultationScreen = lazy(() => import("./components/screens/VideoConsultationScreen"));
+const MedicalRecordsScreen = lazy(() => import("./components/screens/MedicalRecordsScreen"));
+const PrescriptionsScreen = lazy(() => import("./components/screens/PrescriptionsScreen"));
+const ConsultationSummariesScreen = lazy(() => import("./components/screens/ConsultationSummariesScreen"));
+const FollowUpCareScreen = lazy(() => import("./components/screens/FollowUpCareScreen"));
+const PaymentsScreen = lazy(() => import("./components/screens/PaymentsScreen"));
+const NotificationsScreen = lazy(() => import("./components/screens/NotificationsScreen"));
+const SettingsScreen = lazy(() => import("./components/screens/SettingsScreen"));
+const ProfileScreen = lazy(() => import("./components/screens/ProfileScreen"));
+const SupportScreen = lazy(() => import("./components/screens/SupportScreen"));
+const ConsentScreen = lazy(() => import("./components/screens/ConsentScreen"));
+const AuthScreen = lazy(() => import("./components/auth/AuthScreen"));
+const ServicesScreen = lazy(() => import("./components/public/ServicesScreen"));
+const AboutUsScreen = lazy(() => import("./components/public/AboutUsScreen"));
+const FaqsScreen = lazy(() => import("./components/public/FaqsScreen"));
+const ContactScreen = lazy(() => import("./components/public/ContactScreen"));
+const DoctorDashboardScreen = lazy(() => import("./components/screens/DoctorDashboardScreen"));
+const DoctorRegistrationScreen = lazy(() => import("./components/auth/DoctorRegistrationScreen"));
+const DoctorVerifyEmailScreen = lazy(() => import("./components/auth/DoctorVerifyEmailScreen"));
+const DoctorPendingApprovalScreen = lazy(() => import("./components/auth/DoctorPendingApprovalScreen"));
+const DoctorAppointmentsScreen = lazy(() => import("./components/screens/DoctorAppointmentsScreen"));
+const DoctorPatientsScreen = lazy(() => import("./components/screens/DoctorPatientsScreen"));
+const DoctorAvailabilityScreen = lazy(() => import("./components/screens/DoctorAvailabilityScreen"));
+const DoctorSettingsScreen = lazy(() => import("./components/screens/DoctorSettingsScreen"));
+const DoctorConsultationScreen = lazy(() => import("./components/screens/DoctorConsultationScreen"));
+const DoctorNotificationsScreen = lazy(() => import("./components/screens/DoctorNotificationsScreen"));
+const ClinicAdminDashboard = lazy(() => import("./components/admin/ClinicAdminDashboard"));
+const SupportDashboardScreen = lazy(() => import("./components/support/SupportDashboardScreen"));
+const SecOpsDashboardScreen = lazy(() => import("./components/secops/SecOpsDashboardScreen"));
 
 const PATH_TO_TAB = {
   "/dashboard": "dashboard",
@@ -96,6 +97,10 @@ function entryModeFromLocation() {
 }
 
 export default function App() {
+  return <Suspense fallback={null}><AppContent /></Suspense>;
+}
+
+function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(() => tabFromLocation());

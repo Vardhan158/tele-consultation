@@ -8,7 +8,7 @@ from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
@@ -320,9 +320,9 @@ async def get_profile(
                 "tenant_id": principal.tenant_id,
                 "$or": [{"id": principal.user_id}, {"user_id": principal.user_id}],
             })
-            full_name = user.get("full_name") if user else "Emma Mitchell"
-            email = user.get("email") if user else "patient@teleconsult.local"
-            phone = user.get("mobile_number") if user else "+1 (800) 555-KAIZEN"
+            full_name = user.get("full_name") if user else "Patient"
+            email = user.get("email") if user else ""
+            phone = (user.get("mobile_number") or user.get("phone")) if user else ""
 
             document = {
                 "id": principal.user_id,
@@ -331,10 +331,15 @@ async def get_profile(
                 "full_name": full_name,
                 "email": email,
                 "phone": phone,
-                "date_of_birth": "1994-06-15",
+                "date_of_birth": user.get("date_of_birth") if user else None,
+                "gender": user.get("gender") if user else None,
                 "preferred_language": "English",
-                "address": "742 Medical Center Blvd, San Francisco, CA",
-                "emergency_contact": "John Mitchell (+1 555-0199)",
+                "address": "",
+                "street_address": "",
+                "city": "",
+                "state": "",
+                "zip_code": "",
+                "emergency_contact": "",
                 "created_at": datetime.now(UTC).isoformat(),
             }
             await db["patients"].insert_one(dict(document))
@@ -351,19 +356,45 @@ async def get_profile(
             if intake_doc and intake_doc.get("allergies"):
                 allergies_val = intake_doc.get("allergies")
 
+        street_address = document.get("street_address")
+        city = document.get("city")
+        state = document.get("state")
+        zip_code = document.get("zip_code")
+        if not street_address and not city and not state and not zip_code and document.get("address"):
+            parts = [p.strip() for p in document.get("address", "").split(",") if p.strip()]
+            if len(parts) >= 1:
+                street_address = parts[0]
+            if len(parts) >= 2:
+                city = parts[1]
+            if len(parts) >= 3:
+                rest = parts[2].split()
+                if len(rest) >= 2:
+                    state = " ".join(rest[:-1])
+                    zip_code = rest[-1]
+                else:
+                    state = parts[2]
+
         return PatientResponse(
             id=_to_uuid(document.get("id") or document.get("user_id")),
             full_name=document.get("full_name", "Patient"),
             email=document.get("email", ""),
             phone=document.get("phone", ""),
             date_of_birth=document.get("date_of_birth"),
+            gender=document.get("gender"),
             preferred_language=document.get("preferred_language", "English"),
             address=document.get("address"),
+            street_address=street_address,
+            city=city,
+            state=state,
+            zip_code=zip_code,
             emergency_contact=document.get("emergency_contact"),
             preferred_pharmacy=document.get("preferred_pharmacy"),
             pharmacy_address=document.get("pharmacy_address"),
             pharmacy_phone=document.get("pharmacy_phone"),
             allergies=allergies_val,
+            created_at=document.get("created_at"),
+            primary_care_provider=document.get("primary_care_provider"),
+            avatar_url=document.get("avatar_url"),
         )
     raise HTTPException(status_code=503, detail="No application database is configured")
 
@@ -391,15 +422,155 @@ async def update_profile(
             email=document.get("email", ""),
             phone=document.get("phone", ""),
             date_of_birth=document.get("date_of_birth"),
+            gender=document.get("gender"),
             preferred_language=document.get("preferred_language", "English"),
             address=document.get("address"),
+            street_address=document.get("street_address"),
+            city=document.get("city"),
+            state=document.get("state"),
+            zip_code=document.get("zip_code"),
             emergency_contact=document.get("emergency_contact"),
             preferred_pharmacy=document.get("preferred_pharmacy"),
             pharmacy_address=document.get("pharmacy_address"),
             pharmacy_phone=document.get("pharmacy_phone"),
             allergies=document.get("allergies"),
+            created_at=document.get("created_at"),
+            primary_care_provider=document.get("primary_care_provider"),
+            avatar_url=document.get("avatar_url"),
         )
     raise HTTPException(status_code=503, detail="No application database is configured")
+
+
+async def _upload_to_cloudinary(file_bytes: bytes, filename: str, content_type: str) -> str:
+    settings = get_settings()
+    cloud_name, api_key, api_secret = settings.get_cloudinary_credentials()
+    if not cloud_name or not api_key:
+        settings = get_settings(fresh=True)
+        cloud_name, api_key, api_secret = settings.get_cloudinary_credentials()
+
+    if not cloud_name or not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Cloudinary is not configured on the server. Missing: {'cloud_name ' if not cloud_name else ''}{'api_key' if not api_key else ''}.",
+        )
+
+    import time
+    timestamp = int(time.time())
+    folder = "patient_profiles"
+
+    params_to_sign = f"folder={folder}&timestamp={timestamp}"
+    signature = ""
+    if api_secret:
+        to_hash = f"{params_to_sign}{api_secret}"
+        signature = hashlib.sha1(to_hash.encode("utf-8")).hexdigest()
+
+    data = {
+        "api_key": api_key,
+        "timestamp": str(timestamp),
+        "folder": folder,
+    }
+    if signature:
+        data["signature"] = signature
+
+    import aiohttp
+    upload_url = f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload"
+
+    form_data = aiohttp.FormData()
+    for k, v in data.items():
+        form_data.add_field(k, v)
+    form_data.add_field(
+        "file",
+        file_bytes,
+        filename=filename,
+        content_type=content_type,
+    )
+
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.post(upload_url, data=form_data) as resp:
+            try:
+                resp_json = await resp.json()
+            except Exception:
+                resp_json = {}
+            if resp.status != 200:
+                err_msg = resp_json.get("error", {}).get("message", f"HTTP {resp.status}")
+                raise HTTPException(status_code=502, detail=f"Cloudinary upload failed: {err_msg}")
+            secure_url = resp_json.get("secure_url") or resp_json.get("url")
+            if not secure_url:
+                raise HTTPException(status_code=502, detail="Cloudinary did not return a valid secure image URL")
+            return secure_url
+
+
+@router.post("/profile/photo")
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(require("patient:profile:write")),
+) -> dict[str, str]:
+    if not get_settings().mongodb_enabled:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/jpg", "image/gif"}
+    content_type = (file.content_type or "").lower()
+    ext = (file.filename or "").split(".")[-1].lower() if "." in (file.filename or "") else ""
+    if content_type not in allowed_types:
+        if ext in ("jpg", "jpeg", "png", "webp", "gif"):
+            content_type = f"image/{'jpeg' if ext in ('jpg', 'jpeg') else ext}"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid image format '{content_type}'. Allowed formats are JPEG, PNG, and WebP.",
+            )
+
+    file_bytes = await file.read()
+    if len(file_bytes) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image size exceeds maximum limit of 5 MB.")
+
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    secure_url = await _upload_to_cloudinary(
+        file_bytes=file_bytes,
+        filename=file.filename or "profile.jpg",
+        content_type=content_type,
+    )
+
+    db = mongo_database.database()
+    user_id_str = str(principal.user_id)
+    tenant_id_str = str(principal.tenant_id or get_settings().default_tenant_id)
+
+    patient_doc = await db["patients"].find_one({
+        "$or": [
+            {"user_id": user_id_str},
+            {"id": user_id_str},
+        ]
+    })
+
+    if patient_doc:
+        await db["patients"].update_one(
+            {"_id": patient_doc["_id"]},
+            {"$set": {"avatar_url": secure_url}},
+        )
+    else:
+        await db["patients"].update_one(
+            {"user_id": user_id_str},
+            {
+                "$set": {"avatar_url": secure_url},
+                "$setOnInsert": {
+                    "id": user_id_str,
+                    "user_id": user_id_str,
+                    "tenant_id": tenant_id_str,
+                    "created_at": datetime.now(UTC).isoformat(),
+                },
+            },
+            upsert=True,
+        )
+
+    await db["users"].update_one(
+        {"$or": [{"id": user_id_str}, {"user_id": user_id_str}]},
+        {"$set": {"avatar_url": secure_url}},
+    )
+
+    return {"avatar_url": secure_url, "message": "Profile photo updated successfully"}
 
 
 @router.post("/intake", response_model=MedicalIntakeResponse, status_code=status.HTTP_201_CREATED)
@@ -431,8 +602,6 @@ async def submit_intake(
 
 async def audit(session: Any, principal: Principal, action: str, resource_id: UUID) -> None:
     pass
-
-
 @router.post("/consents", response_model=ConsentResponse, status_code=status.HTTP_201_CREATED)
 async def grant_consent(
     payload: ConsentCreate,
@@ -651,7 +820,7 @@ async def book_appointment(
     payload: AppointmentCreate,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(require("appointment:create")),
-) -> AppointmentResponse:
+) -> Any:
     settings = get_settings()
     if settings.mongodb_enabled:
         db = mongo_database.database()
@@ -760,7 +929,7 @@ async def book_appointment(
                 raise HTTPException(status_code=409, detail="Selected appointment slot is no longer available") from exc
             raise
         return appointment
-    raise HTTPException(status_code=503, detail="Application database is unavailable")
+    raise HTTPException(status_code=503, detail="No application database is configured")
 
 
 def _to_int(val: Any) -> int | None:
@@ -1318,7 +1487,6 @@ async def reschedule_appointment(
 
     raise HTTPException(status_code=503, detail="No application database is configured")
 
-
 # =============================================================================
 # ON-DEMAND URGENT CARE QUEUE (Phase 3.3)
 # =============================================================================
@@ -1533,7 +1701,6 @@ async def create_family_member(
         created_at=now_iso,
         **payload.model_dump(),
     )
-
 
 @router.delete("/family-members/{member_id}")
 async def delete_family_member(

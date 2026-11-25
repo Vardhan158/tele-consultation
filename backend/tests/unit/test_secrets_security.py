@@ -27,7 +27,7 @@ def test_production_secrets_pass_when_configured():
     prod_settings = Settings(
         environment="production",
         mongodb_enabled=True,
-        mongodb_uri="mongodb+srv://user:pass@cluster.mongodb.net/teleconsult",
+        mongodb_uri="mongodb+srv://user:pass@atlas.example.com",
         razorpay_key_id="rzp_live_realKey123",
         razorpay_key_secret="real_secret_token_abc456",
         clinical_encryption_key="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -42,7 +42,7 @@ def test_production_startup_does_not_require_clinical_encryption_key():
     prod_settings = Settings(
         environment="production",
         mongodb_enabled=True,
-        mongodb_uri="mongodb+srv://user:pass@cluster.mongodb.net/teleconsult",
+        mongodb_uri="mongodb+srv://user:pass@atlas.example.com",
         razorpay_key_id="rzp_live_realKey123",
         razorpay_key_secret="real_secret_token_abc456",
         clinical_encryption_key="",

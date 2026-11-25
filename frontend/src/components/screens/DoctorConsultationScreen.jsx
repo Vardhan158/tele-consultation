@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { doctorApi } from "../../lib/api";
 import WebRtcConsultation from "../consultation/WebRtcConsultation";
 import PrescriptionComposer from "../consultation/PrescriptionComposer";
@@ -6,6 +6,7 @@ import PrescriptionComposer from "../consultation/PrescriptionComposer";
 export default function DoctorConsultationScreen({ appointment, onBack }) {
   const [room, setRoom] = useState(null);
   const [error, setError] = useState("");
+  const webrtcRef = useRef(null);
 
   useEffect(() => {
     if (appointment?.id)
@@ -56,6 +57,7 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
             </h3>
             {room ? (
               <WebRtcConsultation
+                ref={webrtcRef}
                 appointmentId={appointment?.id}
                 authorization={room}
                 role="doctor"
@@ -82,8 +84,8 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
             <PrescriptionComposer
               appointmentId={appointment?.id}
               patientName={appointment?.patient_name || "Patient"}
-              onPublished={() => {
-                // Prescription successfully published
+              onPublished={(result, payloadContent) => {
+                webrtcRef.current?.emitPrescriptionPublished(result, payloadContent);
               }}
             />
           </div>

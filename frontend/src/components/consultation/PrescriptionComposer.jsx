@@ -138,7 +138,7 @@ export default function PrescriptionComposer({
       });
 
       setPublishedPrescription(result);
-      if (onPublished) onPublished(result);
+      if (onPublished) onPublished(result, payloadContent);
     } catch (err) {
       setError(
         err.message ||

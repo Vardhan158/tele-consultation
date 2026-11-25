@@ -45,6 +45,10 @@ async def payment_session():
     yield None
 
 
+AsyncSession = Any
+tenant_session = payment_session
+
+
 def get_razorpay_client():
     settings = get_settings()
     key_id = settings.razorpay_key_id or os.getenv("RAZORPAY_KEY_ID", "")

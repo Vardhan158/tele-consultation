@@ -1,13 +1,11 @@
 import { useEffect, useState, useRef } from "react";
-import { io } from "socket.io-client";
 import {
   API_BASE_URL,
   consultationApi,
   patientApi,
-  recordsApi,
-  supportApi,
+  clinicalApi,
 } from "../../lib/api";
-import InCallChat from "../consultation/InCallChat";
+import WebRtcConsultation from "../consultation/WebRtcConsultation";
 
 export default function VideoConsultationScreen({ onNavigate }) {
   const [appointmentId, setAppointmentId] = useState(
@@ -15,11 +13,11 @@ export default function VideoConsultationScreen({ onNavigate }) {
   );
   const [appointment, setAppointment] = useState(null);
   const [patientProfile, setPatientProfile] = useState(null);
-  const [vitalsReadings, setVitalsReadings] = useState([]);
-  const [attachedRecords, setAttachedRecords] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
   const [roomAuth, setRoomAuth] = useState(null);
-  const [roomState, setRoomState] = useState("READINESS"); // 'READINESS' | 'WAITING_ROOM' | 'IN_CALL' | 'ENDED'
+  const [roomState, setRoomState] = useState(() => {
+    return localStorage.getItem("teleconsult_in_call") === "true" ? "IN_CALL" : "READINESS";
+  }); // 'READINESS' | 'WAITING_ROOM' | 'IN_CALL' | 'ENDED'
   const [errorMessage, setErrorMessage] = useState("");
   const [devices, setDevices] = useState({
     camera: true,
@@ -27,48 +25,34 @@ export default function VideoConsultationScreen({ onNavigate }) {
     network: true,
     speaker: true,
   });
-  const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
-  const [activeSideTab, setActiveSideTab] = useState("chat");
   const [callDuration, setCallDuration] = useState(0);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [connectionQuality, setConnectionQuality] = useState("Connected (WebRTC P2P)");
 
   const timerRef = useRef(null);
   const previewVideoRef = useRef(null);
-  const localPipVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const peerRef = useRef(null);
-  const socketRef = useRef(null);
   const streamRef = useRef(null);
+
+  // Auto-resume call on page reload if active call flag is present
+  useEffect(() => {
+    const targetAptId = appointment?.id || appointmentId;
+    if (localStorage.getItem("teleconsult_in_call") === "true" && targetAptId && roomState === "IN_CALL" && !roomAuth) {
+      consultationApi.join(targetAptId)
+        .then((auth) => {
+          setRoomAuth(auth);
+          setRoomState("IN_CALL");
+        })
+        .catch(() => {
+          localStorage.removeItem("teleconsult_in_call");
+          setRoomState("READINESS");
+        });
+    }
+  }, [appointment, appointmentId, roomState, roomAuth]);
 
   useEffect(() => {
     patientApi
       .profile()
       .then((p) => {
         if (p) setPatientProfile(p);
-      })
-      .catch(() => {});
-
-    supportApi
-      .bpReadings()
-      .then((readings) => {
-        if (Array.isArray(readings)) setVitalsReadings(readings);
-      })
-      .catch(() => {});
-
-    recordsApi
-      .list()
-      .then((recs) => {
-        if (Array.isArray(recs)) setAttachedRecords(recs);
-      })
-      .catch(() => {});
-
-    patientApi
-      .prescriptions()
-      .then((items) => {
-        if (Array.isArray(items)) setPrescriptions(items);
       })
       .catch(() => {});
 
@@ -92,6 +76,31 @@ export default function VideoConsultationScreen({ onNavigate }) {
       })
       .catch(() => {});
   }, [appointmentId]);
+
+  // Real-time polling effect (every 3 seconds) for newly published e-prescriptions matching active appointment ID
+  useEffect(() => {
+    const targetAptId = appointment?.id || appointmentId;
+    if (!targetAptId) return;
+
+    const fetchPrescriptions = async () => {
+      try {
+        const items = await clinicalApi.prescriptions();
+        if (Array.isArray(items)) {
+          const matching = items.filter(
+            (rx) => String(rx.appointment_id || rx.appointmentId || "").toLowerCase() === String(targetAptId).toLowerCase()
+          );
+          const relevantRx = matching.length > 0 ? matching : items;
+          setPrescriptions(relevantRx);
+        }
+      } catch (err) {
+        console.error("Failed to poll prescriptions:", err);
+      }
+    };
+
+    fetchPrescriptions();
+    const interval = setInterval(fetchPrescriptions, 3000);
+    return () => clearInterval(interval);
+  }, [appointment?.id, appointmentId]);
 
   // Duration timer when IN_CALL
   useEffect(() => {
@@ -162,220 +171,22 @@ export default function VideoConsultationScreen({ onNavigate }) {
     }
   };
 
-  // Admit to call and start real WebRTC peer connection
+  // Admit to call and use WebRtcConsultation component
   const handleAdmitToCall = async () => {
-    if (!roomAuth?.token) {
-      setErrorMessage(
-        "Missing consultation authorization token. Please rejoin from Waiting Room.",
-      );
+    if (!targetAptId) {
+      setErrorMessage("No appointment selected for video consultation.");
       return;
     }
     setErrorMessage("");
-    setRoomState("IN_CALL");
-
     try {
-      // 1. Get real user media stream
-      let localStream = streamRef.current;
-      if (!localStream || !localStream.active) {
-        try {
-          localStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true,
-          });
-          streamRef.current = localStream;
-        } catch (mediaErr) {
-          console.warn("getUserMedia error, creating synthetic tracks:", mediaErr);
-          // Fallback in headless environment without physical devices
-          const canvas = document.createElement("canvas");
-          canvas.width = 640;
-          canvas.height = 480;
-          const ctx = canvas.getContext("2d");
-          ctx.fillStyle = "#162623";
-          ctx.fillRect(0, 0, 640, 480);
-          const canvasStream = canvas.captureStream(30);
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const osc = audioCtx.createOscillator();
-          const dst = audioCtx.createMediaStreamDestination();
-          osc.connect(dst);
-          osc.start();
-          const combinedStream = new MediaStream([
-            canvasStream.getVideoTracks()[0],
-            dst.stream.getAudioTracks()[0],
-          ]);
-          localStream = combinedStream;
-          streamRef.current = localStream;
-        }
-      }
-
-      // 2. Instantiate real WebRTC RTCPeerConnection
-      const iceServers = roomAuth?.ice_servers || [{ urls: "stun:stun.l.google.com:19302" }];
-      const pc = new RTCPeerConnection({ iceServers });
-      peerRef.current = pc;
-      window.__webrtc_peer = pc;
-      window.__webrtc_stream = localStream;
-
-      // Add local tracks
-      if (localStream) {
-        localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
-        if (localPipVideoRef.current) {
-          localPipVideoRef.current.srcObject = localStream;
-        }
-      }
-
-      // Handle remote incoming tracks
-      pc.ontrack = (event) => {
-        if (remoteVideoRef.current && event.streams?.[0]) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      pc.oniceconnectionstatechange = () => {
-        const ice = pc.iceConnectionState;
-        if (ice === "disconnected" || ice === "failed") {
-          setConnectionQuality("Reconnecting…");
-          socketRef.current?.emit("request_ice_restart");
-        } else if (ice === "connected" || ice === "completed") {
-          setConnectionQuality("Connected (WebRTC P2P)");
-          if (remoteVideoRef.current && pc.getReceivers().length > 0) {
-            const remoteStream = new MediaStream(pc.getReceivers().map(r => r.track).filter(Boolean));
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play?.().catch(() => {});
-          }
-        } else {
-          setConnectionQuality(`WebRTC ICE: ${ice}`);
-        }
-      };
-
-      pc.onconnectionstatechange = () => {
-        const conn = pc.connectionState;
-        if (conn === "disconnected" || conn === "failed") {
-          setConnectionQuality("Reconnecting…");
-        } else if (conn === "connected") {
-          setConnectionQuality("Connected (WebRTC P2P)");
-        }
-      };
-
-      // 3. Connect to backend Socket.IO signaling with genuine token
-      const token = roomAuth.token;
-      const sId = roomAuth.session_id || `ses-${targetAptId}`;
-      const socket = io(API_BASE_URL, {
-        withCredentials: true,
-        auth: { consultationToken: token, sessionId: sId },
-        transports: ["websocket"],
-      });
-      socketRef.current = socket;
-      window.__webrtc_socket = socket;
-
-      socket.on("connect", () => {
-        socket.emit("join_room", { appointmentId: targetAptId });
-        socket.emit("signaling_ready");
-        if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-          setConnectionQuality("Reconnecting…");
-          socket.emit("request_ice_restart");
-        }
-      });
-
-      socket.on("reconnect", () => {
-        socket.emit("join_room", { appointmentId: targetAptId });
-        socket.emit("signaling_ready");
-        socket.emit("request_ice_restart");
-      });
-
-      socket.on("disconnect", () => {
-        setConnectionQuality("Reconnecting…");
-      });
-      socket.on("peer_disconnected", () => {
-        setConnectionQuality("Reconnecting…");
-      });
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("ice_candidate", { candidate: event.candidate });
-        }
-      };
-
-      socket.on("offer", async (data) => {
-        try {
-          const offer = data?.offer || data?.sdp || data;
-          if (offer && offer.sdp) {
-            if (pc.signalingState !== "stable") {
-              try {
-                await pc.setLocalDescription({ type: "rollback" });
-              } catch {}
-            }
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            socket.emit("answer", { answer, sdp: pc.localDescription });
-          }
-        } catch (err) {
-          console.warn("Signaling offer handling error:", err);
-        }
-      });
-
-      socket.on("answer", async (data) => {
-        try {
-          const answer = data?.answer || data?.sdp || data;
-          if (answer && answer.sdp && pc.signalingState === "have-local-offer") {
-            await pc.setRemoteDescription(new RTCSessionDescription(answer));
-          }
-        } catch (err) {
-          console.warn("Signaling answer handling error:", err);
-        }
-      });
-
-      socket.on("ice_candidate", async (data) => {
-        try {
-          const candidate = data?.candidate || data;
-          if (candidate) {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
-          }
-        } catch (err) {
-          console.warn("Signaling ICE handling error:", err);
-        }
-      });
-    } catch (webrtcErr) {
-      console.warn("WebRTC startup error:", webrtcErr);
-    }
-  };
-
-  const handleEndCall = async () => {
-    if (roomAuth?.session_id) {
-      try {
-        await consultationApi.disconnected(roomAuth.session_id);
-      } catch {
-        // ignore
-      }
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-    }
-    if (socketRef.current) {
-      socketRef.current.emit("end_call");
-      socketRef.current.disconnect();
-    }
-    if (peerRef.current) {
-      peerRef.current.close();
-    }
-    window.__webrtc_peer = null;
-    window.__webrtc_stream = null;
-    setRoomState("ENDED");
-  };
-
-  const toggleMic = () => {
-    const nextMuted = !muted;
-    setMuted(nextMuted);
-    if (streamRef.current) {
-      streamRef.current.getAudioTracks().forEach((t) => (t.enabled = !nextMuted));
-    }
-  };
-
-  const toggleCamera = () => {
-    const nextCamOff = !cameraOff;
-    setCameraOff(nextCamOff);
-    if (streamRef.current) {
-      streamRef.current.getVideoTracks().forEach((t) => (t.enabled = !nextCamOff));
+      const auth = roomAuth || (await consultationApi.join(targetAptId));
+      setRoomAuth(auth);
+      setRoomState("IN_CALL");
+      localStorage.setItem("teleconsult_in_call", "true");
+    } catch (err) {
+      setErrorMessage(
+        err.message || "Unable to authorize consultation session.",
+      );
     }
   };
 
@@ -406,23 +217,6 @@ export default function VideoConsultationScreen({ onNavigate }) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputMessage.trim()) return;
-    const newMsg = {
-      sender: `${patientName} (You)`,
-      text: inputMessage,
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-    setChatMessages((prev) => [...prev, newMsg]);
-    setInputMessage("");
-  };
-
-  const latestReading = vitalsReadings.length > 0 ? vitalsReadings[vitalsReadings.length - 1] : null;
 
   return (
     <div className="w-full bg-[#F0F5F7] px-4 sm:px-6 lg:px-10 py-8 lg:py-10 max-w-full overflow-x-hidden font-sans">
@@ -736,7 +530,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
           </div>
         )}
 
-        {/* PHASE 3: Live Video Consultation Room with Real WebRTC */}
+        {/* PHASE 3: Live Video Consultation Room with WebRtcConsultation */}
         {roomState === "IN_CALL" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left Side: Video Call & Streaming */}
@@ -745,245 +539,135 @@ export default function VideoConsultationScreen({ onNavigate }) {
                 <span className="material-symbols-outlined text-[#25836F]">videocam</span>
                 Video Streaming
               </h3>
-              <div className="relative aspect-video rounded-2xl bg-[#162623] overflow-hidden border border-[#577877]/20 shadow-2xl flex items-center justify-center">
-                {/* Real Remote Video Track */}
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
+              {roomAuth ? (
+                <WebRtcConsultation
+                  appointmentId={targetAptId}
+                  authorization={roomAuth}
+                  role="patient"
+                  onEnded={() => {
+                    localStorage.removeItem("teleconsult_in_call");
+                    setRoomState("ENDED");
+                  }}
+                  onPrescriptionPublished={(data) => {
+                    if (data?.result) {
+                      const rx = data.result;
+                      setPrescriptions((prev) => {
+                        const exists = prev.some((p) => String(p.id || p._id) === String(rx.id || rx._id));
+                        if (!exists) {
+                          return [rx, ...prev];
+                        }
+                        return prev;
+                      });
+                    }
+                  }}
                 />
-
-                {/* Top Bar Overlay */}
-                <div className="absolute top-4 left-4 right-4 flex items-center justify-between text-xs text-white bg-black/50 backdrop-blur-md px-4 py-2 rounded-xl z-20">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-                    <span className="font-bold">WEBRTC LIVE</span>
-                    <span>· {formatTimer(callDuration)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-emerald-400">
-                      verified_user
-                    </span>
-                    <span className="text-[11px] text-white/90">
-                      {connectionQuality}
-                    </span>
-                  </div>
+              ) : (
+                <div className="p-12 text-center text-[#577877] space-y-3">
+                  <span className="material-symbols-outlined animate-spin text-4xl text-[#25836F]">
+                    sync
+                  </span>
+                  <p className="text-sm font-bold text-[#162623]">
+                    Authorizing video consultation room…
+                  </p>
                 </div>
-
-                {/* Picture-in-Picture Local Patient View */}
-                <div className="absolute bottom-4 right-4 w-36 sm:w-44 aspect-video rounded-xl bg-[#25836F] border-2 border-white/60 shadow-lg overflow-hidden flex items-center justify-center z-20">
-                  {cameraOff ? (
-                    <div className="text-center text-white/70">
-                      <span className="material-symbols-outlined text-lg">
-                        videocam_off
-                      </span>
-                      <p className="text-[9px]">Camera Off</p>
-                    </div>
-                  ) : (
-                    <video
-                      ref={localPipVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  <div className="absolute bottom-1 left-2 text-[9px] text-white/90 bg-black/40 px-1 rounded">
-                    {muted ? "Muted" : "Mic Live"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Call Controls Dock */}
-              <div className="p-4 rounded-2xl bg-[#F0F5F7] border border-[#577877]/20 shadow-sm flex items-center justify-center gap-4 flex-wrap">
-                <button
-                  type="button"
-                  onClick={toggleMic}
-                  className={`p-3.5 rounded-xl transition cursor-pointer ${
-                    muted
-                      ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-white text-[#25836F] hover:bg-[#25836F] hover:text-white"
-                  }`}
-                  title={muted ? "Unmute microphone" : "Mute microphone"}
-                >
-                  <span className="material-symbols-outlined text-xl">
-                    {muted ? "mic_off" : "mic"}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={toggleCamera}
-                  className={`p-3.5 rounded-xl transition cursor-pointer ${
-                    cameraOff
-                      ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-white text-[#25836F] hover:bg-[#25836F] hover:text-white"
-                  }`}
-                  title={cameraOff ? "Turn camera on" : "Turn camera off"}
-                >
-                  <span className="material-symbols-outlined text-xl">
-                    {cameraOff ? "videocam_off" : "videocam"}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleEndCall}
-                  className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs flex items-center gap-2 shadow-sm transition cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-lg">
-                    call_end
-                  </span>
-                  End Call
-                </button>
-              </div>
+              )}
             </div>
 
-            {/* Right Side: Prescription, clinical chat, vitals, and reports panel */}
+            {/* Right Side: e-Prescriptions & Medications Panel */}
             <div className="lg:col-span-6 rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xl overflow-y-auto max-h-[calc(100vh-120px)] space-y-4">
               <h3 className="text-sm font-bold text-[#162623] mb-2 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#25836F]">clinical_notes</span>
-                Clinical Panel &amp; Prescription
+                <span className="material-symbols-outlined text-[#25836F]">medication</span>
+                e-Prescriptions &amp; Medications
               </h3>
 
-              {/* Panel Tabs */}
-              <div className="flex border-b border-[#577877]/20 pb-2 mb-4 gap-1 bg-[#F0F5F7] p-2 rounded-xl">
-                {[
-                  { id: "prescription", label: "Prescription", icon: "medication" },
-                  { id: "chat", label: "Chat", icon: "chat" },
-                  { id: "vitals", label: "Vitals", icon: "vital_signs" },
-                  { id: "reports", label: "Reports", icon: "description" },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveSideTab(tab.id)}
-                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition cursor-pointer ${
-                      activeSideTab === tab.id
-                        ? "bg-[#25836F] text-white shadow-sm"
-                        : "text-[#577877] hover:text-[#162623] bg-white"
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-sm">
-                      {tab.icon}
-                    </span>
-                    <span className="truncate">{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab Contents */}
               <div className="space-y-4">
-                {activeSideTab === "prescription" && (
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#25836F] text-base">medication</span>
-                      Prescriptions &amp; Medications
-                    </h3>
-                    {prescriptions.length > 0 ? (
-                      prescriptions.map((rx) => (
-                        <div key={rx.id || rx._id} className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="text-xs font-bold text-[#162623]">
-                                {rx.medication_name || rx.title || rx.medication || "Prescription Item"}
-                              </p>
-                              <p className="text-[11px] text-[#577877]">
-                                Dosage: {rx.dosage || rx.instructions || "As directed"}
-                              </p>
-                            </div>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
-                              Active
-                            </span>
+                {prescriptions.length > 0 ? (
+                  prescriptions.map((rx) => {
+                    const rxId = rx.id || rx._id;
+                    const content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
+                    const meds = content.medicines || (rx.medication_name ? [{ name: rx.medication_name, dosage: rx.dosage, frequency: rx.frequency, duration: rx.duration, instructions: rx.instructions }] : []);
+                    return (
+                      <div key={rxId || Math.random()} className="p-4 rounded-xl bg-white border border-[#577877]/15 space-y-3 shadow-xs">
+                        <div className="flex justify-between items-start border-b border-[#577877]/10 pb-2">
+                          <div>
+                            <p className="text-xs font-bold text-[#162623] flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[#25836F] text-sm">prescriptions</span>
+                              {rx.title || content.diagnosis || "e-Prescription"}
+                            </p>
+                            <p className="text-[10px] text-[#577877] mt-0.5">
+                              Issued: {rx.released_at ? new Date(rx.released_at).toLocaleString() : "Recently"}
+                            </p>
                           </div>
-                          {rx.duration && (
-                            <p className="text-[10px] text-[#577877]">Duration: {rx.duration}</p>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-6 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-2">
-                        <span className="material-symbols-outlined text-3xl text-[#577877]/60">medication_liquid</span>
-                        <p className="font-semibold text-[#162623]">No Prescriptions Issued Yet</p>
-                        <p>Your doctor will issue or update your electronic prescription during or after this consultation.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeSideTab === "chat" && (
-                  <div className="h-[460px]">
-                    <InCallChat
-                      socket={socketRef.current}
-                      role="patient"
-                      appointmentId={appointmentId}
-                    />
-                  </div>
-                )}
-
-                {activeSideTab === "vitals" && (
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#25836F] text-base">vital_signs</span>
-                      Patient Vitals (Shared with Doctor)
-                    </h3>
-                    {latestReading ? (
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <div className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15">
-                          <span className="text-[10px] text-[#577877] block">
-                            Blood Pressure
-                          </span>
-                          <span className="text-sm font-bold text-[#162623]">
-                            {latestReading.systolic}/{latestReading.diastolic} mmHg
-                          </span>
-                          <span className="text-[9px] text-[#25836F] block mt-0.5 font-medium">
-                            Latest recorded
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
+                            {rx.status || "Active"}
                           </span>
                         </div>
-                        <div className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15">
-                          <span className="text-[10px] text-[#577877] block">
-                            Pulse / Heart Rate
-                          </span>
-                          <span className="text-sm font-bold text-[#162623]">
-                            {latestReading.pulse ? `${latestReading.pulse} bpm` : "Not recorded"}
-                          </span>
-                          <span className="text-[9px] text-[#25836F] block mt-0.5 font-medium">
-                            Resting pulse
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-1">
-                        <p className="font-semibold text-[#162623]">No Vitals Recorded Yet</p>
-                        <p>Log your blood pressure and pulse in Follow-Up Care to share them with your clinician.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
 
-                {(activeSideTab === "reports" || activeSideTab === "notes") && (
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#577877] flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[#25836F] text-base">description</span>
-                      Shared Documents for this Visit
-                    </h3>
-                    {attachedRecords.length > 0 ? (
-                      attachedRecords.slice(0, 3).map((rec) => (
-                        <div key={rec.id} className="p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-1">
-                          <p className="text-xs font-bold text-[#162623] truncate">
-                            {rec.file_name || rec.title || "Clinical document.pdf"}
+                        {content.diagnosis && (
+                          <p className="text-[11px] text-slate-700">
+                            <strong>Diagnosis:</strong> {content.diagnosis}
                           </p>
-                          <p className="text-[10px] text-[#577877]">
-                            {rec.category || "Clinical Record"} · Verified
+                        )}
+
+                        {meds.length > 0 && (
+                          <div className="space-y-1.5 bg-[#F0F5F7] p-3 rounded-xl border border-[#577877]/10">
+                            <p className="font-bold text-[11px] text-[#162623]">
+                              Prescribed Medications:
+                            </p>
+                            {meds.map((m, idx) => (
+                              <div key={idx} className="text-[11px] text-slate-700 border-b border-slate-200/60 pb-1.5 last:border-b-0">
+                                <span className="font-semibold">{m.name}</span> {m.dosage ? `(${m.dosage})` : ""} {m.frequency ? `· ${m.frequency}` : ""} {m.duration ? `for ${m.duration}` : ""}
+                                {m.instructions && (
+                                  <div className="text-[10px] text-[#577877] mt-0.5">
+                                    Instructions: {m.instructions}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {content.instructions && (
+                          <p className="text-[10px] text-slate-600">
+                            <strong>General Instructions:</strong> {content.instructions}
                           </p>
+                        )}
+
+                        <div className="pt-1 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!rxId) return;
+                              try {
+                                const blob = await clinicalApi.downloadPrescription(rxId);
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `Prescription-${rxId}.pdf`;
+                                document.body.appendChild(a);
+                                a.click();
+                                window.URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                              } catch (err) {
+                                console.error("PDF download failed", err);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#25836F] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] transition cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-sm">
+                              download
+                            </span>
+                            Download Prescription PDF
+                          </button>
                         </div>
-                      ))
-                    ) : (
-                      <div className="p-4 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877]">
-                        No medical records uploaded yet. Upload records from the Medical Records screen.
                       </div>
-                    )}
+                    );
+                  })
+                ) : (
+                  <div className="p-6 rounded-xl bg-[#F0F5F7] text-center text-xs text-[#577877] space-y-2">
+                    <span className="material-symbols-outlined text-3xl text-[#577877]/60">medication_liquid</span>
+                    <p className="font-semibold text-[#162623]">No Prescriptions Issued Yet</p>
+                    <p>Your doctor will issue or update your electronic prescription during or after this consultation.</p>
                   </div>
                 )}
               </div>

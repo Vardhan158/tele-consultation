@@ -12,7 +12,11 @@ class TenancyMode(StrEnum):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TELECONSULT_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="TELECONSULT_",
+        env_file=(".env", "backend/.env", "../backend/.env"),
+        extra="ignore",
+    )
 
     environment: str = "dev"
     tenancy_mode: TenancyMode = TenancyMode.POOLED
@@ -79,6 +83,66 @@ class Settings(BaseSettings):
     # Sensitive Health Data Encryption (DB-07, SEC-08, GAP-11)
     clinical_encryption_key: str = Field(default="", validation_alias="CLINICAL_ENCRYPTION_KEY")
 
+    # Cloudinary Image Storage (Profile Avatars)
+    cloudinary_cloud_name: str = Field(default="", validation_alias="CLOUDINARY_CLOUD_NAME")
+    cloudinary_api_key: str = Field(default="", validation_alias="CLOUDINARY_API_KEY")
+    cloudinary_api_secret: str = Field(default="", validation_alias="CLOUDINARY_API_SECRET")
+    cloudinary_url: str = Field(default="", validation_alias="CLOUDINARY_URL")
+
+    def get_cloudinary_credentials(self) -> tuple[str, str, str]:
+        """Return (cloud_name, api_key, api_secret) parsed from settings, environment, or .env."""
+        import os
+        from pathlib import Path
+        import urllib.parse
+
+        cloud_name = self.cloudinary_cloud_name or os.environ.get("CLOUDINARY_CLOUD_NAME") or os.environ.get("TELECONSULT_CLOUDINARY_CLOUD_NAME") or ""
+        api_key = self.cloudinary_api_key or os.environ.get("CLOUDINARY_API_KEY") or os.environ.get("TELECONSULT_CLOUDINARY_API_KEY") or ""
+        api_secret = self.cloudinary_api_secret or os.environ.get("CLOUDINARY_API_SECRET") or os.environ.get("TELECONSULT_CLOUDINARY_API_SECRET") or ""
+        c_url = self.cloudinary_url or os.environ.get("CLOUDINARY_URL") or os.environ.get("TELECONSULT_CLOUDINARY_URL") or ""
+
+        if not cloud_name or not api_key:
+            # Check .env files directly on disk in case settings was cached before .env was updated
+            cur_file = Path(__file__).resolve()
+            search_paths = [
+                Path(".env"),
+                Path("backend/.env"),
+                Path("../backend/.env"),
+                cur_file.parents[4] / ".env",
+                cur_file.parents[3] / ".env",
+                cur_file.parents[2] / ".env",
+            ]
+            for env_path in search_paths:
+                if env_path.is_file():
+                    try:
+                        with open(env_path, "r", encoding="utf-8") as f:
+                            for line in f:
+                                line = line.strip()
+                                if not line or line.startswith("#") or "=" not in line:
+                                    continue
+                                k, v = line.split("=", 1)
+                                k, v = k.strip(), v.strip().strip("'\"")
+                                if k in ("CLOUDINARY_CLOUD_NAME", "TELECONSULT_CLOUDINARY_CLOUD_NAME") and not cloud_name:
+                                    cloud_name = v
+                                elif k in ("CLOUDINARY_API_KEY", "TELECONSULT_CLOUDINARY_API_KEY") and not api_key:
+                                    api_key = v
+                                elif k in ("CLOUDINARY_API_SECRET", "TELECONSULT_CLOUDINARY_API_SECRET") and not api_secret:
+                                    api_secret = v
+                                elif k in ("CLOUDINARY_URL", "TELECONSULT_CLOUDINARY_URL") and not c_url:
+                                    c_url = v
+                    except Exception:
+                        pass
+                if cloud_name and api_key and (api_secret or c_url):
+                    break
+
+        if c_url and (not cloud_name or not api_key or not api_secret):
+            parsed = urllib.parse.urlparse(c_url)
+            if parsed.scheme == "cloudinary":
+                api_key = api_key or (parsed.username or "")
+                api_secret = api_secret or (parsed.password or "")
+                cloud_name = cloud_name or (parsed.hostname or "")
+
+        return cloud_name, api_key, api_secret
+
     def validate_production_configuration(self) -> None:
         """Enforce fail-fast configuration validation when running in production/staging (AUD-09, GAP-02).
 
@@ -112,11 +176,24 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5173",
             "http://localhost:5174",
             "http://127.0.0.1:5174",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
         ]
 
         return list(dict.fromkeys(configured + always_allow))
 
 
 @lru_cache
-def get_settings() -> Settings:
+def _cached_settings() -> Settings:
     return Settings()
+
+
+def get_settings(fresh: bool = False) -> Settings:
+    if fresh:
+        _cached_settings.cache_clear()
+    return _cached_settings()
+
+
+get_settings.cache_clear = _cached_settings.cache_clear  # type: ignore[attr-defined]

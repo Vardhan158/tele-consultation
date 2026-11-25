@@ -190,9 +190,17 @@ export default function Header({
             aria-haspopup="true"
             className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-white transition cursor-pointer group"
           >
-            <div className="w-8 h-8 rounded-full bg-[#185A4D] text-white flex items-center justify-center font-bold text-xs shadow-sm">
-              {initials}
-            </div>
+            {patient?.avatar_url ? (
+              <img
+                src={patient.avatar_url}
+                alt={name}
+                className="w-8 h-8 rounded-full object-cover shadow-sm ring-1 ring-[#577877]/20"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-[#185A4D] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                {initials}
+              </div>
+            )}
             <span className="font-semibold text-[#162623] hidden md:inline text-xs">
               {name}
             </span>
