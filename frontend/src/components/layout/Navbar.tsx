@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import DoctorRegistrationScreen from "../auth/DoctorRegistrationScreen";
+import { lazy, Suspense } from "react";
+
+const DoctorRegistrationScreen = lazy(() => import("../auth/DoctorRegistrationScreen"));
 
 const PUBLIC_NAV_LINKS = [
   { label: "Home", path: "/" },
@@ -168,7 +170,7 @@ export default function Navbar() {
         </NavLink>
 
         {/* Center Desktop Navigation Links */}
-        <nav aria-label="Primary navigation" className="hidden items-center gap-2 md:flex">
+        <nav aria-label="Primary navigation" className="hidden items-center gap-2 lg:flex">
           {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, false))}
         </nav>
 
@@ -220,7 +222,7 @@ export default function Navbar() {
           aria-expanded={open}
           aria-controls="public-mobile-navigation"
           onClick={() => setOpen((prev) => !prev)}
-          className={`rounded-lg p-2 transition md:hidden cursor-pointer ${
+          className={`rounded-lg p-2 transition lg:hidden cursor-pointer ${
             useSolidWhiteHeader
               ? "text-[#165849] hover:bg-[#EEF6F3]"
               : "text-white hover:bg-white/10"
@@ -236,7 +238,7 @@ export default function Navbar() {
       {open && (
         <div
           id="public-mobile-navigation"
-          className={`border-t px-6 py-4 md:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+          className={`border-t px-6 py-4 lg:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
             useSolidWhiteHeader
               ? "border-white/40 bg-white/95 backdrop-blur-xl text-[#162623]"
               : "border-white/10 bg-[#165849]/95 backdrop-blur-xl text-white"
@@ -282,7 +284,7 @@ export default function Navbar() {
 
       {/* Doctor Registration Popup Modal with all 3 steps */}
       {showDoctorModal && (
-        <DoctorRegistrationScreen
+        <Suspense fallback={null}><DoctorRegistrationScreen
           isModal={true}
           onClose={() => setShowDoctorModal(false)}
           onSuccess={(email: string) => {
@@ -293,7 +295,7 @@ export default function Navbar() {
             setShowDoctorModal(false);
             navigate("/login");
           }}
-        />
+        /></Suspense>
       )}
     </header>
   );

@@ -1,8 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Lenis from "lenis";
 import PublicNavbar from "./PublicNavbar";
-import Stethoscope3D from "./Stethoscope3D";
+import StorySection from "./story/StorySection";
+import { ScrollTrigger } from "./story/scrollRuntime";
+
+const Stethoscope3D = lazy(() => import("./Stethoscope3D"));
+
+function CinematicStethoscope() {
+  const [ref, inView] = useInView({ threshold: 0, rootMargin: "200px" });
+  return <div ref={ref} className="absolute inset-0">
+    {inView && <Suspense fallback={null}>
+      <Stethoscope3D className="absolute inset-0 !h-full !w-full" interactive={false} cinematic />
+    </Suspense>}
+  </div>;
+}
 
 // ============================================================================
 // Scroll Animation Hooks & Components
@@ -167,21 +179,30 @@ export default function LandingScreen({
 
   // Initialize 60+ FPS inertia smooth scrolling with Lenis
   useEffect(() => {
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // smooth easeOutExpo
+      lerp: 0.105,
       orientation: "vertical",
       gestureOrientation: "vertical",
-      smoothWheel: true,
+      smoothWheel: !motion.matches,
       wheelMultiplier: 1,
-      touchMultiplier: 1.5,
+      syncTouch: false,
     });
     lenisRef.current = lenis;
+    const syncMotion = () => { lenis.options.smoothWheel = !motion.matches; };
+    motion.addEventListener("change", syncMotion);
 
+    let headerScrolled;
     const onScroll = ({ scroll }) => {
-      setScrolled(scroll > 40);
+      const next = scroll > 40;
+      if (next !== headerScrolled) {
+        headerScrolled = next;
+        setScrolled(next);
+      }
+      ScrollTrigger.update();
     };
     lenis.on("scroll", onScroll);
+    onScroll({ scroll: lenis.scroll });
 
     let rafId;
     function raf(time) {
@@ -191,6 +212,7 @@ export default function LandingScreen({
     rafId = requestAnimationFrame(raf);
 
     return () => {
+      motion.removeEventListener("change", syncMotion);
       cancelAnimationFrame(rafId);
       if (lenisRef.current) {
         lenisRef.current.destroy();
@@ -415,12 +437,14 @@ export default function LandingScreen({
               />
             ) : (
               <div className="w-full max-w-xl h-[450px] sm:h-[550px] lg:h-[620px] flex items-center justify-center relative">
-                <Stethoscope3D className="w-full h-full" interactive={true} />
+                <Suspense fallback={null}><Stethoscope3D className="w-full h-full" interactive={true} /></Suspense>
               </div>
             )}
           </div>
         </div>
       </section>
+
+      <StorySection lenisRef={lenisRef} />
 
       {/* ========================================================= */}
       {/* 2. STATS MARQUEE (PLATFORM HIGHLIGHTS)                     */}
@@ -561,7 +585,7 @@ export default function LandingScreen({
         <div className="sticky top-0 h-screen w-full overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_64%_45%,rgba(32,199,167,0.22),transparent_38%),linear-gradient(135deg,#071713_0%,#0d2b25_58%,#071713_100%)]" />
           <div className="absolute inset-0 opacity-40 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:64px_64px]" />
-          <Stethoscope3D className="absolute inset-0 !h-full !w-full" interactive={false} cinematic />
+          <CinematicStethoscope />
           <div className="absolute inset-0 bg-gradient-to-r from-[#071713]/85 via-transparent to-[#071713]/25 pointer-events-none" />
           <div className="absolute bottom-7 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-white/55">
             <span>Scroll to explore</span>

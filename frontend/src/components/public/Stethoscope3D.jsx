@@ -8,6 +8,7 @@ export default function Stethoscope3D({ className = "", interactive = true, cine
   const mountRef = useRef(null);
   const [hovered, setHovered] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [fps, setFps] = useState(60);
 
   useEffect(() => {
@@ -22,11 +23,17 @@ export default function Stethoscope3D({ className = "", interactive = true, cine
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
     camera.position.set(0, 0, 8.2);
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: "high-performance",
-    });
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance",
+      });
+    } catch {
+      queueMicrotask(() => setUnavailable(true));
+      return;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -367,7 +374,17 @@ export default function Stethoscope3D({ className = "", interactive = true, cine
       animFrameId = requestAnimationFrame(animate);
     };
 
-    animate();
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && animFrameId === undefined) {
+        lastFpsCheck = performance.now();
+        frameCount = 0;
+        animFrameId = requestAnimationFrame(animate);
+      } else if (!entry.isIntersecting && animFrameId !== undefined) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = undefined;
+      }
+    });
+    observer.observe(container);
 
     // 10. Responsive Resize Handler
     const handleResize = () => {
@@ -382,6 +399,7 @@ export default function Stethoscope3D({ className = "", interactive = true, cine
     window.addEventListener("resize", handleResize);
 
     return () => {
+      observer.disconnect();
       cancelAnimationFrame(animFrameId);
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("scroll", handleScroll);
@@ -409,8 +427,14 @@ export default function Stethoscope3D({ className = "", interactive = true, cine
       {/* Luxury Background Glow Ring */}
       <div className="pointer-events-none absolute size-72 sm:size-96 lg:size-[480px] rounded-full bg-gradient-to-tr from-[#20C7A7]/25 via-[#123D35]/15 to-transparent blur-3xl animate-pulse" />
 
+      {unavailable && (
+        <p role="status" className="relative z-20 rounded-lg bg-white/90 px-4 py-3 text-sm text-[#162623]">
+          The 3D stethoscope is unavailable on this device.
+        </p>
+      )}
+
       {/* FS 60P Studio Style Badge */}
-      {!cinematic && <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-[#EBEBEB] text-[#000000] text-[10px] font-mono font-medium border border-zinc-300 shadow-2xs">
+      {!unavailable && !cinematic && <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-[#EBEBEB] text-[#000000] text-[10px] font-mono font-medium border border-zinc-300 shadow-2xs">
         <span className="size-2 rounded-full bg-[#123D35] animate-ping" />
         <span>{loaded ? "Stethoscope.glb · Loaded" : "3D WebGL Engine"}</span>
         <span className="opacity-40">|</span>
@@ -418,7 +442,7 @@ export default function Stethoscope3D({ className = "", interactive = true, cine
       </div>}
 
       {/* Interactive Helper Pill */}
-      {interactive && (
+      {!unavailable && interactive && (
         <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 px-3.5 py-1.5 rounded-full bg-[#000000]/80 text-[#FFFFFF] text-[11px] font-medium border border-white/20 backdrop-blur-md transition-all duration-300 pointer-events-none ${
           hovered ? "opacity-100 scale-102" : "opacity-75 scale-100"
         }`}>
