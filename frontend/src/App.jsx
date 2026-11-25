@@ -18,6 +18,7 @@ const ProfileScreen = lazy(() => import("./components/screens/ProfileScreen"));
 const SupportScreen = lazy(() => import("./components/screens/SupportScreen"));
 const ConsentScreen = lazy(() => import("./components/screens/ConsentScreen"));
 const AuthScreen = lazy(() => import("./components/auth/AuthScreen"));
+const LandingScreen = lazy(() => import("./components/public/LandingScreen"));
 const ServicesScreen = lazy(() => import("./components/public/ServicesScreen"));
 const AboutUsScreen = lazy(() => import("./components/public/AboutUsScreen"));
 const FaqsScreen = lazy(() => import("./components/public/FaqsScreen"));
