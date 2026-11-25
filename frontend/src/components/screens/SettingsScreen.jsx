@@ -280,20 +280,6 @@ export default function SettingsScreen({ onNavigate }) {
           >
             Account &amp; security
           </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              onNavigate ? onNavigate("consent") : setActiveTab("privacy")
-            }
-            className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap ${
-              activeTab === "privacy"
-                ? "text-[#25836F] border-b-2 border-[#25836F]"
-                : "text-[#577877] hover:text-[#162623]"
-            }`}
-          >
-            Privacy &amp; Consent Directives
-          </button>
         </div>
 
         {/* Main 2-Column Content Layout */}
