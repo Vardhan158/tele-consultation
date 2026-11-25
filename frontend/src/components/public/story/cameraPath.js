@@ -10,10 +10,10 @@ const path = new CatmullRomCurve3([
 ], false, 'centripetal');
 
 const approachEnd = 0.55;
-const enterStart = 0.64;
+const doorOpenAt = 0.64;
 
 export function sampleDoor(progress) {
-  return MathUtils.smoothstep(progress, 0.45, enterStart) * Math.PI / 2;
+  return MathUtils.smoothstep(progress, 0.45, doorOpenAt) * Math.PI / 2;
 }
 
 export function sampleFov(progress, aspect) {
@@ -22,7 +22,7 @@ export function sampleFov(progress, aspect) {
 
 export function sampleCamera(progress, aspect, target) {
   if (progress > approachEnd) {
-    const travel = MathUtils.smoothstep(progress, enterStart, 1);
+    const travel = MathUtils.smoothstep(progress, approachEnd, 1);
     const portrait = MathUtils.smoothstep(1 - aspect, 0, 0.45);
     const endZ = 2 + 0.65 * portrait;
     const z = MathUtils.lerp(8.2, endZ, travel);

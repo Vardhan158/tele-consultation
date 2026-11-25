@@ -26,7 +26,7 @@ export function sampleTravel(t) {
     stand: MathUtils.smoothstep(t, 0, .105),
     walk: MathUtils.smoothstep(t, .08, .44),
     enter: MathUtils.smoothstep(t, .479, .55),
-    door: (MathUtils.smoothstep(t, .434, .48) - MathUtils.smoothstep(t, .54, .587)) * 1.04,
+    door: (MathUtils.smoothstep(t, .434, .48) - MathUtils.smoothstep(t, .55, .587)) * 1.04,
     carX: carStartX + distance,
     carZ: carLaneZ - .63 * curb,
     heading: .10 * Math.sin(Math.PI * curb),

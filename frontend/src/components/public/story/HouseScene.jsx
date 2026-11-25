@@ -2,19 +2,21 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { refineStorySurface } from './storySurfaces';
+import { MathUtils } from 'three';
+import { finaleProgress } from './finaleProgress';
 import { sampleDoor } from './cameraPath';
 import { entranceProgress } from './patientTimeline';
 import { patientProgress } from './laptopTimeline';
 import { bookingProgress } from './consultationTimeline';
 import { earlierProgress } from './prescriptionTimeline';
 import { preTravelProgress } from './travelTimeline';
-import { previousJourney } from './pharmacyTimeline';
+import { homeEntry, pharmacyStart, pharmacyProgress, previousJourney } from './pharmacyTimeline';
 
 export const HOUSE_MODEL_URL = '/assets/house/modern-house.glb';
 
 // The exported hinge owns the leaf and its hardware. Keep it separate from the
 // static shell so a later scene can open it without moving walls or glazing.
-export default function HouseScene({ controller }) {
+export default function HouseScene({ controller, finaleController }) {
   const { scene } = useGLTF(HOUSE_MODEL_URL, false);
   const invalidate = useThree((state) => state.invalidate);
   const gl = useThree((state) => state.gl);
@@ -48,12 +50,18 @@ export default function HouseScene({ controller }) {
 
   useFrame(({ gl: renderer }) => {
     const hinge = hingeRef.current;
-    const angle = sampleDoor(entranceProgress(patientProgress(bookingProgress(earlierProgress(preTravelProgress(previousJourney(controller.progress)))))));
+    let angle = sampleDoor(entranceProgress(patientProgress(bookingProgress(earlierProgress(preTravelProgress(previousJourney(controller.progress)))))));
+    if (controller.progress > pharmacyStart) {
+      const t = pharmacyProgress(controller.progress);
+      const garden = finaleProgress(finaleController.progress);
+      angle = angle * (1 - MathUtils.smoothstep(t, 0, .05)) +
+        1.43 * (homeEntry(t).open + MathUtils.smoothstep(garden,.845,.88));
+    }
     if (hinge && hinge.rotation.y !== angle) {
       hinge.rotation.y = angle;
       renderer.shadowMap.needsUpdate = true;
     }
-  });
+  }, -1);
 
   // useGLTF owns cached geometries/materials; route unmounts must not dispose
   // resources needed on return. Only the lightweight scene graph is cloned.

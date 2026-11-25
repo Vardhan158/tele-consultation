@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { gsap, ScrollTrigger } from './scrollRuntime';
 import { endCardStart, finaleProgress } from './finaleProgress';
-import { playbackProgress } from './storyPlayback';
+import { easeStoryProgress, playbackProgress } from './storyPlayback';
 import './story.css';
 
 const StoryCanvas = lazy(() => import('./StoryCanvas'));
@@ -47,12 +47,30 @@ export default function StorySection({ lenisRef }) {
     const runway = () => Math.max(1, section.offsetHeight - stage.offsetHeight);
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let scrollProgress = 0;
-    const commit = (rawProgress) => {
-      scrollProgress = rawProgress;
-      const progress = playbackProgress(rawProgress, motion.matches);
+    let playbackFrame = 0;
+    let previousTime = null;
+    const publish = (progress) => {
       if (controller.progress === progress) return;
       section.style.setProperty('--story-progress', progress);
       controller.update(progress);
+    };
+    const animate = (time) => {
+      const elapsed = previousTime === null ? 1000 / 60 : time - previousTime;
+      previousTime = time;
+      publish(easeStoryProgress(controller.progress, scrollProgress, elapsed));
+      playbackFrame = controller.progress === scrollProgress ? 0 : requestAnimationFrame(animate);
+      if (!playbackFrame) previousTime = null;
+    };
+    const commit = (rawProgress) => {
+      scrollProgress = rawProgress;
+      if (motion.matches) {
+        cancelAnimationFrame(playbackFrame);
+        playbackFrame = 0;
+        previousTime = null;
+        publish(playbackProgress(rawProgress, motion.matches));
+      } else if (!playbackFrame) {
+        playbackFrame = requestAnimationFrame(animate);
+      }
     };
     const readProgress = () => gsap.utils.clamp(0, 1, -section.getBoundingClientRect().top / runway());
     let resizeProgress;
@@ -112,6 +130,7 @@ export default function StorySection({ lenisRef }) {
       motion.removeEventListener('change', syncMotion);
       window.removeEventListener('scroll', syncScroll);
       cancelAnimationFrame(refreshFrame);
+      cancelAnimationFrame(playbackFrame);
       layoutObserver.disconnect();
       trigger.kill();
       controller.update(0);

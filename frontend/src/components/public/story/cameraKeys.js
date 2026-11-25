@@ -1,4 +1,4 @@
-import { MathUtils } from 'three';
+import { MathUtils, Matrix4, Quaternion, Vector3 } from 'three';
 
 function tangent(a, b) {
   return a * b > 0 ? 2 * a * b / (a + b) : 0;
@@ -19,25 +19,37 @@ function axisAt(shots, index, channel, axis, u) {
   return MathUtils.lerp(a, b, u * u * (3 - 2 * u)) + u * (1 - u) * ((1 - u) * m0 - u * m1);
 }
 
-function viewAngles(eye, target) {
-  const x = target[0] - eye[0];
-  const y = target[1] - eye[1];
-  const z = target[2] - eye[2];
-  const length = Math.hypot(x, y, z);
-  return { yaw: Math.atan2(x, z), pitch: Math.asin(y / length), length };
+const forward = new Vector3();
+const origin = new Vector3();
+const targetPoint = new Vector3();
+const up = new Vector3(0, 1, 0);
+const rotation = new Matrix4();
+const orientations = new WeakMap();
+
+function shotOrientations(shots) {
+  if (!orientations.has(shots)) {
+    orientations.set(shots, shots.map(([, from, focus]) => {
+      forward.fromArray(focus).sub(origin.fromArray(from));
+      return {
+        yaw: Math.atan2(forward.x, forward.z),
+        distance: forward.length(),
+        quaternion: new Quaternion().setFromRotationMatrix(rotation.lookAt(origin, targetPoint.fromArray(focus), up)),
+      };
+    }));
+  }
+  return orientations.get(shots);
 }
 
-// A straight interpolation of focus points can sweep through the camera during a turn.
+const orientation = new Quaternion();
+
+// For wide turns interpolate the view rotation so the focus cannot cross the lens.
 function turnWithClearance(from, to, u, eye, target) {
   const angle = Math.atan2(Math.sin(to.yaw - from.yaw), Math.cos(to.yaw - from.yaw));
   if (Math.abs(angle) < 1.55) return;
-  const mix = u * u * (3 - 2 * u);
-  const yaw = from.yaw + angle * mix;
-  const pitch = MathUtils.lerp(from.pitch, to.pitch, mix);
-  const length = MathUtils.lerp(from.length, to.length, mix);
-  const horizontal = length * Math.cos(pitch);
-  target.set(eye.x + horizontal * Math.sin(yaw), eye.y + length * Math.sin(pitch),
-    eye.z + horizontal * Math.cos(yaw));
+  const mix = MathUtils.smoothstep(u, 0, 1);
+  orientation.slerpQuaternions(from.quaternion, to.quaternion, mix);
+  forward.set(0, 0, -1).applyQuaternion(orientation);
+  target.copy(eye).addScaledVector(forward, MathUtils.lerp(from.distance, to.distance, mix));
 }
 
 export function sampleCameraKeys(shots, progress, eye, target) {
@@ -46,7 +58,6 @@ export function sampleCameraKeys(shots, progress, eye, target) {
   const u = MathUtils.clamp((progress - shots[index][0]) / (shots[index + 1][0] - shots[index][0]), 0, 1);
   eye.set(axisAt(shots, index, 1, 0, u), axisAt(shots, index, 1, 1, u), axisAt(shots, index, 1, 2, u));
   target.set(axisAt(shots, index, 2, 0, u), axisAt(shots, index, 2, 1, u), axisAt(shots, index, 2, 2, u));
-  const [, from, focus] = shots[index];
-  const [, to, nextFocus] = shots[index + 1];
-  turnWithClearance(viewAngles(from, focus), viewAngles(to, nextFocus), u, eye, target);
+  const keys = shotOrientations(shots);
+  turnWithClearance(keys[index], keys[index + 1], u, eye, target);
 }
