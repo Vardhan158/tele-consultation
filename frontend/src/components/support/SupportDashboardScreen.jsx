@@ -844,12 +844,12 @@ function SupportDashboardContent({ user, onLogout }) {
       {/* Main Screen Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         {/* Desktop Sticky Header */}
-        <header className="hidden lg:flex sticky top-0 z-20 bg-white border-b border-[#577877]/15 px-8 py-4 items-center justify-between shadow-xs">
+        <header className="hidden lg:flex sticky top-0 z-20 h-16 bg-[#F0F5F7]/95 backdrop-blur-md border-b border-[#577877]/15 px-4 sm:px-6 lg:px-8 items-center justify-between font-sans text-[#162623]">
           <div>
-            <h2 className="text-xl font-bold text-[#172B2B]">
+            <h2 className="text-base font-bold text-[#162623] leading-none">
               {tabs.find((t) => t.id === activeTab)?.label || "Dashboard"}
             </h2>
-            <p className="text-xs text-[#577877] mt-0.5">Platform Support Operations &amp; Diagnostics</p>
+            <p className="text-[11px] text-[#577877] mt-1">Platform Support Operations &amp; Diagnostics</p>
           </div>
 
           <div className="flex items-center gap-3">

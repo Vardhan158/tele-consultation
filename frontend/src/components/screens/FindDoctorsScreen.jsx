@@ -548,7 +548,7 @@ export default function FindDoctorsScreen({
     <div className="min-h-screen bg-[#F9FBFA] font-sans text-zinc-800 antialiased selection:bg-[#1A7D67] selection:text-white">
       {!authenticated && <PublicNavbar />}
 
-      <div className={`max-w-7xl mx-auto px-5 py-6 lg:px-10 space-y-6 ${!authenticated ? "pt-24 sm:pt-28" : ""}`}>
+      <div className={`max-w-7xl mx-auto px-5 py-6 lg:px-10 space-y-6 ${!authenticated ? "pt-16 sm:pt-20" : ""}`}>
 
         {/* Mobile Filter Toggle Header (Visible only on < lg screens) */}
         <div className="lg:hidden flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs">

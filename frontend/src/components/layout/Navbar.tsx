@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import DoctorRegistrationScreen from "../auth/DoctorRegistrationScreen";
-import { authApi, patientApi } from "../../lib/api";
+import { authApi, patientApi, notificationApi } from "../../lib/api";
 
 const PUBLIC_NAV_LINKS = [
   { label: "Home", path: "/" },
@@ -20,6 +20,7 @@ export default function Navbar() {
   const [activeHash, setActiveHash] = useState("");
   const [isScrolled, setIsScrolled] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +60,23 @@ export default function Navbar() {
       isMounted = false;
     };
   }, [location.pathname]);
+
+  // Sync unread notification count when authenticated
+  useEffect(() => {
+    if (!currentUser || currentUser.role === "doctor" || currentUser.role === "clinic_admin") {
+      setUnreadCount(0);
+      return;
+    }
+    notificationApi
+      .list()
+      .then((items) => {
+        if (Array.isArray(items)) {
+          const unread = items.filter((n: any) => !n.read_at && n.status !== "read");
+          setUnreadCount(unread.length);
+        }
+      })
+      .catch(() => {});
+  }, [currentUser]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -181,7 +199,7 @@ export default function Navbar() {
         key={item.label}
         href={item.path}
         onClick={(e) => handleLinkClick(item, e)}
-        className={`nav-draw px-3.5 py-2 text-[15px] font-semibold transition-colors duration-200 cursor-pointer ${baseText}`}
+        className={`nav-draw px-3 py-1.5 text-xs sm:text-sm font-semibold transition-colors duration-200 cursor-pointer ${baseText}`}
       >
         <span>{item.label}</span>
       </a>
@@ -233,104 +251,110 @@ export default function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 w-full z-50 select-none transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 w-full z-50 h-16 select-none transition-all duration-300 ${
         useSolidWhiteHeader
-          ? "bg-white/80 backdrop-blur-xl backdrop-saturate-150 border-b border-white/60 shadow-[0_4px_25px_rgba(22,38,35,0.08)]"
-          : "bg-transparent border-b border-transparent shadow-none"
+          ? "bg-[#F0F5F7]/95 backdrop-blur-md border-b border-[#577877]/15 shadow-xs text-[#162623]"
+          : "bg-transparent border-b border-transparent shadow-none text-white"
       }`}
     >
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-6 sm:px-10 lg:px-16 xl:px-20 py-4.5 sm:py-5">
+      <div className="w-full h-full flex items-center justify-between px-4 sm:px-6 lg:px-8 font-sans">
         {/* Brand Logo */}
         <NavLink
           to="/"
           onClick={() => setOpen(false)}
-          className={`flex shrink-0 items-center gap-2.5 rounded-xl focus:outline-none transition-colors duration-300 ${
+          className={`flex shrink-0 items-center gap-2.5 rounded-xl focus:outline-none transition-colors duration-200 ${
             useSolidWhiteHeader ? "text-[#162623]" : "text-white"
           }`}
         >
-          <svg
-            width="35"
-            height="42"
-            viewBox="0 0 35 42"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-8 sm:h-9 w-auto shrink-0"
-            aria-hidden="true"
+          <div
+            className={`flex items-center justify-center w-8 h-8 rounded-xl ${
+              useSolidWhiteHeader ? "bg-[#185A4D] text-white" : "bg-white text-[#185A4D]"
+            } shadow-xs`}
           >
-            <path
-              d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
-              fill="currentColor"
-            />
-            <rect
-              width="12.629"
-              height="32.626"
-              rx="6.315"
-              transform="rotate(-45 16.202 6.711)"
-              fill="currentColor"
-            />
-          </svg>
-          <span className="text-2xl sm:text-[27px] font-bold leading-none tracking-tight">
+            <svg
+              width="20"
+              height="24"
+              viewBox="0 0 35 42"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4.5 w-auto"
+              aria-hidden="true"
+            >
+              <path
+                d="M14.451 5.223A7.466 7.466 0 0 1 24.9 15.891q-.3.293-.584.512L13.933 5.802q.22-.285.518-.579M7.093 25.239A7.466 7.466 0 0 0 17.607 35.84a7 7 0 0 0 .518-.574L7.675 24.73a6 6 0 0 0-.582.508"
+                fill="currentColor"
+              />
+              <rect
+                width="12.629"
+                height="32.626"
+                rx="6.315"
+                transform="rotate(-45 16.202 6.711)"
+                fill="currentColor"
+              />
+            </svg>
+          </div>
+          <span className="text-lg sm:text-xl font-bold leading-none tracking-tight">
             Kaizen Care
           </span>
         </NavLink>
 
         {/* Center Desktop Navigation Links */}
-        <nav aria-label="Primary navigation" className="hidden items-center gap-1.5 md:flex">
+        <nav aria-label="Primary navigation" className="hidden items-center gap-1 md:flex">
           {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, false))}
         </nav>
 
         {/* Right Desktop Actions */}
-        <div className="hidden items-center gap-4 sm:flex">
+        <div className="hidden items-center gap-3 sm:gap-4 text-xs sm:flex">
           {currentUser ? (
-            <div className="flex items-center gap-3">
+            <>
+              {/* Notifications bell matching portal top bar */}
               <button
                 type="button"
-                onClick={() => go(getDashboardPath())}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                  useSolidWhiteHeader
-                    ? "bg-[#EEF6F3] text-[#165849] hover:bg-[#E2F0EB]"
-                    : "bg-white/15 text-white hover:bg-white/25"
-                }`}
+                onClick={() => go("/notifications")}
+                className="flex items-center gap-1.5 p-1.5 rounded-xl hover:bg-white transition cursor-pointer"
+                title="Notifications"
               >
-                <span className="material-symbols-outlined text-lg">dashboard</span>
-                <span>Dashboard</span>
+                <span className="material-symbols-outlined !text-[#577877] text-xl">
+                  notifications
+                </span>
+                {unreadCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full bg-[#25836F] text-white font-bold text-[11px]">
+                    {unreadCount} new
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-[#E5EEF1] text-[#577877] font-medium text-[11px]">
+                    0 new
+                  </span>
+                )}
               </button>
 
-              {/* Profile Dropdown */}
-              <div className="relative" ref={dropdownRef}>
+              {/* Profile Dropdown matching portal top bar 1:1 */}
+              <div className="relative pl-2 border-l border-[#577877]/20" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setProfileOpen((prev) => !prev)}
                   aria-expanded={profileOpen}
                   aria-haspopup="true"
-                  className={`flex items-center gap-2 p-1.5 rounded-xl transition cursor-pointer ${
-                    useSolidWhiteHeader
-                      ? "hover:bg-zinc-100"
-                      : "hover:bg-white/10"
-                  }`}
+                  className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-white transition cursor-pointer group"
                 >
                   {currentUser.avatar_url ? (
                     <img
                       src={currentUser.avatar_url}
                       alt={userName}
-                      className="w-8 h-8 rounded-full object-cover shadow-sm ring-1 ring-zinc-300"
+                      className="w-8 h-8 rounded-full object-cover shadow-sm ring-1 ring-[#577877]/20"
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-[#185A4D] text-white flex items-center justify-center font-bold text-xs shadow-sm">
                       {userInitials}
                     </div>
                   )}
-                  <span
-                    className={`font-semibold hidden lg:inline text-xs sm:text-sm ${
-                      useSolidWhiteHeader ? "text-[#162623]" : "text-white"
-                    }`}
-                  >
+                  <span className="font-semibold text-[#162623] hidden md:inline text-xs">
                     {userName}
                   </span>
                   <span
-                    className={`material-symbols-outlined text-base transition-transform duration-200 ${
-                      useSolidWhiteHeader ? "text-[#577877]" : "text-white/80"
-                    } ${profileOpen ? "rotate-180" : ""}`}
+                    className={`material-symbols-outlined text-base text-[#577877] transition-transform duration-200 ${
+                      profileOpen ? "rotate-180" : ""
+                    }`}
                   >
                     expand_more
                   </span>
@@ -404,16 +428,16 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
-            </div>
+            </>
           ) : (
             <>
               <button
                 type="button"
                 onClick={() => go("/login")}
-                className={`text-sm sm:text-[15px] font-semibold transition-colors duration-200 cursor-pointer ${
+                className={`text-xs font-semibold transition-colors duration-200 cursor-pointer px-3 py-1.5 rounded-xl ${
                   useSolidWhiteHeader
-                    ? "text-[#165849] hover:text-[#124b3e]"
-                    : "text-white hover:text-white/80"
+                    ? "text-[#165849] hover:bg-white"
+                    : "text-white hover:bg-white/10"
                 }`}
               >
                 Sign In
@@ -421,28 +445,14 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => setShowDoctorModal(true)}
-                className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 sm:px-6 sm:py-2.5 text-sm sm:text-[15px] font-semibold transition-all duration-200 cursor-pointer shadow-xs ${
+                className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 cursor-pointer shadow-xs ${
                   useSolidWhiteHeader
                     ? "bg-[#165849] hover:bg-[#124b3e] text-white"
                     : "bg-white hover:bg-[#f6f7f2] text-[#162623]"
                 }`}
               >
                 <span>Doctor Registration</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={useSolidWhiteHeader ? "text-white" : "text-[#162623]"}
-                >
-                  <path d="M5 12h14"></path>
-                  <path d="m12 5 7 7-7 7"></path>
-                </svg>
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
               </button>
             </>
           )}
@@ -473,7 +483,7 @@ export default function Navbar() {
           id="public-mobile-navigation"
           className={`border-t px-6 py-4 md:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
             useSolidWhiteHeader
-              ? "border-white/40 bg-white/95 backdrop-blur-xl text-[#162623]"
+              ? "border-white/40 bg-[#F0F5F7]/95 backdrop-blur-xl text-[#162623]"
               : "border-white/10 bg-[#165849]/95 backdrop-blur-xl text-white"
           }`}
         >
@@ -486,7 +496,7 @@ export default function Navbar() {
             >
               {currentUser ? (
                 <>
-                  <div className="flex items-center gap-3 p-2 rounded-xl bg-[#F0F5F7]/80">
+                  <div className="flex items-center gap-3 p-2 rounded-xl bg-white/80">
                     {currentUser.avatar_url ? (
                       <img
                         src={currentUser.avatar_url}
@@ -506,7 +516,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => go(getDashboardPath())}
-                    className="w-full rounded-xl bg-[#165849] py-2.5 text-xs font-semibold text-white cursor-pointer"
+                    className="w-full rounded-xl bg-[#165849] py-2 text-xs font-semibold text-white cursor-pointer"
                   >
                     Go to Dashboard
                   </button>
@@ -537,7 +547,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => go("/login")}
-                    className={`w-full rounded-xl py-2.5 text-xs font-semibold cursor-pointer ${
+                    className={`w-full rounded-xl py-2 text-xs font-semibold cursor-pointer ${
                       useSolidWhiteHeader
                         ? "border border-[#577877]/30 bg-white text-[#162623]"
                         : "border border-white/40 bg-white/10 text-white"
@@ -551,7 +561,7 @@ export default function Navbar() {
                       setOpen(false);
                       setShowDoctorModal(true);
                     }}
-                    className={`w-full inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold cursor-pointer ${
+                    className={`w-full inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold cursor-pointer ${
                       useSolidWhiteHeader
                         ? "bg-[#165849] text-white"
                         : "bg-white text-[#162623]"
