@@ -110,14 +110,45 @@ class AppointmentCancelRequest(BaseModel):
 
 class ConsentCreate(BaseModel):
     consent_type: str = Field(min_length=2, max_length=64)
-    version: str = Field(min_length=1, max_length=32)
+    version: str = Field(default="v2.1", min_length=1, max_length=32)
 
 
 class ConsentResponse(ConsentCreate):
     model_config = ConfigDict(from_attributes=True)
-    id: UUID
+    id: UUID | str
     status: str
     granted_at: datetime
+    withdrawn_at: datetime | None = None
+    document_title: str | None = None
+    category: str | None = None
+    required: bool | None = None
+
+
+class ConsentDocumentSection(BaseModel):
+    heading: str
+    body: str
+
+
+class ConsentDocumentDefinition(BaseModel):
+    id: str
+    consent_type: str
+    title: str
+    category: str  # "essential" | "optional"
+    required: bool
+    version: str
+    effective_date: str
+    summary: str
+    sections: list[ConsentDocumentSection]
+
+
+class ConsentHistoryItem(BaseModel):
+    id: str
+    consent_type: str
+    title: str
+    version: str
+    action: str  # "Granted" | "Withdrawn"
+    occurred_at: datetime
+    source: str = "Patient portal"
 
 
 class PatientProfileUpdate(BaseModel):

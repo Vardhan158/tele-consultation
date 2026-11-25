@@ -1012,36 +1012,56 @@ export default function ProfileScreen({
         {/* TAB 4: CONSENT MANAGEMENT */}
         {activeTab === "consent" && (
           <div className="care-card p-7 sm:p-8 space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-[#162623]">
-                Consent &amp; Privacy Directives
-              </h3>
-              <p className="text-xs text-[#577877] mt-1">
-                Control individual authorizations for video care, medical record
-                sharing, and diagnostic releases.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-[#162623]">
+                  Consent &amp; Privacy Directives
+                </h3>
+                <p className="text-xs text-[#577877] mt-1">
+                  Control authorizations for video teleconsultations, health data processing, and optional medical record sharing.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate("consent")}
+                className="text-xs font-semibold text-[#25836F] hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+              >
+                <span>Full consent directives &amp; history</span>
+                <span className="material-symbols-outlined text-xs">arrow_forward</span>
+              </button>
             </div>
 
             <div className="space-y-4 text-xs">
               {[
                 {
                   type: "teleconsultation",
-                  title: "Teleconsultation Clinical Care Notice",
-                  desc: "Authorizes video teleconsultation with licensed medical practitioners and acknowledges non-emergency limitations.",
+                  title: "Teleconsultation Consent",
+                  category: "Essential Clinical Care",
+                  version: "v2.1",
+                  desc: "Consent to receive medical assessment, diagnoses, and care recommendations via remote audio/video consultations.",
                 },
                 {
-                  type: "privacy_notice",
-                  title: "Health Data Privacy & Security Agreement",
-                  desc: "Governs 256-bit encrypted handling of diagnostic records, EHR records, and prescription archiving.",
+                  type: "health_data_privacy",
+                  title: "Health Data Privacy Consent",
+                  category: "Essential Clinical Care",
+                  version: "v2.1",
+                  desc: "Consent to collect and store health information strictly needed for your diagnosis, consultations, and digital prescriptions.",
                 },
                 {
-                  type: "optional_data_processing",
-                  title: "Specialist Referral & Lab Record Sharing",
-                  desc: "Permits sharing diagnostic panels with referred diagnostic centers and fulfillment pharmacies.",
+                  type: "medical_record_sharing",
+                  title: "Medical Record Sharing Consent",
+                  category: "Optional Authorization",
+                  version: "v2.1",
+                  desc: "Optional authorization allowing treating physicians and consulting specialists to view your past diagnostic reports and lab results.",
                 },
               ].map((item) => {
                 const current = consents.find(
-                  (c) => c.consent_type === item.type && c.status === "granted",
+                  (c) =>
+                    (c.consent_type === item.type ||
+                      (item.type === "teleconsultation" && (c.consent_type === "telehealth" || c.consent_type === "treatment")) ||
+                      (item.type === "health_data_privacy" && c.consent_type === "privacy_notice") ||
+                      (item.type === "medical_record_sharing" && c.consent_type === "optional_data_processing")) &&
+                    (c.status === "granted" || c.status === "active"),
                 );
                 return (
                   <div
@@ -1049,17 +1069,33 @@ export default function ProfileScreen({
                     className="p-5 rounded-xl border border-[#577877]/20 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div className="space-y-1">
-                      <h4 className="text-sm font-bold text-[#162623]">
-                        {item.title}
-                      </h4>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold text-[#162623]">
+                          {item.title}
+                        </h4>
+                        <span className="text-[10px] font-semibold text-[#577877] bg-[#F0F5F7] px-2 py-0.5 rounded-md">
+                          Version {item.version}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            item.category.includes("Essential")
+                              ? "bg-[#E7F3F1] text-[#25836F]"
+                              : "bg-[#F0F5F7] text-[#577877]"
+                          }`}
+                        >
+                          {item.category}
+                        </span>
+                      </div>
                       <p className="text-xs text-[#577877] max-w-xl leading-relaxed">
                         {item.desc}
                       </p>
                       <span
-                        className={`text-[11px] font-semibold block pt-1 ${current ? "text-emerald-700" : "text-amber-700"}`}
+                        className={`text-[11px] font-semibold block pt-1 ${
+                          current ? "text-emerald-700" : "text-amber-700"
+                        }`}
                       >
                         {current
-                          ? "● Active Consent Granted"
+                          ? `● Active Consent Granted · ${new Date(current.granted_at || Date.now()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
                           : "○ Consent Not Granted"}
                       </span>
                     </div>

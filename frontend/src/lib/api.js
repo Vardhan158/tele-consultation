@@ -89,6 +89,8 @@ export const patientApi = {
       body: JSON.stringify(intake),
     }),
   consents: () => apiRequest("/patient/consents"),
+  consentDocuments: () => apiRequest("/patient/consents/documents"),
+  consentHistory: () => apiRequest("/patient/consents/history"),
   grantConsent: (consent) =>
     apiRequest("/patient/consents", {
       method: "POST",
