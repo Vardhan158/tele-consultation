@@ -27,6 +27,11 @@ export default function PharmacyTravel({ controller }) {
   const assets = useMemo(() => {
     const copy = scene.clone(true);
     const car = sedan.getObjectByName('TravelCar').clone(true);
+    const door = car.getObjectByName('TravelDoor');
+    const pull = door.getObjectByName('Handle').clone();
+    pull.name = 'InteriorPull';
+    pull.position.set(-.36, -.095, .105);
+    door.add(pull);
     const street = copy.getObjectByName('PharmacyStreet');
     // In the original export these material batches contain the solid shell,
     // fixed glass, mullions and handles. The new shell preserves their facade.
@@ -43,7 +48,7 @@ export default function PharmacyTravel({ controller }) {
     return {
       car,
       street,
-      door: car.getObjectByName('TravelDoor'),
+      door,
       wheels: ['00', '01', '10', '11'].map((id) => car.getObjectByName(`TravelWheel${id}`)),
     };
   }, [scene, sedan]);

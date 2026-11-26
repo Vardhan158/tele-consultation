@@ -10,7 +10,8 @@ import { earlierProgress, prescriptionFrame } from './prescriptionTimeline';
 import { departureTrack, preTravelProgress, sampleTravel, travelProgress, travelStart, walkPose } from './travelTimeline';
 import { homeEntry, bagCounter, counterPaper, pharmacyFrame, pharmacyProgress, pharmacyStart, previousJourney, samplePharmacyPatient } from './pharmacyTimeline';
 import { bagOnTable, cupOnTable, finaleFrame, finaleProgress, finaleStart, sampleFinalePatient } from './finaleTimeline';
-import { gaitContact, transferAt } from './characterMotion';
+import cabinTargets from './cabinTargets.json';
+import { gaitContact } from './characterMotion';
 import calibration from './rigCalibration.json';
 import ContactShadow from './ContactShadow';
 import LaptopDisplay from './LaptopDisplay';
@@ -361,40 +362,64 @@ function poseFingers(rig, side, amount, pinch = false) {
 // All transfer targets are in sedan coordinates (+X forward, driver on -Z).
 // Sample the same poses in reverse for an exit, including after the car turns.
 function cabinTransfer(actor, rig, scratch, amount, car, outsideX, outsideZ, ground, outsideHeading) {
-  const { tuck, inside, lean } = transferAt(amount);
-  const lower = MathUtils.smoothstep(amount, .07, .53);
-  const slide = MathUtils.smoothstep(amount, .26, .81);
-  const turn = MathUtils.smoothstep(amount, .18, .89);
-  actor.position.set(MathUtils.lerp(outsideX, .12, slide), ground,
-    MathUtils.lerp(outsideZ, -.40, slide));
-  actor.position.applyAxisAngle(up, car.heading);
-  actor.position.x += car.carX;
-  actor.position.z += car.carZ;
-  actor.rotation.y = car.heading + outsideHeading +
-    Math.atan2(Math.sin(Math.PI / 2 - outsideHeading), Math.cos(Math.PI / 2 - outsideHeading)) * turn;
+  const frame = amount * (cabinTargets.length - 1);
+  const i = Math.floor(frame);
+  const row = cabinTargets[i], next = cabinTargets[Math.min(i + 1, cabinTargets.length - 1)];
+  const value = k => MathUtils.lerp(row[k], next[k], frame - i);
+  const outside = 1 - MathUtils.smoothstep(amount, 0, .55);
+  const turn = MathUtils.smoothstep(amount, .02, .48);
+  const settle = MathUtils.smoothstep(amount, .60, .98);
+  const facing = outsideHeading + Math.atan2(Math.sin(2.82 - outsideHeading),
+    Math.cos(2.82 - outsideHeading)) * turn + (Math.PI / 2 - 2.82) * settle;
+  function position(point, x, y, z) {
+    point.set(x, y, z).applyAxisAngle(up, car.heading);
+    point.x += car.carX;
+    point.z += car.carZ;
+  }
+  position(actor.position, value(0) + (outsideX + .54) * outside, ground,
+    value(2) + (outsideZ + 1.31) * outside);
+  actor.rotation.y = car.heading + facing;
   actor.updateWorldMatrix(true, true);
   rig.hips.getWorldPosition(scratch.hand);
-  actor.position.y += (.71 - scratch.hand.y) * lower - .055 * lean;
+  actor.position.y += (value(1) - scratch.hand.y) * MathUtils.smoothstep(amount, 0, .12);
   actor.updateWorldMatrix(true, true);
+  const lean = MathUtils.smoothstep(amount, .04, .42) * (1 - .81 * settle);
   rig.chest.getWorldPosition(scratch.hand);
-  scratch.hand.add(scratch.foot.set(.24, -.23, .06).applyAxisAngle(up, car.heading));
-  aim(rig.spine, rig.chest, scratch.hand, .88 * lean);
-  rig.crown.getWorldPosition(scratch.hand);
-  scratch.hand.add(scratch.foot.set(.22, -.15, 0).applyAxisAngle(up, car.heading));
-  aim(rig.head, rig.crown, scratch.hand, .83 * lean);
-  for (const [index, leg] of [rig.leftLeg, rig.rightLeg].entries()) {
-    const phase = index ? tuck : inside;
-    const side = index ? .105 : -.105;
-    scratch.foot.set(MathUtils.lerp(outsideX + side, .54, phase),
-      MathUtils.lerp(ground + .13, .465, phase) + .24 * Math.sin(Math.PI * phase),
-      MathUtils.lerp(outsideZ, -.40 + side, phase)).applyAxisAngle(up, car.heading);
-    scratch.foot.x += car.carX;
-    scratch.foot.z += car.carZ;
-    scratch.pole.set(1, .22, side).applyAxisAngle(up, car.heading);
+  scratch.hand.add(scratch.foot.set(0, -.08, .19).applyAxisAngle(up, actor.rotation.y));
+  aim(rig.spine, rig.chest, scratch.hand, lean);
+  for (const [index, leg] of rig.legs.entries()) {
+    const k = 3 + index * 3;
+    const sign = index ? -1 : 1;
+    const sx = sign * (.115 * Math.cos(outsideHeading) + .045 * Math.sin(outsideHeading));
+    const sz = sign * (.045 * Math.cos(outsideHeading) - .115 * Math.sin(outsideHeading));
+    const plant = 1 - MathUtils.smoothstep(amount, index ? .22 : 0, index ? .42 : .24);
+    position(scratch.foot, value(k) + (outsideX + sx - cabinTargets[0][k]) * plant,
+      value(k+1) + (ground + rig.shoes[index].height - .115) * plant,
+      value(k+2) + (outsideZ + sz - cabinTargets[0][k+2]) * plant);
+    const yaw = MathUtils.lerp(facing, Math.PI / 2,
+      MathUtils.smoothstep(amount, index ? .52 : .67, index ? .82 : 1)) + car.heading;
+    scratch.pole.set(Math.sin(yaw), .08, Math.cos(yaw));
     reach(leg, scratch.foot, scratch.pole, 1);
-    leg[2].getWorldPosition(scratch.hand);
-    scratch.hand.add(scratch.foot.set(.105,-.08,0).applyAxisAngle(up,car.heading));
-    aim(leg[2],rig.toes[index],scratch.hand,phase);
+    orientShoe(rig, index, yaw, 1);
+  }
+}
+
+function pullDoor(scene, rig, scratch, contact, transfer) {
+  const handle = carHandle(scene);
+  if (!handle || !contact) return;
+  const opening = contact * (1 - MathUtils.smoothstep(transfer, .02, .22));
+  const closing = contact * MathUtils.smoothstep(transfer, .60, .92);
+  scratch.pole.set(0, -1, 0);
+  if (opening) {
+    handle.getWorldPosition(scratch.hand);
+    reach(rig.right, scratch.hand, scratch.pole, opening);
+    poseFingers(rig, 1, .7 * opening);
+  }
+  if (closing) {
+    const pull = handle.parent.getObjectByName('InteriorPull');
+    pull.getWorldPosition(scratch.hand);
+    reach(rig.left, scratch.hand, scratch.pole, closing);
+    poseFingers(rig, 0, .7 * closing);
   }
 }
 
@@ -439,11 +464,7 @@ function pharmacyPose(t, actor, rig, scratch, scene) {
     MathUtils.smoothstep(t, .583, .591) * (1 - MathUtils.smoothstep(t, .651, .657)),
     MathUtils.smoothstep(t, .855, .861) * (1 - MathUtils.smoothstep(t, .900, .908)),
   );
-  const hardware = carHandle(scene);
-  if (doorContact > 0 && hardware) {
-    hardware.getWorldPosition(scratch.hand);
-    reach(rig.right, scratch.hand, scratch.pole, doorContact);
-  }
+  pullDoor(scene, rig, scratch, doorContact, transfer);
   if (t > .95) {
     const grip = homeEntry(t).grip;
     const pull = scene.getObjectByName('EntranceDoor_Handle');
@@ -869,7 +890,8 @@ export default function PatientScene({ controller, finaleController, chair }) {
       helper.visible = true;
       const approach = MathUtils.smoothstep(stage, .935, .997);
       const walk = delivery.walk;
-      const heading = walkPose(walk, scratch.path, scratch.tangent);
+      const arrival = walkPose(walk, scratch.path, scratch.tangent);
+      const heading = MathUtils.lerp(arrival, 2.05, MathUtils.smoothstep(walk, .96, 1));
       const join = MathUtils.smoothstep(walk, 0, .12);
       helper.position.copy(scratch.path);
       helper.position.x += -.11 * (1 - join);
@@ -882,15 +904,9 @@ export default function PatientScene({ controller, finaleController, chair }) {
       const waitingAtCar = MathUtils.smoothstep(travel,.424,.443) * (1 - MathUtils.smoothstep(travel,.479,.495));
       plantFeet(helper, companionRig, scratch, Math.max(waitingForPaper, waitingAtCar));
       if (delivery.enter > 0) {
-        cabinTransfer(helper, companionRig, scratch, delivery.enter, delivery, -.54, -1.31, .025, heading);
+        cabinTransfer(helper, companionRig, scratch, delivery.enter, delivery, -.15, -1.31, .025, heading);
       }
-      const handle = carHandle(world);
-      const contact = MathUtils.smoothstep(travel, .417, .434) * (1 - MathUtils.smoothstep(travel, .56, .585));
-      if (handle && contact > 0) {
-        handle.getWorldPosition(scratch.hand);
-        scratch.pole.set(0,-1,-.2);
-        reach(companionRig.right, scratch.hand, scratch.pole, contact);
-      }
+      const contact = MathUtils.smoothstep(travel, .417, .434) * (1 - MathUtils.smoothstep(travel, .587, .593));
       if (departing && sheet) {
         const offer = MathUtils.smoothstep(travel, 0, .038);
         const grasp = MathUtils.smoothstep(travel, .018, .060);
@@ -915,6 +931,7 @@ export default function PatientScene({ controller, finaleController, chair }) {
         scratch.pole.set(-.30, -1, -.12);
         gripPrescription(sheet, companionRig.left, -1, scratch.pole, grasp);
       }
+      pullDoor(world, companionRig, scratch, contact, delivery.enter);
       updatePatientShadow(gl, companionRig, helper, finaleController.progress);
     }
     updatePatientShadow(gl, rig, actor, finaleController.progress);
