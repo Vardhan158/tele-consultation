@@ -420,7 +420,7 @@ function makePatientRig(scene, animations) {
 }
 
 export default function PatientScene({ controller, finaleController, chair }) {
-  const { scene, animations } = useGLTF('/assets/house/elderly-patient.glb', false);
+  const { scene, animations } = useGLTF('/assets/house/elderly_patient.glb', false);
   const { scene: laptopSource } = useGLTF('/assets/house/patient-laptop.glb', false);
   const body = useRef(null), prop = useRef(null), floorContact = useRef(null);
   const { scene: companionScene, animations: companionClips } = useGLTF('/assets/house/patient.glb', false);
