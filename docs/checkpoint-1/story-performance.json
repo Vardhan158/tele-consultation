@@ -1,0 +1,222 @@
+{
+  "desktop": [
+    {
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "loadMs": 1316.4000000059605,
+      "transfer": 12892862,
+      "scenes": {
+        "approach": {
+          "fps": 1.046983379138856,
+          "drawsPerFrame": 219.25,
+          "trackedBytes": 23398224,
+          "contextLosses": 0
+        },
+        "patient": {
+          "fps": 0.4595113097221892,
+          "drawsPerFrame": 137.5,
+          "trackedBytes": 43678454,
+          "contextLosses": 0
+        },
+        "pharmacy": {
+          "fps": 0.40104807229567907,
+          "drawsPerFrame": 61,
+          "trackedBytes": 70438880,
+          "contextLosses": 0
+        },
+        "finale": {
+          "fps": 0.8943423900401265,
+          "drawsPerFrame": 161.8,
+          "trackedBytes": 98719804,
+          "contextLosses": 0
+        }
+      },
+      "offscreen": {
+        "drawsWhileOffscreen": 0,
+        "retainedCanvas": true,
+        "resumedDrawing": false
+      }
+    },
+    {
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "loadMs": 649.5999999940395,
+      "transfer": 12892862,
+      "scenes": {
+        "approach": {
+          "fps": 1.0287272072636025,
+          "drawsPerFrame": 220.25,
+          "trackedBytes": 23398224,
+          "contextLosses": 0
+        },
+        "patient": {
+          "fps": 0.43816409245262355,
+          "drawsPerFrame": 137.75,
+          "trackedBytes": 43678454,
+          "contextLosses": 0
+        },
+        "pharmacy": {
+          "fps": 0.3262039644656734,
+          "drawsPerFrame": 123,
+          "trackedBytes": 70438880,
+          "contextLosses": 0
+        },
+        "finale": {
+          "fps": 0.7648651542731273,
+          "drawsPerFrame": 176.4,
+          "trackedBytes": 98719804,
+          "contextLosses": 0
+        }
+      },
+      "offscreen": {
+        "drawsWhileOffscreen": 108,
+        "retainedCanvas": true,
+        "resumedDrawing": false
+      }
+    },
+    {
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "loadMs": 1382.3000000044703,
+      "transfer": 12892862,
+      "scenes": {
+        "approach": {
+          "fps": 0.8856611460472762,
+          "drawsPerFrame": 242,
+          "trackedBytes": 23398224,
+          "contextLosses": 0
+        },
+        "patient": {
+          "fps": 0.7230657989877078,
+          "drawsPerFrame": 131.33333333333334,
+          "trackedBytes": 23398224,
+          "contextLosses": 0
+        },
+        "pharmacy": {
+          "fps": 0.3884852958317027,
+          "drawsPerFrame": 97,
+          "trackedBytes": 46882170,
+          "contextLosses": 0
+        },
+        "finale": {
+          "fps": 0.38485715385298797,
+          "drawsPerFrame": 215.33333333333334,
+          "trackedBytes": 98719804,
+          "contextLosses": 0
+        }
+      },
+      "offscreen": {
+        "drawsWhileOffscreen": 0,
+        "retainedCanvas": true,
+        "resumedDrawing": false
+      }
+    }
+  ],
+  "mobile-emulation": [
+    {
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "loadMs": 1908.2000000029802,
+      "transfer": 12892862,
+      "scenes": {
+        "approach": {
+          "fps": 0.6949270326615705,
+          "drawsPerFrame": 89.66666666666667,
+          "trackedBytes": 18247684,
+          "contextLosses": 0
+        },
+        "patient": {
+          "fps": 1.2718762718753076,
+          "drawsPerFrame": 58,
+          "trackedBytes": 18247684,
+          "contextLosses": 0
+        },
+        "pharmacy": {
+          "fps": 0.5104189263340796,
+          "drawsPerFrame": 83.25,
+          "trackedBytes": 70124452,
+          "contextLosses": 0
+        },
+        "finale": {
+          "fps": 0.5312226088344423,
+          "drawsPerFrame": 82.75,
+          "trackedBytes": 98719804,
+          "contextLosses": 0
+        }
+      },
+      "offscreen": {
+        "drawsWhileOffscreen": 0,
+        "retainedCanvas": true,
+        "resumedDrawing": false
+      }
+    },
+    {
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "loadMs": 1617.3999999985099,
+      "transfer": 12892862,
+      "scenes": {
+        "approach": {
+          "fps": 0.725724514974639,
+          "drawsPerFrame": 90.33333333333333,
+          "trackedBytes": 18247684,
+          "contextLosses": 0
+        },
+        "patient": {
+          "fps": 1.4180374361883155,
+          "drawsPerFrame": 58,
+          "trackedBytes": 18247684,
+          "contextLosses": 0
+        },
+        "pharmacy": {
+          "fps": 0.4641591756535181,
+          "drawsPerFrame": 84.66666666666667,
+          "trackedBytes": 46567742,
+          "contextLosses": 0
+        },
+        "finale": {
+          "fps": 0.3157828256246246,
+          "drawsPerFrame": 177.33333333333334,
+          "trackedBytes": 98706468,
+          "contextLosses": 0
+        }
+      },
+      "offscreen": {
+        "drawsWhileOffscreen": 0,
+        "retainedCanvas": true,
+        "resumedDrawing": false
+      }
+    },
+    {
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "loadMs": 1533.7999999970198,
+      "transfer": 12892862,
+      "scenes": {
+        "approach": {
+          "fps": 0,
+          "drawsPerFrame": null,
+          "trackedBytes": 18247684,
+          "contextLosses": 0
+        },
+        "patient": {
+          "fps": 1.9863603257621134,
+          "drawsPerFrame": 60.166666666666664,
+          "trackedBytes": 18247684,
+          "contextLosses": 0
+        },
+        "pharmacy": {
+          "fps": 0.3661025636332518,
+          "drawsPerFrame": 126.25,
+          "trackedBytes": 70411088,
+          "contextLosses": 0
+        },
+        "finale": {
+          "fps": 0.5029675082988382,
+          "drawsPerFrame": 135.33333333333334,
+          "trackedBytes": 98719804,
+          "contextLosses": 0
+        }
+      },
+      "offscreen": {
+        "drawsWhileOffscreen": 0,
+        "retainedCanvas": true,
+        "resumedDrawing": false
+      }
+    }
+  ]
+}
