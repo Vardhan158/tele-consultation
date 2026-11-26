@@ -21,6 +21,7 @@ const chairPadTop = .608 + .061 / 2;
 const seatedHipHeight = chairPadTop + .115;
 const approachTrack = new LineCurve3(approach, stoppingPoint);
 const tabletop = new Vector3(3.22, .952, -1.34);
+const livingRoomRugTop = .2085;
 const up = new Vector3(0, 1, 0);
 const sideAxis = new Vector3(0, 0, 1);
 const level = new Quaternion();
@@ -149,36 +150,83 @@ function sampleRig(rig, phase) {
   rig.hips.position.z = rig.rest.z;
 }
 
+function storyFloor(x, z, ground) {
+  const onLivingRoomRug = x > 1.99 && x < 5.82 && z > -3.07 && z < -.05 && ground >= .18;
+  return onLivingRoomRug ? Math.max(ground, livingRoomRugTop) : ground;
+}
+
+function orientShoe(rig, index, heading, weight) {
+  const { bone, neutral } = rig.shoes[index];
+  bone.parent.getWorldQuaternion(parentRotation).invert();
+  worldRotation.copy(parentRotation).multiply(delta.setFromAxisAngle(up, heading)).multiply(neutral);
+  bone.quaternion.slerp(worldRotation, weight);
+  bone.updateWorldMatrix(false, true);
+}
+
 function plantFeet(actor, rig, scratch, weight) {
   if (weight <= 0) return;
   const heading = actor.rotation.y;
+  const ground = actor.position.y;
+  // Keep a little knee flex so a fully extended leg does not suspend the sole.
+  actor.position.y -= .022 * MathUtils.smoothstep(weight, .55, 1);
+  actor.updateWorldMatrix(true, true);
   scratch.pole.set(Math.sin(heading), 0, Math.cos(heading));
   for (const [index, leg] of [rig.leftLeg, rig.rightLeg].entries()) {
     const side = index ? -1 : 1;
-    scratch.foot.set(side * .105, calibration.feet[index].ankle[1] - .032, side * .045).applyAxisAngle(up, heading).add(actor.position);
+    scratch.foot.set(side * .115, 0, side * .045).applyAxisAngle(up, heading).add(actor.position);
+    scratch.foot.y = storyFloor(scratch.foot.x, scratch.foot.z, ground) + rig.shoes[index].height;
     reach(leg, scratch.foot, scratch.pole, weight);
-    leg[2].getWorldPosition(scratch.hand);
-    scratch.hand.add(scratch.foot.fromArray(calibration.feet[index].toe).applyAxisAngle(up, heading));
-    aim(leg[2], rig.toes[index], scratch.hand, weight);
+    orientShoe(rig, index, heading, weight);
   }
 }
+
+const solePoint = new Vector3();
+const shadowHeel = new Vector3();
+const shadowToe = new Vector3();
+const swingRotation = new Quaternion();
 
 function lockWalkingFeet(rig, scratch, track, phase, cycles, strength) {
   if (!track || strength <= 0) return;
   for (const [index, leg] of [rig.leftLeg, rig.rightLeg].entries()) {
     const profile = calibration.feet[index];
     const { anchor, weight } = stanceAt(phase, profile);
-    if (weight <= 0) continue;
-    const at = MathUtils.clamp(anchor / cycles, 0, 1);
+    const at = MathUtils.clamp((weight > 0 ? anchor : phase) / cycles, 0, 1);
     track.getPointAt(at, scratch.support);
     track.getTangentAt(at, scratch.supportTangent);
     const heading = Math.atan2(scratch.supportTangent.x, scratch.supportTangent.z);
     scratch.pole.set(Math.sin(heading), 0, Math.cos(heading));
-    scratch.foot.set(...profile.ankle, 0).applyAxisAngle(up, heading).add(scratch.support);
-    reach(leg, scratch.foot, scratch.pole, strength * weight);
-    leg[2].getWorldPosition(scratch.hand);
-    scratch.hand.add(scratch.foot.fromArray(profile.toe).applyAxisAngle(up, heading));
-    aim(leg[2], rig.toes[index], scratch.hand, strength * weight);
+    const shoe = rig.shoes[index];
+    if (weight > 0) {
+      scratch.foot.set(profile.ankle[0], 0, 0).applyAxisAngle(up, heading).add(scratch.support);
+      scratch.foot.y = storyFloor(scratch.foot.x, scratch.foot.z, scratch.support.y) + shoe.height;
+      reach(leg, scratch.foot, scratch.pole, strength * weight);
+      orientShoe(rig, index, heading, strength * weight);
+    }
+
+    // Preserve heel and toe roll in swing while preventing the rigid sole from crossing the floor.
+    let penetration = 0;
+    for (const probe of shoe.sole) {
+      shoe.bone.localToWorld(solePoint.copy(probe));
+      penetration = Math.max(penetration, storyFloor(solePoint.x, solePoint.z, scratch.support.y) - solePoint.y);
+    }
+    if (penetration > .002) {
+      shoe.bone.getWorldQuaternion(swingRotation);
+      shoe.bone.getWorldPosition(scratch.foot);
+      scratch.foot.y += penetration;
+      reach(leg, scratch.foot, scratch.pole, strength);
+      shoe.bone.parent.getWorldQuaternion(parentRotation).invert();
+      shoe.bone.quaternion.copy(parentRotation.multiply(swingRotation));
+      shoe.bone.updateWorldMatrix(false, true);
+    }
+  }
+}
+
+function poseFingers(rig, side, amount, pinch = false) {
+  if (amount <= 0) return;
+  for (const { bone, axis, digit, joint } of rig.fingers[side]) {
+    const angle = (pinch && digit !== 'Thumb' && digit !== 'Index' ? .28 : 1)
+      * (joint === 1 ? .43 : .68) * amount;
+    bone.quaternion.multiply(delta.setFromAxisAngle(axis, angle));
   }
 }
 
@@ -347,6 +395,7 @@ function finalePose(t, actor, rig, scratch, scene) {
     MathUtils.smoothstep(t,.103,.130) * (1 - MathUtils.smoothstep(t,.427,.452)),
     MathUtils.smoothstep(t,.950,.976),
   );
+  plantFeet(actor, rig, scratch, standing);
   scratch.pole.set(0,-1,0);
   scratch.hand.copy(actor.position).add(scratch.foot.set(.24,.91,.21).applyAxisAngle(up,motion.heading));
   const bagReach = MathUtils.smoothstep(t,.116,.170) * (1 - MathUtils.smoothstep(t,.23,.275));
@@ -365,20 +414,15 @@ function finalePose(t, actor, rig, scratch, scene) {
   rig.head.rotateZ(.045 * read - .07 * rest);
   rig.spine.rotateX(.008 * rest * Math.sin(t * 82));
 
-  for (const [index, leg] of [rig.leftLeg,rig.rightLeg].entries()) {
-    scratch.pole.set(Math.sin(motion.heading),0,Math.cos(motion.heading));
-    scratch.foot.set(index ? -.118 : .118,.095,.03).applyAxisAngle(up,motion.heading).add(actor.position);
-    reach(leg,scratch.foot,scratch.pole,standing);
-    if (sofaStance > 0) {
+  if (sofaStance > 0) {
+    for (const [index, leg] of [rig.leftLeg, rig.rightLeg].entries()) {
       const side = index ? -1 : 1;
-      scratch.pole.set(side * .09,.08,1);
-      scratch.foot.set(4.44 + side * .128,.213 + calibration.feet[index].ankle[1] - .032,
+      scratch.pole.set(side * .09, .08, 1);
+      scratch.foot.set(4.44 + side * .128, livingRoomRugTop + rig.shoes[index].height,
         -2.54 + side * .032);
-      reach(leg,scratch.foot,scratch.pole,sofaStance);
+      reach(leg, scratch.foot, scratch.pole, sofaStance);
+      orientShoe(rig, index, motion.heading, sofaStance);
     }
-    leg[2].getWorldPosition(scratch.hand);
-    scratch.hand.add(scratch.foot.fromArray(calibration.feet[index].toe).applyAxisAngle(up,motion.heading));
-    aim(leg[2],rig.toes[index],scratch.hand,Math.max(standing,sofaStance));
   }
 
   const bag = scene.getObjectByName('SealedBagStory');
@@ -412,6 +456,7 @@ function finalePose(t, actor, rig, scratch, scene) {
     wrist.parent.getWorldQuaternion(parentRotation).invert();
     worldRotation.copy(parentRotation).multiply(cup.quaternion).multiply(cupGrip);
     wrist.quaternion.slerp(worldRotation,holdCup);
+    poseFingers(rig, 1, .72 * holdCup);
 
   }
 }
@@ -435,17 +480,41 @@ function makePatientRig(scene, animations) {
     const leftLeg = bones(['LeftUpLeg', 'LeftLeg', 'LeftFoot']);
     const rightLeg = bones(['RightUpLeg', 'RightLeg', 'RightFoot']);
     const toes = bones(['LeftToeBase', 'RightToeBase']);
-    const rotations = [spine, chest, head, ...left, ...right, ...leftLeg, ...rightLeg].map((bone) => [bone, bone.quaternion.clone()]);
+    model.updateMatrixWorld(true);
+    const shoes = [leftLeg[2], rightLeg[2]].map((bone, index) => {
+      const ankle = bone.getWorldPosition(new Vector3());
+      const forward = toes[index].getWorldPosition(new Vector3()).sub(ankle).setY(0).normalize();
+      const across = new Vector3(forward.z, 0, -forward.x);
+      const offset = index ? -.020 : -.010;
+      const sole = [[-.103, 0], [.118, -.070], [.118, .070], [.215, 0]].map(([length, width]) =>
+        bone.worldToLocal(ankle.clone().addScaledVector(forward, length)
+          .addScaledVector(across, width + offset).setY(0)));
+      return { bone, height: ankle.y, neutral: bone.getWorldQuaternion(new Quaternion()), sole };
+    });
+    const fingers = ['Left', 'Right'].map((side, index) => ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'].flatMap((digit) =>
+      [1, 2, 3].flatMap((joint) => {
+        const bone = model.getObjectByName(`${side}${digit}${joint}`);
+        if (!bone) return [];
+        const inverse = bone.getWorldQuaternion(new Quaternion()).invert();
+        const inward = new Vector3(index ? 1 : -1, 0, digit === 'Thumb' ? -.65 : 0).applyQuaternion(inverse);
+        const axis = new Vector3(0, 1, 0).cross(inward).normalize();
+        return [{ bone, axis, digit, joint }];
+      })));
+    const articulatedFingers = fingers.flat().map(({ bone }) => bone);
+    const rotations = [spine, chest, head, ...left, ...right, ...leftLeg, ...rightLeg, ...articulatedFingers]
+      .map((bone) => [bone, bone.quaternion.clone()]);
     return { model, shadowFrame: -1, mixer, action, clip, hips, rest: hips.position.clone(), hipSample: hips.position.clone(),
-      spine, chest, head, crown, face, left, right, leftLeg, rightLeg, toes, rotations };
+      spine, chest, head, crown, face, left, right, leftLeg, rightLeg, toes, shoes, fingers, rotations };
 }
 
 export default function PatientScene({ controller, finaleController, chair }) {
-  const { scene, animations } = useGLTF('/assets/house/elderly_patient.glb', false);
+  const { scene, animations } = useGLTF('/assets/house/elderly_patient.glb?v=2', false);
   const { scene: laptopSource } = useGLTF('/assets/house/patient-laptop.glb', false);
   const body = useRef(null), prop = useRef(null), floorContact = useRef(null);
-  const { scene: companionScene, animations: companionClips } = useGLTF('/assets/house/patient.glb', false);
+  const { scene: companionScene, animations: companionClips } = useGLTF('/assets/house/companion.glb', false);
   const companion = useRef(null);
+  const patientContact = useRef(null);
+  const companionContact = useRef(null);
   const companionRig = useMemo(() => makePatientRig(companionScene, companionClips), [companionScene, companionClips]);
   const rig = useMemo(() => makePatientRig(scene, animations), [scene, animations]);
   const laptop = useMemo(() => {
@@ -547,7 +616,7 @@ export default function PatientScene({ controller, finaleController, chair }) {
     actor.position.x = MathUtils.lerp(actor.position.x, chair.position.x - .22,
       MathUtils.smoothstep(transfer, 0, .36));
     actor.position.z = MathUtils.lerp(actor.position.z, -1.29, MathUtils.smoothstep(transfer, .18, .54));
-    actor.position.x += .17 * sit;
+    actor.position.x += .17 * sit - .047 * sitLean * (1 - sit);
     actor.rotation.y = MathUtils.lerp(Math.PI, -Math.PI / 2 + Math.PI * 2, turn);
 
     sampleRig(rig, walk * 3);
@@ -563,16 +632,16 @@ export default function PatientScene({ controller, finaleController, chair }) {
     lockWalkingFeet(rig, scratch, approachTrack,
       walk * 3, 3, walking);
     plantFeet(actor, rig, scratch, settleFeet);
-    // Hinge forward over the planted feet before lowering onto the seat.
-    if (sitLean > 0) {
+    // Shift through the lower back as he sits and reaches across the table.
+    const tableLean = .15 * MathUtils.smoothstep(place, .08, .90) * (1 - .66 * open)
+      + .075 * Math.sin(Math.PI * open);
+    const torsoLean = .42 * sitLean + tableLean;
+    if (torsoLean > 0) {
       rig.chest.getWorldPosition(scratch.foot);
       rig.spine.getWorldPosition(scratch.hand).sub(scratch.foot)
-        .applyAxisAngle(sideAxis, .42 * sitLean).add(scratch.foot);
+        .applyAxisAngle(sideAxis, torsoLean).add(scratch.foot);
       aim(rig.chest, rig.spine, scratch.hand, 1);
     }
-    rig.chest.getWorldPosition(scratch.hand);
-    scratch.hand.x -= .14 + .095 * Math.sin(Math.PI * open);
-    aim(rig.spine, rig.chest, scratch.hand, place * (1 - .45 * open));
     const attend = MathUtils.smoothstep(progress, .905, .98) * sit;
     scratch.hand.set(3.20, 1.17, -1.34);
     aim(rig.head, rig.face, scratch.hand, .62 * attend);
@@ -609,9 +678,13 @@ export default function PatientScene({ controller, finaleController, chair }) {
       .multiply(palmUnderLaptop)
       .multiply(delta.setFromAxisAngle(up, Math.PI * .8 * cornerGrip));
     wrist.quaternion.slerp(worldRotation, hold);
+    poseFingers(rig, 0, .36 * hold);
     scratch.pole.set(0, -1, .16);
     scratch.hand.set(chair.position.x + .245, 1.105, -1.035);
     reach(rig.right, scratch.hand, scratch.pole, grip);
+    const lapSupport = sit * (1 - MathUtils.smoothstep(progress, .942, .958));
+    scratch.hand.set(actor.position.x - .20, seatedHipHeight + .056, actor.position.z - .14);
+    reach(rig.right, scratch.hand, scratch.pole, lapSupport);
     laptop.hinge.localToWorld(scratch.hand.set(.221, .004, -.093));
     scratch.hand.x += .035;
     scratch.hand.lerp(scratch.foot.set(3.39, .99, -1.24), MathUtils.smoothstep(progress, .986, 1));
@@ -638,25 +711,24 @@ export default function PatientScene({ controller, finaleController, chair }) {
       reach(rig.right, scratch.hand, scratch.pole, prescription.reach);
     }
 
-    scratch.pole.set(-1, 0, 0);
     for (const [index, leg] of [rig.leftLeg, rig.rightLeg].entries()) {
       const side = index ? -1 : 1;
+      scratch.pole.set(-1, .035, side * .11);
       const step = MathUtils.smoothstep(transfer, index * .19, .35 + index * .19);
       const adjust = MathUtils.smoothstep(scoot / .56, index * .45, .55 + index * .45);
       const support = step;
       scratch.foot.set(4.49 - .38 - .56 * .82 * adjust + side * .025,
-        .215 + calibration.feet[index].ankle[1] - .032 + .035 * Math.sin(Math.PI * adjust),
+        livingRoomRugTop + rig.shoes[index].height + .021 * Math.sin(Math.PI * adjust),
         -1.29 + side * .125);
       reach(leg, scratch.foot, scratch.pole, support);
-      leg[2].getWorldPosition(scratch.hand);
-      scratch.hand.add(scratch.foot.fromArray(calibration.feet[index].toe).applyAxisAngle(up, -Math.PI / 2));
-      aim(leg[2], rig.toes[index], scratch.hand, support);
+      orientShoe(rig, index, -Math.PI / 2, support);
     }
 
     const sheet = world.getObjectByName('TravelPrescription');
     if (sheet && prescription.reach > 0 && !departing) {
       scratch.pole.set(-.12, -1, .32);
       gripPrescription(sheet, rig.left, 1, scratch.pole, prescription.reach);
+      poseFingers(rig, 0, .57 * prescription.reach, true);
     }
     if (stage >= .935) {
       helper.visible = true;
@@ -704,6 +776,7 @@ export default function PatientScene({ controller, finaleController, chair }) {
         aim(companionRig.head, companionRig.face, sheet.position, .38 * grasp * (1 - take));
         scratch.pole.set(-.25, -1, .32);
         gripPrescription(sheet, rig.left, 1, scratch.pole, 1 - release);
+        poseFingers(rig, 0, .57 * (1 - release), true);
         scratch.pole.set(-.30, -1, -.12);
         gripPrescription(sheet, companionRig.left, -1, scratch.pole, grasp);
       }
@@ -719,14 +792,41 @@ export default function PatientScene({ controller, finaleController, chair }) {
     const onRug = position.x > 1.99 && position.x < 5.82 && position.z > -3.07 && position.z < -.05;
     const inShop = position.x > 28 && position.z < 8.1;
     floorContact.current.visible = visible && (inside || inShop);
-    floorContact.current.position.set(position.x, inShop ? .076 : onRug ? .215 : .185, position.z);
+    floorContact.current.position.set(position.x, inShop ? .076 : onRug ? livingRoomRugTop + .001 : .189, position.z);
     floorContact.current.rotation.y = subject.rotation.y;
+
+    for (const [actor, actorRig, shadows] of [
+      [body.current, rig, patientContact.current],
+      [companion.current, companionRig, companionContact.current],
+    ]) {
+      const { x, z } = actor.position;
+      shadows.visible = actor.visible && x > 1.65 && x < 6.4 && z > -3.07 && z < 3.8;
+      if (!shadows.visible) continue;
+      for (const [index, { bone, sole }] of actorRig.shoes.entries()) {
+        bone.localToWorld(shadowHeel.copy(sole[0]));
+        bone.localToWorld(shadowToe.copy(sole[3]));
+        const centerX = (shadowHeel.x + shadowToe.x) / 2;
+        const centerZ = (shadowHeel.z + shadowToe.z) / 2;
+        const floor = storyFloor(centerX, centerZ, .188);
+        const height = Math.min(shadowHeel.y, shadowToe.y) - floor;
+        const marker = shadows.children[index];
+        marker.position.set(centerX, floor + .0014, centerZ);
+        marker.rotation.y = Math.atan2(shadowToe.x - shadowHeel.x, shadowToe.z - shadowHeel.z);
+        marker.children[0].material.opacity = .34 * (1 - MathUtils.smoothstep(height, .008, .10));
+      }
+    }
   });
   /* eslint-enable react-hooks/immutability */
 
   return <>
     <group ref={floorContact} visible={false}>
       <ContactShadow size={[.95, .82]} opacity={.40} />
+    </group>
+    <group ref={patientContact} visible={false}>
+      {[0, 1].map((side) => <group key={side}><ContactShadow size={[.28, .43]} opacity={0} /></group>)}
+    </group>
+    <group ref={companionContact} visible={false}>
+      {[0, 1].map((side) => <group key={side}><ContactShadow size={[.28, .43]} opacity={0} /></group>)}
     </group>
     <group ref={companion} visible={false}><primitive object={companionRig.model} dispose={null} /></group>
     <group ref={body} visible={false}><primitive object={rig.model} dispose={null} /></group>
