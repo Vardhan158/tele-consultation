@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { AnimationMixer, InstancedMesh, LineCurve3, MathUtils, Quaternion, Vector3 } from 'three';
+import { AnimationMixer, InstancedMesh, LineCurve3, MathUtils, Quaternion, Raycaster, Vector3 } from 'three';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { beat, pulledChair } from './patientTimeline';
 import { patientProgress } from './laptopTimeline';
@@ -10,7 +10,7 @@ import { earlierProgress, prescriptionFrame } from './prescriptionTimeline';
 import { departureTrack, preTravelProgress, sampleTravel, travelProgress, travelStart, walkPose } from './travelTimeline';
 import { homeEntry, bagCounter, counterPaper, pharmacyFrame, pharmacyProgress, pharmacyStart, previousJourney, samplePharmacyPatient } from './pharmacyTimeline';
 import { bagOnTable, cupOnTable, finaleFrame, finaleProgress, finaleStart, sampleFinalePatient } from './finaleTimeline';
-import { stanceAt, transferAt } from './characterMotion';
+import { gaitContact, transferAt } from './characterMotion';
 import calibration from './rigCalibration.json';
 import ContactShadow from './ContactShadow';
 import LaptopDisplay from './LaptopDisplay';
@@ -22,6 +22,7 @@ const seatedHipHeight = chairPadTop + .115;
 const approachTrack = new LineCurve3(approach, stoppingPoint);
 const tabletop = new Vector3(3.22, .952, -1.34);
 const livingRoomRugTop = .2085;
+const chairFrontClearance = .36;
 const up = new Vector3(0, 1, 0);
 const sideAxis = new Vector3(0, 0, 1);
 const level = new Quaternion();
@@ -155,10 +156,29 @@ function storyFloor(x, z, ground) {
   return onLivingRoomRug ? Math.max(ground, livingRoomRugTop) : ground;
 }
 
-function orientShoe(rig, index, heading, weight) {
+const groundMeshes = new Set([
+  'ENV_driveway', 'ENV_level_approach', 'ENV_road', 'ENV_sidewalk', 'ENV_terrain', 'HERO_floor',
+  'Entry_landing', 'Parking_lay-by', 'Terrazzo_tile', 'Subfloor',
+]);
+
+function indoorFootprint(x, z) {
+  return x > 1.99 && x < 5.82 && z > -3.07 && z < 1.45;
+}
+
+function walkableSurface(scratch, x, z, approximate) {
+  if (indoorFootprint(x, z)) return storyFloor(x, z, .188);
+  const { ray, terrain, groundHits } = scratch;
+  ray.ray.origin.set(x, approximate + .30, z);
+  groundHits.length = 0;
+  ray.intersectObjects(terrain, false, groundHits);
+  return groundHits[0]?.point.y ?? approximate;
+}
+
+function orientShoe(rig, index, heading, weight, pitch = 0) {
   const { bone, neutral } = rig.shoes[index];
   bone.parent.getWorldQuaternion(parentRotation).invert();
-  worldRotation.copy(parentRotation).multiply(delta.setFromAxisAngle(up, heading)).multiply(neutral);
+  worldRotation.copy(parentRotation).multiply(delta.setFromAxisAngle(up, heading))
+    .multiply(delta.setFromAxisAngle(sheetRight, pitch)).multiply(neutral);
   bone.quaternion.slerp(worldRotation, weight);
   bone.updateWorldMatrix(false, true);
 }
@@ -180,45 +200,153 @@ function plantFeet(actor, rig, scratch, weight) {
   }
 }
 
-const solePoint = new Vector3();
 const shadowHeel = new Vector3();
 const shadowToe = new Vector3();
-const swingRotation = new Quaternion();
+const strideTangent = new Vector3();
+const hipWorld = new Vector3();
+const walkingEnd = new Vector3();
+const anklePosition = new Vector3();
+const soleProbe = new Vector3();
+const ankleOrientation = new Quaternion();
+
+function strideAnchor(track, phase, cycles, lateral, target, scratch) {
+  const t = MathUtils.clamp(phase / cycles, 0, 1);
+  track.getPointAt(t, target);
+  track.getTangentAt(t, strideTangent);
+  const heading = Math.atan2(strideTangent.x, strideTangent.z);
+  target.x += Math.cos(heading) * lateral;
+  target.z -= Math.sin(heading) * lateral;
+  // At the rug edge use the highest surface under the toe or heel, not just the ankle.
+  const ground = target.y;
+  const forwardX = Math.sin(heading), forwardZ = Math.cos(heading);
+  target.y = Math.max(
+    walkableSurface(scratch, target.x, target.z, ground),
+    walkableSurface(scratch, target.x + .211 * forwardX, target.z + .211 * forwardZ, ground),
+    walkableSurface(scratch, target.x - .101 * forwardX, target.z - .101 * forwardZ, ground),
+  );
+  return heading;
+}
+
+function walkingFoot(track, phase, cycles, index, shoe, scratch) {
+  const profile = calibration.feet[index];
+  const { from, to: next, swing } = gaitContact(phase, profile);
+  const startHeading = strideAnchor(track, from, cycles, profile.ankle[0], shoe.target, scratch);
+  const endHeading = from === next ? startHeading
+    : strideAnchor(track, next, cycles, profile.ankle[0], walkingEnd, scratch);
+  const blend = MathUtils.smoothstep(swing, 0, 1);
+  if (from !== next) shoe.target.lerp(walkingEnd, blend);
+  const lift = Math.sin(Math.PI * swing) * MathUtils.smoothstep(phase, 0, .16)
+    * (1 - MathUtils.smoothstep(phase, cycles - .18, cycles));
+  shoe.target.y += shoe.height + .072 * lift ** 1.45;
+  shoe.heading = startHeading + Math.atan2(Math.sin(endHeading - startHeading), Math.cos(endHeading - startHeading)) * blend;
+  shoe.pitch = .19 * Math.sin(2 * Math.PI * swing) * lift;
+}
+
+function allowKneeFlex(rig, weight) {
+  let drop = 0;
+  for (const [index, shoe] of rig.shoes.entries()) {
+    rig.legs[index][0].getWorldPosition(hipWorld);
+    const x = hipWorld.x - shoe.target.x, z = hipWorld.z - shoe.target.z;
+    const extension = Math.sqrt(Math.max(.15, shoe.legLength ** 2 - x*x - z*z));
+    drop = Math.max(drop, hipWorld.y - shoe.target.y - extension);
+  }
+  if (drop <= 0) return;
+  rig.hips.getWorldPosition(hipWorld);
+  hipWorld.y -= Math.min(drop, .13) * weight;
+  rig.hips.position.copy(rig.hips.parent.worldToLocal(hipWorld));
+  rig.hips.updateWorldMatrix(false, true);
+}
 
 function lockWalkingFeet(rig, scratch, track, phase, cycles, strength) {
   if (!track || strength <= 0) return;
-  for (const [index, leg] of [rig.leftLeg, rig.rightLeg].entries()) {
-    const profile = calibration.feet[index];
-    const { anchor, weight } = stanceAt(phase, profile);
-    const at = MathUtils.clamp((weight > 0 ? anchor : phase) / cycles, 0, 1);
-    track.getPointAt(at, scratch.support);
-    track.getTangentAt(at, scratch.supportTangent);
-    const heading = Math.atan2(scratch.supportTangent.x, scratch.supportTangent.z);
-    scratch.pole.set(Math.sin(heading), 0, Math.cos(heading));
-    const shoe = rig.shoes[index];
-    if (weight > 0) {
-      scratch.foot.set(profile.ankle[0], 0, 0).applyAxisAngle(up, heading).add(scratch.support);
-      scratch.foot.y = storyFloor(scratch.foot.x, scratch.foot.z, scratch.support.y) + shoe.height;
-      reach(leg, scratch.foot, scratch.pole, strength * weight);
-      orientShoe(rig, index, heading, strength * weight);
-    }
-
-    // Preserve heel and toe roll in swing while preventing the rigid sole from crossing the floor.
-    let penetration = 0;
-    for (const probe of shoe.sole) {
-      shoe.bone.localToWorld(solePoint.copy(probe));
-      penetration = Math.max(penetration, storyFloor(solePoint.x, solePoint.z, scratch.support.y) - solePoint.y);
-    }
-    if (penetration > .002) {
-      shoe.bone.getWorldQuaternion(swingRotation);
-      shoe.bone.getWorldPosition(scratch.foot);
-      scratch.foot.y += penetration;
-      reach(leg, scratch.foot, scratch.pole, strength);
-      shoe.bone.parent.getWorldQuaternion(parentRotation).invert();
-      shoe.bone.quaternion.copy(parentRotation.multiply(swingRotation));
-      shoe.bone.updateWorldMatrix(false, true);
+  for (const [index, shoe] of rig.shoes.entries()) {
+    walkingFoot(track, phase, cycles, index, shoe, scratch);
+    if (strength < 1) {
+      shoe.bone.getWorldPosition(anklePosition);
+      shoe.target.lerp(anklePosition, 1 - strength);
     }
   }
+  allowKneeFlex(rig, strength);
+  for (const [index, leg] of rig.legs.entries()) {
+    const shoe = rig.shoes[index];
+    scratch.pole.set(Math.sin(shoe.heading), .035, Math.cos(shoe.heading));
+    reach(leg, shoe.target, scratch.pole, 1);
+    orientShoe(rig, index, shoe.heading, strength, shoe.pitch);
+  }
+}
+
+function chairFeet(rig, scratch, progress, transfer, scoot, turnBlend) {
+  if (turnBlend <= 0) return;
+  for (const [index, shoe] of rig.shoes.entries()) {
+    const side = index ? -1 : 1;
+    walkingFoot(approachTrack, 3, 3, index, shoe, scratch);
+    const turnStep = MathUtils.smoothstep(progress, index ? .801 : .780, index ? .824 : .801);
+    const pivot = Math.PI + Math.PI / 2 * turnStep;
+    const forward = MathUtils.smoothstep(transfer, index ? .175 : .02, index ? .335 : .175);
+    const sideways = MathUtils.smoothstep(transfer, index ? .335 : .47, index ? .47 : .62);
+    const scootStep = MathUtils.smoothstep(scoot / .56, index * .50, .50 + index * .50);
+    const ankleX = 4.11 + side * .035;
+    const outerZ = -.80 + side * .118;
+    shoe.target.lerp(scratch.foot.set(4.80 + side * .072, livingRoomRugTop + shoe.height,
+      outerZ), turnStep);
+    // Step in front of the chair first. A diagonal cut crosses the side rail.
+    shoe.target.x = MathUtils.lerp(shoe.target.x, ankleX, forward) - .56 * .82 * scootStep;
+    shoe.target.z = MathUtils.lerp(shoe.target.z, -1.29 + side * .125, sideways);
+    shoe.target.y += .044 * Math.sin(Math.PI * turnStep) + .065 * Math.sin(Math.PI * forward)
+      + .05 * Math.sin(Math.PI * sideways) + .030 * Math.sin(Math.PI * scootStep);
+    shoe.heading = pivot;
+    shoe.bone.getWorldPosition(anklePosition);
+    shoe.target.lerp(anklePosition, 1 - turnBlend);
+  }
+  if (transfer < .63) allowKneeFlex(rig, turnBlend * (1 - MathUtils.smoothstep(transfer, .54, .63)));
+  for (const [index, leg] of rig.legs.entries()) {
+    const shoe = rig.shoes[index];
+    scratch.pole.set(Math.sin(shoe.heading), .035, Math.cos(shoe.heading));
+    reach(leg, shoe.target, scratch.pole, 1);
+    orientShoe(rig, index, shoe.heading, turnBlend);
+  }
+}
+
+function protectSoles(actor, rig, scratch, progress) {
+  const { x, z } = actor.position;
+  // Exterior paths use scene geometry. The car-transfer poses intentionally share neither floor.
+  const exteriorWalk = (progress > .499 && progress < .554)
+    || (progress > .649 && progress < .683)
+    || (progress > .733 && progress < .758)
+    || (progress > .819 && progress < .840)
+    || progress > .977;
+  if (!actor.visible || (!indoorFootprint(x, z) && !exteriorWalk)) return;
+  const heading = actor.rotation.y;
+  scratch.pole.set(Math.sin(heading), .035, Math.cos(heading));
+  for (const [index, shoe] of rig.shoes.entries()) {
+    let correction = 0;
+    for (const point of shoe.sole) {
+      shoe.bone.localToWorld(soleProbe.copy(point));
+      const ground = walkableSurface(scratch, soleProbe.x, soleProbe.z, actor.position.y);
+      correction = Math.max(correction, ground - soleProbe.y);
+    }
+    if (correction <= .0012) continue;
+    shoe.bone.getWorldQuaternion(ankleOrientation);
+    shoe.bone.getWorldPosition(anklePosition);
+    anklePosition.y += correction + .0012;
+    reach(rig.legs[index], anklePosition, scratch.pole, 1);
+    shoe.bone.parent.getWorldQuaternion(parentRotation).invert();
+    shoe.bone.quaternion.copy(parentRotation.multiply(ankleOrientation));
+    shoe.bone.updateWorldMatrix(false, true);
+  }
+}
+
+function poseExpression(rig, progress, younger = false) {
+  if (!rig.expression) return;
+  const time = progress * (younger ? 13 : 17);
+  const phase = (time + .14 * Math.sin(time * 1.61) + (younger ? .42 : 0)) % 1;
+  const blink = 1 - MathUtils.smoothstep(Math.abs(phase - .76), .009, .079);
+  const attentive = MathUtils.smoothstep(progress, .19, .26) * (1 - MathUtils.smoothstep(progress, .45, .56));
+  const relief = MathUtils.smoothstep(progress, .855, .887) * (1 - MathUtils.smoothstep(progress, .912, .96));
+  const { weights, Blink, SoftSmile, Focus } = rig.expression;
+  weights[Blink] = blink;
+  weights[SoftSmile] = (younger ? .26 : .12) + .17 * relief;
+  weights[Focus] = .27 * attentive * (1 - blink);
 }
 
 function poseFingers(rig, side, amount, pinch = false) {
@@ -481,7 +609,8 @@ function makePatientRig(scene, animations) {
     const rightLeg = bones(['RightUpLeg', 'RightLeg', 'RightFoot']);
     const toes = bones(['LeftToeBase', 'RightToeBase']);
     model.updateMatrixWorld(true);
-    const shoes = [leftLeg[2], rightLeg[2]].map((bone, index) => {
+    const legs = [leftLeg, rightLeg];
+    const shoes = legs.map(([upper, lower, bone], index) => {
       const ankle = bone.getWorldPosition(new Vector3());
       const forward = toes[index].getWorldPosition(new Vector3()).sub(ankle).setY(0).normalize();
       const across = new Vector3(forward.z, 0, -forward.x);
@@ -489,7 +618,10 @@ function makePatientRig(scene, animations) {
       const sole = [[-.103, 0], [.118, -.070], [.118, .070], [.215, 0]].map(([length, width]) =>
         bone.worldToLocal(ankle.clone().addScaledVector(forward, length)
           .addScaledVector(across, width + offset).setY(0)));
-      return { bone, height: ankle.y, neutral: bone.getWorldQuaternion(new Quaternion()), sole };
+      const knee = lower.getWorldPosition(new Vector3());
+      const legLength = ankle.distanceTo(knee) + knee.distanceTo(upper.getWorldPosition(new Vector3())) - .004;
+      return { bone, height: ankle.y, neutral: bone.getWorldQuaternion(new Quaternion()), sole, legLength,
+        target: new Vector3(), heading: 0, pitch: 0 };
     });
     const fingers = ['Left', 'Right'].map((side, index) => ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'].flatMap((digit) =>
       [1, 2, 3].flatMap((joint) => {
@@ -501,17 +633,23 @@ function makePatientRig(scene, animations) {
         return [{ bone, axis, digit, joint }];
       })));
     const articulatedFingers = fingers.flat().map(({ bone }) => bone);
+    let expression;
+    model.traverse((object) => {
+      if (object.morphTargetDictionary?.Blink !== undefined) {
+        expression = { ...object.morphTargetDictionary, weights: object.morphTargetInfluences };
+      }
+    });
     const rotations = [spine, chest, head, ...left, ...right, ...leftLeg, ...rightLeg, ...articulatedFingers]
       .map((bone) => [bone, bone.quaternion.clone()]);
     return { model, shadowFrame: -1, mixer, action, clip, hips, rest: hips.position.clone(), hipSample: hips.position.clone(),
-      spine, chest, head, crown, face, left, right, leftLeg, rightLeg, toes, shoes, fingers, rotations };
+      spine, chest, head, crown, face, left, right, leftLeg, rightLeg, toes, legs, shoes, fingers, expression, rotations };
 }
 
 export default function PatientScene({ controller, finaleController, chair }) {
-  const { scene, animations } = useGLTF('/assets/house/elderly_patient.glb?v=2', false);
+  const { scene, animations } = useGLTF('/assets/house/elderly_patient.glb?v=3', false);
   const { scene: laptopSource } = useGLTF('/assets/house/patient-laptop.glb', false);
   const body = useRef(null), prop = useRef(null), floorContact = useRef(null);
-  const { scene: companionScene, animations: companionClips } = useGLTF('/assets/house/companion.glb', false);
+  const { scene: companionScene, animations: companionClips } = useGLTF('/assets/house/companion.glb?v=2', false);
   const companion = useRef(null);
   const patientContact = useRef(null);
   const companionContact = useRef(null);
@@ -523,10 +661,22 @@ export default function PatientScene({ controller, finaleController, chair }) {
     return { model, instances, hinge: model.getObjectByName('LaptopHinge') };
   }, [laptopSource]);
   useEffect(() => () => { laptop.instances?.dispose(); }, [laptop]);
-  const scratch = useMemo(() => ({ carry: new Vector3(), hand: new Vector3(), pole: new Vector3(), foot: new Vector3(), path: new Vector3(), tangent: new Vector3(), support: new Vector3(), supportTangent: new Vector3() }), []);
+  const scratch = useMemo(() => ({
+    carry: new Vector3(), hand: new Vector3(), pole: new Vector3(), foot: new Vector3(),
+    path: new Vector3(), tangent: new Vector3(), terrain: [], groundHits: [],
+    ray: new Raycaster(new Vector3(), new Vector3(0, -1, 0), 0, .60),
+  }), []);
 
   /* eslint-disable react-hooks/immutability -- The frame callback updates mutable Three.js scene objects. */
   useFrame(({ gl, scene: world }) => {
+    if (!scratch.terrain.length) {
+      world.traverse((object) => {
+        if (object.isMesh && groundMeshes.has(object.name)) {
+          object.updateWorldMatrix(true, false);
+          scratch.terrain.push(object);
+        }
+      });
+    }
     const journey = previousJourney(controller.progress);
     const stage = preTravelProgress(journey);
     const departing = journey > travelStart;
@@ -613,10 +763,10 @@ export default function PatientScene({ controller, finaleController, chair }) {
     actor.position.lerpVectors(approach, stoppingPoint, walk);
     actor.position.x += .14 * pull;
     // Step around the side of the pad before backing onto it.
-    actor.position.x = MathUtils.lerp(actor.position.x, chair.position.x - .22,
-      MathUtils.smoothstep(transfer, 0, .36));
-    actor.position.z = MathUtils.lerp(actor.position.z, -1.29, MathUtils.smoothstep(transfer, .18, .54));
-    actor.position.x += .17 * sit - .047 * sitLean * (1 - sit);
+    actor.position.x = MathUtils.lerp(actor.position.x, chair.position.x - chairFrontClearance,
+      MathUtils.smoothstep(transfer, .025, .335));
+    actor.position.z = MathUtils.lerp(actor.position.z, -1.29, MathUtils.smoothstep(transfer, .335, .62));
+    actor.position.x += .31 * sit - .047 * sitLean * (1 - sit);
     actor.rotation.y = MathUtils.lerp(Math.PI, -Math.PI / 2 + Math.PI * 2, turn);
 
     sampleRig(rig, walk * 3);
@@ -627,11 +777,9 @@ export default function PatientScene({ controller, finaleController, chair }) {
       actor.position.y += (seatedHipHeight - scratch.hand.y) * sit;
       actor.updateWorldMatrix(true, true);
     }
-    const settleFeet = MathUtils.smoothstep(progress, .778, .810) * (1 - sit);
-    const walking = (1 - sit) * (1 - settleFeet);
-    lockWalkingFeet(rig, scratch, approachTrack,
-      walk * 3, 3, walking);
-    plantFeet(actor, rig, scratch, settleFeet);
+    const turnBlend = MathUtils.smoothstep(progress, .777, .793);
+    lockWalkingFeet(rig, scratch, approachTrack, walk * 3, 3, 1 - turnBlend);
+    chairFeet(rig, scratch, progress, transfer, scoot, turnBlend);
     // Shift through the lower back as he sits and reaches across the table.
     const tableLean = .15 * MathUtils.smoothstep(place, .08, .90) * (1 - .66 * open)
       + .075 * Math.sin(Math.PI * open);
@@ -711,19 +859,6 @@ export default function PatientScene({ controller, finaleController, chair }) {
       reach(rig.right, scratch.hand, scratch.pole, prescription.reach);
     }
 
-    for (const [index, leg] of [rig.leftLeg, rig.rightLeg].entries()) {
-      const side = index ? -1 : 1;
-      scratch.pole.set(-1, .035, side * .11);
-      const step = MathUtils.smoothstep(transfer, index * .19, .35 + index * .19);
-      const adjust = MathUtils.smoothstep(scoot / .56, index * .45, .55 + index * .45);
-      const support = step;
-      scratch.foot.set(4.49 - .38 - .56 * .82 * adjust + side * .025,
-        livingRoomRugTop + rig.shoes[index].height + .021 * Math.sin(Math.PI * adjust),
-        -1.29 + side * .125);
-      reach(leg, scratch.foot, scratch.pole, support);
-      orientShoe(rig, index, -Math.PI / 2, support);
-    }
-
     const sheet = world.getObjectByName('TravelPrescription');
     if (sheet && prescription.reach > 0 && !departing) {
       scratch.pole.set(-.12, -1, .32);
@@ -786,6 +921,11 @@ export default function PatientScene({ controller, finaleController, chair }) {
   });
   useFrame(() => {
     if (!floorContact.current || !body.current) return;
+    const progress = finaleController.progress;
+    protectSoles(body.current, rig, scratch, progress);
+    protectSoles(companion.current, companionRig, scratch, progress);
+    if (body.current.visible) poseExpression(rig, progress);
+    if (companion.current.visible) poseExpression(companionRig, progress, true);
     const subject = companion.current?.visible ? companion.current : body.current;
     const { position, visible } = subject;
     const inside = position.x > 1.65 && position.x < 6.4 && position.z < 3.8;

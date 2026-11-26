@@ -1,6 +1,6 @@
 import { easeStoryProgress, playbackProgress } from '../src/components/public/story/storyPlayback.js';
 import { createCameraScratch, sampleJourneyCamera } from '../src/components/public/story/cameraJourney.js';
-import { stanceAt, transferAt } from '../src/components/public/story/characterMotion.js';
+import { gaitContact, transferAt } from '../src/components/public/story/characterMotion.js';
 import calibration from '../src/components/public/story/rigCalibration.json' with { type: 'json' };
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -200,15 +200,23 @@ test('reversible camera clears the open door and frames the table on desktop and
   assert.equal(sampleDoor(1), Math.PI / 2);
 });
 
-test('Blender stance contacts stay fixed through gait wrap and reverse sampling', () => {
+test('shoe anchors stay fixed through stance and bridge continuously across swing and wrap', () => {
   for (const foot of calibration.feet) {
     const center = foot.center + 2;
-    const phases = [center - .11, center, center + .11];
-    const contact = phases.map((phase) => stanceAt(phase, foot));
-    assert.ok(contact.every(({ anchor, weight }) => Math.abs(anchor - center) < 1e-8 && weight > .9));
-    assert.deepEqual(phases.toReversed().map((phase) => stanceAt(phase, foot)), contact.toReversed());
+    const phases = [center - .20, center, center + .20];
+    const contact = phases.map((phase) => gaitContact(phase, foot));
+    assert.ok(contact.every(({ from, to, swing }) => Math.abs(from - center) < 1e-8 && to === from && swing === 0));
+    assert.deepEqual(phases.toReversed().map((phase) => gaitContact(phase, foot)), contact.toReversed());
+    const midSwing = gaitContact(center + .5, foot);
+    assert.ok(Math.abs(midSwing.from - center) < 1e-8);
+    assert.ok(Math.abs(midSwing.to - center - 1) < 1e-8);
+    assert.ok(Math.abs(midSwing.swing - .5) < 1e-8);
+    const stanceEnd = center + foot.halfWidth + .018;
+    assert.ok(gaitContact(stanceEnd + 1e-7, foot).swing < 1e-6);
+    const nextContact = center + 1 - foot.halfWidth - .018;
+    assert.ok(gaitContact(nextContact - 1e-7, foot).swing > .999999);
   }
-  assert.equal(stanceAt(.98, calibration.feet[1]).anchor, 1.05);
+  assert.equal(gaitContact(.98, calibration.feet[1]).from, 1.05);
   assert.deepEqual(transferAt(0), { tuck: 0, inside: 0, lean: 0 });
   assert.equal(transferAt(1).inside, 1);
 });
