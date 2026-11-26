@@ -22,7 +22,7 @@ const seatedHipHeight = chairPadTop + .115;
 const approachTrack = new LineCurve3(approach, stoppingPoint);
 const tabletop = new Vector3(3.22, .952, -1.34);
 const up = new Vector3(0, 1, 0);
-const chairLeanAxis = new Vector3(0, 0, 1);
+const sideAxis = new Vector3(0, 0, 1);
 const level = new Quaternion();
 // The hand bone points down its local Y axis toward the fingertips.
 const palmUnderLaptop = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2);
@@ -547,7 +547,7 @@ export default function PatientScene({ controller, finaleController, chair }) {
     if (sitLean > 0) {
       rig.chest.getWorldPosition(scratch.foot);
       rig.spine.getWorldPosition(scratch.hand).sub(scratch.foot)
-        .applyAxisAngle(chairLeanAxis, .42 * sitLean).add(scratch.foot);
+        .applyAxisAngle(sideAxis, .42 * sitLean).add(scratch.foot);
       aim(rig.chest, rig.spine, scratch.hand, 1);
     }
     rig.chest.getWorldPosition(scratch.hand);
@@ -569,25 +569,34 @@ export default function PatientScene({ controller, finaleController, chair }) {
     laptop.hinge.rotation.z = open * 1.83;
 
     const grip = beat(progress, 'grip') * (1 - sit);
-    const hold = 1 - MathUtils.smoothstep(progress, .951, .961);
-    // Support the near edge from below, then slide outboard before the base lands.
-    const slide = MathUtils.smoothstep(place, .68, .98);
-    scratch.hand.set(.10, -.033 + .048 * slide, -.175 - .14 * slide);
+    // Move from supporting the base to guiding its near corner before landing.
+    const cornerGrip = MathUtils.smoothstep(place, .38, .77);
+    const release = MathUtils.smoothstep(progress, .951, .970);
+    const hold = 1 - MathUtils.smoothstep(release, .45, 1);
+    scratch.hand.set(
+      MathUtils.lerp(.10, .316, cornerGrip) + .10 * release,
+      MathUtils.lerp(-.033, .061, cornerGrip) + .035 * release,
+      MathUtils.lerp(-.175, .118, cornerGrip),
+    );
     object.localToWorld(scratch.hand);
     scratch.pole.set(.38, -1, -.25).applyAxisAngle(up, actor.rotation.y);
     reach(rig.left, scratch.hand, scratch.pole, hold);
     const wrist = rig.left[2];
     wrist.parent.getWorldQuaternion(parentRotation).invert();
-    worldRotation.copy(parentRotation).multiply(object.quaternion).multiply(palmUnderLaptop);
+    worldRotation.copy(parentRotation).multiply(object.quaternion)
+      .multiply(delta.setFromAxisAngle(sideAxis, .24 * cornerGrip))
+      .multiply(delta.setFromAxisAngle(up, -Math.PI / 2 * cornerGrip))
+      .multiply(palmUnderLaptop)
+      .multiply(delta.setFromAxisAngle(up, Math.PI * .8 * cornerGrip));
     wrist.quaternion.slerp(worldRotation, hold);
     scratch.pole.set(0, -1, .16);
     scratch.hand.set(chair.position.x + .245, 1.105, -1.035);
     reach(rig.right, scratch.hand, scratch.pole, grip);
-    laptop.hinge.localToWorld(scratch.hand.set(.221, .004, .093));
+    laptop.hinge.localToWorld(scratch.hand.set(.221, .004, -.093));
     scratch.hand.x += .035;
     scratch.hand.lerp(scratch.foot.set(3.39, .99, -1.24), MathUtils.smoothstep(progress, .986, 1));
     const lowerHand = MathUtils.smoothstep(booking, .735, .775);
-    reach(rig.right, scratch.hand, scratch.pole, MathUtils.smoothstep(progress, .941, .966) * (1 - lowerHand));
+    reach(rig.right, scratch.hand, scratch.pole, MathUtils.smoothstep(progress, .951, .966) * (1 - lowerHand));
     if (call.phase === 'active' && !prescription.phase) {
       rig.crown.getWorldPosition(scratch.hand);
       scratch.hand.x -= .034 + .045 * call.nod;
