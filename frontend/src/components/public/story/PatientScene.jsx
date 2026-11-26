@@ -117,6 +117,26 @@ const sheetGripFrame = new Quaternion(), sheetPitch = new Quaternion();
 const cupGrip = new Quaternion().setFromAxisAngle(new Vector3(0,1,0), .25).multiply(palmUnderLaptop);
 const sheetRight = new Vector3(1, 0, 0);
 const sheetFacing = new Quaternion().setFromAxisAngle(up, Math.PI);
+const prescriptionHandoff = new Vector3(3.80, 1.18, -.86);
+const handoffOrientation = new Quaternion().setFromAxisAngle(up, Math.PI)
+  .multiply(new Quaternion().setFromAxisAngle(sheetRight, .14));
+const prescriptionPalm = new Quaternion().setFromAxisAngle(sheetRight, 1.34)
+  .multiply(new Quaternion().setFromAxisAngle(up, .97));
+const paperWristTarget = new Vector3();
+
+function gripPrescription(sheet, chain, edge, pole, weight) {
+  if (weight <= 0) return;
+  // The sheet is 21 cm long. The wrist sits behind the edge so the fingertips meet it.
+  paperWristTarget.set(0, -.024, edge * .185).applyQuaternion(sheet.quaternion).add(sheet.position);
+  reach(chain, paperWristTarget, pole, weight);
+  const wrist = chain[2];
+  wrist.parent.getWorldQuaternion(parentRotation).invert();
+  worldRotation.copy(parentRotation).multiply(sheet.quaternion);
+  if (edge > 0) worldRotation.multiply(sheetFacing);
+  worldRotation.multiply(prescriptionPalm);
+  wrist.quaternion.slerp(worldRotation, weight);
+  wrist.updateWorldMatrix(false, true);
+}
 
 function sampleRig(rig, phase) {
   for (const [bone, sampled] of rig.rotations) bone.quaternion.copy(sampled);
@@ -607,12 +627,12 @@ export default function PatientScene({ controller, finaleController, chair }) {
       rig.right[2].rotateX(-.19 * call.gesture);
     }
     if (prescription.reach > 0) {
-      rig.chest.getWorldPosition(scratch.hand);
-      scratch.hand.x -= .32 * prescription.reach * (1 - .56 * prescription.pickup);
-      scratch.hand.z += .09 * prescription.reach;
-      aim(rig.spine, rig.chest, scratch.hand, 1);
-      scratch.hand.set(prescription.paperX + .163, prescription.paperY + .012 + .055 * Math.sin(Math.PI * prescription.reach), prescription.paperZ);
-      reach(rig.left, scratch.hand, scratch.pole, prescription.reach);
+      const printerLean = .29 * prescription.reach * (1 - .68 * prescription.pickup);
+      rig.chest.getWorldPosition(scratch.foot);
+      rig.spine.getWorldPosition(scratch.hand).sub(scratch.foot)
+        .applyAxisAngle(sideAxis, printerLean).add(scratch.foot);
+      aim(rig.chest, rig.spine, scratch.hand, 1);
+      scratch.hand.set(prescription.paperX, prescription.paperY, prescription.paperZ);
       aim(rig.head, rig.face, scratch.hand, .68 * prescription.reach);
       scratch.hand.set(3.89, .79, -1.43);
       reach(rig.right, scratch.hand, scratch.pole, prescription.reach);
@@ -633,10 +653,10 @@ export default function PatientScene({ controller, finaleController, chair }) {
       aim(leg[2], rig.toes[index], scratch.hand, support);
     }
 
-    if (prescription.reach > 0) {
-      const sheet = world.getObjectByName('TravelPrescription');
-      if (sheet) holdPrescription(sheet, rig.left[2], actor.rotation.y,
-        prescription.pickup * .22, prescription.reach, prescription.pickup);
+    const sheet = world.getObjectByName('TravelPrescription');
+    if (sheet && prescription.reach > 0 && !departing) {
+      scratch.pole.set(-.12, -1, .32);
+      gripPrescription(sheet, rig.left, 1, scratch.pole, prescription.reach);
     }
     if (stage >= .935) {
       helper.visible = true;
@@ -664,32 +684,28 @@ export default function PatientScene({ controller, finaleController, chair }) {
         scratch.pole.set(0,-1,-.2);
         reach(companionRig.right, scratch.hand, scratch.pole, contact);
       }
-      const offer = MathUtils.smoothstep(travel, 0, .046);
-      const grasp = MathUtils.smoothstep(travel, .036, .063);
-      const release = MathUtils.smoothstep(travel, .067, .093);
-      const sheet = world.getObjectByName('TravelPrescription');
       if (departing && sheet) {
-        scratch.hand.set(3.75, 1.19, -.96);
-        scratch.pole.set(-.25, -1, .25);
-        reach(rig.left, scratch.hand, scratch.pole, offer * (1 - release));
-        holdPrescription(sheet, rig.left[2], MathUtils.lerp(actor.rotation.y, 0, offer),
-          .22 * (1 - offer), offer * (1 - release), offer);
-        // Approach the opposite short edge while the giver still supports the page.
-        scratch.hand.copy(sheet.position);
-        scratch.hand.z += .163;
-        scratch.hand.y += .012;
-        scratch.foot.set(.23, 1.02, .25).applyAxisAngle(up, helper.rotation.y).add(helper.position);
-        scratch.hand.lerp(scratch.foot, release);
-        scratch.pole.set(-.3, -1, .15);
-        reach(companionRig.left, scratch.hand, scratch.pole, grasp);
-        if (release > 0) {
-          scratch.foot.set(3.83, .89, -1.12);
-          reach(rig.left, scratch.foot, scratch.pole, release);
-        }
-        // Keep the printed face's orientation as control passes to the opposite edge.
-        sheet.quaternion.multiply(sheetFacing);
-        holdPrescription(sheet, companionRig.left[2], helper.rotation.y, .58 * release, grasp, release);
-        sheet.quaternion.multiply(sheetFacing);
+        const offer = MathUtils.smoothstep(travel, 0, .038);
+        const grasp = MathUtils.smoothstep(travel, .018, .060);
+        const release = MathUtils.smoothstep(travel, .062, .080);
+        const take = MathUtils.smoothstep(travel, .080, .115);
+        sheet.position.lerp(prescriptionHandoff, offer);
+        sheet.quaternion.slerp(handoffOrientation, offer);
+
+        // Both wrists share the same sheet pose during contact. The receiver moves
+        // the sheet away only after the giver has let go.
+        scratch.foot.set(.21, 1.02, .43).applyAxisAngle(up, helper.rotation.y).add(helper.position);
+        sheet.position.lerp(scratch.foot, take);
+        sheetPitch.setFromAxisAngle(sheetRight, .38 * take);
+        sheetGripFrame.setFromAxisAngle(up, helper.rotation.y).multiply(sheetPitch);
+        sheet.quaternion.slerp(sheetGripFrame, take);
+
+        aim(rig.head, rig.face, sheet.position, .55 * offer * (1 - release));
+        aim(companionRig.head, companionRig.face, sheet.position, .38 * grasp * (1 - take));
+        scratch.pole.set(-.25, -1, .32);
+        gripPrescription(sheet, rig.left, 1, scratch.pole, 1 - release);
+        scratch.pole.set(-.30, -1, -.12);
+        gripPrescription(sheet, companionRig.left, -1, scratch.pole, grasp);
       }
       updatePatientShadow(gl, companionRig, helper, finaleController.progress);
     }
