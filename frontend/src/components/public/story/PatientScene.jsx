@@ -22,6 +22,7 @@ const seatedHipHeight = chairPadTop + .115;
 const approachTrack = new LineCurve3(approach, stoppingPoint);
 const tabletop = new Vector3(3.22, .952, -1.34);
 const up = new Vector3(0, 1, 0);
+const chairLeanAxis = new Vector3(0, 0, 1);
 const level = new Quaternion();
 // The hand bone points down its local Y axis toward the fingertips.
 const palmUnderLaptop = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2);
@@ -414,7 +415,7 @@ function makePatientRig(scene, animations) {
     const leftLeg = bones(['LeftUpLeg', 'LeftLeg', 'LeftFoot']);
     const rightLeg = bones(['RightUpLeg', 'RightLeg', 'RightFoot']);
     const toes = bones(['LeftToeBase', 'RightToeBase']);
-    const rotations = [spine, head, ...left, ...right, ...leftLeg, ...rightLeg].map((bone) => [bone, bone.quaternion.clone()]);
+    const rotations = [spine, chest, head, ...left, ...right, ...leftLeg, ...rightLeg].map((bone) => [bone, bone.quaternion.clone()]);
     return { model, shadowFrame: -1, mixer, action, clip, hips, rest: hips.position.clone(), hipSample: hips.position.clone(),
       spine, chest, head, crown, face, left, right, leftLeg, rightLeg, toes, rotations };
 }
@@ -506,8 +507,9 @@ export default function PatientScene({ controller, finaleController, chair }) {
     const turn = beat(progress, 'turn');
     const pull = beat(progress, 'pull');
     const transfer = beat(progress, 'sit');
-    const lower = MathUtils.smoothstep(transfer, .38, 1);
-    const sit = lower;
+    const sit = MathUtils.smoothstep(transfer, .63, .98);
+    const sitLean = MathUtils.smoothstep(transfer, .42, .63)
+      * (1 - MathUtils.smoothstep(transfer, .81, 1));
     const place = beat(progress, 'place');
     const open = beat(progress, 'open');
     actor.visible = progress >= .63;
@@ -524,8 +526,8 @@ export default function PatientScene({ controller, finaleController, chair }) {
     // Step around the side of the pad before backing onto it.
     actor.position.x = MathUtils.lerp(actor.position.x, chair.position.x - .22,
       MathUtils.smoothstep(transfer, 0, .36));
-    actor.position.z = MathUtils.lerp(actor.position.z, -1.29, MathUtils.smoothstep(transfer, .22, .58));
-    actor.position.x += .17 * lower;
+    actor.position.z = MathUtils.lerp(actor.position.z, -1.29, MathUtils.smoothstep(transfer, .18, .54));
+    actor.position.x += .17 * sit;
     actor.rotation.y = MathUtils.lerp(Math.PI, -Math.PI / 2 + Math.PI * 2, turn);
 
     sampleRig(rig, walk * 3);
@@ -541,10 +543,16 @@ export default function PatientScene({ controller, finaleController, chair }) {
     lockWalkingFeet(rig, scratch, approachTrack,
       walk * 3, 3, walking);
     plantFeet(actor, rig, scratch, settleFeet);
+    // Hinge forward over the planted feet before lowering onto the seat.
+    if (sitLean > 0) {
+      rig.chest.getWorldPosition(scratch.foot);
+      rig.spine.getWorldPosition(scratch.hand).sub(scratch.foot)
+        .applyAxisAngle(chairLeanAxis, .42 * sitLean).add(scratch.foot);
+      aim(rig.chest, rig.spine, scratch.hand, 1);
+    }
     rig.chest.getWorldPosition(scratch.hand);
-    const settleLean = Math.sin(Math.PI * MathUtils.smoothstep(transfer, .28, .95));
-    scratch.hand.x -= .14 + .095 * Math.sin(Math.PI * open) + .15 * settleLean;
-    aim(rig.spine, rig.chest, scratch.hand, Math.max(place * (1 - .45 * open), settleLean));
+    scratch.hand.x -= .14 + .095 * Math.sin(Math.PI * open);
+    aim(rig.spine, rig.chest, scratch.hand, place * (1 - .45 * open));
     const attend = MathUtils.smoothstep(progress, .905, .98) * sit;
     scratch.hand.set(3.20, 1.17, -1.34);
     aim(rig.head, rig.face, scratch.hand, .62 * attend);
