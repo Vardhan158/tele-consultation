@@ -189,6 +189,7 @@ export default function LandingScreen({
       syncTouch: false,
     });
     lenisRef.current = lenis;
+    window.__lenis = lenis;
     const syncMotion = () => { lenis.options.smoothWheel = !motion.matches; };
     motion.addEventListener("change", syncMotion);
 
@@ -217,6 +218,7 @@ export default function LandingScreen({
       if (lenisRef.current) {
         lenisRef.current.destroy();
         lenisRef.current = null;
+        window.__lenis = null;
       }
       document.documentElement.classList.remove("lenis", "lenis-smooth", "lenis-scrolling", "lenis-stopped");
       document.body.classList.remove("lenis", "lenis-smooth", "lenis-scrolling", "lenis-stopped");

@@ -20,15 +20,28 @@ class MongoDatabase:
     def __init__(self) -> None:
         self._client: AsyncMongoClient[dict[str, Any]] | None = None
         self._loop: Any = None
+        self._in_memory: Any = None
 
     @property
     def enabled(self) -> bool:
         settings = get_settings()
-        return settings.mongodb_enabled and bool(settings.mongodb_uri)
+        if not settings.mongodb_enabled:
+            return False
+        return bool(settings.mongodb_uri) or settings.environment in {"dev", "local"}
 
     async def connect(self) -> None:
         if not self.enabled:
             return
+        settings = get_settings()
+        if settings.mongodb_uri in {"memory", "mock", "inmemory"} or (
+            settings.environment in {"dev", "local"} and not settings.mongodb_uri
+        ):
+            if self._in_memory is None:
+                from teleconsult.kernel.mongodb.in_memory import InMemoryDatabase, seed_enterprise_defaults
+                self._in_memory = InMemoryDatabase()
+                await seed_enterprise_defaults(self._in_memory)
+            return
+
         import asyncio
         current_loop = asyncio.get_running_loop()
         if self._client is not None and self._loop is not None and self._loop is not current_loop:
@@ -43,7 +56,6 @@ class MongoDatabase:
         if self._client is not None:
             return
 
-        settings = get_settings()
         self._client = AsyncMongoClient(
             settings.mongodb_uri,
             serverSelectionTimeoutMS=settings.mongodb_server_selection_timeout_ms,
@@ -71,15 +83,27 @@ class MongoDatabase:
                 pass
             self._client = None
             self._loop = None
+        self._in_memory = None
 
     def database(self) -> AsyncDatabase[dict[str, Any]]:
+        if self._in_memory is not None:
+            return self._in_memory
         if self._client is None:
+            settings = get_settings()
+            if settings.mongodb_uri in {"memory", "mock", "inmemory"} or (
+                settings.environment in {"dev", "local"} and not settings.mongodb_uri
+            ):
+                from teleconsult.kernel.mongodb.in_memory import InMemoryDatabase
+                self._in_memory = InMemoryDatabase()
+                return self._in_memory
             raise RuntimeError("MongoDB is not connected")
         return self._client[get_settings().mongodb_database]
 
     async def ping(self) -> dict[str, Any]:
         if not self.enabled:
             return {"enabled": False, "status": "disabled"}
+        if self._in_memory is not None:
+            return {"enabled": True, "status": "ok", "ok": 1}
         if self._client is None:
             await self.connect()
         assert self._client is not None
@@ -89,6 +113,8 @@ class MongoDatabase:
     async def transaction_probe(self) -> dict[str, Any]:
         if not self.enabled:
             return {"enabled": False, "supported": False, "reason": "MongoDB is disabled"}
+        if self._in_memory is not None:
+            return {"enabled": True, "supported": True}
         if self._client is None:
             await self.connect()
         assert self._client is not None

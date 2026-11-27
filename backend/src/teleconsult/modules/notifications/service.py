@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
-from zoneinfo import ZoneInfo
+from teleconsult.kernel.timezone import get_ist_timezone
 
 from teleconsult.kernel.mongodb.client import mongo_database
 
@@ -11,7 +11,7 @@ def format_appointment_message(body: str, patient_display_name: str, starts_at) 
         start = starts_at if isinstance(starts_at, datetime) else datetime.fromisoformat(str(starts_at).replace("Z", "+00:00"))
         if start.tzinfo is None:
             start = start.replace(tzinfo=UTC)
-        local = start.astimezone(ZoneInfo("Asia/Kolkata"))
+        local = start.astimezone(get_ist_timezone())
         formatted = f"{local.day:02d} {local.strftime('%b %Y at %I:%M %p')} IST".replace(" at 0", " at ")
         return f"{patient_display_name} booked an appointment for {formatted}."
     except (TypeError, ValueError):
@@ -107,7 +107,7 @@ async def ensure_doctor_appointment_notification(*, tenant_id: str, doctor_id: s
         start = raw_start if isinstance(raw_start, datetime) else datetime.fromisoformat(str(raw_start).replace("Z", "+00:00"))
         if start.tzinfo is None:
             start = start.replace(tzinfo=UTC)
-        appointment_time = start.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p IST")
+        appointment_time = start.astimezone(get_ist_timezone()).strftime("%d %b %Y, %I:%M %p IST")
     except (TypeError, ValueError):
         appointment_time = "the scheduled time (IST)"
     await database["notifications"].update_one(

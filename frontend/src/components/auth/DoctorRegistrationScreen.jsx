@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { doctorApi } from "../../lib/api";
 
 function ClinicianHeader({ onBack, isModal = false, onClose }) {
@@ -115,17 +116,32 @@ export default function DoctorRegistrationScreen({
 
   useEffect(() => {
     if (!inModal) return;
+
+    // Save and lock body/html scroll
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    // Stop Lenis smooth scroll on the background page
+    if (typeof window !== "undefined" && window.__lenis) {
+      window.__lenis.stop();
+    }
+
     const handleKeyDown = (e) => {
       if (e.key === "Escape" && onClose) {
         onClose();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      if (typeof window !== "undefined" && window.__lenis) {
+        window.__lenis.start();
+      }
     };
   }, [inModal, onClose]);
 
@@ -143,6 +159,7 @@ export default function DoctorRegistrationScreen({
     specialty: "",
     registration_number: "",
     medical_council: "",
+    hpr_id: "",
     qualifications: "",
     experience_years: "",
     languages: "",
@@ -168,6 +185,7 @@ export default function DoctorRegistrationScreen({
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showAdditionalDocs, setShowAdditionalDocs] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -176,6 +194,50 @@ export default function DoctorRegistrationScreen({
   const [submittedData, setSubmittedData] = useState(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [licenseCheck, setLicenseCheck] = useState({
+    checking: false,
+    verified: false,
+    result: null,
+    error: null,
+  });
+
+  const handleVerifyLicense = async () => {
+    if (!form.registration_number?.trim() || !form.medical_council?.trim()) {
+      setLicenseCheck((prev) => ({
+        ...prev,
+        error: "Please enter your Registration Number and Medical Council to verify.",
+      }));
+      return;
+    }
+    setLicenseCheck({ checking: true, verified: false, result: null, error: null });
+    try {
+      const res = await doctorApi.verifyLicensePrecheck({
+        registration_number: form.registration_number.trim(),
+        medical_council: form.medical_council.trim(),
+        hpr_id: form.hpr_id?.trim() || null,
+        full_name: form.full_name?.trim() || "Doctor",
+        state_of_practice: form.state,
+        specialty: form.specialty,
+        hpr_id: form.hpr_id?.trim() || null,
+      });
+      setLicenseCheck({
+        checking: false,
+        verified: res.is_valid,
+        result: res,
+        error: res.is_valid ? null : res.remarks,
+      });
+      if (res.is_valid && res.qualifications?.length && !form.qualifications) {
+        setForm((prev) => ({ ...prev, qualifications: res.qualifications.join(", ") }));
+      }
+    } catch (err) {
+      setLicenseCheck({
+        checking: false,
+        verified: false,
+        result: null,
+        error: err.message || "License pre-check failed. Our compliance team will review your certificate manually.",
+      });
+    }
+  };
 
   const validateField = (name, value, allValues = form) => {
     switch (name) {
@@ -448,6 +510,7 @@ export default function DoctorRegistrationScreen({
         specialty: form.specialty.trim(),
         registration_number: form.registration_number.trim(),
         medical_council: form.medical_council.trim(),
+        hpr_id: form.hpr_id?.trim() || null,
         qualifications: form.qualifications
           .split(",")
           .map((item) => item.trim())
@@ -504,9 +567,10 @@ export default function DoctorRegistrationScreen({
 
   const content = (
     <div
+      data-lenis-prevent="true"
       className={`font-sans flex flex-col text-[#162623] bg-[#F0F5F7] ${
         inModal
-          ? "relative w-full max-w-2xl max-h-[96vh] rounded-[24px] shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
+          ? "w-full max-h-[90vh] rounded-[24px] shadow-2xl overflow-hidden border border-[#577877]/20 flex flex-col"
           : "min-h-screen lg:h-screen lg:max-h-screen lg:overflow-hidden"
       }`}
     >
@@ -514,17 +578,28 @@ export default function DoctorRegistrationScreen({
       <ClinicianHeader onBack={onBack} isModal={inModal} onClose={onClose} />
 
       <main
-        className={`flex-1 flex flex-col justify-between p-6 sm:p-8 w-full mx-auto overflow-y-auto ${
-          inModal ? "max-h-[calc(96vh-72px)]" : "max-w-4xl lg:overflow-hidden"
+        data-lenis-prevent="true"
+        className={`flex-1 flex flex-col justify-between p-6 sm:p-8 w-full mx-auto overflow-y-auto overscroll-contain ${
+          inModal ? "max-h-[calc(90vh-64px)]" : "max-w-4xl lg:overflow-hidden"
         }`}
       >
-        {/* Title */}
-        <div className="w-full pb-3 border-b border-[#577877]/10 flex flex-col gap-1 shrink-0">
-          <div>
+        {/* Title & Step Indicator */}
+        <div className="w-full pb-3 border-b border-[#577877]/10 flex flex-col gap-2 shrink-0">
+          <div className="flex items-center justify-between">
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#162623] leading-none">
               Doctor Registration
             </h2>
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#577877]">
+              <span className={currentStep === 1 ? "text-[#25836F] font-bold" : ""}>1. Personal</span>
+              <span>·</span>
+              <span className={currentStep === 2 ? "text-[#25836F] font-bold" : ""}>2. Credentials</span>
+              <span>·</span>
+              <span className={currentStep === 3 ? "text-[#25836F] font-bold" : ""}>3. Verification</span>
+            </div>
           </div>
+          <p className="text-xs font-semibold text-[#577877]">
+            Step {currentStep} of 3: {currentStep === 1 ? "Personal Information" : currentStep === 2 ? "Medical Credentials" : "Verification Documents"}
+          </p>
         </div>
 
         {state === "success" && submittedData ? (
@@ -857,6 +932,115 @@ export default function DoctorRegistrationScreen({
                     )}
                   </div>
 
+                  {/* Real-Time NMC / SMC License Pre-Check Trigger & Badge */}
+                  <div className="rounded-xl border border-[#25836F]/20 bg-[#F0F5F7]/60 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#162623]">
+                        <span className="material-symbols-outlined text-sm text-[#25836F]">verified_user</span>
+                        <span>Official Medical Council Verification</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleVerifyLicense}
+                        disabled={licenseCheck.checking || !form.registration_number.trim() || !form.medical_council.trim()}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-white bg-[#25836F] hover:bg-[#1f6d5c] disabled:opacity-50 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                      >
+                        {licenseCheck.checking ? (
+                          <>
+                            <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                            <span>Verifying…</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-xs">search_check</span>
+                            <span>Verify with NMC / SMC</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {licenseCheck.verified && licenseCheck.result && (
+                      <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5 text-xs text-emerald-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                          <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
+                          <span>{licenseCheck.result.status_label}</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-700 leading-relaxed">
+                          {licenseCheck.result.remarks}
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1 text-[10px] text-emerald-800 font-medium">
+                          <span className="bg-emerald-100 px-1.5 py-0.5 rounded">Source: {licenseCheck.result.verification_source}</span>
+                          <span className="bg-emerald-100 px-1.5 py-0.5 rounded">Match: {Math.round(licenseCheck.result.confidence_score * 100)}%</span>
+                          <span className="bg-emerald-100 px-1.5 py-0.5 rounded">Receipt: {licenseCheck.result.verification_receipt_id}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {licenseCheck.result && !licenseCheck.verified && licenseCheck.result.status === "REGISTRY_NOT_FOUND" && (
+                      <div className="rounded-lg bg-amber-50 border border-amber-300 p-2.5 text-xs text-amber-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                          <span className="material-symbols-outlined text-sm text-amber-600">warning</span>
+                          <span>{licenseCheck.result.status_label}</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          {licenseCheck.result.remarks}
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1 text-[10px] font-medium">
+                          <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">Status: Unverified</span>
+                          <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">Action: Certificate Upload Required</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {licenseCheck.result && !licenseCheck.verified && licenseCheck.result.status === "NAME_MISMATCH" && (
+                      <div className="rounded-lg bg-red-50 border border-red-300 p-2.5 text-xs text-red-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-red-900">
+                          <span className="material-symbols-outlined text-sm text-red-600">gavel</span>
+                          <span>{licenseCheck.result.status_label}</span>
+                        </div>
+                        <p className="text-[11px] text-red-800 leading-relaxed">
+                          {licenseCheck.result.remarks}
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1 text-[10px] font-medium">
+                          <span className="bg-red-100 text-red-900 px-1.5 py-0.5 rounded border border-red-300">Fraud Alert: Identity Mismatch</span>
+                          <span className="bg-red-100 text-red-900 px-1.5 py-0.5 rounded border border-red-300">Status: Rejected</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {licenseCheck.error && !licenseCheck.result && (
+                      <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900 flex items-start gap-1.5">
+                        <span className="material-symbols-outlined text-sm text-amber-600 shrink-0 mt-0.5">warning</span>
+                        <p className="text-[11px] text-amber-800">{licenseCheck.error}</p>
+                      </div>
+                    )}
+
+                    {/* Ayushman Bharat HP-ID (Optional) */}
+                    <div className="pt-1 border-t border-[#577877]/10">
+                      <label className="flex items-center justify-between text-[11px] font-medium text-[#577877] mb-1">
+                        <span>Ayushman Bharat HP-ID (Optional ABDM Health ID)</span>
+                        <span className="text-[10px] text-[#25836F]">e.g. 14-digit or alias@hpr</span>
+                      </label>
+                      <input
+                        name="hpr_id"
+                        type="text"
+                        value={form.hpr_id || ""}
+                        onChange={update}
+                        placeholder="e.g. 12-3456-7890-1234 or dr.name@hpr"
+                        className={`w-full h-9 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/40 focus:outline-none transition ${
+                          form.hpr_id && !(/^(\d{2}-\d{4}-\d{4}-\d{4}|\d{14}|[a-zA-Z0-9._-]+@(hpr|abdm|hpr\.abdm))$/i.test(form.hpr_id.trim()))
+                            ? "border-red-400 focus:border-red-500"
+                            : "border-[#577877]/20 focus:border-[#25836F]"
+                        }`}
+                      />
+                      {form.hpr_id && !(/^(\d{2}-\d{4}-\d{4}-\d{4}|\d{14}|[a-zA-Z0-9._-]+@(hpr|abdm|hpr\.abdm))$/i.test(form.hpr_id.trim())) && (
+                        <p className="text-[10px] text-red-600 mt-1">
+                          ⚠️ Invalid ABDM HP-ID format. Must be 14 digits (e.g. 12-3456-7890-1234) or valid @hpr handle.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Qualifications */}
                   <div className="space-y-1">
                     <label className="flex items-center justify-between text-xs font-semibold text-[#162623]">
@@ -1084,18 +1268,28 @@ export default function DoctorRegistrationScreen({
                       <div className="relative">
                         <input
                           name="confirm_password"
-                          type={showPassword ? "text" : "password"}
+                          type={showConfirmPassword ? "text" : "password"}
                           autoComplete="new-password"
                           value={form.confirm_password}
                           onChange={update}
                           onBlur={handleBlur}
                           placeholder="Re-enter password"
-                          className={`w-full h-11 px-4 rounded-xl border bg-white text-sm text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                          className={`w-full h-11 pl-4 pr-10 rounded-xl border bg-white text-sm text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                             touched.confirm_password && errors.confirm_password
                               ? "border-red-500 focus:border-red-500"
                               : "border-[#577877]/25 focus:border-[#25836F]"
                           }`}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-base">
+                            {showConfirmPassword ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
                       </div>
                       {touched.confirm_password && errors.confirm_password && (
                         <p className="text-xs text-red-600 font-medium leading-none mt-1 truncate">{errors.confirm_password}</p>
@@ -1107,7 +1301,7 @@ export default function DoctorRegistrationScreen({
                       <label className="flex items-center justify-between text-xs font-semibold text-[#162623]">
                         <span>Declarations &amp; Privacy <span className="text-red-600">*</span></span>
                       </label>
-                      <div className="h-11 flex flex-col justify-center space-y-1.5 px-1">
+                      <div className="min-h-11 flex flex-col justify-center space-y-2 px-1 py-1">
                         <label className="flex items-center gap-2 text-[#162623] cursor-pointer leading-tight">
                           <input
                             type="checkbox"
@@ -1349,7 +1543,7 @@ export default function DoctorRegistrationScreen({
 
       {/* Terms of Service Modal */}
       {showTermsModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-[24px] bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
@@ -1390,7 +1584,7 @@ export default function DoctorRegistrationScreen({
 
       {/* Privacy Policy Modal */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-[24px] bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
@@ -1432,16 +1626,29 @@ export default function DoctorRegistrationScreen({
   );
 
   if (inModal) {
-    return (
+    const modalMarkup = (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200"
+        data-lenis-prevent="true"
+        data-lenis-prevent-wheel="true"
+        data-lenis-prevent-touch="true"
+        className="fixed inset-0 z-[9999] overflow-y-auto bg-[#162623]/80 backdrop-blur-sm flex min-h-screen items-center justify-center p-3 sm:p-4 md:p-6 animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget && onClose) onClose();
         }}
       >
-        {content}
+        <div
+          data-lenis-prevent="true"
+          className="relative w-full max-w-2xl my-auto animate-in zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {content}
+        </div>
       </div>
     );
+
+    return typeof document !== "undefined"
+      ? createPortal(modalMarkup, document.body)
+      : modalMarkup;
   }
 
   return content;

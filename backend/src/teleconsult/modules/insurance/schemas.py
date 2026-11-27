@@ -866,6 +866,30 @@ class ReimbursementEvidenceUploadResponse(BaseModel):
     created_at: str
 
 
+class PreflightClaimValidationRequest(BaseModel):
+    appointment_id: str
+    policy_id: str | None = None
+
+
+class PreflightCheckItem(BaseModel):
+    key: str
+    title: str
+    passed: bool
+    severity: Literal["error", "warning", "info"] = "error"
+    message: str
+    action_hint: str | None = None
+
+
+class PreflightClaimValidationResponse(BaseModel):
+    appointment_id: str
+    policy_id: str | None = None
+    readiness_score: int  # 0 - 100%
+    is_submission_ready: bool
+    checks: list[PreflightCheckItem] = Field(default_factory=list)
+    summary_message: str
+
+
+
 
 
 

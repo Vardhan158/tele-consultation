@@ -83,7 +83,7 @@ class MockRequest:
 
 
 @pytest.mark.asyncio
-async def test_clinic_overview_net_revenue_and_booking_count():
+async def test_clinic_overview_net_revenue_and_booking_count(monkeypatch):
     tenant_id = get_settings().default_tenant_id
     admin_user_id = "admin_user_1"
 
@@ -117,30 +117,24 @@ async def test_clinic_overview_net_revenue_and_booking_count():
     import teleconsult.kernel.mongodb.client as mongo_client
     import teleconsult.modules.admin.routes as admin_routes_mod
 
-    original_database = mongo_client.mongo_database.database
+    monkeypatch.setattr(mongo_client.mongo_database, "database", lambda: db)
 
-    try:
-        mongo_client.mongo_database.database = lambda: db
+    async def mock_verify_admin(request):
+        return Principal(
+            user_id=admin_user_id,
+            tenant_id=tenant_id,
+            roles=frozenset({"clinic_admin"}),
+            permissions=frozenset({"clinic:admin"}),
+        )
 
-        async def mock_verify_admin(request):
-            return Principal(
-                user_id=admin_user_id,
-                tenant_id=tenant_id,
-                roles=frozenset({"clinic_admin"}),
-                permissions=frozenset({"clinic:admin"}),
-            )
+    monkeypatch.setattr(admin_routes_mod, "_verify_admin", mock_verify_admin)
 
-        admin_routes_mod._verify_admin = mock_verify_admin
+    req = MockRequest()
+    res = await get_overview(request=req, session=None)
 
-        req = MockRequest()
-        res = await get_overview(request=req, session=None)
-
-        kpis = res["kpis"]
-        # Net revenue = ₹4,000 captured - ₹400 refunded = ₹3,600.00
-        assert kpis["total_revenue"] == 3600.0
-        # Total appointments = 1
-        assert kpis["total_appointments"] == 1
-        assert kpis["active_doctors"] == 1
-
-    finally:
-        mongo_client.mongo_database.database = original_database
+    kpis = res["kpis"]
+    # Net revenue = ₹4,000 captured - ₹400 refunded = ₹3,600.00
+    assert kpis["total_revenue"] == 3600.0
+    # Total appointments = 1
+    assert kpis["total_appointments"] == 1
+    assert kpis["active_doctors"] == 1

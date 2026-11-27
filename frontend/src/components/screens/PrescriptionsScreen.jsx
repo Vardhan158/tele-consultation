@@ -64,7 +64,7 @@ export default function PrescriptionsScreen({
               rx.status === "completed" ||
               rx.status === "expired" ||
               rx.status === "inactive";
-            let content = {};
+            let content;
             try {
               content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
             } catch {

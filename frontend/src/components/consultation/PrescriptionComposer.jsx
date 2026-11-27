@@ -71,6 +71,11 @@ export default function PrescriptionComposer({
   const [publishedPrescription, setPublishedPrescription] = useState(null);
   const [downloading, setDownloading] = useState(false);
 
+  // Phase 2 (F-05): Drug-Drug Interaction & Dosage Safety Copilot State
+  const [safetyReport, setSafetyReport] = useState(null);
+  const [checkingSafety, setCheckingSafety] = useState(false);
+  const [clinicalOverride, setClinicalOverride] = useState(false);
+
   // Check if any medication contains a Schedule X prohibited substance
   const findProhibitedSubstance = () => {
     for (const med of medicines) {
@@ -87,6 +92,34 @@ export default function PrescriptionComposer({
 
   const prohibitedSubstance = findProhibitedSubstance();
 
+  const runSafetyAudit = async (customMeds) => {
+    const medsToCheck = customMeds || medicines;
+    const validMeds = medsToCheck.filter((m) => m.name && m.name.trim().length > 0);
+    if (validMeds.length === 0) {
+      setSafetyReport(null);
+      return;
+    }
+    setCheckingSafety(true);
+    try {
+      const res = await doctorApi.checkDrugSafety({
+        appointment_id: String(appointmentId || ""),
+        medications: validMeds.map((m) => ({
+          name: m.name,
+          dosage: m.dosage || "1 tablet",
+          frequency: m.frequency || "1-0-1",
+          duration: m.duration || "5 days",
+          instructions: m.instructions || "",
+        })),
+      });
+      setSafetyReport(res);
+    } catch (err) {
+      // Non-blocking for offline or dev fallback
+      console.warn("Drug safety copilot audit unavailable:", err);
+    } finally {
+      setCheckingSafety(false);
+    }
+  };
+
   const handleMedicineChange = (index, field, value) => {
     setMedicines((prev) => {
       const next = [...prev];
@@ -102,7 +135,13 @@ export default function PrescriptionComposer({
 
   const removeMedicine = (index) => {
     if (medicines.length <= 1) return;
-    setMedicines((prev) => prev.filter((_, i) => i !== index));
+    const updated = medicines.filter((_, i) => i !== index);
+    setMedicines(updated);
+    if (updated.some((m) => m.name.trim())) {
+      runSafetyAudit(updated);
+    } else {
+      setSafetyReport(null);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -119,6 +158,17 @@ export default function PrescriptionComposer({
     if (prohibitedSubstance) {
       setError(
         `Statutory Safety Alert: '${prohibitedSubstance}' is a Schedule X / NDPS prohibited substance and cannot be prescribed via teleconsultation under Indian Telemedicine Practice Guidelines (2020).`,
+      );
+      return;
+    }
+
+    if (
+      safetyReport &&
+      safetyReport.overall_risk_level === "contraindicated" &&
+      !clinicalOverride
+    ) {
+      setError(
+        "Clinical Alert: A contraindicated drug interaction or severe allergy conflict was detected. You must modify the medication order or check the clinical exception override before release.",
       );
       return;
     }
@@ -407,6 +457,119 @@ export default function PrescriptionComposer({
             </div>
           </div>
 
+          {/* Phase 2 (F-05): Drug-Drug Interaction & Dosage Safety Copilot */}
+          <div className="rounded-xl border border-[#25836F]/20 bg-[#FAFDFD] p-4 sm:p-5 space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[#25836F]/10 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#25836F] text-lg">
+                  verified_user
+                </span>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-[#162623] flex items-center gap-2">
+                    <span>Drug-Drug Interaction &amp; Safety Copilot</span>
+                    {safetyReport && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          safetyReport.overall_risk_level === "contraindicated"
+                            ? "bg-rose-100 text-rose-800"
+                            : safetyReport.overall_risk_level === "major"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {safetyReport.overall_risk_level === "contraindicated"
+                          ? "Contraindication Alert"
+                          : safetyReport.overall_risk_level === "major"
+                          ? "Major Warning"
+                          : "Safety Check Passed"}
+                      </span>
+                    )}
+                  </h4>
+                  <p className="text-[11px] text-[#577877]">
+                    Cross-references Schedule X, patient allergy records, and concurrent active prescriptions
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => runSafetyAudit()}
+                disabled={checkingSafety || medicines.every((m) => !m.name.trim())}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#25836F]/30 bg-white hover:bg-[#F0F5F7] text-xs font-semibold text-[#25836F] shadow-2xs transition cursor-pointer disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-sm ${checkingSafety ? "animate-spin" : ""}`}>
+                  {checkingSafety ? "sync" : "security"}
+                </span>
+                <span>{checkingSafety ? "Auditing…" : "Audit Drug Safety"}</span>
+              </button>
+            </div>
+
+            {/* Safety Copilot Results */}
+            {safetyReport ? (
+              <div className="space-y-3 pt-1">
+                {safetyReport.alerts.length === 0 ? (
+                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                    <span className="material-symbols-outlined text-base">check_circle</span>
+                    <span>
+                      <strong>All clear:</strong> No adverse drug-drug interactions or allergen contraindications detected for the entered medications.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {safetyReport.alerts.map((alert, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border text-xs space-y-1 ${
+                          alert.severity === "contraindicated"
+                            ? "bg-rose-50 border-rose-300 text-rose-900"
+                            : alert.severity === "major"
+                            ? "bg-amber-50 border-amber-300 text-amber-900"
+                            : "bg-sky-50 border-sky-300 text-sky-900"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">
+                              {alert.severity === "contraindicated" ? "block" : "warning"}
+                            </span>
+                            {alert.interacting_drugs.join(" ↔ ")} ({alert.category})
+                          </span>
+                          <span className="uppercase text-[10px] px-2 py-0.5 rounded font-black bg-white/70">
+                            {alert.severity}
+                          </span>
+                        </div>
+                        <p className="leading-relaxed opacity-90">{alert.mechanism}</p>
+                        <p className="font-semibold pt-0.5">
+                          Recommendation: <span className="font-normal">{alert.recommendation}</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Clinical Exception Override for doctors if warnings present */}
+                {safetyReport.alerts.some((a) => a.severity === "contraindicated" || a.severity === "major") && (
+                  <label className="flex items-start gap-2 pt-1 text-xs text-[#162623] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={clinicalOverride}
+                      onChange={(e) => setClinicalOverride(e.target.checked)}
+                      className="mt-0.5 rounded text-[#25836F] focus:ring-[#25836F]"
+                    />
+                    <span className="leading-tight">
+                      <strong>Clinical Override Acknowledgement:</strong> I have evaluated the clinical risks and drug interaction alerts. I authorize this prescription order under strict clinical supervision.
+                    </span>
+                  </label>
+                )}
+              </div>
+            ) : (
+              <div className="text-[11px] text-[#577877] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-[#25836F]">info</span>
+                <span>Click &lsquo;Audit Drug Safety&rsquo; or enter medication details to perform an automated cross-allergy and drug interaction screening.</span>
+              </div>
+            )}
+          </div>
+
           {/* General Advice & Care Instructions */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-[#162623]">
@@ -428,7 +591,11 @@ export default function PrescriptionComposer({
             </div>
             <button
               type="submit"
-              disabled={submitting || Boolean(prohibitedSubstance)}
+              disabled={
+                submitting ||
+                Boolean(prohibitedSubstance) ||
+                (safetyReport?.overall_risk_level === "contraindicated" && !clinicalOverride)
+              }
               className="inline-flex items-center gap-2 rounded-xl bg-[#25836F] px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-[#1d6e5d] transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-sm">

@@ -70,6 +70,28 @@ export async function apiRequest(path, options = {}) {
 export const patientApi = {
   bookingOptions: () => apiRequest("/api/v1/patient/booking-options"),
   profile: () => apiRequest("/patient/profile"),
+  getProfile: () => apiRequest("/patient/profile"),
+  downloadPrescription: async (id) => {
+    const response = await fetch(
+      `${API_BASE_URL}/patient/clinical-outputs/prescriptions/${id}/download`,
+      { credentials: "include" },
+    );
+    if (!response.ok) throw new Error("Unable to download this prescription.");
+    return response.blob();
+  },
+  getEmergencyCard: () => apiRequest("/patient/emergency-card"),
+  getHealthTimeline: () => apiRequest("/patient/health-timeline"),
+  getGranularConsents: () => apiRequest("/patient/consents/granular-ledger"),
+  createGranularConsent: (payload) =>
+    apiRequest("/patient/consents/granular-ledger", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  revokeGranularConsent: (id, payload) =>
+    apiRequest(`/patient/consents/granular-ledger/${id}/revoke`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   updateProfile: (profile) =>
     apiRequest("/patient/profile", {
       method: "PATCH",
@@ -165,9 +187,31 @@ export const patientApi = {
   getUrgentCareStatus: () => apiRequest("/patient/urgent-care/status"),
   cancelUrgentCare: (ticketId) =>
     apiRequest(`/patient/urgent-care/${ticketId}/cancel`, { method: "POST" }),
+  // Phase 4 (F-10): 3D Pain & Symptom Visualizer
+  getPainMap: (appointmentId) =>
+    apiRequest(`/patient/appointments/${appointmentId}/pain-map`),
+  savePainMap: (appointmentId, payload) =>
+    apiRequest(`/patient/appointments/${appointmentId}/pain-map`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // Phase 4 (F-11): Collaborative In-Call Teleconsent
+  getActiveTeleconsent: (appointmentId) =>
+    apiRequest(`/patient/consultations/${appointmentId}/teleconsent/active`),
+  signTeleconsent: (appointmentId, payload) =>
+    apiRequest(`/patient/consultations/${appointmentId}/teleconsent/sign`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const doctorApi = {
+  verifyLicensePrecheck: (payload) =>
+    apiRequest("/doctor/verify-license-precheck", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  medicalCouncils: () => apiRequest("/doctor/medical-councils"),
   register: (payload) => {
     const hasFile = Object.values(payload || {}).some((v) => v instanceof File);
     if (hasFile) {
@@ -262,6 +306,11 @@ export const doctorApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  checkDrugSafety: (payload) =>
+    apiRequest("/clinician/clinical-outputs/check-drug-safety", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   getFollowUpThread: (appointmentId) =>
     apiRequest(`/doctor/appointments/${appointmentId}/follow-up`),
   sendFollowUpMessage: (appointmentId, message) =>
@@ -277,6 +326,36 @@ export const doctorApi = {
   getUrgentCareQueue: () => apiRequest("/doctor/urgent-care/queue"),
   claimUrgentCareTicket: (ticketId) =>
     apiRequest(`/doctor/urgent-care/${ticketId}/claim`, { method: "POST" }),
+  getPerformanceTier: () => apiRequest("/doctor/payouts/performance-tier"),
+  inviteBoardSpecialist: (appointmentId, payload) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/invite-specialist`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getBoardMembers: (appointmentId) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/board-members`),
+  addBoardNote: (appointmentId, payload) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/board-notes`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getBoardNotes: (appointmentId) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/board-notes`),
+  // Phase 4 (F-10 & F-11): 3D Pain Map & Teleconsent
+  getPainMap: (appointmentId) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/pain-map`),
+  annotatePainMap: (appointmentId, payload) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/pain-map`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  requestTeleconsent: (appointmentId, payload) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/teleconsent/request`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getTeleconsentStatus: (appointmentId) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/teleconsent/status`),
 };
 
 export const authApi = {
@@ -470,6 +549,11 @@ export const clinicalApi = {
   pharmacyOrders: () => apiRequest("/patient/clinical-outputs/pharmacy-orders"),
   verifySignature: (prescriptionId) =>
     apiRequest(`/patient/clinical-outputs/prescriptions/${prescriptionId}/verify-signature`),
+  checkDrugSafety: (payload) =>
+    apiRequest("/clinician/clinical-outputs/check-drug-safety", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const abdmApi = {
@@ -536,6 +620,10 @@ export const adminApi = {
     apiRequest(`/doctor/${id}/reject`, {
       method: "POST",
       body: JSON.stringify({ reason }),
+    }),
+  reverifyDoctorLicense: (id) =>
+    apiRequest(`/admin/doctors/${id}/reverify-license`, {
+      method: "POST",
     }),
   downloadDoctorCredential: async (id, inline = false) => {
     const response = await fetch(
@@ -642,6 +730,18 @@ export const adminApi = {
     const qs = new URLSearchParams(params).toString();
     return apiRequest(`/admin/audit-logs${qs ? `?${qs}` : ""}`);
   },
+  getSlaMonitor: () => apiRequest("/admin/sla/monitor"),
+  reassignSlaTicket: (payload) =>
+    apiRequest("/admin/sla/reassign-ticket", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  nudgeSlaDoctor: (payload) =>
+    apiRequest("/admin/sla/nudge-doctor", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getDoctorTiers: () => apiRequest("/admin/payouts/doctor-tiers"),
 };
 
 export const supportStaffApi = {
@@ -742,6 +842,11 @@ export const insuranceApi = {
     };
   },
   // Post-Consultation Insurance Claim (Checkpoint 4 & 5)
+  preflightValidateClaim: (payload) =>
+    apiRequest("/patient/insurance/claims/preflight-validate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   checkClaimEligibility: (appointmentId) =>
     apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-eligibility`),
   initiateClaim: (appointmentId, payload) =>

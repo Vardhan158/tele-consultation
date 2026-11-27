@@ -38,7 +38,7 @@ async def secops_user(request: Request) -> MongoPrincipal:
     })
 
     user = await db["users"].find_one({"tenant_id": settings.default_tenant_id, "id": session["user_id"]}) if session else None
-    if not user or user.get("role") not in {"security_ops", "clinic_admin", "admin", "support"}:
+    if not user or user.get("role") not in {"security_ops", "secops", "clinic_admin", "admin", "support"}:
         raise HTTPException(403, "Security & Operations Dashboard access required")
 
     return MongoPrincipal(user_id=user["id"], tenant_id=user["tenant_id"], role=user["role"], clinic_id=user.get("clinic_id"))

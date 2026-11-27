@@ -889,7 +889,7 @@ export default function FindDoctorsScreen({
           {/* ========================================================= */}
           {/* RIGHT MAIN CONTENT SECTION                                */}
           {/* ========================================================= */}
-          <main className="lg:col-span-8 xl:col-span-9 space-y-5">
+          <section aria-label="Available Doctors Listing" className="lg:col-span-8 xl:col-span-9 space-y-5">
             {/* Results Count & Active Filter Pills Bar */}
             <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:px-5 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="text-zinc-500">
@@ -1134,7 +1134,7 @@ export default function FindDoctorsScreen({
         )}
       </>
     )}
-          </main>
+          </section>
         </div>
 
       {/* Detailed Doctor Profile Modal */}

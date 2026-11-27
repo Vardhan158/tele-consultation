@@ -61,7 +61,7 @@ class MockRequest:
 
 
 @pytest.mark.asyncio
-async def test_razorpay_refund_verification_and_duplicate_prevention():
+async def test_razorpay_refund_verification_and_duplicate_prevention(monkeypatch):
     tenant_id = get_settings().default_tenant_id
     admin_user_id = "admin_user_1"
     payment_id = "pay_captured_400"
@@ -92,38 +92,32 @@ async def test_razorpay_refund_verification_and_duplicate_prevention():
     import teleconsult.kernel.mongodb.client as mongo_client
     import teleconsult.modules.admin.routes as admin_routes_mod
 
-    original_database = mongo_client.mongo_database.database
+    monkeypatch.setattr(mongo_client.mongo_database, "database", lambda: db)
 
-    try:
-        mongo_client.mongo_database.database = lambda: db
+    async def mock_verify_admin(request):
+        return Principal(
+            user_id=admin_user_id,
+            tenant_id=tenant_id,
+            roles=frozenset({"clinic_admin"}),
+            permissions=frozenset({"clinic:admin"}),
+        )
 
-        async def mock_verify_admin(request):
-            return Principal(
-                user_id=admin_user_id,
-                tenant_id=tenant_id,
-                roles=frozenset({"clinic_admin"}),
-                permissions=frozenset({"clinic:admin"}),
-            )
+    monkeypatch.setattr(admin_routes_mod, "_verify_admin", mock_verify_admin)
 
-        admin_routes_mod._verify_admin = mock_verify_admin
+    req = MockRequest()
+    payload = RefundPayload(reason="Customer goodwill refund")
 
-        req = MockRequest()
-        payload = RefundPayload(reason="Customer goodwill refund")
+    # 1. Process refund first time (Success)
+    res = await refund_payment_admin(payment_id=payment_id, payload=payload, request=req, session=None)
 
-        # 1. Process refund first time (Success)
-        res = await refund_payment_admin(payment_id=payment_id, payload=payload, request=req, session=None)
+    assert res["status"] == "refunded"
+    assert res["amount_paise"] == 40000
+    assert res["formatted_amount"] == "₹400.00"
+    assert res["razorpay_refund_id"].startswith("rfnd_")
 
-        assert res["status"] == "refunded"
-        assert res["amount_paise"] == 40000
-        assert res["formatted_amount"] == "₹400.00"
-        assert res["razorpay_refund_id"].startswith("rfnd_")
+    # 2. Process refund second time (Duplicate refund prevention raises 409 Conflict)
+    with pytest.raises(HTTPException) as exc_info:
+        await refund_payment_admin(payment_id=payment_id, payload=payload, request=req, session=None)
 
-        # 2. Process refund second time (Duplicate refund prevention raises 409 Conflict)
-        with pytest.raises(HTTPException) as exc_info:
-            await refund_payment_admin(payment_id=payment_id, payload=payload, request=req, session=None)
-
-        assert exc_info.value.status_code == 409
-        assert "already been refunded" in exc_info.value.detail
-
-    finally:
-        mongo_client.mongo_database.database = original_database
+    assert exc_info.value.status_code == 409
+    assert "already been refunded" in exc_info.value.detail

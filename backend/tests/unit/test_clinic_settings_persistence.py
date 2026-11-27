@@ -47,7 +47,7 @@ class MockRequest:
 
 
 @pytest.mark.asyncio
-async def test_clinic_settings_cancellation_deadline_persistence():
+async def test_clinic_settings_cancellation_deadline_persistence(monkeypatch):
     tenant_id = get_settings().default_tenant_id
     admin_id = "admin-user"
 
@@ -69,65 +69,59 @@ async def test_clinic_settings_cancellation_deadline_persistence():
     import teleconsult.kernel.mongodb.client as mongo_client
     import teleconsult.modules.admin.routes as admin_routes_mod
 
-    original_database = mongo_client.mongo_database.database
+    monkeypatch.setattr(mongo_client.mongo_database, "database", lambda: db)
 
-    try:
-        mongo_client.mongo_database.database = lambda: db
-
-        async def mock_verify_admin(request):
-            return Principal(
-                user_id=admin_id,
-                tenant_id=tenant_id,
-                roles=frozenset({"clinic_admin"}),
-                permissions=frozenset({"clinic:admin"}),
-            )
-
-        admin_routes_mod._verify_admin = mock_verify_admin
-        req = MockRequest()
-
-        # 1. Fetch initial settings (24 hours)
-        initial = await get_clinic_settings(request=req)
-        assert initial["cancellation_deadline_hours"] == 24
-        assert initial["clinic_name"] == "Kaizen Care Telehealth Center"
-        assert "Bengaluru" in initial["address"]
-
-        # 2. Update Cancellation Deadline from 24 to 12 hours
-        payload_12 = ClinicSettingsPayload(
-            clinic_name="Kaizen Care Telehealth Center",
-            address="Kaizen Care Health Tower, MG Road, Bengaluru, Karnataka 560001, India",
-            contact_email="support@kaizencare.in",
-            contact_phone="+91 80 4567 8900",
-            timezone="Asia/Kolkata",
-            cancellation_deadline_hours=12,
-            intake_policy="clinic_configured",
-            prescriptions_enabled=True,
-            operating_hours="Mon - Sat: 08:00 AM - 08:00 PM IST",
-            authorized_administrators=["admin@kaizencare.in"],
+    async def mock_verify_admin(request):
+        return Principal(
+            user_id=admin_id,
+            tenant_id=tenant_id,
+            roles=frozenset({"clinic_admin"}),
+            permissions=frozenset({"clinic:admin"}),
         )
-        await update_clinic_settings(payload=payload_12, request=req)
 
-        # 3. Query settings again (Verify value remains 12)
-        updated = await get_clinic_settings(request=req)
-        assert updated["cancellation_deadline_hours"] == 12
+    monkeypatch.setattr(admin_routes_mod, "_verify_admin", mock_verify_admin)
+    req = MockRequest()
 
-        # 4. Restore Cancellation Deadline back to 24 hours
-        payload_24 = ClinicSettingsPayload(
-            clinic_name="Kaizen Care Telehealth Center",
-            address="Kaizen Care Health Tower, MG Road, Bengaluru, Karnataka 560001, India",
-            contact_email="support@kaizencare.in",
-            contact_phone="+91 80 4567 8900",
-            timezone="Asia/Kolkata",
-            cancellation_deadline_hours=24,
-            intake_policy="clinic_configured",
-            prescriptions_enabled=True,
-            operating_hours="Mon - Sat: 08:00 AM - 08:00 PM IST",
-            authorized_administrators=["admin@kaizencare.in"],
-        )
-        await update_clinic_settings(payload=payload_24, request=req)
+    # 1. Fetch initial settings (24 hours)
+    initial = await get_clinic_settings(request=req)
+    assert initial["cancellation_deadline_hours"] == 24
+    assert initial["clinic_name"] == "Kaizen Care Telehealth Center"
+    assert "Bengaluru" in initial["address"]
 
-        # 5. Final query (Verify value restored to 24)
-        restored = await get_clinic_settings(request=req)
-        assert restored["cancellation_deadline_hours"] == 24
+    # 2. Update Cancellation Deadline from 24 to 12 hours
+    payload_12 = ClinicSettingsPayload(
+        clinic_name="Kaizen Care Telehealth Center",
+        address="Kaizen Care Health Tower, MG Road, Bengaluru, Karnataka 560001, India",
+        contact_email="support@kaizencare.in",
+        contact_phone="+91 80 4567 8900",
+        timezone="Asia/Kolkata",
+        cancellation_deadline_hours=12,
+        intake_policy="clinic_configured",
+        prescriptions_enabled=True,
+        operating_hours="Mon - Sat: 08:00 AM - 08:00 PM IST",
+        authorized_administrators=["admin@kaizencare.in"],
+    )
+    await update_clinic_settings(payload=payload_12, request=req)
 
-    finally:
-        mongo_client.mongo_database.database = original_database
+    # 3. Query settings again (Verify value remains 12)
+    updated = await get_clinic_settings(request=req)
+    assert updated["cancellation_deadline_hours"] == 12
+
+    # 4. Restore Cancellation Deadline back to 24 hours
+    payload_24 = ClinicSettingsPayload(
+        clinic_name="Kaizen Care Telehealth Center",
+        address="Kaizen Care Health Tower, MG Road, Bengaluru, Karnataka 560001, India",
+        contact_email="support@kaizencare.in",
+        contact_phone="+91 80 4567 8900",
+        timezone="Asia/Kolkata",
+        cancellation_deadline_hours=24,
+        intake_policy="clinic_configured",
+        prescriptions_enabled=True,
+        operating_hours="Mon - Sat: 08:00 AM - 08:00 PM IST",
+        authorized_administrators=["admin@kaizencare.in"],
+    )
+    await update_clinic_settings(payload=payload_24, request=req)
+
+    # 5. Final query (Verify value restored to 24)
+    restored = await get_clinic_settings(request=req)
+    assert restored["cancellation_deadline_hours"] == 24

@@ -95,6 +95,30 @@ export default function DoctorManagementTab() {
     }
   };
 
+  const handleReverifyLicense = async (doctor) => {
+    setActionLoading(doctor.id);
+    try {
+      const res = await adminApi.reverifyDoctorLicense(doctor.id);
+      showToast(
+        `Registry verification updated for ${doctor.full_name}: ${res.status_label || "Verified Active"}`,
+        "success"
+      );
+      loadDoctors();
+      if (selectedDoctor && selectedDoctor.id === doctor.id) {
+        setSelectedDoctor((prev) => ({
+          ...prev,
+          verification_status: res.verification_status,
+          verification_details: res.verification_details,
+          confidence_score: res.confidence_score,
+        }));
+      }
+    } catch (err) {
+      showToast(err.message || "License re-verification failed.", "error");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const filteredDoctors = doctors.filter((doc) => {
     if (filter === "pending" && doc.approval_status !== "pending") return false;
     if (filter === "approved" && doc.approval_status !== "approved") return false;
@@ -284,6 +308,74 @@ export default function DoctorManagementTab() {
                 <div><strong>Mobile Number:</strong> {selectedDoctor.mobile_number || "N/A"}</div>
                 <div><strong>Email Verification:</strong> {selectedDoctor.email_verified ? "Verified ✅" : "Pending ⏳"}</div>
               </div>
+
+              {/* NMC & State Council Statutory Registry Verification Card */}
+              {selectedDoctor.verification_status === "verified_active" && selectedDoctor.verification_details?.status === "VERIFIED_ACTIVE" ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-950 text-xs">
+                      <span className="material-symbols-outlined text-sm text-emerald-700">verified_user</span>
+                      <span>Statutory Medical Council Verification (NMC / SMC / ABDM)</span>
+                    </div>
+                    <span className="rounded-full bg-emerald-200/80 px-2 py-0.5 text-[10px] font-bold text-emerald-900 uppercase">
+                      VERIFIED ACTIVE
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] text-emerald-900">
+                    <div><strong>Registry Council:</strong> {selectedDoctor.verification_details?.council_name || selectedDoctor.medical_council || "State Medical Council"} ({selectedDoctor.council_code || "SMC"})</div>
+                    <div><strong>Match Confidence:</strong> {Math.round((selectedDoctor.confidence_score || 0.95) * 100)}% (Fuzzy Identity Match)</div>
+                    <div><strong>Verification Receipt:</strong> <span className="font-mono text-[10px]">{selectedDoctor.verification_details?.verification_receipt_id || selectedDoctor.verification_details?.verification_id || "NMC-VERIF-DEFAULT"}</span></div>
+                    <div><strong>ABDM HPR Status:</strong> {selectedDoctor.hpr_id ? `Linked (${selectedDoctor.hpr_id})` : "Not provided"}</div>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-emerald-700 italic">
+                      Verified under India Telemedicine Practice Guidelines (2020) & NMC Act.
+                    </span>
+                    <button
+                      type="button"
+                      disabled={actionLoading === selectedDoctor.id}
+                      onClick={() => handleReverifyLicense(selectedDoctor)}
+                      className="inline-flex items-center gap-1 rounded bg-emerald-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                    >
+                      <span className={`material-symbols-outlined text-[11px] ${actionLoading === selectedDoctor.id ? "animate-spin" : ""}`}>
+                        {actionLoading === selectedDoctor.id ? "sync" : "refresh"}
+                      </span>
+                      <span>{actionLoading === selectedDoctor.id ? "Checking…" : "Re-check Council Registry"}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-950 text-xs">
+                      <span className="material-symbols-outlined text-sm text-amber-700">warning</span>
+                      <span>Statutory Medical Council Verification: UNVERIFIED</span>
+                    </div>
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase">
+                      {selectedDoctor.verification_details?.status || "UNVERIFIED"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    {selectedDoctor.verification_details?.remarks || `Registration number '${selectedDoctor.registration_number}' was not found in active council records. Manual physical certificate review is required.`}
+                  </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-amber-800 font-semibold">
+                      Requires Clinic Administrator manual certificate inspection before approval.
+                    </span>
+                    <button
+                      type="button"
+                      disabled={actionLoading === selectedDoctor.id}
+                      onClick={() => handleReverifyLicense(selectedDoctor)}
+                      className="inline-flex items-center gap-1 rounded bg-amber-800 px-2 py-1 text-[10px] font-semibold text-white hover:bg-amber-900 disabled:opacity-50"
+                    >
+                      <span className={`material-symbols-outlined text-[11px] ${actionLoading === selectedDoctor.id ? "animate-spin" : ""}`}>
+                        {actionLoading === selectedDoctor.id ? "sync" : "refresh"}
+                      </span>
+                      <span>{actionLoading === selectedDoctor.id ? "Checking…" : "Re-check Council Registry"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {selectedDoctor.rejection_reason && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900">
@@ -619,6 +711,39 @@ export default function DoctorManagementTab() {
                       {doc.date_of_birth && <div><strong>DOB:</strong> {doc.date_of_birth}</div>}
                       {doc.gender && <div><strong>Gender:</strong> {doc.gender}</div>}
                       <div><strong>Clinic:</strong> {doc.clinic_name}</div>
+                    </div>
+
+                    {/* Statutory Verification Status Badge & ABDM ID */}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {doc.verification_status === "verified_active" && doc.verification_details?.status === "VERIFIED_ACTIVE" ? (
+                        <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
+                          <span className="material-symbols-outlined text-xs text-emerald-600">verified</span>
+                          <span>NMC / {doc.council_code || "SMC"} Verified Active ({Math.round((doc.confidence_score || 0.95) * 100)}% match)</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900 border border-amber-300">
+                          <span className="material-symbols-outlined text-xs text-amber-600">warning</span>
+                          <span>NMC: Unverified in Registry (Manual Review)</span>
+                        </div>
+                      )}
+                      {doc.hpr_id && (
+                        <div className="inline-flex items-center gap-1 rounded-lg bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-800 border border-teal-200">
+                          <span className="material-symbols-outlined text-xs text-teal-600">badge</span>
+                          <span>ABDM: {doc.hpr_id}</span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        disabled={actionLoading === doc.id}
+                        onClick={() => handleReverifyLicense(doc)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#25836F]/30 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#25836F] hover:bg-[#F0F5F7] transition disabled:opacity-50"
+                        title="Re-verify credentials against State Medical Council & National Medical Commission registers"
+                      >
+                        <span className={`material-symbols-outlined text-xs ${actionLoading === doc.id ? "animate-spin" : ""}`}>
+                          {actionLoading === doc.id ? "sync" : "refresh"}
+                        </span>
+                        <span>{actionLoading === doc.id ? "Verifying…" : "Re-verify"}</span>
+                      </button>
                     </div>
                   </div>
 

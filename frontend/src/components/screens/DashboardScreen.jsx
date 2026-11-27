@@ -7,12 +7,14 @@ import {
   recordsApi,
   supportApi,
 } from "../../lib/api";
+import EmergencyModal from "../common/EmergencyModal";
 
 export default function DashboardScreen({ onNavigate }) {
   const [data, setData] = useState(null);
   const [state, setState] = useState("loading");
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -624,21 +626,32 @@ export default function DashboardScreen({ onNavigate }) {
               </p>
             </button>
 
-            {/* Emergency Info Card */}
-            <div className="p-4 rounded-xl bg-[#F0F5F7] border border-[#577877]/20 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined !text-[#25836F] text-base">
-                  emergency
-                </span>
-                <span className="text-xs font-bold text-[#162623]">
-                  Clinical Advisory
+            {/* Emergency Info Card with Paramedic Modal Trigger */}
+            <div className="p-4 rounded-xl bg-red-50/70 border border-red-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-600 text-base animate-pulse">
+                    emergency
+                  </span>
+                  <span className="text-xs font-bold text-red-950 uppercase tracking-wider">
+                    Emergency Advisory
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+                  24/7 Access
                 </span>
               </div>
-              <p className="text-xs text-[#577877] leading-relaxed">
-                Teleconsultation is intended for routine, follow-up, and
-                non-emergency care. In case of acute chest pain or respiratory
-                distress, call 112 / 108 immediately.
+              <p className="text-xs text-red-900/80 leading-relaxed">
+                Telehealth is strictly for non-emergencies. For acute respiratory distress, severe chest pain, or trauma, access your emergency card or call 112 / 108 immediately.
               </p>
+              <button
+                type="button"
+                onClick={() => setEmergencyModalOpen(true)}
+                className="w-full mt-1 py-2 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">medical_services</span>
+                <span>Open Paramedic Card &amp; Hospital Finder</span>
+              </button>
             </div>
           </div>
         </div>
@@ -839,6 +852,12 @@ export default function DashboardScreen({ onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* Emergency First Responder & Paramedic Modal */}
+      <EmergencyModal
+        isOpen={emergencyModalOpen}
+        onClose={() => setEmergencyModalOpen(false)}
+      />
     </div>
   );
 }

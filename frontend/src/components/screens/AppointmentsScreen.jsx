@@ -298,6 +298,27 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   const [consentActionError, setConsentActionError] = useState("");
   const [showReviewConsentModal, setShowReviewConsentModal] = useState(false);
   const [consentLegalDoc, setConsentLegalDoc] = useState(null);
+
+  // Phase 1 (F-01): Pre-Flight Claim Health Checker
+  const [preflightData, setPreflightData] = useState(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightError, setPreflightError] = useState("");
+
+  const loadPreflightCheck = async (aptId, policyId = null) => {
+    setPreflightLoading(true);
+    setPreflightError("");
+    try {
+      const res = await insuranceApi.preflightValidateClaim({
+        appointment_id: aptId,
+        policy_id: policyId || null,
+      });
+      setPreflightData(res);
+    } catch (err) {
+      setPreflightError(err.message || "Failed to run pre-flight claim health check");
+    } finally {
+      setPreflightLoading(false);
+    }
+  };
   const [consentLegalDocLoading, setConsentLegalDocLoading] = useState(false);
 
   const loadDossier = async (aptId, policyId = null) => {
@@ -428,9 +449,10 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
       }
       setActiveMasterProviders(Array.isArray(providersRes) ? providersRes : []);
 
-      // Auto-fetch Checkpoint 5 dossier and Checkpoint 6 consent status
+      // Auto-fetch Checkpoint 5 dossier, Checkpoint 6 consent status, and Phase 1 Preflight Claim Health Check
       loadDossier(apt.id, initialPolId);
       loadClaimConsent(apt.id, initialPolId);
+      loadPreflightCheck(apt.id, initialPolId);
     } catch (err) {
       setEligibilityError(err.message || "Failed to load claim details.");
     } finally {
@@ -443,6 +465,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
     if (selectedCompletedApt) {
       loadDossier(selectedCompletedApt.id, newPolicyId);
       loadClaimConsent(selectedCompletedApt.id, newPolicyId);
+      loadPreflightCheck(selectedCompletedApt.id, newPolicyId);
     }
   };
 
@@ -2770,6 +2793,114 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
                                 placeholder="e.g. Follow-up consultation fee reimbursement request"
                                 className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#185A4D]/20 focus:border-[#185A4D]"
                               />
+                            </div>
+
+                            {/* ======================================================= */}
+                            {/* PHASE 1 (F-01): PRE-FLIGHT CLAIM HEALTH CHECKER         */}
+                            {/* ======================================================= */}
+                            <div className="p-4 rounded-xl border border-teal-200 bg-teal-50/50 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="material-symbols-outlined text-teal-700 text-lg">health_and_safety</span>
+                                  <div>
+                                    <h6 className="font-bold text-xs text-teal-900 uppercase tracking-wider">
+                                      Pre-Flight Claim Health &amp; Audit Readiness
+                                    </h6>
+                                    <p className="text-[11px] text-teal-700">
+                                      Pre-submission compliance check validating documentation, fee, and coverage window.
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {preflightLoading ? (
+                                    <span className="text-[11px] text-teal-700 animate-pulse font-medium">Checking health...</span>
+                                  ) : preflightData ? (
+                                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                                      preflightData.readiness_score === 100
+                                        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                        : preflightData.readiness_score >= 70
+                                        ? "bg-amber-100 text-amber-800 border-amber-300"
+                                        : "bg-rose-100 text-rose-800 border-rose-300"
+                                    }`}>
+                                      {preflightData.readiness_score}% Readiness
+                                    </span>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() => selectedCompletedApt && loadPreflightCheck(selectedCompletedApt.id, selectedPolicyId)}
+                                    className="p-1 rounded hover:bg-teal-100 text-teal-800 cursor-pointer"
+                                    title="Re-run health check"
+                                  >
+                                    <span className="material-symbols-outlined text-base">refresh</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Progress bar */}
+                              {preflightData && (
+                                <div className="space-y-1.5">
+                                  <div className="w-full bg-zinc-200 rounded-full h-2 overflow-hidden">
+                                    <div
+                                      className={`h-2 rounded-full transition-all duration-500 ${
+                                        preflightData.readiness_score === 100
+                                          ? "bg-emerald-600"
+                                          : preflightData.readiness_score >= 70
+                                          ? "bg-amber-500"
+                                          : "bg-rose-500"
+                                      }`}
+                                      style={{ width: `${preflightData.readiness_score}%` }}
+                                    />
+                                  </div>
+                                  <p className="text-[11px] text-zinc-700 font-medium">
+                                    {preflightData.summary_message}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Itemized checklist */}
+                              {preflightData?.checks && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                  {preflightData.checks.map((check) => (
+                                    <div
+                                      key={check.key}
+                                      className={`p-2.5 rounded-lg border text-xs flex items-start gap-2 ${
+                                        check.passed
+                                          ? "bg-white border-emerald-200 text-zinc-800"
+                                          : check.severity === "error"
+                                          ? "bg-rose-50 border-rose-200 text-rose-900"
+                                          : "bg-amber-50 border-amber-200 text-amber-900"
+                                      }`}
+                                    >
+                                      <span
+                                        className={`material-symbols-outlined text-base shrink-0 mt-0.5 ${
+                                          check.passed
+                                            ? "text-emerald-600"
+                                            : check.severity === "error"
+                                            ? "text-rose-600"
+                                            : "text-amber-600"
+                                        }`}
+                                      >
+                                        {check.passed ? "check_circle" : check.severity === "error" ? "cancel" : "warning"}
+                                      </span>
+                                      <div className="space-y-0.5 min-w-0">
+                                        <span className="font-semibold block truncate">{check.title}</span>
+                                        <p className="text-[11px] opacity-85 leading-tight">{check.message}</p>
+                                        {!check.passed && check.action_hint && (
+                                          <p className="text-[10px] font-medium text-teal-800 mt-1 bg-teal-100/70 px-1.5 py-0.5 rounded">
+                                            Tip: {check.action_hint}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {preflightError && (
+                                <div className="p-2 rounded bg-rose-50 text-rose-700 text-xs border border-rose-200">
+                                  {preflightError}
+                                </div>
+                              )}
                             </div>
 
                             {/* ======================================================= */}

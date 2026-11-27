@@ -69,7 +69,7 @@ class MockRequest:
 
 
 @pytest.mark.asyncio
-async def test_operational_analytics_filtering_and_net_revenue():
+async def test_operational_analytics_filtering_and_net_revenue(monkeypatch):
     tenant_id = get_settings().default_tenant_id
     admin_id = "admin-user"
     now = datetime.now(UTC)
@@ -118,27 +118,21 @@ async def test_operational_analytics_filtering_and_net_revenue():
     import teleconsult.kernel.mongodb.client as mongo_client
     import teleconsult.modules.admin.routes as admin_routes_mod
 
-    original_database = mongo_client.mongo_database.database
+    monkeypatch.setattr(mongo_client.mongo_database, "database", lambda: db)
 
-    try:
-        mongo_client.mongo_database.database = lambda: db
+    async def mock_verify_admin(request):
+        return Principal(
+            user_id=admin_id,
+            tenant_id=tenant_id,
+            roles=frozenset({"clinic_admin"}),
+            permissions=frozenset({"clinic:admin"}),
+        )
 
-        async def mock_verify_admin(request):
-            return Principal(
-                user_id=admin_id,
-                tenant_id=tenant_id,
-                roles=frozenset({"clinic_admin"}),
-                permissions=frozenset({"clinic:admin"}),
-            )
+    monkeypatch.setattr(admin_routes_mod, "_verify_admin", mock_verify_admin)
 
-        admin_routes_mod._verify_admin = mock_verify_admin
+    req = MockRequest()
+    res = await get_reports(request=req, time_range="7d", session=None)
 
-        req = MockRequest()
-        res = await get_reports(request=req, time_range="7d", session=None)
-
-        assert res["summary"]["total_consultations"] == 2
-        assert res["summary"]["completion_rate"] == "100.0%"
-        assert len(res["by_specialty"]) > 0
-
-    finally:
-        mongo_client.mongo_database.database = original_database
+    assert res["summary"]["total_consultations"] == 2
+    assert res["summary"]["completion_rate"] == "100.0%"
+    assert len(res["by_specialty"]) > 0

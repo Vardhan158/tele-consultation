@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { authApi, notificationApi, adminNotificationApi, patientApi } from "../../lib/api";
+import EmergencyModal from "../common/EmergencyModal";
+import { useTranslation } from "../../i18n/I18nContext";
 
 export default function Header({
   onOpenMobile,
@@ -11,17 +13,23 @@ export default function Header({
   const [currentUser, setCurrentUser] = useState(patient || null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const langDropdownRef = useRef(null);
+
+  const { t, language, changeLanguage, languages } = useTranslation();
+  const currentLangObj = languages.find((l) => l.code === language) || languages[0];
 
   useEffect(() => {
     if (patient) {
       setCurrentUser(patient);
       if (!patient.avatar_url && patient.role !== "doctor" && patient.role !== "clinic_admin") {
-        patientApi.getProfile().then((p) => {
+        patientApi?.getProfile?.()?.then((p) => {
           if (p?.avatar_url) {
             setCurrentUser((prev) => ({ ...prev, avatar_url: p.avatar_url }));
           }
-        }).catch(() => {});
+        })?.catch(() => {});
       }
     } else {
       authApi
@@ -30,11 +38,11 @@ export default function Header({
           if (u?.authenticated) {
             setCurrentUser(u);
             if (!u.avatar_url && u.role !== "doctor" && u.role !== "clinic_admin") {
-              patientApi.getProfile().then((p) => {
+              patientApi?.getProfile?.()?.then((p) => {
                 if (p?.avatar_url) {
                   setCurrentUser((prev) => ({ ...prev, avatar_url: p.avatar_url }));
                 }
-              }).catch(() => {});
+              })?.catch(() => {});
             }
           }
         })
@@ -87,9 +95,15 @@ export default function Header({
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setProfileOpen(false);
       }
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target)) {
+        setLangDropdownOpen(false);
+      }
     };
     const handleEscape = (e) => {
-      if (e.key === "Escape") setProfileOpen(false);
+      if (e.key === "Escape") {
+        setProfileOpen(false);
+        setLangDropdownOpen(false);
+      }
     };
 
     if (profileOpen) {
@@ -106,7 +120,7 @@ export default function Header({
     switch (activeTab) {
       case "clinic-overview":
       case "overview":
-        return "Overview";
+        return t("nav.clinic_overview", "Overview");
       case "clinic-doctors":
       case "doctors":
       case "clinic-approvals":
@@ -118,9 +132,9 @@ export default function Header({
       case "schedules":
         return "Schedules";
       case "clinic-appointments":
-        return "Appointments";
+        return t("nav.appointments", "Appointments");
       case "clinic-payments":
-        return "Payments";
+        return t("nav.payments", "Payments");
       case "clinic-insurance":
       case "insurance":
       case "insurance-providers":
@@ -137,38 +151,38 @@ export default function Header({
         return "Clinic settings";
       case "dashboard":
       case "doctor-dashboard":
-        return "Dashboard";
+        return t("nav.dashboard", "Dashboard");
       case "find-doctors":
-        return "Find doctors";
+        return t("nav.find_doctors", "Find doctors");
       case "doctor-availability":
       case "availability":
         return "Availability";
       case "appointments":
       case "doctor-appointments":
-        return isDoctor ? "Appointments" : "My appointments";
+        return isDoctor ? t("nav.appointments", "Appointments") : t("nav.appointments", "My appointments");
       case "doctor-patients":
         return "Patients";
       case "medical-records":
-        return "Medical records";
+        return t("nav.medical_records", "Medical records");
       case "prescriptions":
-        return "Prescriptions";
+        return t("nav.prescriptions", "Prescriptions");
       case "summaries":
-        return "Consultation summaries";
+        return t("nav.summaries", "Consultation summaries");
       case "follow-up":
-        return "Follow-up care";
+        return t("nav.follow_up", "Follow-up care");
       case "my-insurance":
-        return "My Insurance";
+        return t("nav.my_insurance", "My Insurance");
       case "support":
-        return "Help & support";
+        return t("nav.support", "Help & support");
       case "payments":
-        return "Payments";
+        return t("nav.payments", "Payments");
       case "consent":
         return "Consent management";
       case "notifications":
-        return "Notifications";
+        return t("nav.notifications", "Notifications");
       case "settings":
       case "doctor-settings":
-        return "Settings";
+        return t("nav.settings", "Settings");
       case "profile":
         return "Profile";
       default:
@@ -206,7 +220,59 @@ export default function Header({
       </div>
 
       {/* Right Header Elements */}
-      <div className="flex items-center gap-3 sm:gap-4 text-xs">
+      <div className="flex items-center gap-2 sm:gap-3 text-xs">
+        {/* Phase 1 (F-03): Emergency SOS & Paramedic Card Trigger */}
+        {!isAdmin && !isDoctor && (
+          <button
+            type="button"
+            onClick={() => setEmergencyModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition cursor-pointer font-bold text-[11px] shadow-2xs"
+            title="Emergency Medical Card & Hospital Locator"
+          >
+            <span className="material-symbols-outlined text-base text-red-600 animate-pulse">
+              emergency
+            </span>
+            <span className="hidden sm:inline">{t("nav.emergency_care", "Emergency SOS")}</span>
+          </button>
+        )}
+
+        {/* Phase 4 (F-12): Multi-Language Frontend Localization Selector */}
+        <div className="relative" ref={langDropdownRef}>
+          <button
+            type="button"
+            onClick={() => setLangDropdownOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#577877]/20 text-[#162623] transition cursor-pointer font-semibold text-xs shadow-2xs"
+            title={t("common.select_language", "Select Language")}
+          >
+            <span className="text-sm">{currentLangObj?.flag || "🌐"}</span>
+            <span className="hidden md:inline font-medium">{currentLangObj?.nativeName || "English"}</span>
+            <span className="material-symbols-outlined text-xs text-[#577877]">arrow_drop_down</span>
+          </button>
+          {langDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl bg-white border border-[#577877]/20 shadow-xl py-1 z-50 animate-fade-in">
+              {languages.map((lng) => (
+                <button
+                  key={lng.code}
+                  type="button"
+                  onClick={() => {
+                    changeLanguage(lng.code);
+                    setLangDropdownOpen(false);
+                  }}
+                  className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-[#F0F5F7] transition cursor-pointer ${
+                    language === lng.code ? "bg-[#25836F]/10 text-[#185A4D] font-bold" : "text-[#162623]"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>{lng.flag}</span>
+                    <span>{lng.nativeName}</span>
+                  </span>
+                  {language === lng.code && <span className="text-[#25836F] font-bold">✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Notifications (Patient & Clinic Admin) */}
         {!isDoctor && (
           <button
@@ -324,6 +390,12 @@ export default function Header({
           )}
         </div>
       </div>
+
+      {/* Emergency First Responder & Paramedic Modal */}
+      <EmergencyModal
+        isOpen={emergencyModalOpen}
+        onClose={() => setEmergencyModalOpen(false)}
+      />
     </header>
   );
 }

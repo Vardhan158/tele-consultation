@@ -40,7 +40,7 @@ export default function NotificationsScreen({ onNavigate }) {
                     ? "billing"
                     : "care";
 
-              let icon = "notifications";
+              let icon;
               if (cat === "insurance") {
                 if (n.event_type?.includes("reimbursement")) icon = "payments";
                 else if (n.event_type?.includes("approved")) icon = "verified";

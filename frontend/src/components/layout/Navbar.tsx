@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import DoctorRegistrationScreen from "../auth/DoctorRegistrationScreen";
 import { authApi, patientApi, notificationApi, adminNotificationApi } from "../../lib/api";
@@ -166,7 +166,7 @@ export default function Navbar() {
 
   const renderNavLink = (item: { label: string; path: string; sectionId?: string }, isMobile = false) => {
     let isActive = false;
-    if (item.path !== "/" && !item.sectionId && item.path === location.pathname) {
+    if (item.path !== "/" && (item.path === location.pathname || (item.path === "/about-us" && location.pathname === "/about"))) {
       isActive = true;
     } else if (item.sectionId && location.pathname === "/" && activeHash === `#${item.sectionId}`) {
       isActive = true;
@@ -179,6 +179,7 @@ export default function Navbar() {
         <a
           key={item.label}
           href={item.path}
+          aria-current={isActive ? "page" : undefined}
           onClick={(e) => handleLinkClick(item, e)}
           className={`rounded-lg px-3 py-2 text-sm font-medium transition cursor-pointer ${
             useSolidWhiteHeader
@@ -207,6 +208,7 @@ export default function Navbar() {
       <a
         key={item.label}
         href={item.path}
+        aria-current={isActive ? "page" : undefined}
         onClick={(e) => handleLinkClick(item, e)}
         className={`nav-draw px-3 py-1.5 text-xs sm:text-sm font-semibold transition-colors duration-200 cursor-pointer ${baseText}`}
       >
@@ -308,12 +310,12 @@ export default function Navbar() {
         </NavLink>
 
         {/* Center Desktop Navigation Links */}
-        <nav aria-label="Primary navigation" className="hidden items-center gap-1 md:flex">
+        <nav aria-label="Primary navigation" className="hidden items-center gap-1 xl:flex">
           {PUBLIC_NAV_LINKS.map((item) => renderNavLink(item, false))}
         </nav>
 
         {/* Right Desktop Actions */}
-        <div className="hidden items-center gap-3 sm:gap-4 text-xs sm:flex">
+        <div className="hidden items-center gap-3 sm:gap-4 text-xs xl:flex">
           {currentUser ? (
             <>
               {/* Notifications bell matching portal top bar */}
@@ -474,7 +476,7 @@ export default function Navbar() {
           aria-expanded={open}
           aria-controls="public-mobile-navigation"
           onClick={() => setOpen((prev) => !prev)}
-          className={`rounded-lg p-2 transition lg:hidden cursor-pointer ${
+          className={`rounded-lg p-2 transition xl:hidden cursor-pointer ${
             useSolidWhiteHeader
               ? "text-[#165849] hover:bg-[#EEF6F3]"
               : "text-white hover:bg-white/10"
@@ -490,7 +492,7 @@ export default function Navbar() {
       {open && (
         <div
           id="public-mobile-navigation"
-          className={`border-t px-6 py-4 lg:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+          className={`border-t px-6 py-4 xl:hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
             useSolidWhiteHeader
               ? "border-white/40 bg-[#F0F5F7]/95 backdrop-blur-xl text-[#162623]"
               : "border-white/10 bg-[#165849]/95 backdrop-blur-xl text-white"

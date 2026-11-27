@@ -96,7 +96,7 @@ export default function InsuranceProvidersTab() {
     }
     if (!data.provider_code?.trim() || data.provider_code.trim().length < 2) {
       errors.provider_code = "Provider code is required (min 2 characters)";
-    } else if (!/^[A-Za-z0-9_\-]+$/.test(data.provider_code.trim())) {
+    } else if (!/^[A-Za-z0-9_-]+$/.test(data.provider_code.trim())) {
       errors.provider_code = "Letters, numbers, hyphens, and underscores only";
     }
     if (!data.country?.trim()) {
