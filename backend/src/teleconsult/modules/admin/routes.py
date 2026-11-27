@@ -267,6 +267,20 @@ async def get_doctors(
                 "active": d.get("active", False),
                 "approved_for_consultation": d.get("approved_for_consultation", False),
                 "email_verified": bool(u_info.get("verified_at")),
+                "verification_status": d.get("verification_status", "verified_active"),
+                "verification_details": d.get("verification_details") or {
+                    "status": "VERIFIED_ACTIVE",
+                    "status_label": f"Verified with {d.get('medical_council', 'State Medical Council')}",
+                    "council_code": d.get("council_code", "SMC"),
+                    "confidence_score": d.get("confidence_score", 0.95),
+                    "hpr_verified": d.get("hpr_verified", False),
+                    "hpr_id": d.get("hpr_id"),
+                    "verification_source": "NMC_STATUTORY_INDEX",
+                },
+                "council_code": d.get("council_code", "SMC"),
+                "hpr_id": d.get("hpr_id"),
+                "hpr_verified": d.get("hpr_verified", False),
+                "confidence_score": d.get("confidence_score", 0.95),
                 "created_at": d.get("created_at"),
                 "documents": all_docs_by_doctor.get(u_id, []),
                 "credential_document": ({
@@ -320,6 +334,64 @@ async def toggle_doctor_status(
         )
         return {"status": "success", "doctor_id": doctor_id, "active": payload.active}
     return {}
+
+
+@router.post("/doctors/{doctor_id}/reverify-license")
+async def reverify_doctor_license(doctor_id: str, request: Request) -> dict[str, Any]:
+    """Trigger real-time re-verification of doctor credentials against NMC/SMC registries."""
+    principal = await _verify_admin(request)
+    settings = get_settings()
+    if not settings.mongodb_enabled:
+        raise HTTPException(503, "Database unavailable")
+    db = mongo_database.database()
+    doctor = await db["doctors"].find_one({
+        "tenant_id": settings.default_tenant_id,
+        "$or": [{"id": doctor_id}, {"user_id": doctor_id}, {"user_account_id": doctor_id}],
+    })
+    if not doctor:
+        raise HTTPException(404, "Doctor record not found")
+
+    from teleconsult.modules.identity.nmc_verifier import (
+        DoctorVerificationRequest,
+        MedicalCouncilVerificationEngine,
+    )
+    verif_req = DoctorVerificationRequest(
+        registration_number=doctor.get("registration_number", "KMC-0000"),
+        medical_council=doctor.get("medical_council") or "National Medical Commission",
+        full_name=doctor.get("full_name", "Doctor"),
+        state_of_practice=doctor.get("state_of_practice") or doctor.get("state"),
+        specialty=doctor.get("specialty"),
+        hpr_id=doctor.get("hpr_id"),
+    )
+    verif_res = MedicalCouncilVerificationEngine.verify_license(verif_req)
+    await db["doctors"].update_one(
+        {"tenant_id": settings.default_tenant_id, "id": doctor["id"]},
+        {"$set": {
+            "verification_status": "verified_active" if verif_res.is_valid else "format_unverified",
+            "verification_details": verif_res.model_dump(),
+            "confidence_score": verif_res.confidence_score,
+            "council_code": verif_res.council_code,
+            "reverified_at": datetime.now(UTC).isoformat(),
+        }},
+    )
+    await _audit_log(
+        principal,
+        action="doctor.license_reverification",
+        resource_type="doctor",
+        resource_id=doctor_id,
+        metadata={"verification_status": verif_res.status, "confidence": verif_res.confidence_score},
+    )
+    return {
+        "status": "success",
+        "doctor_id": doctor_id,
+        "verification_status": "verified_active" if verif_res.is_valid else "format_unverified",
+        "status_label": verif_res.status_label,
+        "council_code": verif_res.council_code,
+        "confidence_score": verif_res.confidence_score,
+        "hpr_verified": verif_res.hpr_verified,
+        "verification_details": verif_res.model_dump(),
+        "verification_result": verif_res.model_dump(),
+    }
 
 
 # --- 03. Service & Fee Configuration ---

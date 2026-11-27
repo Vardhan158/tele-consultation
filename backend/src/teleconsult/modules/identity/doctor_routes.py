@@ -26,6 +26,12 @@ from teleconsult.modules.identity.auth_routes import (
     send_verification_email,
     token_hash,
 )
+from teleconsult.modules.identity.nmc_verifier import (
+    DoctorVerificationRequest,
+    DoctorVerificationResult,
+    MedicalCouncilVerificationEngine,
+    INDIAN_MEDICAL_COUNCILS,
+)
 
 router = APIRouter(prefix="/doctor", tags=["doctor-onboarding"])
 OTP_EXPIRY_MINUTES = 5
@@ -101,6 +107,7 @@ class DoctorRegistration(BaseModel):
     qualifications: list[str] = Field(default_factory=list, max_length=20)
     experience_years: int = Field(default=0, ge=0, le=80)
     languages: list[str] = Field(default_factory=list, max_length=20)
+    hpr_id: str | None = Field(default=None, max_length=50)
 
     @field_validator("mobile_number")
     @classmethod
@@ -166,6 +173,26 @@ def _valid_mfa_code(secret: str | None, code: str) -> bool:
         return any(hmac.compare_digest(_totp(secret, int(time.time() // 30) + offset), code) for offset in (-1, 0, 1))
     except (ValueError, TypeError, binascii.Error):
         return False
+
+
+@router.post("/verify-license-precheck", response_model=DoctorVerificationResult)
+async def verify_doctor_license_precheck(payload: DoctorVerificationRequest) -> DoctorVerificationResult:
+    """Real-time open-source pre-check of doctor registration number against statutory NMC/SMC standards."""
+    return MedicalCouncilVerificationEngine.verify_license(payload)
+
+
+@router.get("/medical-councils")
+async def list_medical_councils() -> list[dict[str, Any]]:
+    """List statutory Indian State Medical Councils and NMC with codes and states."""
+    return [
+        {
+            "name": name,
+            "code": meta["code"],
+            "state": meta["state"],
+            "portal": meta.get("portal"),
+        }
+        for name, meta in INDIAN_MEDICAL_COUNCILS.items()
+    ]
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -249,6 +276,16 @@ async def register_doctor(
             "verified_at": None,
             "created_at": now,
         }
+        verif_req = DoctorVerificationRequest(
+            registration_number=payload.registration_number,
+            medical_council=payload.medical_council or "National Medical Commission",
+            full_name=payload.full_name,
+            state_of_practice=payload.state_of_practice or payload.state,
+            specialty=payload.specialty,
+            hpr_id=payload.hpr_id,
+        )
+        verif_result = MedicalCouncilVerificationEngine.verify_license(verif_req)
+
         doctor = {
             "id": user_id,
             "user_id": user_id,
@@ -258,12 +295,12 @@ async def register_doctor(
             "specialty": payload.specialty,
             "clinic_name": payload.clinic_name,
             "registration_number": payload.registration_number,
-            "medical_council": payload.medical_council,
+            "medical_council": payload.medical_council or verif_result.council_name,
             "state": payload.state or payload.state_of_practice,
             "state_of_practice": payload.state_of_practice or payload.state,
             "date_of_birth": payload.date_of_birth,
             "gender": payload.gender,
-            "qualifications": payload.qualifications,
+            "qualifications": payload.qualifications or verif_result.qualifications,
             "experience_years": payload.experience_years,
             "languages": payload.languages,
             "supported_languages": payload.languages,
@@ -272,6 +309,12 @@ async def register_doctor(
             "approval_status": "pending",
             "approval_reason": None,
             "rejection_reason": None,
+            "verification_status": "verified_active" if verif_result.is_valid else "format_unverified",
+            "verification_details": verif_result.model_dump(),
+            "council_code": verif_result.council_code,
+            "hpr_id": verif_result.hpr_id,
+            "hpr_verified": verif_result.hpr_verified,
+            "confidence_score": verif_result.confidence_score,
             "created_at": now,
         }
         code = generate_verification_otp()

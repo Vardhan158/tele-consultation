@@ -143,6 +143,7 @@ export default function DoctorRegistrationScreen({
     specialty: "",
     registration_number: "",
     medical_council: "",
+    hpr_id: "",
     qualifications: "",
     experience_years: "",
     languages: "",
@@ -176,6 +177,50 @@ export default function DoctorRegistrationScreen({
   const [submittedData, setSubmittedData] = useState(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [licenseCheck, setLicenseCheck] = useState({
+    checking: false,
+    verified: false,
+    result: null,
+    error: null,
+  });
+
+  const handleVerifyLicense = async () => {
+    if (!form.registration_number?.trim() || !form.medical_council?.trim()) {
+      setLicenseCheck((prev) => ({
+        ...prev,
+        error: "Please enter your Registration Number and Medical Council to verify.",
+      }));
+      return;
+    }
+    setLicenseCheck({ checking: true, verified: false, result: null, error: null });
+    try {
+      const res = await doctorApi.verifyLicensePrecheck({
+        registration_number: form.registration_number.trim(),
+        medical_council: form.medical_council.trim(),
+        hpr_id: form.hpr_id?.trim() || null,
+        full_name: form.full_name?.trim() || "Doctor",
+        state_of_practice: form.state,
+        specialty: form.specialty,
+        hpr_id: form.hpr_id?.trim() || null,
+      });
+      setLicenseCheck({
+        checking: false,
+        verified: res.is_valid,
+        result: res,
+        error: res.is_valid ? null : res.remarks,
+      });
+      if (res.is_valid && res.qualifications?.length && !form.qualifications) {
+        setForm((prev) => ({ ...prev, qualifications: res.qualifications.join(", ") }));
+      }
+    } catch (err) {
+      setLicenseCheck({
+        checking: false,
+        verified: false,
+        result: null,
+        error: err.message || "License pre-check failed. Our compliance team will review your certificate manually.",
+      });
+    }
+  };
 
   const validateField = (name, value, allValues = form) => {
     switch (name) {
@@ -448,6 +493,7 @@ export default function DoctorRegistrationScreen({
         specialty: form.specialty.trim(),
         registration_number: form.registration_number.trim(),
         medical_council: form.medical_council.trim(),
+        hpr_id: form.hpr_id?.trim() || null,
         qualifications: form.qualifications
           .split(",")
           .map((item) => item.trim())
@@ -855,6 +901,74 @@ export default function DoctorRegistrationScreen({
                     {touched.medical_council && errors.medical_council && (
                       <p className="text-xs text-red-600 font-medium leading-none mt-1 truncate">{errors.medical_council}</p>
                     )}
+                  </div>
+
+                  {/* Real-Time NMC / SMC License Pre-Check Trigger & Badge */}
+                  <div className="rounded-xl border border-[#25836F]/20 bg-[#F0F5F7]/60 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#162623]">
+                        <span className="material-symbols-outlined text-sm text-[#25836F]">verified_user</span>
+                        <span>Official Medical Council Verification</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleVerifyLicense}
+                        disabled={licenseCheck.checking || !form.registration_number.trim() || !form.medical_council.trim()}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-white bg-[#25836F] hover:bg-[#1f6d5c] disabled:opacity-50 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                      >
+                        {licenseCheck.checking ? (
+                          <>
+                            <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                            <span>Verifying…</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-xs">search_check</span>
+                            <span>Verify with NMC / SMC</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {licenseCheck.verified && licenseCheck.result && (
+                      <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5 text-xs text-emerald-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                          <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
+                          <span>{licenseCheck.result.status_label}</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-700 leading-relaxed">
+                          {licenseCheck.result.remarks}
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1 text-[10px] text-emerald-800 font-medium">
+                          <span className="bg-emerald-100 px-1.5 py-0.5 rounded">Source: {licenseCheck.result.verification_source}</span>
+                          <span className="bg-emerald-100 px-1.5 py-0.5 rounded">Match: {Math.round(licenseCheck.result.confidence_score * 100)}%</span>
+                          <span className="bg-emerald-100 px-1.5 py-0.5 rounded">Receipt: {licenseCheck.result.verification_receipt_id}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {licenseCheck.error && (
+                      <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900 flex items-start gap-1.5">
+                        <span className="material-symbols-outlined text-sm text-amber-600 shrink-0 mt-0.5">warning</span>
+                        <p className="text-[11px] text-amber-800">{licenseCheck.error}</p>
+                      </div>
+                    )}
+
+                    {/* Ayushman Bharat HP-ID (Optional) */}
+                    <div className="pt-1 border-t border-[#577877]/10">
+                      <label className="flex items-center justify-between text-[11px] font-medium text-[#577877] mb-1">
+                        <span>Ayushman Bharat HP-ID (Optional ABDM Health ID)</span>
+                        <span className="text-[10px] text-[#25836F]">e.g. 14-digit or alias@hpr</span>
+                      </label>
+                      <input
+                        name="hpr_id"
+                        type="text"
+                        value={form.hpr_id || ""}
+                        onChange={update}
+                        placeholder="e.g. 12-3456-7890-1234 or dr.name@hpr"
+                        className="w-full h-9 px-3 rounded-lg border border-[#577877]/20 bg-white text-xs text-[#162623] placeholder:text-[#577877]/40 focus:outline-none focus:border-[#25836F] transition"
+                      />
+                    </div>
                   </div>
 
                   {/* Qualifications */}

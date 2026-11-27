@@ -206,6 +206,12 @@ export const patientApi = {
 };
 
 export const doctorApi = {
+  verifyLicensePrecheck: (payload) =>
+    apiRequest("/doctor/verify-license-precheck", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  medicalCouncils: () => apiRequest("/doctor/medical-councils"),
   register: (payload) => {
     const hasFile = Object.values(payload || {}).some((v) => v instanceof File);
     if (hasFile) {
@@ -614,6 +620,10 @@ export const adminApi = {
     apiRequest(`/doctor/${id}/reject`, {
       method: "POST",
       body: JSON.stringify({ reason }),
+    }),
+  reverifyDoctorLicense: (id) =>
+    apiRequest(`/admin/doctors/${id}/reverify-license`, {
+      method: "POST",
     }),
   downloadDoctorCredential: async (id, inline = false) => {
     const response = await fetch(
