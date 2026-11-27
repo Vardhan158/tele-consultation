@@ -25,11 +25,11 @@ export default function Header({
     if (patient) {
       setCurrentUser(patient);
       if (!patient.avatar_url && patient.role !== "doctor" && patient.role !== "clinic_admin") {
-        patientApi.getProfile().then((p) => {
+        patientApi?.getProfile?.()?.then((p) => {
           if (p?.avatar_url) {
             setCurrentUser((prev) => ({ ...prev, avatar_url: p.avatar_url }));
           }
-        }).catch(() => {});
+        })?.catch(() => {});
       }
     } else {
       authApi
@@ -38,11 +38,11 @@ export default function Header({
           if (u?.authenticated) {
             setCurrentUser(u);
             if (!u.avatar_url && u.role !== "doctor" && u.role !== "clinic_admin") {
-              patientApi.getProfile().then((p) => {
+              patientApi?.getProfile?.()?.then((p) => {
                 if (p?.avatar_url) {
                   setCurrentUser((prev) => ({ ...prev, avatar_url: p.avatar_url }));
                 }
-              }).catch(() => {});
+              })?.catch(() => {});
             }
           }
         })
