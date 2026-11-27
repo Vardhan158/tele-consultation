@@ -997,7 +997,7 @@ export default function DoctorRegistrationScreen({
                       </div>
                     )}
 
-                    {licenseCheck.error && (
+                    {licenseCheck.error && !licenseCheck.result && (
                       <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900 flex items-start gap-1.5">
                         <span className="material-symbols-outlined text-sm text-amber-600 shrink-0 mt-0.5">warning</span>
                         <p className="text-[11px] text-amber-800">{licenseCheck.error}</p>
