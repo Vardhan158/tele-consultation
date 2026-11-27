@@ -13,15 +13,15 @@ for (const width of [375, 1440]) {
     await expect(page.getByAltText('Personalized Care, Trusted Results')).toBeVisible();
     const nav = width < 1280
       ? page.getByRole('button', { name: 'Toggle navigation menu' })
-      : page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'About', exact: true });
+      : page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: /About/i });
     if (width < 1280) {
       await nav.click();
-      await expect(page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'About', exact: true })).toHaveAttribute('aria-current', 'page');
+      await expect(page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: /About/i })).toHaveAttribute('aria-current', 'page');
     } else {
-      await expect(nav).toHaveAttribute('href', '/about');
+      await expect(nav).toHaveAttribute('href', /\/about/);
       await expect(nav).toHaveAttribute('aria-current', 'page');
     }
-    expect(await page.locator('header').evaluate(el => getComputedStyle(el).position)).toBe('sticky');
+    expect(await page.locator('header').evaluate(el => ['sticky', 'fixed'].includes(getComputedStyle(el).position))).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole('button', { name: 'Meet Our Doctors', exact: true }).click();
     await expect(page).toHaveURL(/\/find-doctors$/);

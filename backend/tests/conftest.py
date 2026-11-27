@@ -13,7 +13,7 @@ from teleconsult.kernel.mongodb.schema import ensure_schema
 from teleconsult.modules.identity.auth_routes import password_hash
 
 
-TEST_TENANT = "00000000-0000-0000-0000-000000000001"
+TEST_TENANT = get_settings().default_tenant_id or "1"
 TEST_ADMIN_ID = "test-clinic-admin"
 TEST_DOCTOR_ID = "51ae2a4f-3fe9-4ca0-a106-3266454e4171"
 

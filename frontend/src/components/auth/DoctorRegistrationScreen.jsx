@@ -185,6 +185,7 @@ export default function DoctorRegistrationScreen({
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showAdditionalDocs, setShowAdditionalDocs] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -582,13 +583,23 @@ export default function DoctorRegistrationScreen({
           inModal ? "max-h-[calc(90vh-64px)]" : "max-w-4xl lg:overflow-hidden"
         }`}
       >
-        {/* Title */}
-        <div className="w-full pb-3 border-b border-[#577877]/10 flex flex-col gap-1 shrink-0">
-          <div>
+        {/* Title & Step Indicator */}
+        <div className="w-full pb-3 border-b border-[#577877]/10 flex flex-col gap-2 shrink-0">
+          <div className="flex items-center justify-between">
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#162623] leading-none">
               Doctor Registration
             </h2>
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#577877]">
+              <span className={currentStep === 1 ? "text-[#25836F] font-bold" : ""}>1. Personal</span>
+              <span>·</span>
+              <span className={currentStep === 2 ? "text-[#25836F] font-bold" : ""}>2. Credentials</span>
+              <span>·</span>
+              <span className={currentStep === 3 ? "text-[#25836F] font-bold" : ""}>3. Verification</span>
+            </div>
           </div>
+          <p className="text-xs font-semibold text-[#577877]">
+            Step {currentStep} of 3: {currentStep === 1 ? "Personal Information" : currentStep === 2 ? "Medical Credentials" : "Verification Documents"}
+          </p>
         </div>
 
         {state === "success" && submittedData ? (
@@ -1257,18 +1268,28 @@ export default function DoctorRegistrationScreen({
                       <div className="relative">
                         <input
                           name="confirm_password"
-                          type={showPassword ? "text" : "password"}
+                          type={showConfirmPassword ? "text" : "password"}
                           autoComplete="new-password"
                           value={form.confirm_password}
                           onChange={update}
                           onBlur={handleBlur}
                           placeholder="Re-enter password"
-                          className={`w-full h-11 px-4 rounded-xl border bg-white text-sm text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
+                          className={`w-full h-11 pl-4 pr-10 rounded-xl border bg-white text-sm text-[#162623] placeholder:text-[#577877]/50 focus:outline-none transition shadow-2xs box-border ${
                             touched.confirm_password && errors.confirm_password
                               ? "border-red-500 focus:border-red-500"
                               : "border-[#577877]/25 focus:border-[#25836F]"
                           }`}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#577877] hover:text-[#162623] cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-base">
+                            {showConfirmPassword ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
                       </div>
                       {touched.confirm_password && errors.confirm_password && (
                         <p className="text-xs text-red-600 font-medium leading-none mt-1 truncate">{errors.confirm_password}</p>
@@ -1280,7 +1301,7 @@ export default function DoctorRegistrationScreen({
                       <label className="flex items-center justify-between text-xs font-semibold text-[#162623]">
                         <span>Declarations &amp; Privacy <span className="text-red-600">*</span></span>
                       </label>
-                      <div className="h-11 flex flex-col justify-center space-y-1.5 px-1">
+                      <div className="min-h-11 flex flex-col justify-center space-y-2 px-1 py-1">
                         <label className="flex items-center gap-2 text-[#162623] cursor-pointer leading-tight">
                           <input
                             type="checkbox"
