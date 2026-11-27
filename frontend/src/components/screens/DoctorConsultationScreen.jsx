@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { doctorApi } from "../../lib/api";
 import WebRtcConsultation from "../consultation/WebRtcConsultation";
 import PrescriptionComposer from "../consultation/PrescriptionComposer";
+import PainVisualizer3D from "../consultation/PainVisualizer3D";
+import TeleconsentModal from "../consultation/TeleconsentModal";
 
 export default function DoctorConsultationScreen({ appointment, onBack }) {
   const [room, setRoom] = useState(null);
@@ -21,6 +23,41 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
   const [newRecommendation, setNewRecommendation] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [boardMessage, setBoardMessage] = useState("");
+
+  // Phase 4 (F-10 & F-11): 3D Pain Visualizer & Teleconsent State
+  const [showPainModal, setShowPainModal] = useState(false);
+  const [painMapData, setPainMapData] = useState({ points: [], overall_severity: 0 });
+  const [showTeleconsentModal, setShowTeleconsentModal] = useState(false);
+  const [teleconsents, setTeleconsents] = useState([]);
+
+  const loadPhase4Data = async () => {
+    if (!appointment?.id) return;
+    try {
+      const [pmap, tconsents] = await Promise.all([
+        doctorApi.getPainMap(appointment.id).catch(() => null),
+        doctorApi.getTeleconsentStatus(appointment.id).catch(() => []),
+      ]);
+      if (pmap) setPainMapData(pmap);
+      if (Array.isArray(tconsents)) setTeleconsents(tconsents);
+    } catch {
+      // Ignored
+    }
+  };
+
+  const handleSaveDoctorPainMap = async (updatedData) => {
+    if (!appointment?.id) return;
+    try {
+      await doctorApi.annotatePainMap(appointment.id, {
+        doctor_notes: updatedData.doctor_notes,
+        additional_points: [],
+      });
+      setBoardMessage("3D Pain Map clinical findings saved.");
+      setTimeout(() => setBoardMessage(""), 3000);
+      await loadPhase4Data();
+    } catch (err) {
+      setBoardMessage(err.message || "Failed to save 3D pain map.");
+    }
+  };
 
   const loadBoardData = async () => {
     if (!appointment?.id) return;
@@ -45,6 +82,7 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
           setError(err.message || "Unable to authorize consultation."),
         );
       loadBoardData();
+      loadPhase4Data();
     }
   }, [appointment]);
 
@@ -115,20 +153,56 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold">Consultation Room</h1>
 
-          {/* Phase 3 (F-09): Virtual Board Launcher */}
-          <button
-            type="button"
-            onClick={() => setShowVirtualBoard(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 px-4 py-2 text-xs font-bold text-purple-900 shadow-xs transition cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-base text-purple-700">groups</span>
-            <span>Multi-Disciplinary Virtual Board</span>
-            {boardMembers.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-200 text-purple-950 font-black">
-                {boardMembers.length}
-              </span>
-            )}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Phase 4 (F-10): 3D Pain Map Launcher */}
+            <button
+              type="button"
+              onClick={() => setShowPainModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 px-4 py-2 text-xs font-bold text-cyan-900 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base text-cyan-700">accessibility_new</span>
+              <span>3D Pain Map</span>
+              {painMapData?.points?.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-cyan-200 text-cyan-950 font-black">
+                  {painMapData.points.length}
+                </span>
+              )}
+            </button>
+
+            {/* Phase 4 (F-11): Live Teleconsent Launcher */}
+            <button
+              type="button"
+              onClick={() => setShowTeleconsentModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 px-4 py-2 text-xs font-bold text-teal-900 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base text-teal-700">draw</span>
+              <span>Live Teleconsent</span>
+              {teleconsents.some((t) => t.status === "signed") ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-200 text-emerald-950 font-bold">
+                  ✓ Signed
+                </span>
+              ) : teleconsents.some((t) => t.status === "pending") ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-200 text-amber-950 font-bold">
+                  Pending
+                </span>
+              ) : null}
+            </button>
+
+            {/* Phase 3 (F-09): Virtual Board Launcher */}
+            <button
+              type="button"
+              onClick={() => setShowVirtualBoard(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 px-4 py-2 text-xs font-bold text-purple-900 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base text-purple-700">groups</span>
+              <span>Virtual Board</span>
+              {boardMembers.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-200 text-purple-950 font-black">
+                  {boardMembers.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {boardMessage && (
@@ -404,6 +478,60 @@ export default function DoctorConsultationScreen({ appointment, onBack }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Phase 4 (F-10): 3D Pain Map Modal Dialog */}
+      {showPainModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-5xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="px-6 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="p-1.5 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-400 text-base">
+                  🧍
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-white">3D Anatomical Pain Map &amp; Symptom Visualizer</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Patient: {appointment?.patient_name || "Patient"} • Palpation tenderness &amp; clinical marking
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPainModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto">
+              <PainVisualizer3D
+                initialPoints={painMapData?.points || []}
+                patientNotes={painMapData?.patient_notes || ""}
+                doctorNotes={painMapData?.doctor_notes || ""}
+                isDoctorMode={true}
+                onSave={handleSaveDoctorPainMap}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 4 (F-11): Teleconsent Push Modal */}
+      {showTeleconsentModal && (
+        <TeleconsentModal
+          isOpen={showTeleconsentModal}
+          onClose={() => setShowTeleconsentModal(false)}
+          appointmentId={appointment?.id}
+          isDoctor={true}
+          doctorName="Attending Clinician"
+          patientName={appointment?.patient_name || "Patient"}
+          onSuccess={() => {
+            setBoardMessage("Informed Teleconsent dispatched to patient.");
+            setTimeout(() => setBoardMessage(""), 4000);
+            loadPhase4Data();
+          }}
+        />
       )}
     </div>
   );

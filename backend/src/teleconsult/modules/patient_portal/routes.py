@@ -2939,5 +2939,257 @@ async def abdm_revoke_consent(
     return {"consent_id": consent_id, "status": "REVOKED", "message": "Consent successfully revoked."}
 
 
+# =============================================================================
+# PHASE 4 (F-10): 3D PAIN & SYMPTOM VISUALIZER (PATIENT INTAKE)
+# =============================================================================
+
+class PatientPainPoint(BaseModel):
+    id: str | None = None
+    body_region: str
+    label: str
+    severity: int = Field(ge=1, le=10)
+    pain_type: str = "Aching"
+    coordinates: list[float] | None = None
+    notes: str | None = None
+    duration_days: int | None = None
+
+
+class PatientPainMapPayload(BaseModel):
+    points: list[PatientPainPoint]
+    overall_severity: int | None = None
+    patient_notes: str | None = None
+
+
+@router.post("/appointments/{appointment_id}/pain-map")
+async def save_patient_pain_map(
+    appointment_id: str,
+    payload: PatientPainMapPayload,
+    principal: Principal = Depends(require("patient:profile:write")),
+):
+    """Save or update interactive 3D anatomical pain points and symptoms for an appointment."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+    patient_id = str(principal.user_id)
+    now_iso = datetime.now(UTC).isoformat()
+
+    calc_severity = payload.overall_severity
+    if calc_severity is None:
+        calc_severity = max([p.severity for p in payload.points], default=0)
+
+    points_dicts = [p.model_dump() for p in payload.points]
+    for pt in points_dicts:
+        if not pt.get("id"):
+            pt["id"] = f"pain-{secrets.token_hex(4)}"
+
+    doc = {
+        "appointment_id": str(appointment_id),
+        "tenant_id": tenant_id,
+        "patient_id": patient_id,
+        "points": points_dicts,
+        "overall_severity": int(calc_severity),
+        "patient_notes": payload.patient_notes or "",
+        "doctor_notes": "",
+        "last_updated_at": now_iso,
+        "annotated_by_doctor": False,
+    }
+
+    await db["appointment_pain_maps"].update_one(
+        {"tenant_id": tenant_id, "appointment_id": str(appointment_id)},
+        {"$set": doc},
+        upsert=True,
+    )
+
+    # Also update pain snapshot directly on appointment record if present
+    await db["appointments"].update_one(
+        {"tenant_id": tenant_id, "id": str(appointment_id)},
+        {"$set": {"pain_map_snapshot": {"points_count": len(points_dicts), "severity": calc_severity, "updated_at": now_iso}}},
+    )
+
+    return {
+        "status": "saved",
+        "appointment_id": appointment_id,
+        "total_points": len(points_dicts),
+        "overall_severity": calc_severity,
+        "last_updated_at": now_iso,
+    }
+
+
+@router.get("/appointments/{appointment_id}/pain-map")
+async def get_patient_pain_map(
+    appointment_id: str,
+    principal: Principal = Depends(require("patient:profile:read")),
+):
+    """Retrieve saved 3D anatomical pain map for the patient's consultation."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+    patient_id = str(principal.user_id)
+
+    record = await db["appointment_pain_maps"].find_one({
+        "tenant_id": tenant_id,
+        "appointment_id": str(appointment_id),
+        "patient_id": patient_id,
+    })
+    if not record:
+        return {
+            "appointment_id": appointment_id,
+            "patient_id": patient_id,
+            "points": [],
+            "overall_severity": 0,
+            "patient_notes": "",
+            "doctor_notes": "",
+            "last_updated_at": None,
+            "annotated_by_doctor": False,
+        }
+
+    return {
+        "appointment_id": str(record.get("appointment_id")),
+        "patient_id": str(record.get("patient_id")),
+        "points": record.get("points", []),
+        "overall_severity": int(record.get("overall_severity", 0)),
+        "patient_notes": record.get("patient_notes", ""),
+        "doctor_notes": record.get("doctor_notes", ""),
+        "last_updated_at": record.get("last_updated_at"),
+        "annotated_by_doctor": bool(record.get("annotated_by_doctor")),
+    }
+
+
+# =============================================================================
+# PHASE 4 (F-11): IN-CALL COLLABORATIVE TELECONSENT (PATIENT SIGNING)
+# =============================================================================
+
+class PatientTeleconsentSignPayload(BaseModel):
+    consent_request_id: str
+    signature_name: str
+    signature_data: str | None = None
+    declaration_accepted: bool = True
+    device_info: str | None = None
+
+
+@router.get("/consultations/{appointment_id}/teleconsent/active")
+async def get_active_teleconsent_for_patient(
+    appointment_id: str,
+    principal: Principal = Depends(require("patient:profile:read")),
+):
+    """Check if there is an active teleconsent requested by the attending clinician during the call."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+    patient_id = str(principal.user_id)
+
+    record = await db["teleconsult_consents"].find_one({
+        "tenant_id": tenant_id,
+        "appointment_id": str(appointment_id),
+        "patient_id": patient_id,
+        "status": "pending",
+    })
+
+    if not record:
+        return {"has_active_request": False, "request": None}
+
+    return {
+        "has_active_request": True,
+        "request": {
+            "id": str(record.get("id") or record.get("_id")),
+            "appointment_id": str(record.get("appointment_id")),
+            "doctor_id": str(record.get("doctor_id")),
+            "doctor_name": str(record.get("doctor_name", "Attending Clinician")),
+            "title": str(record.get("title")),
+            "procedure_name": str(record.get("procedure_name")),
+            "procedure_description": str(record.get("procedure_description")),
+            "clauses": record.get("clauses", []),
+            "risks_disclosed": record.get("risks_disclosed", []),
+            "urgency": str(record.get("urgency", "routine")),
+            "requested_at": str(record.get("requested_at")),
+            "status": "pending",
+        },
+    }
+
+
+@router.post("/consultations/{appointment_id}/teleconsent/sign")
+async def sign_teleconsent_by_patient(
+    appointment_id: str,
+    payload: PatientTeleconsentSignPayload,
+    principal: Principal = Depends(require("patient:profile:write")),
+):
+    """Digitally sign and seal the in-call informed teleconsent with cryptographic verification."""
+    if not payload.declaration_accepted or not payload.signature_name.strip():
+        raise HTTPException(status_code=400, detail="Signature name and declaration acceptance are mandatory")
+
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+    patient_id = str(principal.user_id)
+    now_iso = datetime.now(UTC).isoformat()
+
+    consent = await db["teleconsult_consents"].find_one({
+        "tenant_id": tenant_id,
+        "appointment_id": str(appointment_id),
+        "patient_id": patient_id,
+        "$or": [{"id": payload.consent_request_id}, {"_id": payload.consent_request_id}],
+    })
+
+    if not consent:
+        raise HTTPException(status_code=404, detail="Teleconsent request not found or not addressed to you")
+
+    if consent.get("status") == "signed":
+        return {
+            "status": "already_signed",
+            "consent_id": payload.consent_request_id,
+            "cryptographic_seal_sha256": consent.get("cryptographic_seal_sha256"),
+            "signed_at": consent.get("signed_at"),
+        }
+
+    # Generate cryptographic SHA-256 integrity seal
+    raw_seal_content = f"KAIZEN-TELECONSENT|{tenant_id}|{appointment_id}|{patient_id}|{payload.consent_request_id}|{payload.signature_name}|{now_iso}"
+    seal_sha256 = hashlib.sha256(raw_seal_content.encode("utf-8")).hexdigest()
+
+    await db["teleconsult_consents"].update_one(
+        {"tenant_id": tenant_id, "id": consent["id"]},
+        {
+            "$set": {
+                "status": "signed",
+                "signed_at": now_iso,
+                "signature_name": payload.signature_name.strip(),
+                "signature_data": payload.signature_data or "cryptographic_affirmation",
+                "device_info": payload.device_info or "Web Browser Telehealth Client",
+                "cryptographic_seal_sha256": seal_sha256,
+            }
+        },
+    )
+
+    # Add ABDM-aligned consent log
+    await db["audit_logs"].insert_one({
+        "id": f"audit-{secrets.token_hex(8)}",
+        "actor_id": patient_id,
+        "tenant_id": tenant_id,
+        "action": "teleconsent.signed",
+        "resource_type": "teleconsult_consent",
+        "resource_id": consent["id"],
+        "metadata": {
+            "appointment_id": appointment_id,
+            "signature_name": payload.signature_name.strip(),
+            "seal_sha256": seal_sha256,
+        },
+        "occurred_at": now_iso,
+        "created_at": now_iso,
+    })
+
+    return {
+        "status": "signed",
+        "consent_id": consent["id"],
+        "signature_name": payload.signature_name.strip(),
+        "signed_at": now_iso,
+        "cryptographic_seal_sha256": seal_sha256,
+        "verification_url": f"/public/consents/verify/{seal_sha256[:16]}",
+    }
+
+
+
 
 

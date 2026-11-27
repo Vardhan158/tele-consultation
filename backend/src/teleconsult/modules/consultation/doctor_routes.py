@@ -1362,4 +1362,224 @@ async def get_virtual_board_notes(
     return notes
 
 
+# =============================================================================
+# PHASE 4 (F-10): 3D PAIN & SYMPTOM VISUALIZER (CLINICIAN INSPECTION & ANNOTATION)
+# =============================================================================
+
+class DoctorPainAnnotationPayload(BaseModel):
+    doctor_notes: str | None = None
+    clinical_observations: list[str] = []
+    differential_diagnosis: str | None = None
+    additional_points: list[dict[str, Any]] = []
+
+
+@router.get("/consultations/{appointment_id}/pain-map")
+async def get_consultation_pain_map(
+    appointment_id: str,
+    principal: Principal = Depends(require("doctor:appointment:read")),
+):
+    """Retrieve patient's interactive 3D pain and symptom map for clinical review during consultation."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+
+    record = await db["appointment_pain_maps"].find_one({
+        "tenant_id": tenant_id,
+        "appointment_id": str(appointment_id),
+    })
+
+    if not record:
+        return {
+            "appointment_id": appointment_id,
+            "patient_id": "",
+            "points": [],
+            "overall_severity": 0,
+            "patient_notes": "",
+            "doctor_notes": "",
+            "last_updated_at": None,
+            "annotated_by_doctor": False,
+        }
+
+    return {
+        "appointment_id": str(record.get("appointment_id")),
+        "patient_id": str(record.get("patient_id", "")),
+        "points": record.get("points", []),
+        "overall_severity": int(record.get("overall_severity", 0)),
+        "patient_notes": record.get("patient_notes", ""),
+        "doctor_notes": record.get("doctor_notes", ""),
+        "last_updated_at": record.get("last_updated_at"),
+        "annotated_by_doctor": bool(record.get("annotated_by_doctor")),
+    }
+
+
+@router.post("/consultations/{appointment_id}/pain-map")
+async def annotate_consultation_pain_map(
+    appointment_id: str,
+    payload: DoctorPainAnnotationPayload,
+    principal: Principal = Depends(require("doctor:appointment:write")),
+):
+    """Annotate the patient's 3D pain map with clinical palpation findings and doctor notes."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+    doc = await _get_doctor(db, principal)
+    now_iso = datetime.now(UTC).isoformat()
+
+    existing = await db["appointment_pain_maps"].find_one({
+        "tenant_id": tenant_id,
+        "appointment_id": str(appointment_id),
+    })
+
+    points = existing.get("points", []) if existing else []
+    if payload.additional_points:
+        for p in payload.additional_points:
+            p_dict = dict(p)
+            if not p_dict.get("id"):
+                p_dict["id"] = f"doc-pain-{secrets.token_hex(4)}"
+            p_dict["annotated_by"] = doc.get("full_name", "Doctor")
+            points.append(p_dict)
+
+    update_dict = {
+        "doctor_notes": payload.doctor_notes or (existing.get("doctor_notes") if existing else ""),
+        "annotated_by_doctor": True,
+        "points": points,
+        "last_updated_at": now_iso,
+    }
+
+    await db["appointment_pain_maps"].update_one(
+        {"tenant_id": tenant_id, "appointment_id": str(appointment_id)},
+        {"$set": update_dict},
+        upsert=True,
+    )
+
+    return {
+        "status": "annotated",
+        "appointment_id": appointment_id,
+        "doctor_notes": update_dict["doctor_notes"],
+        "total_points": len(points),
+        "annotated_by_doctor": True,
+        "last_updated_at": now_iso,
+    }
+
+
+# =============================================================================
+# PHASE 4 (F-11): IN-CALL COLLABORATIVE TELECONSENT (CLINICIAN REQUEST)
+# =============================================================================
+
+class ClinicianTeleconsentRequestPayload(BaseModel):
+    title: str = "Informed Telehealth Procedure & Treatment Consent"
+    procedure_name: str
+    procedure_description: str
+    clauses: list[str] = [
+        "I understand the nature, risks, and alternatives of the proposed clinical teleconsultation and treatment plan.",
+        "I confirm voluntary agreement to clinical assessment and management via encrypted telecommunications.",
+        "I confirm truthful disclosure of past medical conditions, ongoing medications, and known drug allergies.",
+    ]
+    risks_disclosed: list[str] = [
+        "Inherent limitations of remote non-physical examination.",
+        "Potential requirement for immediate in-person triage if emergency red flags arise.",
+    ]
+    urgency: str = "routine"
+
+
+@router.post("/consultations/{appointment_id}/teleconsent/request")
+async def request_in_call_teleconsent(
+    appointment_id: str,
+    payload: ClinicianTeleconsentRequestPayload,
+    principal: Principal = Depends(require("doctor:appointment:write")),
+):
+    """Doctor dispatches an interactive teleconsent form directly to the patient during the live consultation."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+    doc = await _get_doctor(db, principal)
+    now_iso = datetime.now(UTC).isoformat()
+
+    # Look up appointment to resolve patient_id
+    appt = await db["appointments"].find_one({
+        "tenant_id": tenant_id,
+        "$or": [{"id": str(appointment_id)}, {"_id": str(appointment_id)}],
+    })
+    patient_id = appt.get("patient_id") if appt else "patient-unknown"
+
+    consent_id = f"teleconsent-{secrets.token_hex(6)}"
+    record = {
+        "id": consent_id,
+        "appointment_id": str(appointment_id),
+        "tenant_id": tenant_id,
+        "doctor_id": str(doc.get("id") or doc.get("user_id")),
+        "doctor_name": str(doc.get("full_name") or "Attending Clinician"),
+        "patient_id": str(patient_id),
+        "title": payload.title,
+        "procedure_name": payload.procedure_name,
+        "procedure_description": payload.procedure_description,
+        "clauses": payload.clauses,
+        "risks_disclosed": payload.risks_disclosed,
+        "urgency": payload.urgency,
+        "status": "pending",
+        "requested_at": now_iso,
+    }
+
+    await db["teleconsult_consents"].insert_one(record)
+
+    # Dispatch high-priority patient notification
+    await db["notifications"].insert_one({
+        "id": f"notif-{secrets.token_hex(8)}",
+        "tenant_id": tenant_id,
+        "recipient_id": str(patient_id),
+        "recipient_role": "patient",
+        "title": "URGENT: Informed Teleconsent Signature Requested",
+        "message": f"Dr. {doc.get('full_name', 'Doctor')} has requested your digital signature for: {payload.procedure_name}.",
+        "priority": "high",
+        "read": False,
+        "created_at": now_iso,
+    })
+
+    return {
+        "status": "requested",
+        "consent_id": consent_id,
+        "appointment_id": appointment_id,
+        "patient_id": patient_id,
+        "procedure_name": payload.procedure_name,
+        "requested_at": now_iso,
+    }
+
+
+@router.get("/consultations/{appointment_id}/teleconsent/status")
+async def get_consultation_teleconsent_status(
+    appointment_id: str,
+    principal: Principal = Depends(require("doctor:appointment:read")),
+):
+    """Retrieve all teleconsent requests and digital signature statuses for the current consultation encounter."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+
+    cursor = db["teleconsult_consents"].find({
+        "tenant_id": tenant_id,
+        "appointment_id": str(appointment_id),
+    }).sort("requested_at", -1)
+
+    items = []
+    async for c in cursor:
+        items.append({
+            "id": str(c.get("id") or c.get("_id")),
+            "appointment_id": str(c.get("appointment_id")),
+            "title": str(c.get("title")),
+            "procedure_name": str(c.get("procedure_name")),
+            "status": str(c.get("status")),
+            "requested_at": str(c.get("requested_at")),
+            "signed_at": c.get("signed_at"),
+            "signature_name": c.get("signature_name"),
+            "cryptographic_seal_sha256": c.get("cryptographic_seal_sha256"),
+            "urgency": str(c.get("urgency", "routine")),
+        })
+    return items
+
+
+
 

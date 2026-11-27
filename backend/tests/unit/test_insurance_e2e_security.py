@@ -656,7 +656,9 @@ async def test_complete_clinic_admin_journey_e2e(mock_db, patient_user, clinic_a
     assert patient_rem["reimbursement_status"] == "fully_reimbursed"
     assert len(patient_rem["transactions"]) == 2
     assert patient_rem["reimbursed_amount"] == "600.00"
-    assert patient_rem["transactions"][0]["payment_reference_masked"] == "•••• •••• -001"
+    masked_refs = [t["payment_reference_masked"] for t in patient_rem["transactions"]]
+    assert "•••• •••• -001" in masked_refs
+    assert "•••• •••• -002" in masked_refs
 
 
 # ==============================================================================

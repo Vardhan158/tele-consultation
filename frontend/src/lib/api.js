@@ -178,6 +178,22 @@ export const patientApi = {
   getUrgentCareStatus: () => apiRequest("/patient/urgent-care/status"),
   cancelUrgentCare: (ticketId) =>
     apiRequest(`/patient/urgent-care/${ticketId}/cancel`, { method: "POST" }),
+  // Phase 4 (F-10): 3D Pain & Symptom Visualizer
+  getPainMap: (appointmentId) =>
+    apiRequest(`/patient/appointments/${appointmentId}/pain-map`),
+  savePainMap: (appointmentId, payload) =>
+    apiRequest(`/patient/appointments/${appointmentId}/pain-map`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // Phase 4 (F-11): Collaborative In-Call Teleconsent
+  getActiveTeleconsent: (appointmentId) =>
+    apiRequest(`/patient/consultations/${appointmentId}/teleconsent/active`),
+  signTeleconsent: (appointmentId, payload) =>
+    apiRequest(`/patient/consultations/${appointmentId}/teleconsent/sign`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const doctorApi = {
@@ -310,6 +326,21 @@ export const doctorApi = {
     }),
   getBoardNotes: (appointmentId) =>
     apiRequest(`/doctor/consultations/${appointmentId}/board-notes`),
+  // Phase 4 (F-10 & F-11): 3D Pain Map & Teleconsent
+  getPainMap: (appointmentId) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/pain-map`),
+  annotatePainMap: (appointmentId, payload) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/pain-map`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  requestTeleconsent: (appointmentId, payload) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/teleconsent/request`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getTeleconsentStatus: (appointmentId) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/teleconsent/status`),
 };
 
 export const authApi = {

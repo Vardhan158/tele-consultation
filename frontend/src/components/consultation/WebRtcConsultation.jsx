@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { io } from "socket.io-client";
-import { API_BASE_URL, consultationApi, doctorApi } from "../../lib/api";
+import { API_BASE_URL, consultationApi, doctorApi, patientApi } from "../../lib/api";
 import InCallChat from "./InCallChat";
+import TeleconsentModal from "./TeleconsentModal";
 
 const fallbackIceServers = [
   ...(import.meta.env.VITE_STUN_URL
@@ -38,6 +39,23 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
     },
   }));
   const [status, setStatus] = useState("connecting");
+  const [pendingTeleconsent, setPendingTeleconsent] = useState(null);
+
+  // Phase 4 (F-11): Collaborative In-Call Teleconsent Check for Patient
+  useEffect(() => {
+    if (role === "patient" && appointmentId) {
+      const checkActiveConsent = () => {
+        patientApi.getActiveTeleconsent(appointmentId).then((res) => {
+          if (res?.has_active_request && res?.request) {
+            setPendingTeleconsent(res.request);
+          }
+        }).catch(() => {});
+      };
+      checkActiveConsent();
+      const interval = setInterval(checkActiveConsent, 6000);
+      return () => clearInterval(interval);
+    }
+  }, [role, appointmentId]);
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
@@ -835,6 +853,18 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
             onClose={() => setShowChat(false)}
           />
         </div>
+      )}
+
+      {/* Phase 4 (F-11): Patient-Facing Teleconsent Modal */}
+      {pendingTeleconsent && (
+        <TeleconsentModal
+          isOpen={Boolean(pendingTeleconsent)}
+          onClose={() => setPendingTeleconsent(null)}
+          appointmentId={appointmentId}
+          isDoctor={false}
+          activeRequest={pendingTeleconsent}
+          onSuccess={() => setPendingTeleconsent(null)}
+        />
       )}
     </div>
   );
