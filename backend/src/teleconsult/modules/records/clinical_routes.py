@@ -8,11 +8,18 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from teleconsult.domain.schedule_x import (
+    PROHIBITED_SCHEDULE_X_SUBSTANCES,
     verify_telemedicine_prescription_safety,
 )
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.records.clinical_schemas import ClinicalOutputResponse
+from teleconsult.modules.records.clinical_schemas import (
+    ClinicalOutputResponse,
+    DrugInteractionAlert,
+    DrugInteractionItem,
+    DrugSafetyCheckRequest,
+    DrugSafetyCheckResponse,
+)
 
 router = APIRouter(prefix="/patient/clinical-outputs", tags=["clinical-outputs"])
 clinician_router = APIRouter(prefix="/clinician/clinical-outputs", tags=["clinical-publication"])
@@ -358,6 +365,204 @@ async def publish_prescription(payload: ClinicalPublication, principal: Principa
     }
     await db["prescriptions"].insert_one(prescription)
     return {"id": prescription["id"], "status": prescription["status"]}
+
+
+# =============================================================================
+# Phase 2 (F-05): DRUG-DRUG INTERACTION & DOSAGE SAFETY COPILOT
+# =============================================================================
+
+@clinician_router.post("/check-drug-safety", response_model=DrugSafetyCheckResponse)
+async def check_drug_safety_copilot(
+    payload: DrugSafetyCheckRequest,
+    principal: Principal = Depends(require("clinical:write")),
+) -> dict[str, Any]:
+    """Evaluate drug-drug interactions, allergy contraindications, and Schedule X prohibited substances."""
+    alerts: list[DrugInteractionAlert] = []
+    meds = payload.medications
+    med_names = [m.name.strip().lower() for m in meds if m.name and m.name.strip()]
+
+    # 1. Schedule X & NDPS Prohibited Substances Intercept (Telemedicine Guidelines 2020)
+    schedule_x_hit = False
+    for med in meds:
+        m_name = (med.name or "").strip().lower()
+        for x_sub in PROHIBITED_SCHEDULE_X_SUBSTANCES:
+            if x_sub in m_name:
+                schedule_x_hit = True
+                alerts.append(DrugInteractionAlert(
+                    severity="contraindicated",
+                    source_drug=med.name,
+                    interacting_drug_or_allergy=f"Schedule X / NDPS Prohibited ({x_sub.capitalize()})",
+                    interaction_type="schedule_x_intercept",
+                    clinical_effect="Prohibited for teleconsultation under MoHFW Telemedicine Practice Guidelines Regulation 3.7",
+                    recommendation="Remove substance from teleconsultation prescription. Requires in-person clinical consultation.",
+                ))
+                break
+
+    # 2. Patient Allergies Matching
+    allergies = [a.strip().lower() for a in payload.allergies if a and a.strip()]
+    db = mongo_database.database() if mongo_database.enabled else None
+    if db and payload.appointment_id and not allergies:
+        try:
+            apt = await db["appointments"].find_one({"tenant_id": str(principal.tenant_id), "id": str(payload.appointment_id)})
+            if apt:
+                patient_doc = await db["patients"].find_one({"tenant_id": str(principal.tenant_id), "$or": [{"id": apt.get("patient_id")}, {"user_id": apt.get("patient_id")}]})
+                if patient_doc and patient_doc.get("allergies"):
+                    raw_al = patient_doc["allergies"]
+                    allergies = [str(a).strip().lower() for a in (raw_al if isinstance(raw_al, list) else raw_al.split(",")) if str(a).strip()]
+        except Exception:
+            pass
+
+    penicillin_drugs = {"penicillin", "amoxicillin", "ampicillin", "augmentin", "piperacillin", "clavulanate", "cefalexin", "cefixime", "ceftriaxone", "cefuroxime"}
+    sulfa_drugs = {"sulfa", "sulfamethoxazole", "trimethoprim", "cotrimoxazole", "bactrim", "dapsone", "sulfasalazine"}
+    nsaid_drugs = {"aspirin", "ibuprofen", "diclofenac", "naproxen", "ketorolac", "piroxicam", "aceclofenac", "indomethacin"}
+
+    for med in meds:
+        m_low = (med.name or "").strip().lower()
+        if any("penicillin" in al or "amoxicillin" in al or "beta-lactam" in al for al in allergies):
+            if any(p in m_low for p in penicillin_drugs):
+                alerts.append(DrugInteractionAlert(
+                    severity="contraindicated",
+                    source_drug=med.name,
+                    interacting_drug_or_allergy="Documented Penicillin / Beta-lactam Allergy",
+                    interaction_type="drug_allergy",
+                    clinical_effect="Severe IgE-mediated anaphylaxis, angioedema, or bronchospasm hazard",
+                    recommendation="Substitute with Macrolide (Azithromycin) or Fluoroquinolone.",
+                ))
+        if any("sulfa" in al for al in allergies):
+            if any(s in m_low for s in sulfa_drugs):
+                alerts.append(DrugInteractionAlert(
+                    severity="contraindicated",
+                    source_drug=med.name,
+                    interacting_drug_or_allergy="Documented Sulfonamide Allergy",
+                    interaction_type="drug_allergy",
+                    clinical_effect="Severe hypersensitivity reaction, Stevens-Johnson syndrome (SJS) hazard",
+                    recommendation="Choose non-sulfonamide antimicrobial agent.",
+                ))
+        if any("aspirin" in al or "nsaid" in al for al in allergies):
+            if any(n in m_low for n in nsaid_drugs):
+                alerts.append(DrugInteractionAlert(
+                    severity="major",
+                    source_drug=med.name,
+                    interacting_drug_or_allergy="Documented Aspirin / NSAID Hypersensitivity",
+                    interaction_type="drug_allergy",
+                    clinical_effect="Aspirin-exacerbated respiratory disease (AERD), severe bronchospasm, or urticaria",
+                    recommendation="Use Paracetamol (Acetaminophen) for analgesia/pyrexia.",
+                ))
+
+    # 3. Existing Medications Lookup & Drug-Drug Interactions
+    all_med_pool = list(med_names)
+    existing_meds = [em.strip().lower() for em in payload.existing_medications if em and em.strip()]
+    if db and payload.appointment_id and not existing_meds:
+        try:
+            apt = await db["appointments"].find_one({"tenant_id": str(principal.tenant_id), "id": str(payload.appointment_id)})
+            if apt:
+                rx_cursor = db["prescriptions"].find({"tenant_id": str(principal.tenant_id), "patient_id": apt.get("patient_id")})
+                async for old_rx in rx_cursor:
+                    for m_item in old_rx.get("medications") or []:
+                        if m_item.get("name"):
+                            existing_meds.append(str(m_item["name"]).strip().lower())
+        except Exception:
+            pass
+    all_med_pool.extend(existing_meds)
+
+    anticoagulants = {"warfarin", "heparin", "apixaban", "rivaroxaban", "dabigatran", "edoxaban"}
+    has_anticoag = any(any(ac in m for ac in anticoagulants) for m in all_med_pool)
+    for med in meds:
+        m_low = (med.name or "").strip().lower()
+        if has_anticoag and any(n in m_low for n in nsaid_drugs):
+            alerts.append(DrugInteractionAlert(
+                severity="major",
+                source_drug=med.name,
+                interacting_drug_or_allergy="Anticoagulant Therapy (Warfarin/DOAC)",
+                interaction_type="drug_drug",
+                clinical_effect="Synergistic platelet impairment causing life-threatening gastrointestinal hemorrhage",
+                recommendation="Avoid systemic NSAID. Consider topical analgesic or Paracetamol with PPI gastroprotection.",
+            ))
+
+    ace_arbs = {"enalapril", "ramipril", "lisinopril", "perindopril", "losartan", "telmisartan", "valsartan", "olmesartan"}
+    k_sparing = {"spironolactone", "eplerenone", "amiloride", "triamterene"}
+    has_k_sparing = any(any(k in m for k in k_sparing) for m in all_med_pool)
+    for med in meds:
+        m_low = (med.name or "").strip().lower()
+        if has_k_sparing and any(a in m_low for a in ace_arbs):
+            alerts.append(DrugInteractionAlert(
+                severity="major",
+                source_drug=med.name,
+                interacting_drug_or_allergy="Potassium-Sparing Diuretic (Spironolactone)",
+                interaction_type="drug_drug",
+                clinical_effect="Additive potassium retention leading to severe hyperkalemia and fatal cardiac dysrhythmias",
+                recommendation="Monitor serum potassium & renal panel within 7 days.",
+            ))
+
+    ssris = {"escitalopram", "sertraline", "fluoxetine", "paroxetine", "citalopram", "duloxetine", "venlafaxine"}
+    has_ssri = any(any(s in m for s in ssris) for m in all_med_pool)
+    for med in meds:
+        m_low = (med.name or "").strip().lower()
+        if (has_ssri and "tramadol" in m_low) or ("tramadol" in all_med_pool and any(s in m_low for s in ssris)):
+            alerts.append(DrugInteractionAlert(
+                severity="major",
+                source_drug=med.name,
+                interacting_drug_or_allergy="Serotonergic Medication (SSRI/SNRI)",
+                interaction_type="drug_drug",
+                clinical_effect="Inhibition of serotonin reuptake triggering life-threatening Serotonin Syndrome",
+                recommendation="Avoid co-administration. Prescribe alternative non-opioid analgesic.",
+            ))
+
+    has_clopidogrel = any("clopidogrel" in m for m in all_med_pool)
+    for med in meds:
+        m_low = (med.name or "").strip().lower()
+        if has_clopidogrel and ("omeprazole" in m_low or "esomeprazole" in m_low):
+            alerts.append(DrugInteractionAlert(
+                severity="moderate",
+                source_drug=med.name,
+                interacting_drug_or_allergy="Clopidogrel (Antiplatelet)",
+                interaction_type="drug_drug",
+                clinical_effect="CYP2C19 competitive inhibition reduces clopidogrel activation and antiplatelet efficacy",
+                recommendation="Switch PPI to Pantoprazole or Rabeprazole, which exhibit negligible CYP2C19 inhibition.",
+            ))
+
+    statins = {"atorvastatin", "simvastatin", "lovastatin"}
+    macrolides = {"clarithromycin", "erythromycin"}
+    has_macrolide = any(any(mc in m for mc in macrolides) for m in all_med_pool)
+    for med in meds:
+        m_low = (med.name or "").strip().lower()
+        if has_macrolide and any(st in m_low for st in statins):
+            alerts.append(DrugInteractionAlert(
+                severity="major",
+                source_drug=med.name,
+                interacting_drug_or_allergy="CYP3A4 Inhibitor Macrolide (Clarithromycin/Erythromycin)",
+                interaction_type="drug_drug",
+                clinical_effect="Inhibition of statin clearance leading to severe rhabdomyolysis and acute renal failure",
+                recommendation="Temporarily suspend statin therapy during antibiotic course, or prescribe Azithromycin.",
+            ))
+
+    # Evaluate Overall Risk Level
+    if any(a.severity == "contraindicated" for a in alerts):
+        risk = "critical"
+        safe = False
+        summary = "Contraindicated interactions or prohibited substances detected. Action required before prescription release."
+    elif any(a.severity == "major" for a in alerts):
+        risk = "high"
+        safe = False
+        summary = f"{len(alerts)} high-severity interaction warning(s) detected. Clinical review and dose adjustment recommended."
+    elif any(a.severity == "moderate" for a in alerts):
+        risk = "medium"
+        safe = True
+        summary = f"{len(alerts)} moderate interaction(s) found. Monitor patient and verify therapeutic alternatives."
+    else:
+        risk = "low"
+        safe = True
+        summary = "No critical drug-drug interactions or allergy contraindications detected. Prescription safe to release."
+
+    return {
+        "safe_to_prescribe": safe,
+        "overall_risk_level": risk,
+        "total_alerts": len(alerts),
+        "alerts": alerts,
+        "schedule_x_intercepted": schedule_x_hit,
+        "summary": summary,
+    }
+
 
 
 # =============================================================================

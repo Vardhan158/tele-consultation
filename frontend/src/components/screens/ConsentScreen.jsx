@@ -141,12 +141,26 @@ export default function ConsentScreen({ onNavigate }) {
   const [toastMessage, setToastMessage] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Phase 2 (F-06): Granular Purpose-Bound Consent Ledger (ABDM Alignment) State
+  const [granularConsents, setGranularConsents] = useState([]);
+  const [showNewConsentModal, setShowNewConsentModal] = useState(false);
+  const [newPurposeCode, setNewPurposeCode] = useState("CARE");
+  const [newGranteeName, setNewGranteeName] = useState("");
+  const [newGranteeEntity, setNewGranteeEntity] = useState("");
+  const [newDataScopes, setNewDataScopes] = useState([
+    "OPD_CONSULT",
+    "PRESCRIPTIONS",
+  ]);
+  const [newValidityDays, setNewValidityDays] = useState(30);
+  const [isSubmittingGranular, setIsSubmittingGranular] = useState(false);
+
   const fetchConsents = async () => {
     try {
-      const [docsRes, consentsRes, historyRes] = await Promise.all([
+      const [docsRes, consentsRes, historyRes, granularRes] = await Promise.all([
         patientApi.consentDocuments().catch(() => DEFAULT_DOCUMENTS),
         patientApi.consents().catch(() => []),
         patientApi.consentHistory().catch(() => []),
+        patientApi.getGranularConsents().catch(() => []),
       ]);
 
       if (Array.isArray(docsRes) && docsRes.length > 0) {
@@ -155,6 +169,7 @@ export default function ConsentScreen({ onNavigate }) {
 
       const consentsList = Array.isArray(consentsRes) ? consentsRes : [];
       setConsents(consentsList);
+      setGranularConsents(Array.isArray(granularRes) ? granularRes : []);
 
       if (consentsList.length > 0) {
         const latest = consentsList[0];
@@ -323,6 +338,64 @@ export default function ConsentScreen({ onNavigate }) {
 
     setToastMessage("Consent audit record downloaded successfully.");
     setTimeout(() => setToastMessage(""), 3500);
+  };
+
+  const handleCreateGranularConsent = async (e) => {
+    e.preventDefault();
+    if (newDataScopes.length === 0) {
+      setToastMessage("Please select at least one data scope.");
+      return;
+    }
+    setIsSubmittingGranular(true);
+    try {
+      const descriptions = {
+        CARE: "Direct Clinical Teleconsultation Care",
+        EMERGENCY: "Emergency Paramedic & Trauma Care Access",
+        CLAIM: "Insurance Claim Processing & Adjudication",
+        LAB: "Diagnostic Laboratory Testing & Panels",
+        RESEARCH: "Anonymized Clinical Study & Health Research",
+      };
+      await patientApi.createGranularConsent({
+        purpose_code: newPurposeCode,
+        purpose_description: descriptions[newPurposeCode] || "Clinical Data Processing",
+        grantee_name: newGranteeName.trim() || "Treating Physician / Clinic Staff",
+        grantee_entity: newGranteeEntity.trim() || "Kaizen Teleconsultation Network",
+        data_scopes: newDataScopes,
+        validity_days: parseInt(newValidityDays, 10) || 30,
+      });
+      setToastMessage("Purpose-bound consent directive authorized and recorded.");
+      setShowNewConsentModal(false);
+      setNewGranteeName("");
+      setNewGranteeEntity("");
+      await fetchConsents();
+    } catch (err) {
+      setToastMessage(err.message || "Failed to create granular consent.");
+    } finally {
+      setIsSubmittingGranular(false);
+      setTimeout(() => setToastMessage(""), 4000);
+    }
+  };
+
+  const handleRevokeGranular = async (consentId) => {
+    try {
+      await patientApi.revokeGranularConsent(consentId, {
+        revocation_reason: "Patient digital discretion via consent portal",
+      });
+      setToastMessage("Consent directive revoked successfully.");
+      await fetchConsents();
+    } catch (err) {
+      setToastMessage(err.message || "Failed to revoke consent directive.");
+    } finally {
+      setTimeout(() => setToastMessage(""), 4000);
+    }
+  };
+
+  const toggleDataScope = (scope) => {
+    setNewDataScopes((prev) =>
+      prev.includes(scope)
+        ? prev.filter((s) => s !== scope)
+        : [...prev, scope],
+    );
   };
 
   const essentialDocs = documents.filter((d) => d.category === "essential");
@@ -612,6 +685,135 @@ export default function ConsentScreen({ onNavigate }) {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Phase 2 (F-06): Granular Purpose-Bound Consent Ledger (ABDM / Telemedicine Guidelines Alignment) */}
+        <div className="care-card p-7 sm:p-8 space-y-6 bg-white rounded-2xl border border-[#577877]/15">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-[#162623]">
+                  Granular Purpose-Bound Consent Ledger
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#E7F3F1] text-[#25836F] tracking-wide uppercase">
+                  ABDM &amp; MoHFW Aligned
+                </span>
+              </div>
+              <p className="text-xs text-[#577877] mt-1 leading-relaxed">
+                Purpose-specific digital consent artifacts controlling health data sharing by purpose, authorized recipient, and strict time limits.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowNewConsentModal(true)}
+              className="btn-primary !px-4 !py-2.5 text-xs font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">add_moderator</span>
+              <span>+ Authorize Purpose</span>
+            </button>
+          </div>
+
+          {granularConsents.length === 0 ? (
+            <div className="p-8 text-center text-[#577877] text-xs font-medium bg-[#F8FAFB] rounded-xl border border-dashed border-[#577877]/20 space-y-2">
+              <span className="material-symbols-outlined text-3xl text-[#25836F]">verified_user</span>
+              <p className="font-bold text-[#162623]">No active purpose-bound directives.</p>
+              <p className="max-w-md mx-auto">
+                Authorize specific clinicians, TPA insurers, or labs to access designated health data categories under explicit validity windows.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {granularConsents.map((item) => {
+                const isActive = item.status === "active";
+                const dtStart = item.valid_from ? new Date(item.valid_from) : new Date();
+                const dtEnd = item.valid_to ? new Date(item.valid_to) : new Date();
+
+                let purposeBadgeClass = "bg-teal-50 text-teal-800 border-teal-200";
+                if (item.purpose_code === "EMERGENCY") purposeBadgeClass = "bg-rose-50 text-rose-800 border-rose-200";
+                else if (item.purpose_code === "CLAIM") purposeBadgeClass = "bg-purple-50 text-purple-800 border-purple-200";
+                else if (item.purpose_code === "LAB") purposeBadgeClass = "bg-amber-50 text-amber-800 border-amber-200";
+                else if (item.purpose_code === "RESEARCH") purposeBadgeClass = "bg-sky-50 text-sky-800 border-sky-200";
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-5 rounded-2xl border transition space-y-3.5 ${
+                      isActive
+                        ? "bg-white border-[#577877]/20 shadow-2xs"
+                        : "bg-slate-50/70 border-slate-200 opacity-80"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${purposeBadgeClass}`}>
+                            {item.purpose_code} · {item.purpose_description}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              isActive
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {isActive ? "Active" : "Revoked"}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-bold text-[#162623] pt-0.5">
+                          {item.grantee_name}
+                        </h4>
+                        <p className="text-[11px] text-[#577877]">
+                          Institution: {item.grantee_entity}
+                        </p>
+                      </div>
+
+                      {isActive && (
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeGranular(item.id)}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition cursor-pointer"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Authorized Scopes */}
+                    <div className="space-y-1">
+                      <span className="text-[11px] text-[#577877] font-semibold">Authorized Data Scopes:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.data_scopes.map((scope, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-md bg-[#F0F5F7] text-[10px] font-mono text-[#162623] border border-[#577877]/10"
+                          >
+                            {scope}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ABDM Artifact Hash & Validity */}
+                    <div className="pt-2 border-t border-[#577877]/10 flex flex-col sm:flex-row sm:items-center sm:justify-between text-[11px] text-[#577877] gap-1">
+                      <span className="font-mono text-[10px] text-[#25836F]">
+                        ID: {item.abdm_artifact_id ? `${item.abdm_artifact_id.slice(0, 16)}…` : "Generated"}
+                      </span>
+                      <span>
+                        Valid: {dtStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {dtEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </span>
+                    </div>
+
+                    {!isActive && item.revocation_reason && (
+                      <p className="text-[11px] text-rose-700 italic">
+                        Reason: {item.revocation_reason}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Bottom Card: Dynamic Consent Activity History Table */}
@@ -907,6 +1109,154 @@ export default function ConsentScreen({ onNavigate }) {
                 Understood &amp; Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 2 (F-06): Authorize New Purpose Modal (ABDM Alignment) */}
+      {showNewConsentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
+                  add_moderator
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-[#162623]">
+                    Authorize Purpose-Bound Consent
+                  </h3>
+                  <p className="text-[11px] text-[#577877]">
+                    ABDM Consent Artifact Specification v2.0
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewConsentModal(false)}
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateGranularConsent} className="space-y-4 text-xs">
+              {/* Purpose Code Selection */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#162623]">
+                  Authorized Purpose Category *
+                </label>
+                <select
+                  value={newPurposeCode}
+                  onChange={(e) => setNewPurposeCode(e.target.value)}
+                  className="w-full rounded-xl border border-[#577877]/30 bg-white px-3 py-2 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
+                >
+                  <option value="CARE">Direct Clinical Care &amp; Teleconsultation (CARE)</option>
+                  <option value="EMERGENCY">Emergency Trauma &amp; Paramedic Access (EMERGENCY)</option>
+                  <option value="CLAIM">TPA &amp; Insurance Claim Adjudication (CLAIM)</option>
+                  <option value="LAB">Diagnostic Laboratory Testing &amp; Panels (LAB)</option>
+                  <option value="RESEARCH">Anonymized Clinical Research (RESEARCH)</option>
+                </select>
+              </div>
+
+              {/* Grantee Name */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#162623]">
+                  Authorized Clinician / Recipient Name
+                </label>
+                <input
+                  type="text"
+                  value={newGranteeName}
+                  onChange={(e) => setNewGranteeName(e.target.value)}
+                  placeholder="e.g. Dr. Priya Sharma, or On-Duty Paramedic"
+                  className="w-full rounded-xl border border-[#577877]/30 bg-white px-3.5 py-2 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
+                />
+              </div>
+
+              {/* Grantee Entity */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#162623]">
+                  Authorized Entity / Institution
+                </label>
+                <input
+                  type="text"
+                  value={newGranteeEntity}
+                  onChange={(e) => setNewGranteeEntity(e.target.value)}
+                  placeholder="e.g. Apollo Tele-Clinic, Star Health TPA, SRL Diagnostics"
+                  className="w-full rounded-xl border border-[#577877]/30 bg-white px-3.5 py-2 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
+                />
+              </div>
+
+              {/* Data Scopes */}
+              <div className="space-y-2">
+                <label className="font-bold text-[#162623] block">
+                  Permitted Health Data Scopes *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "OPD_CONSULT", label: "Consultation Notes" },
+                    { id: "PRESCRIPTIONS", label: "e-Prescriptions" },
+                    { id: "DIAGNOSTIC_REPORTS", label: "Lab / Diagnostic Reports" },
+                    { id: "VITALS_HISTORY", label: "Longitudinal Vitals" },
+                  ].map((scope) => (
+                    <label
+                      key={scope.id}
+                      className="flex items-center gap-2 p-2.5 rounded-xl border border-[#577877]/15 bg-[#FAFDFD] cursor-pointer hover:bg-[#F0F5F7] transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={newDataScopes.includes(scope.id)}
+                        onChange={() => toggleDataScope(scope.id)}
+                        className="rounded text-[#25836F] focus:ring-[#25836F]"
+                      />
+                      <span className="text-[11px] font-medium text-[#162623]">
+                        {scope.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Validity Window */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#162623]">
+                  Consent Validity Period
+                </label>
+                <select
+                  value={newValidityDays}
+                  onChange={(e) => setNewValidityDays(Number(e.target.value))}
+                  className="w-full rounded-xl border border-[#577877]/30 bg-white px-3 py-2 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
+                >
+                  <option value={7}>7 Days (Single Treatment Episode)</option>
+                  <option value={30}>30 Days (Standard Episode Window)</option>
+                  <option value={90}>90 Days (Quarterly Management)</option>
+                  <option value={180}>180 Days (Semi-Annual Care Plan)</option>
+                  <option value={365}>365 Days (Annual Chronic Care)</option>
+                </select>
+              </div>
+
+              {/* ABDM Statutory Notice */}
+              <div className="p-3 bg-[#E8F3F3] border border-[#25836F]/20 rounded-xl text-[11px] text-[#577877] space-y-1 leading-relaxed">
+                <strong className="text-[#162623]">Digital Governance:</strong> A cryptographic ABDM artifact hash will be generated. You can revoke this authorization at any time with immediate effect.
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowNewConsentModal(false)}
+                  className="btn-secondary text-xs !py-2 !px-4 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingGranular || newDataScopes.length === 0}
+                  className="btn-primary text-xs !py-2 !px-5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingGranular ? "Authorizing…" : "Authorize & Sign Directive"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -26,15 +26,30 @@ async def get_principal(request: Request) -> Principal:
     """
     raw_token = request.cookies.get("teleconsult_session")
     if not raw_token or not mongo_database.enabled:
-        if get_settings().environment in {"dev", "local"} and request.headers.get("X-Dev-Patient-Id"):
-            user_id = request.headers["X-Dev-Patient-Id"]
-            tenant_id = request.headers.get("X-Dev-Tenant-Id") or get_settings().default_tenant_id
-            return Principal(
-                user_id=user_id,
-                tenant_id=tenant_id,
-                roles=frozenset({"patient"}),
-                permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read", "insurance:read", "insurance:write"}),
-            )
+        if get_settings().environment in {"dev", "local"}:
+            if request.headers.get("X-Dev-Doctor-Id"):
+                user_id = request.headers["X-Dev-Doctor-Id"]
+                tenant_id = request.headers.get("X-Dev-Tenant-Id") or get_settings().default_tenant_id
+                return Principal(
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    roles=frozenset({"doctor"}),
+                    permissions=frozenset({
+                        "doctor:profile:read", "doctor:profile:write", "doctor:availability:read",
+                        "doctor:availability:write", "doctor:appointment:read", "doctor:appointment:write",
+                        "consultation:join", "consultation:admit", "consultation:complete", "clinical:read",
+                        "clinical:write", "clinical:publish", "records:read", "prescription:read", "notification:read",
+                    }),
+                )
+            if request.headers.get("X-Dev-Patient-Id"):
+                user_id = request.headers["X-Dev-Patient-Id"]
+                tenant_id = request.headers.get("X-Dev-Tenant-Id") or get_settings().default_tenant_id
+                return Principal(
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    roles=frozenset({"patient"}),
+                    permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read", "insurance:read", "insurance:write"}),
+                )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     else:
         import hashlib

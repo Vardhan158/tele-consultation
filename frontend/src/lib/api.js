@@ -71,6 +71,18 @@ export const patientApi = {
   bookingOptions: () => apiRequest("/api/v1/patient/booking-options"),
   profile: () => apiRequest("/patient/profile"),
   getEmergencyCard: () => apiRequest("/patient/emergency-card"),
+  getHealthTimeline: () => apiRequest("/patient/health-timeline"),
+  getGranularConsents: () => apiRequest("/patient/consents/granular-ledger"),
+  createGranularConsent: (payload) =>
+    apiRequest("/patient/consents/granular-ledger", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  revokeGranularConsent: (id, payload) =>
+    apiRequest(`/patient/consents/granular-ledger/${id}/revoke`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   updateProfile: (profile) =>
     apiRequest("/patient/profile", {
       method: "PATCH",
@@ -260,6 +272,11 @@ export const doctorApi = {
     }),
   publishPrescription: (payload) =>
     apiRequest("/clinician/clinical-outputs/prescriptions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  checkDrugSafety: (payload) =>
+    apiRequest("/clinician/clinical-outputs/check-drug-safety", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
@@ -471,6 +488,11 @@ export const clinicalApi = {
   pharmacyOrders: () => apiRequest("/patient/clinical-outputs/pharmacy-orders"),
   verifySignature: (prescriptionId) =>
     apiRequest(`/patient/clinical-outputs/prescriptions/${prescriptionId}/verify-signature`),
+  checkDrugSafety: (payload) =>
+    apiRequest("/clinician/clinical-outputs/check-drug-safety", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const abdmApi = {

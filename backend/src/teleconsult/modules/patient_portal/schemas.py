@@ -1,3 +1,4 @@
+from typing import Any
 import re
 from datetime import datetime
 from uuid import UUID
@@ -259,4 +260,62 @@ class EmergencyParamedicCardResponse(BaseModel):
     clinic_phone: str = "+91 80 4567 8900"
     emergency_hotlines: list[dict[str, str]] = Field(default_factory=list)
     generated_at: str
+
+
+# =====================================================================
+# Phase 2 (F-04): Chrono-Care Timeline & Longitudinal Trends Schemas
+# =====================================================================
+
+class ChronoTimelineEvent(BaseModel):
+    id: str
+    event_type: str  # "consultation", "prescription", "summary", "record", "follow_up", "vital_reading"
+    title: str
+    timestamp: str
+    clinician_name: str | None = None
+    specialty: str | None = None
+    summary: str | None = None
+    status: str | None = None
+    badge: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class PatientHealthTimelineResponse(BaseModel):
+    patient_id: str
+    patient_name: str
+    total_events: int
+    events: list[ChronoTimelineEvent]
+    vital_trends: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+
+
+# =====================================================================
+# Phase 2 (F-06): Granular Purpose-Bound Consent Ledger Schemas
+# =====================================================================
+
+class GranularConsentCreateRequest(BaseModel):
+    purpose_code: str = Field(description="CARE, CLAIM, LAB, EMERGENCY, RESEARCH")
+    purpose_title: str
+    data_types: list[str] = Field(default_factory=lambda: ["prescriptions", "summaries"])
+    validity_days: int = 365
+    delegate_entity: str | None = None
+
+
+class GranularConsentRevokeRequest(BaseModel):
+    reason: str | None = None
+
+
+class GranularConsentRecord(BaseModel):
+    id: str
+    patient_id: str
+    purpose_code: str
+    purpose_title: str
+    data_types: list[str]
+    granted_at: str
+    expires_at: str | None = None
+    status: str  # "active", "revoked", "expired"
+    revoked_at: str | None = None
+    revocation_reason: str | None = None
+    delegate_entity: str | None = None
+    abdm_artifact_id: str
+    hip_id: str = "IN-KAIZEN-CARE-01"
+
 

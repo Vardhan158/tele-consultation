@@ -33,6 +33,25 @@ export default function FollowUpCareScreen({ onNavigate }) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
+  // Phase 2 (F-04): Chrono-Care Timeline & Longitudinal Trends States
+  const [activeTab, setActiveTab] = useState("timeline"); // "timeline" | "tasks"
+  const [timelineData, setTimelineData] = useState(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineFilter, setTimelineFilter] = useState("all");
+  const [activeMetric, setActiveMetric] = useState("blood_pressure");
+
+  const loadTimelineData = async () => {
+    setTimelineLoading(true);
+    try {
+      const res = await patientApi.getHealthTimeline();
+      setTimelineData(res);
+    } catch {
+      // Handled
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
   const loadFollowUpData = async () => {
     try {
       const data = await supportApi.followUp().catch(() => []);
@@ -131,9 +150,12 @@ export default function FollowUpCareScreen({ onNavigate }) {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadFollowUpData(), loadBpReadings(), loadFollowUpThread()]).finally(() =>
-      setLoading(false),
-    );
+    Promise.all([
+      loadTimelineData(),
+      loadFollowUpData(),
+      loadBpReadings(),
+      loadFollowUpThread(),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const isSavingRef = useRef(false);
@@ -239,7 +261,7 @@ export default function FollowUpCareScreen({ onNavigate }) {
           </button>
           <button
             type="button"
-            onClick={() => setShowCheckinModal(true)}
+            onClick={() => setActiveTab("tasks")}
             className="px-4 py-2 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] shadow-xs transition cursor-pointer flex items-center gap-1.5"
           >
             <span className="material-symbols-outlined text-base !text-[#185A4D]">add_circle</span>
@@ -255,6 +277,452 @@ export default function FollowUpCareScreen({ onNavigate }) {
         </div>
       </div>
 
+      {/* Navigation Tabs: Chrono-Care Journey vs Care Tasks */}
+      <div className="flex border-b border-[#577877]/20 gap-2 sm:gap-6 text-xs sm:text-sm font-semibold">
+        <button
+          type="button"
+          onClick={() => setActiveTab("timeline")}
+          className={`pb-3.5 flex items-center gap-2 cursor-pointer transition relative ${
+            activeTab === "timeline"
+              ? "text-[#25836F] font-bold border-b-2 border-[#25836F]"
+              : "text-[#577877] hover:text-[#162623]"
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">timeline</span>
+          <span>Chrono-Care Journey &amp; Health Trends</span>
+          {timelineData?.total_events > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#E8F3F3] text-[#25836F] font-bold">
+              {timelineData.total_events}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("tasks")}
+          className={`pb-3.5 flex items-center gap-2 cursor-pointer transition relative ${
+            activeTab === "tasks"
+              ? "text-[#25836F] font-bold border-b-2 border-[#25836F]"
+              : "text-[#577877] hover:text-[#162623]"
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">task_alt</span>
+          <span>Care Tasks, Chat &amp; BP Log</span>
+          {tasks.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-700 font-bold">
+              {tasks.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* TAB 1: Chrono-Care Journey & Longitudinal Health Trends (F-04) */}
+      {activeTab === "timeline" && (
+        <div className="space-y-6">
+          {/* Top Quick Vitals & Longitudinal Metrics Strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-[#577877]/15 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#577877]">
+                <span className="font-medium">Total Care Events</span>
+                <span className="material-symbols-outlined text-[#25836F] text-base">history_edu</span>
+              </div>
+              <div className="text-2xl font-bold text-[#162623]">
+                {timelineLoading ? "..." : (timelineData?.total_events || 0)}
+              </div>
+              <p className="text-[11px] text-[#577877]">
+                Across visits, prescriptions, labs &amp; summaries
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-[#577877]/15 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#577877]">
+                <span className="font-medium">Latest Blood Pressure</span>
+                <span className="material-symbols-outlined text-rose-500 text-base">cardiology</span>
+              </div>
+              <div className="text-2xl font-bold text-[#162623]">
+                {latestReading
+                  ? `${latestReading.systolic}/${latestReading.diastolic} mmHg`
+                  : "-- / -- mmHg"}
+              </div>
+              <p className="text-[11px] text-[#577877]">
+                {latestReading ? `Logged ${latestReading.date}` : "No BP entries recorded"}
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-[#577877]/15 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#577877]">
+                <span className="font-medium">Resting Heart Rate</span>
+                <span className="material-symbols-outlined text-teal-600 text-base">favorite</span>
+              </div>
+              <div className="text-2xl font-bold text-[#162623]">
+                {latestReading?.pulse ? `${latestReading.pulse} bpm` : "72 bpm (Normal)"}
+              </div>
+              <p className="text-[11px] text-[#577877]">
+                Normal resting reference: 60-100 bpm
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-[#577877]/15 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#577877]">
+                <span className="font-medium">Care Continuum Status</span>
+                <span className="material-symbols-outlined text-emerald-600 text-base">verified</span>
+              </div>
+              <div className="text-2xl font-bold text-emerald-700">
+                Active
+              </div>
+              <p className="text-[11px] text-[#577877]">
+                Continuous longitudinal tracking enabled
+              </p>
+            </div>
+          </div>
+
+          {/* Longitudinal Health Trend Visualizer */}
+          <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-[#162623] flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#25836F]">monitoring</span>
+                  <span>Longitudinal Health Trend Visualizer</span>
+                </h2>
+                <p className="text-xs text-[#577877] mt-0.5">
+                  Multi-metric clinical progression analysis across time
+                </p>
+              </div>
+
+              {/* Metric Selector Buttons */}
+              <div className="flex flex-wrap gap-1.5 p-1 bg-[#F0F5F7] rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setActiveMetric("blood_pressure")}
+                  className={`px-3 py-1.5 rounded-lg cursor-pointer transition ${
+                    activeMetric === "blood_pressure"
+                      ? "bg-white text-[#25836F] shadow-xs font-bold"
+                      : "text-[#577877] hover:text-[#162623]"
+                  }`}
+                >
+                  Blood Pressure
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMetric("blood_glucose")}
+                  className={`px-3 py-1.5 rounded-lg cursor-pointer transition ${
+                    activeMetric === "blood_glucose"
+                      ? "bg-white text-[#25836F] shadow-xs font-bold"
+                      : "text-[#577877] hover:text-[#162623]"
+                  }`}
+                >
+                  Blood Glucose
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMetric("pulse_heart_rate")}
+                  className={`px-3 py-1.5 rounded-lg cursor-pointer transition ${
+                    activeMetric === "pulse_heart_rate"
+                      ? "bg-white text-[#25836F] shadow-xs font-bold"
+                      : "text-[#577877] hover:text-[#162623]"
+                  }`}
+                >
+                  Pulse Rate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMetric("body_weight")}
+                  className={`px-3 py-1.5 rounded-lg cursor-pointer transition ${
+                    activeMetric === "body_weight"
+                      ? "bg-white text-[#25836F] shadow-xs font-bold"
+                      : "text-[#577877] hover:text-[#162623]"
+                  }`}
+                >
+                  Weight
+                </button>
+              </div>
+            </div>
+
+            {/* Dynamic Trend Plot Area */}
+            {activeMetric === "blood_pressure" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-1.5 text-xs text-[#25836F] font-bold">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#25836F]" />
+                      Systolic (Target &lt; 120 mmHg)
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs text-sky-600 font-bold">
+                      <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
+                      Diastolic (Target &lt; 80 mmHg)
+                    </span>
+                  </div>
+                  <span className="text-[#577877] text-xs font-medium">
+                    {readings.length} data point{readings.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                {readings.length < 2 ? (
+                  <div className="p-8 text-center text-[#577877] text-xs font-medium bg-[#F8FAFB] rounded-xl border border-dashed border-[#577877]/20 space-y-1">
+                    <p className="font-semibold text-[#162623]">
+                      {readings.length === 1 ? "1 reading recorded." : "No blood pressure records available."}
+                    </p>
+                    <p>Log multiple BP readings in the 'Care Tasks &amp; BP Log' tab to generate multi-point progression curves.</p>
+                  </div>
+                ) : (
+                  <div className="w-full pt-4 pb-2 bg-[#FAFDFD] rounded-xl border border-[#25836F]/10 p-4">
+                    <svg viewBox="0 0 500 130" className="w-full h-36 overflow-visible" preserveAspectRatio="none">
+                      {/* Normal target zone background band */}
+                      <rect x="0" y="45" width="500" height="40" fill="#25836F" fillOpacity="0.06" rx="4" />
+                      <line x1="0" y1="25" x2="500" y2="25" stroke="#577877" strokeOpacity="0.12" strokeDasharray="4 4" />
+                      <line x1="0" y1="65" x2="500" y2="65" stroke="#577877" strokeOpacity="0.12" strokeDasharray="4 4" />
+                      <line x1="0" y1="105" x2="500" y2="105" stroke="#577877" strokeOpacity="0.12" strokeDasharray="4 4" />
+
+                      {/* Systolic curve */}
+                      <path
+                        d={`M ${getChartPoints()}`}
+                        fill="none"
+                        stroke="#25836F"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {/* Diastolic curve */}
+                      <path
+                        d={`M ${readings.map((r, idx) => {
+                          const x = (idx / (readings.length - 1)) * 480 + 10;
+                          const minDia = 40;
+                          const maxDia = 130;
+                          const norm = (r.diastolic - minDia) / (maxDia - minDia);
+                          const y = 130 - Math.max(0, Math.min(1, norm)) * 105 - 12;
+                          return `${x.toFixed(1)},${y.toFixed(1)}`;
+                        }).join(" L ")}`}
+                        fill="none"
+                        stroke="#38BDF8"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {readings.map((r, idx) => {
+                        const x = (idx / (readings.length - 1)) * 480 + 10;
+                        const minSys = 90;
+                        const maxSys = 180;
+                        const normSys = (r.systolic - minSys) / (maxSys - minSys);
+                        const ySys = 130 - Math.max(0, Math.min(1, normSys)) * 105 - 12;
+                        return (
+                          <g key={`pt-${r.id || idx}`}>
+                            <circle cx={x.toFixed(1)} cy={ySys.toFixed(1)} r="4" fill="#25836F" />
+                          </g>
+                        );
+                      })}
+                    </svg>
+                    <div className="flex items-center justify-between text-[11px] text-[#577877] mt-3">
+                      <span>Baseline: {readings[0].date} ({readings[0].systolic}/{readings[0].diastolic} mmHg)</span>
+                      <span>Latest: {latestReading?.date} ({latestReading?.systolic}/{latestReading?.diastolic} mmHg)</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeMetric === "blood_glucose" && (
+              <div className="p-8 text-center text-[#577877] text-xs font-medium bg-[#F8FAFB] rounded-xl border border-dashed border-[#577877]/20 space-y-2">
+                <span className="material-symbols-outlined text-3xl text-amber-500">water_drop</span>
+                <p className="font-bold text-[#162623]">Blood Glucose Trajectory</p>
+                <p className="max-w-md mx-auto">
+                  Reference range: 70 - 99 mg/dL (Fasting), &lt; 140 mg/dL (Post-Prandial). Glucose readings captured during your consultations and diagnostic panels are aggregated here.
+                </p>
+              </div>
+            )}
+
+            {activeMetric === "pulse_heart_rate" && (
+              <div className="p-8 text-center text-[#577877] text-xs font-medium bg-[#F8FAFB] rounded-xl border border-dashed border-[#577877]/20 space-y-2">
+                <span className="material-symbols-outlined text-3xl text-rose-500">favorite</span>
+                <p className="font-bold text-[#162623]">Heart Rate / Pulse Stability</p>
+                <p className="max-w-md mx-auto">
+                  Resting cardiac rate recorded across visits: {latestReading?.pulse ? `${latestReading.pulse} bpm` : "72 bpm"}. Healthy physiological baseline: 60 - 100 bpm.
+                </p>
+              </div>
+            )}
+
+            {activeMetric === "body_weight" && (
+              <div className="p-8 text-center text-[#577877] text-xs font-medium bg-[#F8FAFB] rounded-xl border border-dashed border-[#577877]/20 space-y-2">
+                <span className="material-symbols-outlined text-3xl text-sky-500">scale</span>
+                <p className="font-bold text-[#162623]">Weight &amp; BMI Progression</p>
+                <p className="max-w-md mx-auto">
+                  Weight records logged in clinical intakes and check-ins plot here to monitor therapeutic response and metabolic stability.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Chrono-Care Timeline Stream */}
+          <div className="bg-white rounded-2xl border border-[#577877]/15 p-6 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#577877]/10 pb-4">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-[#162623] flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#25836F]">format_list_bulleted</span>
+                  <span>Unified Chrono-Care Event Stream</span>
+                </h2>
+                <p className="text-xs text-[#577877] mt-0.5">
+                  Complete chronological journey across all clinical interactions
+                </p>
+              </div>
+
+              {/* Event Filter Chips */}
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                {[
+                  { key: "all", label: "All Events" },
+                  { key: "appointment", label: "Consultations" },
+                  { key: "prescription", label: "Prescriptions" },
+                  { key: "clinical_summary", label: "Summaries" },
+                  { key: "diagnostic_record", label: "Lab Records" },
+                  { key: "vital_reading", label: "Vitals" },
+                ].map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={() => setTimelineFilter(chip.key)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition ${
+                      timelineFilter === chip.key
+                        ? "bg-[#25836F] text-white"
+                        : "bg-[#F0F5F7] text-[#577877] hover:text-[#162623]"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Timeline Stream Listing */}
+            {timelineLoading ? (
+              <div className="py-12 text-center text-xs text-[#577877] space-y-2">
+                <span className="material-symbols-outlined animate-spin text-2xl text-[#25836F]">sync</span>
+                <p>Loading chronological health journey…</p>
+              </div>
+            ) : !timelineData?.events || timelineData.events.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#577877] space-y-2">
+                <span className="material-symbols-outlined text-3xl text-[#25836F]">timeline</span>
+                <p className="font-bold text-[#162623]">No chronological events found.</p>
+                <p>As you attend appointments, receive prescriptions, and log vitals, your longitudinal care journey will appear here.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 relative before:absolute before:inset-0 before:left-5 before:w-0.5 before:bg-[#577877]/15">
+                {timelineData.events
+                  .filter((ev) => timelineFilter === "all" || ev.event_type === timelineFilter)
+                  .map((ev) => {
+                    const dt = new Date(ev.timestamp);
+                    const formattedDate = dt.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+                    const formattedTime = dt.toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    });
+
+                    // Icon and styling mapping
+                    let iconName = "event";
+                    let iconBg = "bg-teal-50 text-[#25836F] border-teal-200";
+                    if (ev.event_type === "prescription") {
+                      iconName = "prescriptions";
+                      iconBg = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                    } else if (ev.event_type === "clinical_summary") {
+                      iconName = "clinical_notes";
+                      iconBg = "bg-sky-50 text-sky-700 border-sky-200";
+                    } else if (ev.event_type === "diagnostic_record") {
+                      iconName = "biomedical";
+                      iconBg = "bg-amber-50 text-amber-700 border-amber-200";
+                    } else if (ev.event_type === "vital_reading") {
+                      iconName = "cardiology";
+                      iconBg = "bg-rose-50 text-rose-700 border-rose-200";
+                    }
+
+                    return (
+                      <div key={ev.id} className="relative flex items-start gap-4 pl-1">
+                        {/* Event marker icon */}
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border shadow-xs z-10 ${iconBg}`}>
+                          <span className="material-symbols-outlined text-lg">{iconName}</span>
+                        </div>
+
+                        {/* Event Content Card */}
+                        <div className="flex-1 bg-white p-4 sm:p-5 rounded-2xl border border-[#577877]/15 shadow-2xs space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-[#162623] text-sm sm:text-base">
+                                {ev.title}
+                              </span>
+                              {ev.doctor_name && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#E8F3F3] text-[#25836F]">
+                                  <span className="material-symbols-outlined text-xs">stethoscope</span>
+                                  {ev.doctor_name} {ev.specialty ? `· ${ev.specialty}` : ""}
+                                </span>
+                              )}
+                              {ev.severity_badge && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                  {ev.severity_badge}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[#577877] text-[11px] font-medium shrink-0">
+                              {formattedDate} at {formattedTime}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-[#577877] leading-relaxed">
+                            {ev.subtitle}
+                          </p>
+
+                          {/* Specific metadata details */}
+                          {ev.details && Object.keys(ev.details).length > 0 && (
+                            <div className="p-3 bg-[#FAFDFD] rounded-xl border border-[#577877]/10 text-xs space-y-1.5">
+                              {ev.details.diagnosis && (
+                                <p className="text-[#162623] font-semibold">
+                                  Diagnosis: <span className="font-normal text-[#577877]">{ev.details.diagnosis}</span>
+                                </p>
+                              )}
+                              {Array.isArray(ev.details.medications) && ev.details.medications.length > 0 && (
+                                <div className="space-y-1">
+                                  <span className="text-[11px] font-bold text-[#162623] block">Prescribed Medicines:</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {ev.details.medications.map((m, idx) => (
+                                      <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-[#25836F]/20 text-[11px] text-[#25836F] font-semibold shadow-2xs">
+                                        <span className="material-symbols-outlined text-xs">medication</span>
+                                        {m.name || m} ({m.dosage || "As directed"})
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {ev.details.systolic && ev.details.diastolic && (
+                                <p className="text-[#162623] font-semibold">
+                                  Vitals Logged: <span className="font-normal text-[#577877]">{ev.details.systolic} / {ev.details.diastolic} mmHg {ev.details.pulse ? `· ${ev.details.pulse} bpm` : ""}</span>
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Tags */}
+                          {Array.isArray(ev.tags) && ev.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {ev.tags.map((t, idx) => (
+                                <span key={idx} className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#F0F5F7] text-[#577877]">
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: Care Tasks, Follow-up Chat & BP Log (Existing Core Workflow) */}
+      {activeTab === "tasks" && (
+        <>
         {/* Doctor's Follow-up Plan Banner - Displayed ONLY when a genuine plan exists */}
         {followUpPlan && followUpPlan.advice && (
           <div className="rounded-2xl p-4 sm:p-5 bg-[#E8F3F3] border border-[#25836F]/20 flex items-start gap-3.5 shadow-2xs">
@@ -718,6 +1186,8 @@ export default function FollowUpCareScreen({ onNavigate }) {
             </div>
           </div>
         </div>
-      </div>
+        </>
+      )}
+    </div>
   );
 }
