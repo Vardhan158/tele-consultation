@@ -947,6 +947,38 @@ export default function DoctorRegistrationScreen({
                       </div>
                     )}
 
+                    {licenseCheck.result && !licenseCheck.verified && licenseCheck.result.status === "REGISTRY_NOT_FOUND" && (
+                      <div className="rounded-lg bg-amber-50 border border-amber-300 p-2.5 text-xs text-amber-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                          <span className="material-symbols-outlined text-sm text-amber-600">warning</span>
+                          <span>{licenseCheck.result.status_label}</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          {licenseCheck.result.remarks}
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1 text-[10px] font-medium">
+                          <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">Status: Unverified</span>
+                          <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">Action: Certificate Upload Required</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {licenseCheck.result && !licenseCheck.verified && licenseCheck.result.status === "NAME_MISMATCH" && (
+                      <div className="rounded-lg bg-red-50 border border-red-300 p-2.5 text-xs text-red-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-red-900">
+                          <span className="material-symbols-outlined text-sm text-red-600">gavel</span>
+                          <span>{licenseCheck.result.status_label}</span>
+                        </div>
+                        <p className="text-[11px] text-red-800 leading-relaxed">
+                          {licenseCheck.result.remarks}
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1 text-[10px] font-medium">
+                          <span className="bg-red-100 text-red-900 px-1.5 py-0.5 rounded border border-red-300">Fraud Alert: Identity Mismatch</span>
+                          <span className="bg-red-100 text-red-900 px-1.5 py-0.5 rounded border border-red-300">Status: Rejected</span>
+                        </div>
+                      </div>
+                    )}
+
                     {licenseCheck.error && (
                       <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-900 flex items-start gap-1.5">
                         <span className="material-symbols-outlined text-sm text-amber-600 shrink-0 mt-0.5">warning</span>
@@ -966,8 +998,17 @@ export default function DoctorRegistrationScreen({
                         value={form.hpr_id || ""}
                         onChange={update}
                         placeholder="e.g. 12-3456-7890-1234 or dr.name@hpr"
-                        className="w-full h-9 px-3 rounded-lg border border-[#577877]/20 bg-white text-xs text-[#162623] placeholder:text-[#577877]/40 focus:outline-none focus:border-[#25836F] transition"
+                        className={`w-full h-9 px-3 rounded-lg border bg-white text-xs text-[#162623] placeholder:text-[#577877]/40 focus:outline-none transition ${
+                          form.hpr_id && !(/^(\d{2}-\d{4}-\d{4}-\d{4}|\d{14}|[a-zA-Z0-9._-]+@(hpr|abdm|hpr\.abdm))$/i.test(form.hpr_id.trim()))
+                            ? "border-red-400 focus:border-red-500"
+                            : "border-[#577877]/20 focus:border-[#25836F]"
+                        }`}
                       />
+                      {form.hpr_id && !(/^(\d{2}-\d{4}-\d{4}-\d{4}|\d{14}|[a-zA-Z0-9._-]+@(hpr|abdm|hpr\.abdm))$/i.test(form.hpr_id.trim())) && (
+                        <p className="text-[10px] text-red-600 mt-1">
+                          ⚠️ Invalid ABDM HP-ID format. Must be 14 digits (e.g. 12-3456-7890-1234) or valid @hpr handle.
+                        </p>
+                      )}
                     </div>
                   </div>
 

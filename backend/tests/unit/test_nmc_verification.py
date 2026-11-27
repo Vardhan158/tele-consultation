@@ -108,20 +108,37 @@ def test_verify_license_ground_truth_match():
     assert result.verification_receipt_id.startswith("NMC-")
 
 
-def test_verify_license_pattern_match_unregistered_num():
-    """Verify pattern validation succeeds for valid format not in mock registry."""
+def test_verify_license_fake_doctor_rejected():
+    """Verify that fake or unlisted doctor numbers are NOT marked as verified."""
     req = DoctorVerificationRequest(
-        full_name="Dr. Vikram Patel",
-        registration_number="MMC-99881",
-        medical_council="Maharashtra Medical Council",
-        specialty="General Surgery",
+        full_name="Fake Doctor",
+        registration_number="KMC-246378",
+        medical_council="Karnataka Medical Council",
+        specialty="Cardiology",
     )
     result = MedicalCouncilVerificationEngine.verify_license(req)
 
-    assert result.is_valid is True
-    assert result.status == "VERIFIED_ACTIVE"
-    assert result.council_code == "MMC"
-    assert result.confidence_score >= 0.85
+    assert result.is_valid is False
+    assert result.status == "REGISTRY_NOT_FOUND"
+    assert "Not Found in Karnataka Medical Council Registry" in result.status_label
+    assert result.confidence_score == 0.0
+    assert "NOT found in the active" in result.remarks
+
+
+def test_verify_license_name_mismatch_fraud_detection():
+    """Verify that real registration used with mismatched physician name is flagged as fraud."""
+    req = DoctorVerificationRequest(
+        full_name="Dr. Impersonator Sharma",
+        registration_number="KMC-2014-98745",  # Officially belongs to Dr. Arvind Rao
+        medical_council="Karnataka Medical Council",
+    )
+    result = MedicalCouncilVerificationEngine.verify_license(req)
+
+    assert result.is_valid is False
+    assert result.status == "NAME_MISMATCH"
+    assert "Registered to Dr. Arvind Rao" in result.status_label
+    assert result.confidence_score == 0.1
+    assert "Fraud Alert" in result.remarks
 
 
 def test_verify_license_invalid_council():
