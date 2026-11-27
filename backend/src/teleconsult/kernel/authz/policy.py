@@ -33,7 +33,7 @@ async def get_principal(request: Request) -> Principal:
                 user_id=user_id,
                 tenant_id=tenant_id,
                 roles=frozenset({"patient"}),
-                permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read"}),
+                permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read", "insurance:read", "insurance:write"}),
             )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     else:

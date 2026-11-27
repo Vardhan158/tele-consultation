@@ -231,8 +231,8 @@ async def get_patient_unread_count(
 
 @router.post("/read-all")
 async def mark_all_read(
-    session: Any | None = None,
     principal: Principal = Depends(require("notification:read")),
+    session: Any | None = None,
 ) -> dict[str, str]:
     if not get_settings().mongodb_enabled and not mongo_database.enabled:
         raise HTTPException(status_code=503, detail="Database unavailable")
