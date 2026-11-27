@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { Vector3 } from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { refineStorySurface } from './storySurfaces';
@@ -9,18 +10,39 @@ import { finaleFrame, finaleProgress } from './finaleTimeline';
 
 export default function LivingRoom({ controller, finaleController }) {
   const { scene } = useGLTF('/assets/house/living-room.glb', false);
+  const { scene: sofa } = useGLTF('/assets/house/lounge-sofa.glb', false);
   const windowFill = useRef(null);
   const warmFill = useRef(null);
   const room = useMemo(() => {
     const root = scene.clone(true);
+    root.getObjectByName('LivingRoom_Sage_upholstery').removeFromParent();
+    // The original export batches the six cushions together with the rug borders.
+    const linen = root.getObjectByName('LivingRoom_Oatmeal_linen');
+    linen.updateWorldMatrix(true, false);
+    const source = linen.geometry;
+    const borderIndices = [];
+    const vertex = new Vector3();
+    for (let i = 0; i < source.index.count; i += 3) {
+      const first = source.index.getX(i);
+      vertex.fromBufferAttribute(source.attributes.position, first).applyMatrix4(linen.matrixWorld);
+      if (vertex.y < .23) borderIndices.push(first, source.index.getX(i + 1), source.index.getX(i + 2));
+    }
+    linen.geometry = source.clone();
+    linen.geometry.setIndex(borderIndices);
+    const replacement = sofa.clone(true);
+    replacement.position.set(4.42, .188, -3.26);
+    replacement.traverse((part) => {
+      if (part.isMesh) part.castShadow = part.receiveShadow = true;
+    });
     root.traverse((object) => {
       if (!object.isMesh) return;
       object.receiveShadow = true;
       refineStorySurface(object);
       object.castShadow = ['Oatmeal linen', 'Sage upholstery', 'Oiled walnut'].includes(object.material.name);
     });
+    root.add(replacement);
     return root;
-  }, [scene]);
+  }, [scene, sofa]);
   useFrame(() => {
     const { dusk, sunlight } = finaleFrame(finaleProgress(finaleController.progress));
     if (windowFill.current) windowFill.current.intensity = 38 - 27 * dusk;

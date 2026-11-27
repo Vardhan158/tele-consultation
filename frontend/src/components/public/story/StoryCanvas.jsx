@@ -72,7 +72,7 @@ export default function StoryCanvas({ controller, visible }) {
         <CameraRig controller={renderProgress} />
         <Suspense fallback={null}>
           <Environment files="/assets/house/daylight.hdr" environmentIntensity={0.45} />
-          <HouseScene controller={chapters} />
+          <HouseScene controller={chapters} finaleController={renderProgress} />
           <PharmacyTravel controller={chapters} />
           <SceneReady onReady={setBaseReady} />
         </Suspense>
