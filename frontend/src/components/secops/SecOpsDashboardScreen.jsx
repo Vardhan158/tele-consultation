@@ -475,7 +475,7 @@ function SecOpsDashboardContent({ user, onLogout }) {
     <div className="min-h-screen bg-[#F0F5F7] text-[#162623] font-sans flex flex-col">
       {/* Top Header */}
       <header className="sticky top-0 z-30 bg-[#123D35] text-white border-b border-[#176354]/40 shadow-md">
-        <div className="max-w-[1440px] mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
+        <div className="w-full h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="size-9 rounded-xl bg-[#20C7A7] text-[#123D35] flex items-center justify-center font-bold shadow-xs">
               <span className="material-symbols-outlined text-xl">shield_person</span>

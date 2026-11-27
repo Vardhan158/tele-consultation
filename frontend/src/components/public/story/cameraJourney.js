@@ -15,17 +15,48 @@ const screenEye = new Vector3(3.69, 1.215, -1.34);
 const screenApproach = new Vector3(3.72, 1.39, -.42);
 const conversationEye = new Vector3(3.90, 1.52, .33);
 const conversationFocus = new Vector3(3.61, 1.33, -1.34);
-const printerEye = new Vector3(3.72, 1.53, .18);
-const printerFocus = new Vector3(3.17, 1.15, -1.03);
+const printerEye = new Vector3(2.13, 1.73, .49);
+const printerFocus = new Vector3(3.48, 1.22, -.94);
 const walkCamera = new CatmullRomCurve3([
-  [4.85, 2.10, 1.35], [5.13, 2.07, 2.15], [3.62, 2.02, 2.96],
+  [2.25, 2.05, 1.55], [3.10, 2.12, 2.55], [3.62, 2.02, 2.96],
   [1.43, 1.93, 3.69], [1.40, 1.91, 4.83], [1.34, 2.03, 6.20],
   [2.60, 2.78, 8.70], [1.55, 3.25, 9.8], [-1.61, 2.70, 8.08],
 ].map((p) => new Vector3(...p)));
 
+// Short physical dolly/orbit moves keep the subject framed during dialogue and prop work.
+const drift = (points) => new CatmullRomCurve3(points.map((point) => new Vector3(...point)));
+const tableEye = drift([[0,0,0],[-.09,.035,.04],[-.16,.025,-.02]]);
+const tableFocus = drift([[0,0,0],[-.045,.035,-.09],[-.12,.02,-.16]]);
+const laptopEye = drift([[0,0,0],[.035,.012,.035],[-.024,-.014,-.027]]);
+const laptopFocus = drift([[0,0,0],[0,.018,.011],[0,-.008,-.014]]);
+const printEye = drift([[0,0,0],[.065,.025,.12],[-.055,-.019,.04]]);
+const printFocus = drift([[0,0,0],[.04,-.038,.032],[-.06,-.06,.055]]);
+const carEye = drift([[0,0,0],[.24,.09,.14],[.32,.18,-.16]]);
+const carFocus = drift([[0,0,0],[-.12,-.04,.17],[-.03,.08,.29]]);
+
+function driftShot(path, point, from, to, release, destination, offset) {
+  if (point <= from || point >= release) return;
+  const t = MathUtils.clamp((point - from) / (to - from), 0, 1);
+  const weight = MathUtils.smoothstep(point, from, from + (to - from) * .22)
+    * (1 - MathUtils.smoothstep(point, to, release));
+  path.getPoint(t, offset);
+  destination.addScaledVector(offset, weight);
+}
+
+function moveDuringAction(progress, eye, target, scratch) {
+  driftShot(tableEye, progress, .155, .218, .232, eye, scratch.offset);
+  driftShot(laptopEye, progress, .222, .376, .396, eye, scratch.offset);
+  driftShot(printEye, progress, .392, .487, .501, eye, scratch.offset);
+  driftShot(carEye, progress, .535, .573, .597, eye, scratch.offset);
+  driftShot(tableFocus, progress, .155, .218, .232, target, scratch.offset);
+  driftShot(laptopFocus, progress, .222, .376, .396, target, scratch.offset);
+  driftShot(printFocus, progress, .392, .487, .501, target, scratch.offset);
+  driftShot(carFocus, progress, .535, .573, .597, target, scratch.offset);
+}
+
 export function createCameraScratch() {
   return { eye: new Vector3(), target: new Vector3(), tangent: new Vector3(),
-    trackingEye: new Vector3(), trackingTarget: new Vector3() };
+    trackingEye: new Vector3(), trackingTarget: new Vector3(), offset: new Vector3() };
 }
 
 export function sampleJourneyCamera(storyProgress, aspect, eye, lookAt, tripView) {
@@ -64,8 +95,9 @@ export function sampleJourneyCamera(storyProgress, aspect, eye, lookAt, tripView
   const portraitLead = MathUtils.smoothstep(1 - aspect, 0, .4) * .42 * (1 - settle);
   lookAt.set(lookAt.x + focus * (1.28 + portraitLead - .50 * settle), lookAt.y + .17 * focus, lookAt.z);
   if (zoom > 0) {
+    // Transition from the over-shoulder dolly to a readable view of the display.
     eye.lerp(screenApproach, MathUtils.smoothstep(zoom, 0, .64))
-      .lerp(screenEye, MathUtils.smoothstep(zoom, .48, 1));
+      .lerp(screenEye, MathUtils.smootherstep(zoom, .36, 1));
     lookAt.lerp(screenCenter, zoom);
   }
   if (story >= callStart) {
@@ -108,5 +140,6 @@ export function sampleJourneyCamera(storyProgress, aspect, eye, lookAt, tripView
       eye.z += .43 * counter * portrait;
     }
   }
+  moveDuringAction(storyProgress, eye, lookAt, tripView);
   return fov;
 }

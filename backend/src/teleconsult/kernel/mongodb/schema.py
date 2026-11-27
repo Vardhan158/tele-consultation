@@ -53,6 +53,12 @@ COLLECTIONS = {
     "user_settings": {"bsonType": "object", "required": ["tenant_id", "user_id"]},
     "recovery_tokens": {"bsonType": "object", "required": ["user_id", "token_hash"]},
     "data_requests": {"bsonType": "object", "required": ["tenant_id", "user_id", "request_type"]},
+    "insurance_providers": {"bsonType": "object", "required": ["tenant_id", "provider_name", "provider_code", "country", "provider_type", "status"]},
+    "patient_insurance_policies": {"bsonType": "object", "required": ["tenant_id", "patient_id", "provider_id", "policy_number", "status"]},
+    "insurance_policies": {"bsonType": "object", "required": ["tenant_id", "patient_id", "provider_id", "policy_number", "policy_holder_name", "relationship", "start_date", "expiry_date", "status"]},
+    "insurance_documents": {"bsonType": "object", "required": ["tenant_id", "patient_id", "file_name", "content_type", "storage_key"]},
+    "insurance_claims": {"bsonType": "object", "required": ["tenant_id", "patient_id", "appointment_id", "status"]},
+    "insurance_reimbursements": {"bsonType": "object", "required": ["tenant_id", "claim_id", "reimbursement_amount", "reimbursement_date"]},
 }
 
 INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
@@ -93,6 +99,10 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
     "audit_logs": [([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {})],
     "blocked_dates": [([("tenant_id", ASCENDING), ("date", ASCENDING)], {"unique": True})],
     "notifications": [([("tenant_id", ASCENDING), ("recipient_id", ASCENDING), ("created_at", DESCENDING)], {})],
+    "consents": [
+        ([("tenant_id", ASCENDING), ("patient_id", ASCENDING), ("consent_type", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("appointment_id", ASCENDING), ("consent_type", ASCENDING)], {}),
+    ],
     "doctor_payout_ledger": [
         ([("tenant_id", ASCENDING), ("payment_id", ASCENDING)], {"unique": True}),
         ([("tenant_id", ASCENDING), ("doctor_id", ASCENDING), ("created_at", DESCENDING)], {}),
@@ -101,6 +111,37 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict[str, Any]]]] = {
     "rate_limit_events": [
         ([("expires_at", ASCENDING)], {"expireAfterSeconds": 0}),
         ([("client_ip", ASCENDING), ("tier", ASCENDING), ("timestamp", DESCENDING)], {}),
+    ],
+    "insurance_providers": [
+        ([("tenant_id", ASCENDING), ("provider_code", ASCENDING)], {"unique": True}),
+        ([("tenant_id", ASCENDING), ("status", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("provider_type", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("created_at", DESCENDING)], {}),
+    ],
+    "patient_insurance_policies": [
+        ([("tenant_id", ASCENDING), ("patient_id", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("status", ASCENDING)], {}),
+    ],
+    "insurance_policies": [
+        ([("tenant_id", ASCENDING), ("patient_id", ASCENDING), ("policy_number", ASCENDING)], {"unique": True}),
+        ([("tenant_id", ASCENDING), ("patient_id", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("status", ASCENDING)], {}),
+    ],
+    "insurance_documents": [
+        ([("tenant_id", ASCENDING), ("patient_id", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("policy_id", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("appointment_id", ASCENDING)], {}),
+    ],
+    "insurance_claims": [
+        ([("tenant_id", ASCENDING), ("appointment_id", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("patient_id", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("status", ASCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("policy_id", ASCENDING)], {}),
+    ],
+    "insurance_reimbursements": [
+        ([("tenant_id", ASCENDING), ("claim_id", ASCENDING), ("created_at", DESCENDING)], {}),
+        ([("tenant_id", ASCENDING), ("claim_id", ASCENDING), ("payment_reference", ASCENDING)], {"unique": True, "sparse": True}),
+        ([("tenant_id", ASCENDING), ("patient_id", ASCENDING), ("created_at", DESCENDING)], {}),
     ],
 }
 

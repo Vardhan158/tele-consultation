@@ -7,7 +7,7 @@ export const wheelRadius = .34;
 const route = new CatmullRomCurve3([
   [3.93, .19, -1.29], [4.57, .19, -.80], [4.35, .19, .78],
   [1.42, .19, 2.29], [1.40, .18, 3.58], [1.40, .18, 5.12],
-  [1.39, .12, 7.85], [.54, .06, 10.15], [-2.24, .025, 10.75], [-5.54, .025, 11.34],
+  [1.39, .12, 7.85], [.54, .06, 10.15], [-2.24, .025, 10.75], [-5.15, .025, 11.34],
 ].map((p) => new Vector3(...p)));
 
 export function preTravelProgress(progress) {
@@ -26,7 +26,7 @@ export function sampleTravel(t) {
     stand: MathUtils.smoothstep(t, 0, .105),
     walk: MathUtils.smoothstep(t, .08, .44),
     enter: MathUtils.smoothstep(t, .479, .55),
-    door: (MathUtils.smoothstep(t, .434, .48) - MathUtils.smoothstep(t, .54, .587)) * 1.04,
+    door: (MathUtils.smoothstep(t, .434, .48) - MathUtils.smoothstep(t, .55, .587)) * 1.04,
     carX: carStartX + distance,
     carZ: carLaneZ - .63 * curb,
     heading: .10 * Math.sin(Math.PI * curb),

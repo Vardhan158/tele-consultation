@@ -35,6 +35,7 @@ from teleconsult.modules.identity.routes import router as identity_router
 from teleconsult.modules.identity.settings_routes import router as settings_router
 from teleconsult.modules.notifications.patient_routes import router as notification_router
 from teleconsult.modules.notifications.routes import router as notifications_router
+from teleconsult.modules.notifications.admin_routes import router as clinic_admin_notifications_router
 from teleconsult.modules.newsletter.routes import router as newsletter_router
 from teleconsult.modules.notifications.doctor_routes import router as doctor_notifications_router
 from teleconsult.modules.contact.routes import router as contact_router
@@ -54,6 +55,7 @@ from teleconsult.modules.tenancy.clinic_admin_routes import router as clinic_adm
 from teleconsult.modules.tenancy.routes import router as tenancy_router
 from teleconsult.modules.admin.support_dashboard_routes import router as support_dashboard_router
 from teleconsult.modules.admin.secops_dashboard_routes import router as secops_dashboard_router
+from teleconsult.modules.insurance.routes import router as insurance_router
 
 # Routes that are intentionally unauthenticated. Keep this list tiny and reviewed.
 PUBLIC_PATHS = frozenset({
@@ -193,10 +195,14 @@ def create_app() -> FastAPI:
     app.include_router(payments_router)
     app.include_router(notifications_router)
     app.include_router(doctor_notifications_router)
+    app.include_router(clinic_admin_notifications_router)
+    app.include_router(clinic_admin_notifications_router, prefix="/api/v1")
     app.include_router(reporting_router)
     app.include_router(support_access_router)
     app.include_router(audit_router)
     app.include_router(clinic_admin_router)
+    app.include_router(insurance_router)
+    app.include_router(insurance_router, prefix="/api/v1")
     app.include_router(support_dashboard_router)
     app.include_router(support_dashboard_router, prefix="/api/v1/support")
     app.include_router(secops_dashboard_router)

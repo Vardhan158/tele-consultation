@@ -661,48 +661,48 @@ export default function FindDoctorsScreen({
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#F9FBFA] font-sans text-zinc-800 antialiased selection:bg-[#1A7D67] selection:text-white">
-      {!authenticated && <PublicNavbar />}
-
-      <div className={`max-w-7xl mx-auto px-5 py-6 lg:px-10 space-y-6 ${!authenticated ? "pt-24 sm:pt-28" : ""}`}>
-
-        {/* On-Demand Urgent Care Banner (Phase 3.3) */}
-        <div className="rounded-2xl bg-gradient-to-r from-[#185A4D] to-[#25836F] p-5 sm:p-6 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white font-bold text-[11px] uppercase tracking-wider flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs">bolt</span>
-                Express Urgent Care
-              </span>
-              <span className="text-white/80 text-xs">Wait Time: ~5 Mins</span>
-            </div>
-            <h2 className="text-lg sm:text-xl font-bold">Need a doctor right now?</h2>
-            <p className="text-xs sm:text-sm text-white/80 max-w-xl">
-              Skip scheduling. Instant triage and 1-on-1 video consultation with the next available on-duty General Physician.
-            </p>
+  const mainContent = (
+    <div className="w-full space-y-6 font-sans text-[#162623]">
+      {/* Compact Heading Banner matching Portal Brand System */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#25836F] via-[#1F6E5E] to-[#185A4D] text-white px-6 py-5 sm:px-8 sm:py-6 shadow-sm border border-[#185A4D]/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase text-[#F0F5F7]/85">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#A3E2D4]" />
+            Verified Clinicians &amp; Specialists
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (!authenticated) {
-                if (onRequireAuth) onRequireAuth();
-                return;
-              }
-              setShowUrgentCareModal(true);
-            }}
-            className="bg-white hover:bg-emerald-50 text-[#185A4D] font-bold text-xs sm:text-sm px-5 py-3 rounded-xl shadow-md transition shrink-0 flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-lg text-[#185A4D]">videocam</span>
-            <span>
-              {urgentCareStatus?.has_active_request
-                ? `Active Queue (#${urgentCareStatus.queue_position || 1})`
-                : "Consult Doctor Now"}
-            </span>
-          </button>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Find Doctors
+          </h1>
+          <p className="text-xs sm:text-sm text-[#F0F5F7]/90 max-w-2xl leading-relaxed">
+            Search certified medical specialists, check available schedules, and book online video consultations.
+          </p>
         </div>
 
-        {/* Mobile Filter Toggle Header (Visible only on < lg screens) */}
+        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center">
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="px-4 py-2 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base !text-[#185A4D]">filter_alt_off</span>
+              <span>Reset Filters</span>
+            </button>
+          )}
+          {authenticated && (
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate("appointments")}
+              className="px-4 py-2.5 rounded-xl font-semibold text-xs bg-white text-[#185A4D] hover:bg-[#F0F5F7] flex items-center gap-2 shadow-xs transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base !text-[#185A4D]">calendar_month</span>
+              <span>My Appointments</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Filter Toggle Header (Visible only on < lg screens) */}
         <div className="lg:hidden flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-zinc-200 shadow-xs">
           <div className="flex items-center gap-2 text-xs font-semibold text-zinc-800">
             <span className="material-symbols-outlined text-[#1A7D67] text-xl">tune</span>
@@ -1695,299 +1695,18 @@ export default function FindDoctorsScreen({
           </div>
         </div>
       )}
+    </div>
+  );
 
-      {/* Add New Family Dependent Modal */}
-      {showAddFamilyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#162623]/60 backdrop-blur-xs p-4">
-          <div className="care-card max-w-md w-full p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#577877]/15 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#25836F] text-xl">person_add</span>
-                <h3 className="text-sm font-bold text-[#162623]">Add Family Dependent</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddFamilyModal(false)}
-                className="text-xs font-semibold text-[#577877] hover:underline cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+  if (authenticated) {
+    return mainContent;
+  }
 
-            <form onSubmit={handleSaveFamilyMember} className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold text-[#162623] block mb-1">Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={newFamilyForm.full_name}
-                  onChange={(e) => setNewFamilyForm({ ...newFamilyForm, full_name: e.target.value })}
-                  placeholder="e.g. Maya Sharma"
-                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-[#162623] block mb-1">Relationship *</label>
-                  <select
-                    value={newFamilyForm.relationship}
-                    onChange={(e) => setNewFamilyForm({ ...newFamilyForm, relationship: e.target.value })}
-                    className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
-                  >
-                    <option value="spouse">Spouse</option>
-                    <option value="child">Child</option>
-                    <option value="parent">Parent</option>
-                    <option value="sibling">Sibling</option>
-                    <option value="other">Other Dependent</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="font-bold text-[#162623] block mb-1">Gender</label>
-                  <select
-                    value={newFamilyForm.gender}
-                    onChange={(e) => setNewFamilyForm({ ...newFamilyForm, gender: e.target.value })}
-                    className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
-                  >
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-[#162623] block mb-1">Date of Birth</label>
-                  <input
-                    type="date"
-                    value={newFamilyForm.date_of_birth}
-                    onChange={(e) => setNewFamilyForm({ ...newFamilyForm, date_of_birth: e.target.value })}
-                    className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-[#162623] block mb-1">Blood Group</label>
-                  <select
-                    value={newFamilyForm.blood_group}
-                    onChange={(e) => setNewFamilyForm({ ...newFamilyForm, blood_group: e.target.value })}
-                    className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
-                  >
-                    <option value="">Unknown</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-[#162623] block mb-1">Known Allergies / Conditions (Optional)</label>
-                <input
-                  type="text"
-                  value={newFamilyForm.allergies}
-                  onChange={(e) => setNewFamilyForm({ ...newFamilyForm, allergies: e.target.value })}
-                  placeholder="e.g. Penicillin, Asthma, Diabetes"
-                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs focus:border-[#25836F] focus:outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#577877]/15">
-                <button
-                  type="button"
-                  onClick={() => setShowAddFamilyModal(false)}
-                  className="px-3 py-2 rounded-xl border border-[#577877]/25 text-xs text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingFamilyMember}
-                  className="btn-primary !py-2 !px-4 text-xs font-semibold cursor-pointer"
-                >
-                  {savingFamilyMember ? "Saving..." : "Save Dependent"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* On-Demand Urgent Care Modal (Phase 3.3) */}
-      {showUrgentCareModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
-              <div className="flex items-center gap-2.5">
-                <span className="w-9 h-9 rounded-xl bg-emerald-100 text-[#185A4D] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-xl">bolt</span>
-                </span>
-                <div>
-                  <h3 className="text-base font-bold text-[#162623]">
-                    Express Urgent Care Triage
-                  </h3>
-                  <p className="text-[11px] text-[#577877]">Connect with next available doctor (~5 min wait)</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowUrgentCareModal(false)}
-                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-
-            {urgentCareMsg && (
-              <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs font-semibold">
-                {urgentCareMsg}
-              </div>
-            )}
-
-            {/* Active Ticket Status Display */}
-            {urgentCareStatus?.has_active_request && urgentCareStatus.status === "claimed" ? (
-              <div className="space-y-4 py-2">
-                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
-                  <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
-                  <h4 className="font-bold text-sm text-emerald-950">Clinician is Ready!</h4>
-                  <p className="text-xs text-emerald-800">
-                    Dr. {urgentCareStatus.doctor_name || "Specialist"} has claimed your request and entered the consultation room.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUrgentCareModal(false);
-                    onNavigate("video-consultation", {
-                      appointmentId: urgentCareStatus.appointment_id,
-                    });
-                  }}
-                  className="w-full bg-[#185A4D] hover:bg-[#12443A] text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-base">videocam</span>
-                  <span>Join Video Consultation Room Now</span>
-                </button>
-              </div>
-            ) : urgentCareStatus?.has_active_request && urgentCareStatus.status === "waiting" ? (
-              <div className="space-y-4 py-2">
-                <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-center space-y-3">
-                  <div className="flex justify-center">
-                    <span className="relative flex h-8 w-8">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-8 w-8 bg-[#25836F] text-white items-center justify-center">
-                        <span className="material-symbols-outlined text-base">hourglass_top</span>
-                      </span>
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-[#162623]">Matching with On-Duty Doctor…</h4>
-                    <p className="text-xs text-[#577877] mt-0.5">
-                      You are #{urgentCareStatus.queue_position || 1} in the urgent care queue.
-                    </p>
-                  </div>
-                  <div className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold text-xs">
-                    Estimated Wait: ~{urgentCareStatus.estimated_wait_minutes || 5} Mins
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#F0F5F7] space-y-1 text-xs">
-                  <span className="text-[#577877] block text-[11px]">Chief Complaint:</span>
-                  <p className="font-semibold text-[#162623]">{urgentCareStatus.chief_complaint}</p>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleCancelUrgentCare}
-                    className="px-4 py-2 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel Urgent Care Request
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowUrgentCareModal(false)}
-                    className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
-                  >
-                    Keep Waiting in Background
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Request Form */
-              <form onSubmit={handleRequestUrgentCare} className="space-y-3 text-xs">
-                <div>
-                  <label className="font-bold text-[#162623] block mb-1">
-                    What symptoms or discomfort are you experiencing? <span className="text-rose-600">*</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    required
-                    value={urgentCareComplaint}
-                    onChange={(e) => setUrgentCareComplaint(e.target.value)}
-                    placeholder="e.g. Sudden severe headache, dizziness, and mild fever since 3 hours ago."
-                    className="w-full rounded-xl border border-[#577877]/25 px-3.5 py-2.5 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-[#162623] block mb-1">Urgency Level</label>
-                    <select
-                      value={urgentCareUrgency}
-                      onChange={(e) => setUrgentCareUrgency(e.target.value)}
-                      className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
-                    >
-                      <option value="mild">Mild (Seeking Advice)</option>
-                      <option value="moderate">Moderate (Need Rx / Evaluation)</option>
-                      <option value="urgent">Urgent (Immediate Attention)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-[#162623] block mb-1">Contact Phone</label>
-                    <input
-                      type="tel"
-                      value={urgentCarePhone}
-                      onChange={(e) => setUrgentCarePhone(e.target.value)}
-                      placeholder="e.g. 9876543210"
-                      className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs text-[#162623] focus:border-[#25836F] focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
-                  <span className="material-symbols-outlined text-base text-amber-700 shrink-0">info</span>
-                  <span>
-                    Emergency Disclaimer: If you or someone you are with is experiencing life-threatening symptoms (chest pain, stroke symptoms, severe bleeding), call 112 immediately.
-                  </span>
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-2 border-t border-[#577877]/15">
-                  <button
-                    type="button"
-                    onClick={() => setShowUrgentCareModal(false)}
-                    className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={urgentCareLoading}
-                    className="btn-primary !py-2 !px-5 text-xs font-semibold cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span className="material-symbols-outlined text-base">bolt</span>
-                    <span>{urgentCareLoading ? "Requesting…" : "Request Instant Consult"}</span>
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+  return (
+    <div className="min-h-screen bg-[#F0F5F7] font-sans text-[#162623] antialiased selection:bg-[#1A7D67] selection:text-white">
+      <PublicNavbar />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 pt-20 sm:pt-24">
+        {mainContent}
       </div>
     </div>
   );

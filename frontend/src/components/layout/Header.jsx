@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { notificationApi } from "../../lib/api";
+import { authApi, notificationApi, adminNotificationApi, patientApi } from "../../lib/api";
 
 export default function Header({
   onOpenMobile,
@@ -8,14 +8,44 @@ export default function Header({
   activeTab = "dashboard",
   patient,
 }) {
+  const [currentUser, setCurrentUser] = useState(patient || null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  const isAdmin = patient?.role === "clinic_admin";
-  const isDoctor = patient?.role === "doctor";
-  const name = patient?.full_name || (isAdmin ? "Clinic Admin" : isDoctor ? "Doctor" : "Patient");
-  const email = patient?.email || "";
+  useEffect(() => {
+    if (patient) {
+      setCurrentUser(patient);
+      if (!patient.avatar_url && patient.role !== "doctor" && patient.role !== "clinic_admin") {
+        patientApi.getProfile().then((p) => {
+          if (p?.avatar_url) {
+            setCurrentUser((prev) => ({ ...prev, avatar_url: p.avatar_url }));
+          }
+        }).catch(() => {});
+      }
+    } else {
+      authApi
+        .me()
+        .then((u) => {
+          if (u?.authenticated) {
+            setCurrentUser(u);
+            if (!u.avatar_url && u.role !== "doctor" && u.role !== "clinic_admin") {
+              patientApi.getProfile().then((p) => {
+                if (p?.avatar_url) {
+                  setCurrentUser((prev) => ({ ...prev, avatar_url: p.avatar_url }));
+                }
+              }).catch(() => {});
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [patient]);
+
+  const activeUser = currentUser || patient;
+  const isAdmin = activeUser?.role === "clinic_admin";
+  const isDoctor = activeUser?.role === "doctor";
+  const name = activeUser?.full_name || (isAdmin ? "Clinic Admin" : isDoctor ? "Doctor" : "Patient");
   const roleLabel = isAdmin ? "Clinic Administrator" : isDoctor ? "Doctor" : "Patient";
   const initials =
     name
@@ -27,8 +57,17 @@ export default function Header({
       .toUpperCase() || "A";
 
   useEffect(() => {
-    if (isAdmin || isDoctor) {
+    if (isDoctor) {
       setUnreadCount(0);
+      return;
+    }
+    if (isAdmin) {
+      adminNotificationApi
+        .unreadCount()
+        .then((res) => {
+          setUnreadCount(res?.unread_count || 0);
+        })
+        .catch(() => {});
       return;
     }
     notificationApi
@@ -40,7 +79,7 @@ export default function Header({
         }
       })
       .catch(() => {});
-  }, [activeTab, patient, isAdmin, isDoctor]);
+  }, [activeTab, activeUser, isAdmin, isDoctor]);
 
   // Close dropdown on outside click or escape
   useEffect(() => {
@@ -67,29 +106,35 @@ export default function Header({
     switch (activeTab) {
       case "clinic-overview":
       case "overview":
-        return "Clinic Overview";
+        return "Overview";
       case "clinic-doctors":
       case "doctors":
       case "clinic-approvals":
-        return "Doctor Approvals & Credentials";
+        return "Doctors";
       case "clinic-services":
       case "services":
-        return "Services & Fee Structure";
+        return "Services & fees";
       case "clinic-schedules":
       case "schedules":
-        return "Schedule & Shifts";
+        return "Schedules";
       case "clinic-appointments":
-        return "Master Appointments";
+        return "Appointments";
       case "clinic-payments":
-        return "Payments & Refunds";
+        return "Payments";
+      case "clinic-insurance":
+      case "insurance":
+      case "insurance-providers":
+        return "Insurance Providers";
       case "clinic-reports":
       case "reports":
-        return "Operational Reports";
+        return "Reports";
+      case "clinic-support-staff":
+        return "Support staff";
       case "clinic-secops":
       case "secops":
         return "Security & Operations";
       case "clinic-settings":
-        return "Clinic Settings";
+        return "Clinic settings";
       case "dashboard":
       case "doctor-dashboard":
         return "Dashboard";
@@ -100,7 +145,9 @@ export default function Header({
         return "Availability";
       case "appointments":
       case "doctor-appointments":
-        return "Appointments";
+        return isDoctor ? "Appointments" : "My appointments";
+      case "doctor-patients":
+        return "Patients";
       case "medical-records":
         return "Medical records";
       case "prescriptions":
@@ -109,6 +156,8 @@ export default function Header({
         return "Consultation summaries";
       case "follow-up":
         return "Follow-up care";
+      case "my-insurance":
+        return "My Insurance";
       case "support":
         return "Help & support";
       case "payments":
@@ -158,11 +207,11 @@ export default function Header({
 
       {/* Right Header Elements */}
       <div className="flex items-center gap-3 sm:gap-4 text-xs">
-        {/* Notifications (Patient only) */}
-        {!isAdmin && !isDoctor && (
+        {/* Notifications (Patient & Clinic Admin) */}
+        {!isDoctor && (
           <button
             type="button"
-            onClick={() => onSelectTab("notifications")}
+            onClick={() => onSelectTab(isAdmin ? "clinic-notifications" : "notifications")}
             className="flex items-center gap-1.5 p-1.5 rounded-xl hover:bg-white transition cursor-pointer"
             title="Notifications"
           >
@@ -190,9 +239,9 @@ export default function Header({
             aria-haspopup="true"
             className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-white transition cursor-pointer group"
           >
-            {patient?.avatar_url ? (
+            {activeUser?.avatar_url ? (
               <img
-                src={patient.avatar_url}
+                src={activeUser.avatar_url}
                 alt={name}
                 className="w-8 h-8 rounded-full object-cover shadow-sm ring-1 ring-[#577877]/20"
               />

@@ -22,9 +22,16 @@ const contactFragment = `
 
 export default function PharmacyTravel({ controller }) {
   const { scene } = useGLTF('/assets/house/pharmacy-travel.glb', false);
+  const { scene: sedan } = useGLTF('/assets/house/journey-sedan.glb', false);
+  const { scene: sign } = useGLTF('/assets/house/pharmacy-sign.glb', false);
   const assets = useMemo(() => {
     const copy = scene.clone(true);
-    const car = copy.getObjectByName('TravelCar');
+    const car = sedan.getObjectByName('TravelCar').clone(true);
+    const door = car.getObjectByName('TravelDoor');
+    const pull = door.getObjectByName('Handle').clone();
+    pull.name = 'InteriorPull';
+    pull.position.set(-.36, -.095, .105);
+    door.add(pull);
     const street = copy.getObjectByName('PharmacyStreet');
     // In the original export these material batches contain the solid shell,
     // fixed glass, mullions and handles. The new shell preserves their facade.
@@ -33,17 +40,6 @@ export default function PharmacyTravel({ controller }) {
       const node = street.getObjectByName(name.replaceAll(' ', '_'));
       node?.removeFromParent();
     }
-    const paint = new Map();
-    car.traverse((mesh) => {
-      if (!mesh.isMesh || !mesh.material.name.startsWith('Deep teal automotive lacquer')) return;
-      if (!paint.has(mesh.material)) {
-        const finish = mesh.material.clone();
-        finish.roughness = .24;
-        finish.envMapIntensity = 1.25;
-        paint.set(mesh.material, finish);
-      }
-      mesh.material = paint.get(mesh.material);
-    });
     street.traverse((mesh) => {
       if (!mesh.isMesh) return;
       mesh.receiveShadow = true;
@@ -52,10 +48,10 @@ export default function PharmacyTravel({ controller }) {
     return {
       car,
       street,
-      door: car.getObjectByName('TravelDoor'),
+      door,
       wheels: ['00', '01', '10', '11'].map((id) => car.getObjectByName(`TravelWheel${id}`)),
     };
-  }, [scene]);
+  }, [scene, sedan]);
   const moving = useRef(null);
   /* eslint-disable react-hooks/immutability -- Animated Three.js transforms are mutable. */
   useFrame(() => {
@@ -73,12 +69,13 @@ export default function PharmacyTravel({ controller }) {
     moving.current.rotation.y = frame.heading;
     assets.door.rotation.y = -frame.door;
     for (const wheel of assets.wheels) wheel.rotation.z = frame.wheel;
-  });
+  }, -1);
   /* eslint-enable react-hooks/immutability */
   return <>
     <group position={[0, -.026, 14]}>
       <primitive object={assets.street} position={[0, 0, 0]} dispose={null} />
     </group>
+    <primitive object={sign} position={[32, 2.94, 8.61]} dispose={null} />
     <group position={[32, .014, 12.94]}>
       <mesh rotation-x={-Math.PI / 2}>
         <planeGeometry args={[5.35, .065]} />

@@ -1,5 +1,6 @@
+import { easeStoryProgress, playbackProgress } from '../src/components/public/story/storyPlayback.js';
 import { createCameraScratch, sampleJourneyCamera } from '../src/components/public/story/cameraJourney.js';
-import { stanceAt, transferAt } from '../src/components/public/story/characterMotion.js';
+import { gaitContact, transferAt } from '../src/components/public/story/characterMotion.js';
 import calibration from '../src/components/public/story/rigCalibration.json' with { type: 'json' };
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -199,15 +200,23 @@ test('reversible camera clears the open door and frames the table on desktop and
   assert.equal(sampleDoor(1), Math.PI / 2);
 });
 
-test('Blender stance contacts stay fixed through gait wrap and reverse sampling', () => {
+test('shoe anchors stay fixed through stance and bridge continuously across swing and wrap', () => {
   for (const foot of calibration.feet) {
     const center = foot.center + 2;
-    const phases = [center - .11, center, center + .11];
-    const contact = phases.map((phase) => stanceAt(phase, foot));
-    assert.ok(contact.every(({ anchor, weight }) => Math.abs(anchor - center) < 1e-8 && weight > .9));
-    assert.deepEqual(phases.toReversed().map((phase) => stanceAt(phase, foot)), contact.toReversed());
+    const phases = [center - .20, center, center + .20];
+    const contact = phases.map((phase) => gaitContact(phase, foot));
+    assert.ok(contact.every(({ from, to, swing }) => Math.abs(from - center) < 1e-8 && to === from && swing === 0));
+    assert.deepEqual(phases.toReversed().map((phase) => gaitContact(phase, foot)), contact.toReversed());
+    const midSwing = gaitContact(center + .5, foot);
+    assert.ok(Math.abs(midSwing.from - center) < 1e-8);
+    assert.ok(Math.abs(midSwing.to - center - 1) < 1e-8);
+    assert.ok(Math.abs(midSwing.swing - .5) < 1e-8);
+    const stanceEnd = center + foot.halfWidth + .018;
+    assert.ok(gaitContact(stanceEnd + 1e-7, foot).swing < 1e-6);
+    const nextContact = center + 1 - foot.halfWidth - .018;
+    assert.ok(gaitContact(nextContact - 1e-7, foot).swing > .999999);
   }
-  assert.equal(stanceAt(.98, calibration.feet[1]).anchor, 1.05);
+  assert.equal(gaitContact(.98, calibration.feet[1]).from, 1.05);
   assert.deepEqual(transferAt(0), { tuck: 0, inside: 0, lean: 0 });
   assert.equal(transferAt(1).inside, 1);
 });
@@ -256,6 +265,36 @@ test('garden follow camera keeps clearance from the walking patient', () => {
       sampleFinaleCamera(t, aspect, eye, target);
       sampleFinalePatient(t, finaleFrame(t), actor, tangent);
       assert.ok(Math.hypot(eye.x - actor.x, eye.z - actor.z) > .70, `Camera approaches the patient at ${t}`);
+    }
+  }
+});
+
+
+test('story scrub follows the stethoscope easing in either direction and preserves reduced-motion stills', () => {
+  const frame = 1000 / 60;
+  assert.ok(Math.abs(easeStoryProgress(0, 1, frame) - .075) < 1e-10);
+  const first = easeStoryProgress(.2, .8, frame / 2);
+  assert.ok(Math.abs(easeStoryProgress(first, .8, frame / 2) - easeStoryProgress(.2, .8, frame)) < 1e-10);
+  let progress = .8;
+  for (let i = 0; i < 120; i++) {
+    const next = easeStoryProgress(progress, .2, frame);
+    assert.ok(next <= progress && next >= .2);
+    progress = next;
+  }
+  assert.equal(progress, .2);
+  assert.equal(playbackProgress(.54, true), .638);
+  assert.equal(playbackProgress(.54, false), .54);
+});
+
+test('camera travels while the door, laptop, printer and car actions play', () => {
+  const scratch = createCameraScratch();
+  const eye = new Vector3(), target = new Vector3();
+  for (const aspect of [1.6, .503]) {
+    for (const [start, end] of [[.095,.109], [.172,.187], [.204,.22], [.252,.34], [.41,.43], [.46,.483], [.555,.565]]) {
+      sampleJourneyCamera(start, aspect, eye, target, scratch);
+      const before = eye.clone();
+      sampleJourneyCamera(end, aspect, eye, target, scratch);
+      assert.ok(eye.distanceTo(before) > .002, `Camera holds between ${start} and ${end} at aspect ${aspect}`);
     }
   }
 });

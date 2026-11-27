@@ -1,41 +1,25 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { authApi } from "./lib/api";
+import { authApi, patientApi } from "./lib/api";
+import ServicesScreen from "./components/public/ServicesScreen";
 import LandingScreen from "./components/public/LandingScreen";
-
-const Layout = lazy(() => import("./components/layout/Layout"));
-const DashboardScreen = lazy(() => import("./components/screens/DashboardScreen"));
-const FindDoctorsScreen = lazy(() => import("./components/screens/FindDoctorsScreen"));
-const AppointmentsScreen = lazy(() => import("./components/screens/AppointmentsScreen"));
-const VideoConsultationScreen = lazy(() => import("./components/screens/VideoConsultationScreen"));
-const MedicalRecordsScreen = lazy(() => import("./components/screens/MedicalRecordsScreen"));
-const PrescriptionsScreen = lazy(() => import("./components/screens/PrescriptionsScreen"));
-const ConsultationSummariesScreen = lazy(() => import("./components/screens/ConsultationSummariesScreen"));
-const FollowUpCareScreen = lazy(() => import("./components/screens/FollowUpCareScreen"));
-const PaymentsScreen = lazy(() => import("./components/screens/PaymentsScreen"));
-const NotificationsScreen = lazy(() => import("./components/screens/NotificationsScreen"));
-const SettingsScreen = lazy(() => import("./components/screens/SettingsScreen"));
-const ProfileScreen = lazy(() => import("./components/screens/ProfileScreen"));
-const SupportScreen = lazy(() => import("./components/screens/SupportScreen"));
-const ConsentScreen = lazy(() => import("./components/screens/ConsentScreen"));
-const AuthScreen = lazy(() => import("./components/auth/AuthScreen"));
-const ServicesScreen = lazy(() => import("./components/public/ServicesScreen"));
-const AboutUsScreen = lazy(() => import("./components/public/AboutUsScreen"));
-const FaqsScreen = lazy(() => import("./components/public/FaqsScreen"));
-const ContactScreen = lazy(() => import("./components/public/ContactScreen"));
-const DoctorDashboardScreen = lazy(() => import("./components/screens/DoctorDashboardScreen"));
-const DoctorRegistrationScreen = lazy(() => import("./components/auth/DoctorRegistrationScreen"));
-const DoctorVerifyEmailScreen = lazy(() => import("./components/auth/DoctorVerifyEmailScreen"));
-const DoctorPendingApprovalScreen = lazy(() => import("./components/auth/DoctorPendingApprovalScreen"));
-const DoctorAppointmentsScreen = lazy(() => import("./components/screens/DoctorAppointmentsScreen"));
-const DoctorPatientsScreen = lazy(() => import("./components/screens/DoctorPatientsScreen"));
-const DoctorAvailabilityScreen = lazy(() => import("./components/screens/DoctorAvailabilityScreen"));
-const DoctorSettingsScreen = lazy(() => import("./components/screens/DoctorSettingsScreen"));
-const DoctorConsultationScreen = lazy(() => import("./components/screens/DoctorConsultationScreen"));
-const DoctorNotificationsScreen = lazy(() => import("./components/screens/DoctorNotificationsScreen"));
-const ClinicAdminDashboard = lazy(() => import("./components/admin/ClinicAdminDashboard"));
-const SupportDashboardScreen = lazy(() => import("./components/support/SupportDashboardScreen"));
-const SecOpsDashboardScreen = lazy(() => import("./components/secops/SecOpsDashboardScreen"));
+import AboutUsScreen from "./components/public/AboutUsScreen";
+import FaqsScreen from "./components/public/FaqsScreen";
+import ContactScreen from "./components/public/ContactScreen";
+import DoctorDashboardScreen from "./components/screens/DoctorDashboardScreen";
+import DoctorRegistrationScreen from "./components/auth/DoctorRegistrationScreen";
+import DoctorVerifyEmailScreen from "./components/auth/DoctorVerifyEmailScreen";
+import DoctorPendingApprovalScreen from "./components/auth/DoctorPendingApprovalScreen";
+import DoctorAppointmentsScreen from "./components/screens/DoctorAppointmentsScreen";
+import DoctorPatientsScreen from "./components/screens/DoctorPatientsScreen";
+import DoctorAvailabilityScreen from "./components/screens/DoctorAvailabilityScreen";
+import DoctorSettingsScreen from "./components/screens/DoctorSettingsScreen";
+import DoctorConsultationScreen from "./components/screens/DoctorConsultationScreen";
+import DoctorNotificationsScreen from "./components/screens/DoctorNotificationsScreen";
+import MyInsuranceScreen from "./components/screens/MyInsuranceScreen";
+import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
+import SupportDashboardScreen from "./components/support/SupportDashboardScreen";
+import SecOpsDashboardScreen from "./components/secops/SecOpsDashboardScreen";
 
 const PATH_TO_TAB = {
   "/dashboard": "dashboard",
@@ -48,6 +32,7 @@ const PATH_TO_TAB = {
   "/prescriptions": "prescriptions",
   "/consultation-summaries": "summaries",
   "/follow-up": "follow-up",
+  "/my-insurance": "my-insurance",
   "/payments": "payments",
   "/notifications": "notifications",
   "/settings": "settings",
@@ -67,6 +52,9 @@ const PATH_TO_TAB = {
   "/clinic/schedules": "clinic-schedules",
   "/clinic/appointments": "clinic-appointments",
   "/clinic/payments": "clinic-payments",
+  "/clinic/insurance": "clinic-insurance",
+  "/clinic/insurance-management": "clinic-insurance",
+  "/clinic/insurance-providers": "clinic-insurance",
   "/clinic/reports": "clinic-reports",
   "/clinic/audit": "clinic-audit",
   "/clinic/support-staff": "clinic-support-staff",
@@ -111,19 +99,40 @@ function AppContent() {
   const [patient, setPatient] = useState(null);
   const [registeredDoctorEmail, setRegisteredDoctorEmail] = useState("");
 
-  const refreshUser = () =>
-    authApi
-      .me()
-      .then((result) => {
-        setAuthenticated(Boolean(result?.authenticated));
-        if (result?.authenticated) setPatient(result);
-        return result;
-      })
-      .catch(() => {
+  const refreshUser = async () => {
+    try {
+      const result = await authApi.me();
+      if (result?.authenticated) {
+        setAuthenticated(true);
+        let userState = { ...result };
+        if (result.role === "patient") {
+          try {
+            const profile = await patientApi.getProfile();
+            if (profile) {
+              userState = {
+                ...userState,
+                ...profile,
+                avatar_url: profile.avatar_url || result.avatar_url,
+                full_name: profile.full_name || result.full_name,
+              };
+            }
+          } catch {
+            // fallback to authApi.me result
+          }
+        }
+        setPatient(userState);
+        return userState;
+      } else {
         setAuthenticated(false);
         setPatient(null);
         return null;
-      });
+      }
+    } catch {
+      setAuthenticated(false);
+      setPatient(null);
+      return null;
+    }
+  };
 
   useEffect(() => {
     refreshUser().finally(() => setAuthChecking(false));
@@ -264,6 +273,7 @@ function AppContent() {
         <ClinicAdminDashboard
           activeTab={routedTab}
           onSelectTab={handleNavigate}
+          navParams={navParams}
         />
       );
     }
@@ -314,6 +324,8 @@ function AppContent() {
         return <ConsultationSummariesScreen onNavigate={handleNavigate} />;
       case "follow-up":
         return <FollowUpCareScreen onNavigate={handleNavigate} />;
+      case "my-insurance":
+        return <MyInsuranceScreen onNavigate={handleNavigate} patient={patient} navParams={navParams} />;
       case "payments":
         return (
           <PaymentsScreen
@@ -327,7 +339,12 @@ function AppContent() {
       case "settings":
         return <SettingsScreen onNavigate={handleNavigate} />;
       case "profile":
-        return <ProfileScreen onNavigate={handleNavigate} />;
+        return (
+          <ProfileScreen
+            onNavigate={handleNavigate}
+            onUserUpdate={(updates) => setPatient((prev) => (prev ? { ...prev, ...updates } : prev))}
+          />
+        );
       case "consent":
         return <ConsentScreen onNavigate={handleNavigate} />;
       case "support":

@@ -5,3 +5,10 @@ export function playbackProgress(progress, reducedMotion) {
   if (!reducedMotion) return progress;
   return stills[Math.min(stills.length - 1, Math.floor(progress * stills.length))];
 }
+
+// Match the stethoscope's 7.5% interpolation at 60 Hz on any refresh rate.
+export function easeStoryProgress(current, target, elapsedMs) {
+  const difference = target - current;
+  if (Math.abs(difference) <= .0002) return target;
+  return current + difference * (1 - .925 ** (Math.min(elapsedMs, 64) / (1000 / 60)));
+}
