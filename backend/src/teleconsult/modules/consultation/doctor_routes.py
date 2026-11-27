@@ -125,7 +125,11 @@ async def dashboard(principal: Principal = Depends(require("doctor:appointment:r
             try:
                 tz = ZoneInfo(tz_name)
             except Exception:
-                tz = ZoneInfo("Asia/Kolkata")
+                try:
+                    tz = ZoneInfo("Asia/Kolkata")
+                except Exception:
+                    from datetime import timezone, timedelta
+                    tz = timezone(timedelta(hours=5, minutes=30), name="IST")
 
             now_tz = datetime.now(tz)
             today_iso = now_tz.strftime("%Y-%m-%d")

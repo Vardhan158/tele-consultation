@@ -13,8 +13,10 @@ class PatientCreate(BaseModel):
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: str) -> str:
-        clean = re.sub(r"[\s()\-]", "", v)
+    def validate_phone(cls, v: str | None) -> str | None:
+        if v is None or not str(v).strip():
+            return None
+        clean = re.sub(r"[\s()\-]", "", str(v))
         if clean.startswith("+91"):
             clean = clean[3:]
         elif clean.startswith("0") or clean.startswith("+"):

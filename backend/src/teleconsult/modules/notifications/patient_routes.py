@@ -100,7 +100,8 @@ async def list_notifications(
                 start_dt = raw_start if isinstance(raw_start, datetime) else datetime.fromisoformat(str(raw_start).replace("Z", "+00:00"))
                 if start_dt.tzinfo is None:
                     start_dt = start_dt.replace(tzinfo=UTC)
-                time_str = start_dt.astimezone(ZoneInfo("Asia/Kolkata")).strftime("%b %d, %Y at %I:%M %p IST")
+                from teleconsult.kernel.timezone import get_ist_timezone
+                time_str = start_dt.astimezone(get_ist_timezone()).strftime("%b %d, %Y at %I:%M %p IST")
             except (ValueError, TypeError):
                 time_str = str(raw_start)
 
