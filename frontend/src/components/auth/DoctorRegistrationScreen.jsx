@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { doctorApi } from "../../lib/api";
 
 function ClinicianHeader({ onBack, isModal = false, onClose }) {
@@ -115,17 +116,32 @@ export default function DoctorRegistrationScreen({
 
   useEffect(() => {
     if (!inModal) return;
+
+    // Save and lock body/html scroll
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    // Stop Lenis smooth scroll on the background page
+    if (typeof window !== "undefined" && window.__lenis) {
+      window.__lenis.stop();
+    }
+
     const handleKeyDown = (e) => {
       if (e.key === "Escape" && onClose) {
         onClose();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      if (typeof window !== "undefined" && window.__lenis) {
+        window.__lenis.start();
+      }
     };
   }, [inModal, onClose]);
 
@@ -550,9 +566,10 @@ export default function DoctorRegistrationScreen({
 
   const content = (
     <div
+      data-lenis-prevent="true"
       className={`font-sans flex flex-col text-[#162623] bg-[#F0F5F7] ${
         inModal
-          ? "relative w-full max-w-2xl max-h-[96vh] rounded-[24px] shadow-2xl overflow-hidden border border-[#577877]/20 animate-in zoom-in-95 duration-200"
+          ? "w-full max-h-[90vh] rounded-[24px] shadow-2xl overflow-hidden border border-[#577877]/20 flex flex-col"
           : "min-h-screen lg:h-screen lg:max-h-screen lg:overflow-hidden"
       }`}
     >
@@ -560,8 +577,9 @@ export default function DoctorRegistrationScreen({
       <ClinicianHeader onBack={onBack} isModal={inModal} onClose={onClose} />
 
       <main
-        className={`flex-1 flex flex-col justify-between p-6 sm:p-8 w-full mx-auto overflow-y-auto ${
-          inModal ? "max-h-[calc(96vh-72px)]" : "max-w-4xl lg:overflow-hidden"
+        data-lenis-prevent="true"
+        className={`flex-1 flex flex-col justify-between p-6 sm:p-8 w-full mx-auto overflow-y-auto overscroll-contain ${
+          inModal ? "max-h-[calc(90vh-64px)]" : "max-w-4xl lg:overflow-hidden"
         }`}
       >
         {/* Title */}
@@ -1504,7 +1522,7 @@ export default function DoctorRegistrationScreen({
 
       {/* Terms of Service Modal */}
       {showTermsModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-[24px] bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
@@ -1545,7 +1563,7 @@ export default function DoctorRegistrationScreen({
 
       {/* Privacy Policy Modal */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-[24px] bg-white border border-[#577877]/20 p-6 sm:p-8 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
               <div className="flex items-center gap-2">
@@ -1587,16 +1605,29 @@ export default function DoctorRegistrationScreen({
   );
 
   if (inModal) {
-    return (
+    const modalMarkup = (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200"
+        data-lenis-prevent="true"
+        data-lenis-prevent-wheel="true"
+        data-lenis-prevent-touch="true"
+        className="fixed inset-0 z-[9999] overflow-y-auto bg-[#162623]/80 backdrop-blur-sm flex min-h-screen items-center justify-center p-3 sm:p-4 md:p-6 animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget && onClose) onClose();
         }}
       >
-        {content}
+        <div
+          data-lenis-prevent="true"
+          className="relative w-full max-w-2xl my-auto animate-in zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {content}
+        </div>
       </div>
     );
+
+    return typeof document !== "undefined"
+      ? createPortal(modalMarkup, document.body)
+      : modalMarkup;
   }
 
   return content;
