@@ -33,6 +33,7 @@ const roleNavigation = {
     { id: "clinic-payments", label: "Payments", icon: "payments" },
     { id: "clinic-insurance", label: "Insurance Management", icon: "health_and_safety" },
     { id: "clinic-reports", label: "Reports", icon: "analytics" },
+    { id: "clinic-audit", label: "Audit logs", icon: "history_edu" },
     { id: "clinic-support-staff", label: "Support staff", icon: "support_agent" },
     { id: "clinic-secops", label: "Security & Operations", icon: "shield_person" },
     { id: "clinic-settings", label: "Clinic settings", icon: "settings" },

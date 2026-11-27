@@ -194,3 +194,6 @@ def get_settings(fresh: bool = False) -> Settings:
     if fresh:
         _cached_settings.cache_clear()
     return _cached_settings()
+
+
+get_settings.cache_clear = _cached_settings.cache_clear  # type: ignore[attr-defined]

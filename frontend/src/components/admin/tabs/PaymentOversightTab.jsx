@@ -16,6 +16,28 @@ export default function PaymentOversightTab() {
   const [refundReason, setRefundReason] = useState("Administrative refund / Goodwill");
   const [refunding, setRefunding] = useState(false);
 
+  // Section 194J Statutory Payout Ledger State
+  const [viewMode, setViewMode] = useState("transactions"); // "transactions" | "section_194j"
+  const [payoutLedgerData, setPayoutLedgerData] = useState(null);
+  const [loadingLedger, setLoadingLedger] = useState(false);
+
+  const loadPayoutLedger = () => {
+    setLoadingLedger(true);
+    adminApi
+      .payoutLedger()
+      .then((data) => setPayoutLedgerData(data))
+      .catch((err) => {
+        showToast(err.message || "Failed to load Section 194J payout ledger.", "error");
+      })
+      .finally(() => setLoadingLedger(false));
+  };
+
+  useEffect(() => {
+    if (viewMode === "section_194j") {
+      loadPayoutLedger();
+    }
+  }, [viewMode]);
+
   const loadPayments = () => {
     setLoading(true);
     adminApi
@@ -104,29 +126,205 @@ export default function PaymentOversightTab() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#577877]/15 pb-4">
         <div>
           <span className="text-xs font-semibold uppercase tracking-wider text-[#577877]">
-            Payment Oversight & Reconciliation
+            Financial &amp; Statutory Compliance Oversight
           </span>
           <h1 className="text-2xl font-bold text-[#162623]">
-            Financial Transactions, Razorpay Receipts & Refunds
+            {viewMode === "section_194j" ? "Section 194J 10% TDS Ledger & Clinician Payouts" : "Financial Transactions, Razorpay Receipts & Refunds"}
           </h1>
           <p className="text-xs text-[#577877]">
-            Monitor gateway transactions, view receipts, handle failed payments, and process refunds.
+            {viewMode === "section_194j"
+              ? "Reconciled statutory tax deduction ledger under Section 194J of the Indian Income Tax Act for quarterly Form 26Q filing."
+              : "Monitor gateway transactions, view receipts, handle failed payments, and process refunds."}
           </p>
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={handleExportCSV}
-            className="rounded-xl border border-[#577877]/30 bg-white px-3.5 py-2 text-xs font-semibold text-[#25836F] hover:bg-[#F0F5F7] flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-sm">download</span>
-            Export CSV
-          </button>
+          {viewMode === "transactions" ? (
+            <button
+              onClick={handleExportCSV}
+              className="rounded-xl border border-[#577877]/30 bg-white px-3.5 py-2 text-xs font-semibold text-[#25836F] hover:bg-[#F0F5F7] flex items-center gap-1.5 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">download</span>
+              Export CSV
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (!payoutLedgerData?.entries?.length) return;
+                const rows = [
+                  ["Ledger ID", "Financial Year", "Doctor Name", "Appointment ID", "Gross Fee (INR)", "Platform Cut (INR)", "TDS Rate (%)", "TDS Withheld (INR)", "Net Payable (INR)", "Status", "Date"],
+                  ...payoutLedgerData.entries.map((e) => [
+                    e.id,
+                    e.financial_year,
+                    e.doctor_name,
+                    e.appointment_id,
+                    e.gross_amount_inr,
+                    e.platform_fee_inr,
+                    e.tds_rate_percent,
+                    e.tds_withheld_inr,
+                    e.net_payable_inr,
+                    e.status,
+                    e.created_at || "",
+                  ]),
+                ];
+                const content = "data:text/csv;charset=utf-8," + rows.map((r) => r.join(",")).join("\n");
+                const link = document.createElement("a");
+                link.setAttribute("href", encodeURI(content));
+                link.setAttribute("download", `section_194j_tds_ledger_${Date.now()}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showToast("Section 194J Tax Ledger CSV exported successfully.", "success");
+              }}
+              className="btn-primary !px-3.5 !py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">file_download</span>
+              Export Form 26Q CSV
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="space-y-3">
+      {/* Navigation Sub-Tabs */}
+      <div className="flex gap-2 border-b border-[#577877]/15 pb-2">
+        <button
+          type="button"
+          onClick={() => setViewMode("transactions")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+            viewMode === "transactions"
+              ? "bg-[#25836F] text-white shadow-xs"
+              : "bg-white text-[#577877] border border-[#577877]/20 hover:text-[#162623]"
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm">receipt_long</span>
+          <span>Patient Payments ({payments.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewMode("section_194j")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+            viewMode === "section_194j"
+              ? "bg-[#25836F] text-white shadow-xs"
+              : "bg-white text-[#577877] border border-[#577877]/20 hover:text-[#162623]"
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm">account_balance</span>
+          <span>Section 194J 10% TDS Ledger</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+            Form 26Q Ready
+          </span>
+        </button>
+      </div>
+
+      {viewMode === "section_194j" ? (
+        <div className="space-y-6">
+          {/* Statutory Stat Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            <div className="p-4 rounded-xl bg-white border border-[#577877]/15 shadow-xs space-y-1">
+              <span className="text-[#577877] font-medium block">Total Consultation Volume</span>
+              <span className="text-xl font-bold text-[#162623] block">
+                ₹{(payoutLedgerData?.total_gross_inr || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-[10px] text-[#577877]">FY {payoutLedgerData?.financial_year || "2026-2027"}</span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white border border-[#577877]/15 shadow-xs space-y-1">
+              <span className="text-[#577877] font-medium block">Platform Commission (15%)</span>
+              <span className="text-xl font-bold text-[#25836F] block">
+                ₹{(payoutLedgerData?.total_platform_commission_inr || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-[10px] text-[#577877]">Clinic net software margin</span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 shadow-xs space-y-1">
+              <span className="text-amber-800 font-bold block flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs">gavel</span>
+                TDS Section 194J (10%)
+              </span>
+              <span className="text-xl font-bold text-amber-900 block">
+                ₹{(payoutLedgerData?.total_tds_withheld_inr || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-[10px] text-amber-700">Statutory Tax Payable to Govt</span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 shadow-xs space-y-1">
+              <span className="text-emerald-800 font-bold block">Net Clinician Payable</span>
+              <span className="text-xl font-bold text-emerald-900 block">
+                ₹{(payoutLedgerData?.total_net_payable_inr || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-[10px] text-emerald-700">Total doctor settlement pool</span>
+            </div>
+          </div>
+
+          {/* Section 194J Ledger Table */}
+          <div className="care-card overflow-hidden">
+            <div className="p-4 bg-[#F0F5F7] border-b border-[#577877]/15 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#25836F]">description</span>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#162623]">
+                  Statutory Tax Withholding Ledger (Form 26Q Schedule)
+                </h3>
+              </div>
+              <span className="text-[11px] font-semibold text-[#577877]">
+                {payoutLedgerData?.entries?.length || 0} Transactions Ledgered
+              </span>
+            </div>
+
+            {loadingLedger ? (
+              <div className="flex h-36 items-center justify-center text-[#577877]">
+                <span className="material-symbols-outlined animate-spin text-2xl">sync</span>
+              </div>
+            ) : payoutLedgerData?.entries?.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F9FBFA] border-b border-[#577877]/15 text-[#577877] font-semibold">
+                    <tr>
+                      <th className="p-3">Attending Clinician</th>
+                      <th className="p-3">Consultation Ref</th>
+                      <th className="p-3">Gross Fee</th>
+                      <th className="p-3">Platform Cut (15%)</th>
+                      <th className="p-3">TDS Section 194J (10%)</th>
+                      <th className="p-3">Net Clinician Due</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Statutory Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#577877]/15">
+                    {payoutLedgerData.entries.map((entry) => (
+                      <tr key={entry.id} className="hover:bg-[#F0F5F7]/50">
+                        <td className="p-3 font-semibold text-[#162623]">{entry.doctor_name}</td>
+                        <td className="p-3 font-mono text-[11px] text-[#577877]">{entry.appointment_id.slice(0, 10)}…</td>
+                        <td className="p-3 font-bold text-[#162623]">₹{entry.gross_amount_inr.toFixed(2)}</td>
+                        <td className="p-3 text-[#577877]">₹{entry.platform_fee_inr.toFixed(2)}</td>
+                        <td className="p-3 font-bold text-amber-800 bg-amber-50/50">₹{entry.tds_withheld_inr.toFixed(2)}</td>
+                        <td className="p-3 font-bold text-emerald-800">₹{entry.net_payable_inr.toFixed(2)}</td>
+                        <td className="p-3 text-[11px] text-[#577877]">
+                          {entry.created_at ? new Date(entry.created_at).toLocaleDateString("en-IN") : "Recent"}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                            Reconciled
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-[#577877] space-y-1">
+                <span className="material-symbols-outlined text-3xl text-[#577877]/60">account_balance_wallet</span>
+                <p className="font-semibold text-[#162623]">No Section 194J TDS entries ledgered yet.</p>
+                <p>As patient payments are captured, 10% TDS withholding records will populate here automatically.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Search & Filter Bar */}
+          <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between care-card p-4">
           <div className="flex gap-2">
             {["all", "captured", "refunded", "failed"].map((st) => (
@@ -411,6 +609,8 @@ export default function PaymentOversightTab() {
             </div>
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   );

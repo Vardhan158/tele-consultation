@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { io } from "socket.io-client";
 import { API_BASE_URL, consultationApi, doctorApi } from "../../lib/api";
+import InCallChat from "./InCallChat";
 
 const fallbackIceServers = [
   ...(import.meta.env.VITE_STUN_URL
@@ -42,6 +43,9 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
   const [cameraOff, setCameraOff] = useState(false);
   const [audioOnlyAvailable, setAudioOnlyAvailable] = useState(false);
   const [remoteMedia, setRemoteMedia] = useState({ audio: false, video: false });
+  const [showChat, setShowChat] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [hasStream, setHasStream] = useState(false);
   const startRef = useRef(null);
   const startingRef = useRef(false);
   const remoteKindsRef = useRef(new Set());
@@ -49,17 +53,19 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
 
   // Re-bind streams when DOM mounts or toggles
   useEffect(() => {
-    if (status === "in_progress" && remoteVideo.current && remoteStreamRef.current) {
+    if ((status === "in_progress" || remoteStreamRef.current) && remoteVideo.current && remoteStreamRef.current) {
       remoteVideo.current.srcObject = remoteStreamRef.current;
       remoteVideo.current.play?.().catch(() => {});
     }
-  }, [status]);
+  }, [status, remoteMedia]);
 
+  // Dedicated useEffect for robust local video binding when streamRef.current is active and cameraOff is false
   useEffect(() => {
     if (!cameraOff && localVideo.current && streamRef.current) {
       localVideo.current.srcObject = streamRef.current;
+      localVideo.current.play?.().catch(() => {});
     }
-  }, [cameraOff]);
+  }, [cameraOff, hasStream, status]);
 
   useEffect(() => {
     let active = true;
@@ -93,6 +99,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
       try {
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+        setHasStream(false);
         const room =
           authorization ||
           (await (role === "doctor"
@@ -124,7 +131,11 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
         setCameraOff(audioOnly);
         setAudioOnlyAvailable(false);
         streamRef.current = stream;
-        if (localVideo.current) localVideo.current.srcObject = stream;
+        setHasStream(true);
+        if (localVideo.current) {
+          localVideo.current.srcObject = stream;
+          localVideo.current.play?.().catch(() => {});
+        }
         const peer = new RTCPeerConnection({
           iceServers: ice.ice_servers || fallbackIceServers,
         });
@@ -264,6 +275,12 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
             setStatus("waiting");
           }
         });
+        socket.on("chat_message", () => {
+          setShowChat((currentShow) => {
+            if (!currentShow) setUnreadCount((c) => c + 1);
+            return currentShow;
+          });
+        });
         socket.on("room_joined", (info) => diagnostic("room-joined", info));
         socket.on("prescription_published", (data) => {
           diagnostic("prescription_published-received", data);
@@ -391,6 +408,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
       socketRef.current = null;
       peerRef.current = null;
       streamRef.current = null;
+      setHasStream(false);
       startingRef.current = false;
       startRef.current = null;
     };
@@ -414,6 +432,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
     peerRef.current?.close();
     streamRef.current = null;
     peerRef.current = null;
+    setHasStream(false);
     setStatus("ended");
     onEnded?.();
   };
@@ -465,7 +484,7 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
       <div className={`relative rounded-2xl overflow-hidden bg-[#162623] shadow-lg ${role === "doctor" ? "h-[300px] sm:h-[360px]" : "aspect-16/10"} flex flex-col justify-between`}>
         {/* Remote Doctor Stream or Waiting Overlay */}
         <div className="w-full h-full relative flex items-center justify-center bg-[#162623]">
-          {status === "in_progress" && (remoteMedia.video || remoteMedia.audio) ? (
+          {status === "in_progress" || remoteStreamRef.current ? (
             <video
               ref={remoteVideo}
               autoPlay
@@ -561,6 +580,27 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
             {!cameraOff ? "Camera On" : "Camera Off"}
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setShowChat(!showChat);
+              if (!showChat) setUnreadCount(0);
+            }}
+            className={`relative px-4 py-2 rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center gap-1.5 ${
+              showChat
+                ? "bg-[#25836F] text-white"
+                : "border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7]"
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">chat</span>
+            <span>Chat &amp; Files</span>
+            {unreadCount > 0 && !showChat && (
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
           {role === "doctor" && status === "waiting" && (
             <button
               type="button"
@@ -580,6 +620,17 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
           {role === "doctor" ? "End Consultation" : "Leave Call"}
         </button>
       </div>
+
+      {showChat && (
+        <div className="mt-3">
+          <InCallChat
+            socket={socketRef.current}
+            role={role}
+            appointmentId={appointmentId}
+            onClose={() => setShowChat(false)}
+          />
+        </div>
+      )}
     </div>
   );
 })

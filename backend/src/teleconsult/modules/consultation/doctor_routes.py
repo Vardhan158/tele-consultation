@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
@@ -180,7 +183,7 @@ async def dashboard(principal: Principal = Depends(require("doctor:appointment:r
 
 
 @router.get("/appointments")
-async def doctor_appointments(principal: Principal = Depends(require("doctor:appointment:read"))):
+async def doctor_appointments(session: Any | None = None, principal: Principal = Depends(require("doctor:appointment:read"))):
     try:
         if get_settings().mongodb_enabled:
             db = mongo_database.database()
@@ -390,7 +393,7 @@ async def delete_availability(
 
 
 @router.post("/appointments/{appointment_id}/notes", status_code=201)
-async def save_note(appointment_id: str, payload: NotePayload, principal: Principal = Depends(require("clinical:write"))):
+async def save_note(appointment_id: str, payload: NotePayload, session: Any | None = None, principal: Principal = Depends(require("clinical:write"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await _get_doctor(db, principal)
@@ -422,7 +425,7 @@ async def save_note(appointment_id: str, payload: NotePayload, principal: Princi
 
 
 @router.get("/appointments/{appointment_id}/notes")
-async def appointment_notes(appointment_id: str, principal: Principal = Depends(require("clinical:read"))):
+async def appointment_notes(appointment_id: str, session: Any | None = None, principal: Principal = Depends(require("clinical:read"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await _get_doctor(db, principal)
@@ -459,7 +462,7 @@ async def appointment_notes(appointment_id: str, principal: Principal = Depends(
 
 
 @router.patch("/notes/{note_id}")
-async def update_draft_note(note_id: str, payload: NotePayload, principal: Principal = Depends(require("clinical:write"))):
+async def update_draft_note(note_id: str, payload: NotePayload, session: Any | None = None, principal: Principal = Depends(require("clinical:write"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await _get_doctor(db, principal)
@@ -519,7 +522,7 @@ async def doctor_patients(principal: Principal = Depends(require("clinical:read"
 
 
 @router.get("/patients/{patient_id}")
-async def doctor_patient_detail(patient_id: str, principal: Principal = Depends(require("clinical:read"))):
+async def doctor_patient_detail(patient_id: str, session: Any | None = None, principal: Principal = Depends(require("clinical:read"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await _get_doctor(db, principal)
@@ -585,7 +588,7 @@ async def doctor_patient_detail(patient_id: str, principal: Principal = Depends(
 
 
 @router.post("/appointments/{appointment_id}/notes/{note_id}/finalize")
-async def finalize_note(appointment_id: str, note_id: str, principal: Principal = Depends(require("clinical:write"))):
+async def finalize_note(appointment_id: str, note_id: str, session: Any | None = None, principal: Principal = Depends(require("clinical:write"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await _get_doctor(db, principal)
@@ -639,7 +642,7 @@ async def note_amendments(note_id: str, principal: Principal = Depends(require("
 
 
 @router.post("/notes/{note_id}/amend", status_code=201)
-async def amend_note(note_id: str, payload: NotePayload, principal: Principal = Depends(require("clinical:write"))):
+async def amend_note(note_id: str, payload: NotePayload, session: Any | None = None, principal: Principal = Depends(require("clinical:write"))):
     if get_settings().mongodb_enabled:
         db = mongo_database.database()
         doctor = await _get_doctor(db, principal)
@@ -661,3 +664,340 @@ async def amend_note(note_id: str, payload: NotePayload, principal: Principal = 
         await db["clinical_note_amendments"].insert_one(amendment)
         return {"id": amendment["id"], "version": version}
     return {}
+
+
+# =============================================================================
+# ON-DEMAND URGENT CARE QUEUE (Phase 3.3)
+# =============================================================================
+
+class UrgentCareToggle(BaseModel):
+    active: bool
+
+
+@router.post("/urgent-care/toggle")
+async def toggle_urgent_care(
+    payload: UrgentCareToggle,
+    principal: Principal = Depends(require("doctor:appointment:write")),
+):
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+
+    await db["doctors"].update_one(
+        {"tenant_id": str(principal.tenant_id), "id": str(doctor["id"])},
+        {"$set": {"urgent_care_duty": payload.active, "urgent_care_updated_at": datetime.now(UTC).isoformat()}},
+    )
+    return {"urgent_care_duty": payload.active, "doctor_id": str(doctor["id"])}
+
+
+@router.get("/urgent-care/queue")
+async def get_urgent_care_queue(
+    principal: Principal = Depends(require("doctor:appointment:read")),
+):
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+
+    cursor = db["urgent_care_queue"].find({
+        "tenant_id": str(principal.tenant_id),
+        "status": "waiting",
+    }).sort("created_at", 1)
+
+    items = []
+    idx = 1
+    async for doc in cursor:
+        items.append({
+            "ticket_id": doc["id"],
+            "patient_id": doc["patient_id"],
+            "patient_name": doc.get("patient_name", "Patient"),
+            "chief_complaint": doc.get("chief_complaint", "Urgent Care Consult"),
+            "urgency_level": doc.get("urgency_level", "moderate"),
+            "contact_phone": doc.get("contact_phone", ""),
+            "queue_position": idx,
+            "created_at": doc.get("created_at"),
+        })
+        idx += 1
+
+    return {
+        "doctor_on_duty": bool(doctor.get("urgent_care_duty", False)),
+        "waiting_patients": items,
+        "queue_count": len(items),
+    }
+
+
+@router.post("/urgent-care/{ticket_id}/claim")
+async def claim_urgent_care_ticket(
+    ticket_id: str,
+    principal: Principal = Depends(require("doctor:appointment:write")),
+):
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+
+    now_dt = datetime.now(UTC)
+    now_iso = now_dt.isoformat()
+    end_iso = (now_dt + timedelta(minutes=15)).isoformat()
+    appointment_id = str(uuid4())
+
+    claimed = await db["urgent_care_queue"].find_one_and_update(
+        {
+            "tenant_id": str(principal.tenant_id),
+            "id": str(ticket_id),
+            "status": "waiting",
+        },
+        {
+            "$set": {
+                "status": "claimed",
+                "doctor_id": str(doctor["id"]),
+                "doctor_name": str(doctor.get("full_name") or "Clinician"),
+                "appointment_id": appointment_id,
+                "claimed_at": now_iso,
+            }
+        },
+        return_document=True,
+    )
+    if not claimed:
+        raise HTTPException(status_code=409, detail="Ticket has already been claimed or cancelled")
+
+    appointment_doc = {
+        "id": appointment_id,
+        "tenant_id": str(principal.tenant_id),
+        "patient_id": str(claimed["patient_id"]),
+        "doctor_id": str(doctor["id"]),
+        "starts_at": now_iso,
+        "ends_at": end_iso,
+        "status": "confirmed",
+        "payment_status": "captured",
+        "type": "urgent_care",
+        "chief_complaint": claimed.get("chief_complaint"),
+        "created_at": now_iso,
+    }
+    await db["appointments"].insert_one(appointment_doc)
+
+    return {
+        "ticket_id": ticket_id,
+        "status": "claimed",
+        "appointment_id": appointment_id,
+        "doctor_name": str(doctor.get("full_name") or "Clinician"),
+        "patient_name": claimed.get("patient_name"),
+        "chief_complaint": claimed.get("chief_complaint"),
+    }
+
+
+# =============================================================================
+# DOCTOR 72-HOUR POST-CONSULTATION FOLLOW-UP (Phase 1.3)
+# =============================================================================
+
+class FollowUpReply(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+
+
+@router.get("/appointments/{appointment_id}/follow-up")
+async def doctor_get_follow_up(
+    appointment_id: str,
+    principal: Principal = Depends(require("doctor:appointment:read")),
+):
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+
+    appointment = await db["appointments"].find_one({
+        "tenant_id": str(principal.tenant_id),
+        "doctor_id": str(doctor["id"]),
+        "$or": [{"id": str(appointment_id)}, {"id": str(appointment_id).lower()}],
+    })
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    chat_docs = await db["followup_chats"].find({
+        "tenant_id": str(principal.tenant_id),
+        "appointment_id": str(appointment["id"]),
+    }).sort("created_at", 1).to_list(100)
+
+    messages = [
+        {
+            "id": doc.get("id", str(doc.get("_id"))),
+            "sender_role": doc.get("sender_role"),
+            "sender_name": doc.get("sender_name"),
+            "message": doc.get("message"),
+            "created_at": doc.get("created_at"),
+        }
+        for doc in chat_docs
+    ]
+
+    return {
+        "appointment_id": str(appointment["id"]),
+        "patient_id": str(appointment.get("patient_id")),
+        "messages": messages,
+    }
+
+
+@router.post("/appointments/{appointment_id}/follow-up", status_code=201)
+async def doctor_reply_follow_up(
+    appointment_id: str,
+    payload: FollowUpReply,
+    principal: Principal = Depends(require("doctor:appointment:write")),
+):
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+
+    appointment = await db["appointments"].find_one({
+        "tenant_id": str(principal.tenant_id),
+        "doctor_id": str(doctor["id"]),
+        "$or": [{"id": str(appointment_id)}, {"id": str(appointment_id).lower()}],
+    })
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    msg_id = f"msg-{secrets.token_hex(6)}"
+    now_iso = datetime.now(UTC).isoformat()
+    chat_doc = {
+        "id": msg_id,
+        "tenant_id": str(principal.tenant_id),
+        "appointment_id": str(appointment["id"]),
+        "sender_id": str(doctor["id"]),
+        "sender_role": "doctor",
+        "sender_name": str(doctor.get("full_name") or "Clinician"),
+        "message": payload.message.strip(),
+        "created_at": now_iso,
+    }
+    await db["followup_chats"].insert_one(chat_doc)
+    return chat_doc
+
+
+# =============================================================================
+# RECURRING AVAILABILITY & SHIFT TEMPLATES (Phase 2.1)
+# =============================================================================
+
+class RecurringAvailabilityPayload(BaseModel):
+    days_of_week: list[int]  # 0=Monday, 6=Sunday
+    start_time: str  # "HH:MM" e.g. "09:00"
+    end_time: str  # "HH:MM" e.g. "17:00"
+    slot_duration_minutes: int = 30
+    weeks_ahead: int = 4
+
+
+@router.post("/availability/recurring", status_code=201)
+async def create_recurring_availability(
+    payload: RecurringAvailabilityPayload,
+    principal: Principal = Depends(require("doctor:availability:write")),
+):
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+    doctor_id = str(doctor["id"])
+
+    start_parts = [int(p) for p in payload.start_time.split(":")]
+    end_parts = [int(p) for p in payload.end_time.split(":")]
+    start_minute = start_parts[0] * 60 + start_parts[1]
+    end_minute = end_parts[0] * 60 + end_parts[1]
+
+    if end_minute <= start_minute:
+        raise HTTPException(status_code=422, detail="End time must be after start time")
+
+    slots_to_create = []
+    now = datetime.now(UTC)
+    today = now.date()
+
+    for day_offset in range(payload.weeks_ahead * 7):
+        target_date = today + timedelta(days=day_offset)
+        if target_date.weekday() in payload.days_of_week:
+            current_m = start_minute
+            while current_m + payload.slot_duration_minutes <= end_minute:
+                slot_start = datetime(
+                    target_date.year, target_date.month, target_date.day,
+                    current_m // 60, current_m % 60, tzinfo=UTC
+                )
+                slot_end = slot_start + timedelta(minutes=payload.slot_duration_minutes)
+
+                if slot_start > now:
+                    slot_id = f"slot-{secrets.token_hex(6)}"
+                    slots_to_create.append({
+                        "id": slot_id,
+                        "tenant_id": str(principal.tenant_id),
+                        "doctor_id": doctor_id,
+                        "starts_at": slot_start.isoformat(),
+                        "ends_at": slot_end.isoformat(),
+                        "status": "available",
+                        "booked": False,
+                        "created_at": now.isoformat(),
+                    })
+                current_m += payload.slot_duration_minutes
+
+    if slots_to_create:
+        for slot in slots_to_create:
+            await db["doctor_availability"].insert_one(slot)
+
+    return {
+        "slots_created": len(slots_to_create),
+        "message": f"Successfully generated {len(slots_to_create)} recurring consultation slots over {payload.weeks_ahead} weeks.",
+    }
+
+
+# =============================================================================
+# DOCTOR PAYOUTS & SECTION 194J 10% TDS (Phase 2.2)
+# =============================================================================
+
+@router.get("/payouts")
+async def doctor_get_payouts(
+    principal: Principal = Depends(require("doctor:appointment:read")),
+):
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+
+    cursor = db["doctor_payout_ledger"].find({
+        "tenant_id": str(principal.tenant_id),
+        "doctor_id": str(doctor["id"]),
+    }).sort("created_at", -1)
+
+    entries = []
+    total_gross_paise = 0
+    total_platform_paise = 0
+    total_tds_paise = 0
+    total_net_paise = 0
+
+    async for doc in cursor:
+        gross = doc.get("gross_amount_paise", 0)
+        plat = doc.get("platform_fee_paise", 0)
+        tds = doc.get("tds_withheld_paise", 0)
+        net = doc.get("net_payable_paise", 0)
+
+        total_gross_paise += gross
+        total_platform_paise += plat
+        total_tds_paise += tds
+        total_net_paise += net
+
+        entries.append({
+            "id": doc.get("id", str(doc.get("_id"))),
+            "appointment_id": doc.get("appointment_id"),
+            "payment_id": doc.get("payment_id"),
+            "gross_amount_inr": gross / 100.0,
+            "platform_commission_inr": plat / 100.0,
+            "tds_rate": doc.get("tds_rate", 0.10),
+            "tds_withheld_inr": tds / 100.0,
+            "net_payable_inr": net / 100.0,
+            "status": doc.get("status", "recorded"),
+            "financial_year": doc.get("financial_year", "2026-2027"),
+            "created_at": doc.get("created_at"),
+        })
+
+    return {
+        "doctor_id": str(doctor["id"]),
+        "doctor_name": str(doctor.get("full_name") or "Clinician"),
+        "total_gross_inr": total_gross_paise / 100.0,
+        "total_platform_commission_inr": total_platform_paise / 100.0,
+        "total_tds_withheld_inr": total_tds_paise / 100.0,
+        "total_net_payable_inr": total_net_paise / 100.0,
+        "entries": entries,
+    }
+
+

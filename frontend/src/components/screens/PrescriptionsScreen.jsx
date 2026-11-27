@@ -22,6 +22,15 @@ export default function PrescriptionsScreen({
   const [refillModalRx, setRefillModalRx] = useState(null);
   const [showPharmacyModal, setShowPharmacyModal] = useState(false);
 
+  const [pharmacyOrdersList, setPharmacyOrdersList] = useState([]);
+  const [orderModalRx, setOrderModalRx] = useState(null);
+  const [genericData, setGenericData] = useState(null);
+  const [genericLoading, setGenericLoading] = useState(false);
+  const [orderTier, setOrderTier] = useState("generic_jan_aushadhi");
+  const [orderDeliveryAddress, setOrderDeliveryAddress] = useState("");
+  const [orderContactPhone, setOrderContactPhone] = useState("");
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
+
   const [pharmacyForm, setPharmacyForm] = useState({
     name: "",
     address: "",
@@ -55,11 +64,20 @@ export default function PrescriptionsScreen({
               rx.status === "completed" ||
               rx.status === "expired" ||
               rx.status === "inactive";
+            let content = {};
+            try {
+              content = typeof rx.content === "string" ? JSON.parse(rx.content || "{}") : (rx.content || {});
+            } catch {
+              content = { diagnosis: "Clinical Consultation", instructions: rx.content };
+            }
+            const meds = content.medicines || rx.medicines || (rx.medication_name ? [{ name: rx.medication_name, dosage: rx.dosage, frequency: rx.frequency, duration: rx.duration, instructions: rx.instructions }] : []);
             return {
               id: rx.id,
-              name: rx.medication_name || rx.title || "Prescription",
-              strength: rx.dosage || "As directed",
-              instructions: rx.instructions || "Follow prescription guidelines.",
+              name: meds[0]?.name || rx.medication_name || rx.title || "Prescription",
+              strength: meds[0]?.dosage || rx.dosage || "As directed",
+              instructions: content.instructions || rx.instructions || "Follow prescription guidelines.",
+              diagnosis: content.diagnosis || "",
+              medicines: meds,
               prescriber: rx.prescriber_name || rx.doctor_name || "Authorized Clinician",
               issuedDate: rx.released_at
                 ? new Date(rx.released_at).toLocaleDateString("en-US", {
@@ -72,17 +90,6 @@ export default function PrescriptionsScreen({
               statusBadge: rx.status ? rx.status.charAt(0).toUpperCase() + rx.status.slice(1) : "Active",
               statusType: isCompletedOrExpired ? "neutral" : "active",
               isCompleted: isCompletedOrExpired,
-              quantity:
-                rx.medicines
-                  ?.map((m) => m.quantity)
-                  .filter(Boolean)
-                  .join(", ") || "See details",
-              daysSupply:
-                rx.medicines
-                  ?.map((m) => m.duration)
-                  .filter(Boolean)
-                  .join(", ") || "See details",
-              medicines: rx.medicines || [],
             };
           }),
         );
@@ -100,6 +107,12 @@ export default function PrescriptionsScreen({
       const summaries = await clinicalApi.summaries().catch(() => []);
       if (Array.isArray(summaries)) {
         setSummariesList(summaries);
+      }
+
+      // 5. Load pharmacy orders
+      const pOrders = await clinicalApi.pharmacyOrders().catch(() => []);
+      if (Array.isArray(pOrders)) {
+        setPharmacyOrdersList(pOrders);
       }
     } catch {
       // Handled
@@ -233,12 +246,12 @@ export default function PrescriptionsScreen({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `prescription-${prescription.id}.txt`;
+      link.download = `Prescription-${prescription.id}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
-      setToastMessage(`Prescription for ${prescription.name} downloaded.`);
+      setToastMessage(`Prescription PDF for ${prescription.name} downloaded.`);
     } catch (err) {
-      setToastMessage(err.message);
+      setToastMessage(err.message || "Unable to download prescription PDF.");
     }
     setTimeout(() => setToastMessage(""), 3500);
   };
@@ -258,6 +271,58 @@ export default function PrescriptionsScreen({
       setToastMessage(err.message || "Consultation summary downloaded.");
     }
     setTimeout(() => setToastMessage(""), 3500);
+  };
+
+  const handleOpenPharmacyOrder = async (rx) => {
+    setOrderModalRx(rx);
+    setGenericLoading(true);
+    setOrderDeliveryAddress(patientProfile?.address || pharmacy.address || "");
+    setOrderContactPhone(patientProfile?.phone_number || pharmacy.phone || "");
+    try {
+      const data = await clinicalApi.getGenericSubstitutes(rx.id);
+      setGenericData(data);
+    } catch {
+      setGenericData(null);
+    } finally {
+      setGenericLoading(false);
+    }
+  };
+
+  const handleConfirmOrderPharmacy = async () => {
+    if (!orderModalRx) return;
+    if (!orderDeliveryAddress.trim() || !orderContactPhone.trim()) {
+      setToastMessage("Please provide your delivery address and contact phone number.");
+      setTimeout(() => setToastMessage(""), 3500);
+      return;
+    }
+    setOrderSubmitting(true);
+    try {
+      const items = (genericData?.substitutes || []).map((sub) => ({
+        name: sub.prescribed_line || orderModalRx.name,
+        generic_name: sub.generic_molecule,
+        dosage: orderModalRx.strength || "",
+        quantity: 1,
+        price_inr:
+          orderTier === "generic_jan_aushadhi"
+            ? sub.jan_aushadhi_price_inr
+            : sub.standard_brand_price_inr,
+      }));
+      await clinicalApi.orderPharmacy(orderModalRx.id, {
+        delivery_address: orderDeliveryAddress.trim(),
+        contact_phone: orderContactPhone.trim(),
+        preferred_tier: orderTier,
+        items,
+        notes: `Order placed via patient portal. Tier: ${orderTier}`,
+      });
+      setToastMessage("🎉 Pharmacy order placed successfully! Partner: PMBJP Jan Aushadhi.");
+      setOrderModalRx(null);
+      await fetchData();
+    } catch (err) {
+      setToastMessage(err.message || "Failed to place pharmacy order.");
+    } finally {
+      setOrderSubmitting(false);
+      setTimeout(() => setToastMessage(""), 4500);
+    }
   };
 
   return (
@@ -346,6 +411,7 @@ export default function PrescriptionsScreen({
           {[
             { id: "active", label: `Active (${activeMedicationsList.length})` },
             { id: "past", label: "Past medications" },
+            { id: "orders", label: `Pharmacy Orders (${pharmacyOrdersList.length})` },
             { id: "refills", label: `Refill requests (${refillTickets.length})` },
             { id: "summaries", label: "Consultation summaries" },
           ].map((tab) => {
@@ -433,8 +499,26 @@ export default function PrescriptionsScreen({
                       </div>
 
                       <div>
+                        {med.diagnosis && (
+                          <p className="text-xs text-slate-700 mb-2">
+                            <strong>Diagnosis:</strong> {med.diagnosis}
+                          </p>
+                        )}
+
+                        {med.medicines && med.medicines.length > 0 && (
+                          <div className="space-y-1.5 bg-[#F0F5F7] p-3 rounded-xl border border-[#577877]/10 text-xs mb-2">
+                            <p className="font-bold text-[#162623]">Prescribed Medications:</p>
+                            {med.medicines.map((m, idx) => (
+                              <div key={idx} className="border-b border-slate-200/60 pb-1.5 last:border-b-0 text-slate-700">
+                                <span className="font-semibold">{m.name}</span> {m.dosage ? `(${m.dosage})` : ""} {m.frequency ? `· ${m.frequency}` : ""} {m.duration ? `for ${m.duration}` : ""}
+                                {m.instructions && <div className="text-[11px] text-[#577877] mt-0.5">Instructions: {m.instructions}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         <p className="text-xs font-semibold text-[#162623]">
-                          {med.instructions}
+                          <strong>General Instructions / Dietary Advice:</strong> {med.instructions}
                         </p>
                       </div>
 
@@ -474,6 +558,15 @@ export default function PrescriptionsScreen({
                           className="border border-[#577877]/30 text-[#162623] hover:bg-[#F0F5F7] px-4 py-2 rounded-xl font-semibold text-xs shadow-2xs transition cursor-pointer"
                         >
                           View prescription
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPharmacyOrder(med)}
+                          className="bg-[#25836F] hover:bg-[#1E6B5A] text-white px-3.5 py-2 rounded-xl font-semibold text-xs shadow-2xs transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-sm">local_shipping</span>
+                          <span>Order Medicines (Jan Aushadhi)</span>
                         </button>
 
                         <button
@@ -541,6 +634,68 @@ export default function PrescriptionsScreen({
                             {med.issuedDate}
                           </span>
                         </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* TAB: PHARMACY ORDERS */}
+            {currentMode === "prescriptions" && activeSubTab === "orders" && (
+              <div className="space-y-4">
+                {pharmacyOrdersList.length === 0 ? (
+                  <div className="care-card p-8 rounded-2xl bg-white border border-[#577877]/15 text-center space-y-3">
+                    <span className="w-12 h-12 rounded-full bg-[#E0F0EC] text-[#25836F] flex items-center justify-center mx-auto">
+                      <span className="material-symbols-outlined !text-[#25836F] text-2xl">
+                        local_shipping
+                      </span>
+                    </span>
+                    <h3 className="text-base font-bold text-[#162623]">
+                      No pharmacy orders placed yet
+                    </h3>
+                    <p className="text-xs text-[#577877] max-w-md mx-auto leading-relaxed">
+                      Order medicines with 1-click home delivery and up to 70% savings via the Jan Aushadhi generic network directly from your active prescriptions.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubTab("active")}
+                      className="btn-primary !px-5 !py-2 text-xs rounded-xl font-semibold shadow-2xs mt-2 cursor-pointer"
+                    >
+                      Browse Active Prescriptions
+                    </button>
+                  </div>
+                ) : (
+                  pharmacyOrdersList.map((order) => (
+                    <div
+                      key={order.id}
+                      className="care-card p-6 sm:p-7 rounded-2xl bg-white border border-[#577877]/15 space-y-3"
+                    >
+                      <div className="flex items-center justify-between text-xs pb-2 border-b border-[#577877]/10">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[#577877] text-[11px]">{order.id}</span>
+                          <span className="font-bold text-[#162623]">Prescribed by {order.doctor_name}</span>
+                        </div>
+                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase text-[10px]">
+                          {order.order_status || "Confirmed"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <span className="text-[#577877] block text-[11px]">Total Amount</span>
+                          <span className="font-bold text-[#162623]">₹{order.total_amount_inr}</span>
+                        </div>
+                        <div>
+                          <span className="text-[#577877] block text-[11px]">Fulfillment Partner</span>
+                          <span className="font-semibold text-[#25836F]">{order.fulfillment_partner || "Jan Aushadhi PMBJP"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[#577877] block text-[11px]">Estimated Delivery</span>
+                          <span className="font-semibold text-[#162623]">{order.estimated_delivery || "Within 24 Hours"}</span>
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-[#577877] pt-1 border-t border-[#577877]/10">
+                        📍 Delivery Address: <span className="text-[#162623] font-medium">{order.delivery_address}</span> ({order.contact_phone})
                       </div>
                     </div>
                   ))
@@ -814,7 +969,7 @@ export default function PrescriptionsScreen({
               </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-2 text-xs">
+            <div className="p-4 rounded-xl bg-[#F0F5F7] space-y-3 text-xs max-h-[380px] overflow-y-auto">
               <div className="flex justify-between">
                 <span className="text-[#577877]">Rx ID:</span>
                 <span className="font-semibold text-[#162623]">
@@ -833,19 +988,38 @@ export default function PrescriptionsScreen({
                   {selectedRx.issuedDate}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#577877]">Instructions:</span>
-                <span className="font-semibold text-[#162623]">
-                  {selectedRx.instructions}
-                </span>
+
+              {selectedRx.diagnosis && (
+                <div className="pt-2 border-t border-[#577877]/15">
+                  <span className="text-[#577877] block font-semibold mb-0.5">Clinical Diagnosis:</span>
+                  <p className="font-bold text-[#162623]">{selectedRx.diagnosis}</p>
+                </div>
+              )}
+
+              {selectedRx.medicines && selectedRx.medicines.length > 0 && (
+                <div className="pt-2 border-t border-[#577877]/15 space-y-1.5">
+                  <span className="text-[#577877] block font-semibold">Prescribed Medications:</span>
+                  {selectedRx.medicines.map((m, idx) => (
+                    <div key={idx} className="bg-white p-2.5 rounded-lg border border-[#577877]/10 text-slate-700">
+                      <span className="font-bold text-[#162623]">{m.name}</span> {m.dosage ? `(${m.dosage})` : ""} {m.frequency ? `· ${m.frequency}` : ""} {m.duration ? `for ${m.duration}` : ""}
+                      {m.instructions && <div className="text-[10px] text-[#577877] mt-0.5">Instructions: {m.instructions}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-[#577877]/15">
+                <span className="text-[#577877] block font-semibold mb-0.5">General Instructions / Dietary Advice:</span>
+                <p className="font-medium text-[#162623]">{selectedRx.instructions}</p>
               </div>
-              <div className="flex justify-between">
+
+              <div className="flex justify-between pt-2 border-t border-[#577877]/15">
                 <span className="text-[#577877]">Pharmacy:</span>
                 <span className="font-semibold text-[#25836F]">
                   {pharmacy.name || "No preferred pharmacy selected"}
                 </span>
               </div>
-              <div className="flex justify-between pt-1 border-t border-[#577877]/15">
+              <div className="flex justify-between">
                 <span className="text-[#577877]">Refills Status:</span>
                 <span className="font-bold text-[#162623]">
                   {selectedRx.refills}
@@ -947,6 +1121,180 @@ export default function PrescriptionsScreen({
                 className="btn-primary !py-2 !px-4 text-xs font-semibold cursor-pointer"
               >
                 Submit refill request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 1-Click Pharmacy Order & Jan Aushadhi Generic Suggester Modal */}
+      {orderModalRx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-[#577877]/20 p-6 sm:p-7 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#577877]/15">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined !text-[#25836F] text-2xl">
+                  local_pharmacy
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-[#162623]">
+                    Order Medicines (Home Delivery)
+                  </h3>
+                  <p className="text-[11px] text-[#577877]">Jan Aushadhi Generic Suggester &amp; Cost Comparison</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrderModalRx(null)}
+                className="p-1 rounded-lg text-[#577877] hover:bg-[#F0F5F7] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Prescribed Item info */}
+            <div className="p-3.5 rounded-xl bg-[#F0F5F7] space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-[#577877]">Prescribed Medication:</span>
+                <span className="font-bold text-[#162623]">{orderModalRx.name} ({orderModalRx.strength})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#577877]">Prescribed by:</span>
+                <span className="font-semibold text-[#162623]">{orderModalRx.prescriber}</span>
+              </div>
+            </div>
+
+            {/* Generic Substitutes Comparison Card */}
+            {genericLoading ? (
+              <div className="py-6 text-center text-xs text-[#577877]">
+                Fetching Jan Aushadhi generic substitutes &amp; pricing…
+              </div>
+            ) : genericData ? (
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-base text-emerald-600">savings</span>
+                      Jan Aushadhi Generic Savings
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-bold text-[11px]">
+                      Save {genericData.savings_percentage}%
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-emerald-200">
+                    <div>
+                      <span className="text-[#577877] text-[11px] block">Standard Branded Est.</span>
+                      <span className="font-bold text-rose-700 line-through">₹{genericData.estimated_brand_total_inr}</span>
+                    </div>
+                    <div>
+                      <span className="text-[#577877] text-[11px] block">Jan Aushadhi Generic</span>
+                      <span className="font-extrabold text-emerald-700 text-sm">₹{genericData.estimated_generic_total_inr}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tier Selection */}
+                <div className="space-y-1.5 text-xs">
+                  <label className="font-semibold text-[#162623] block">Select Medicine Tier:</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label
+                      className={`p-3 rounded-xl border cursor-pointer flex flex-col gap-1 transition ${
+                        orderTier === "generic_jan_aushadhi"
+                          ? "border-[#25836F] bg-[#EEF6F3]"
+                          : "border-[#577877]/25 hover:bg-[#F0F5F7]"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="orderTier"
+                        value="generic_jan_aushadhi"
+                        checked={orderTier === "generic_jan_aushadhi"}
+                        onChange={() => setOrderTier("generic_jan_aushadhi")}
+                        className="sr-only"
+                      />
+                      <span className="font-bold text-xs text-[#162623]">Jan Aushadhi Generic</span>
+                      <span className="text-[11px] text-[#25836F] font-semibold">₹{genericData.estimated_generic_total_inr} (Best Value)</span>
+                    </label>
+
+                    <label
+                      className={`p-3 rounded-xl border cursor-pointer flex flex-col gap-1 transition ${
+                        orderTier === "brand"
+                          ? "border-[#25836F] bg-[#EEF6F3]"
+                          : "border-[#577877]/25 hover:bg-[#F0F5F7]"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="orderTier"
+                        value="brand"
+                        checked={orderTier === "brand"}
+                        onChange={() => setOrderTier("brand")}
+                        className="sr-only"
+                      />
+                      <span className="font-bold text-xs text-[#162623]">Standard Branded</span>
+                      <span className="text-[11px] text-[#577877]">₹{genericData.estimated_brand_total_inr}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Address & Phone inputs */}
+            <div className="space-y-3 text-xs pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-[#162623] mb-1">
+                  Delivery Address <span className="text-rose-600">*</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={orderDeliveryAddress}
+                  onChange={(e) => setOrderDeliveryAddress(e.target.value)}
+                  placeholder="Enter full street address, apartment, city, pincode"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#162623] mb-1">
+                  Contact Phone Number <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={orderContactPhone}
+                  onChange={(e) => setOrderContactPhone(e.target.value)}
+                  placeholder="e.g. 9876543210"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#577877]/25 bg-white text-xs text-[#162623] focus:outline-none focus:border-[#25836F]"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#F0F5F7] text-[11px] text-[#577877] flex items-center gap-2">
+              <span className="material-symbols-outlined text-base text-[#25836F]">verified</span>
+              <span>Fulfilled by authorized PMBJP Jan Aushadhi Kendra or Licensed Network Pharmacy.</span>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-[#577877]/15">
+              <button
+                type="button"
+                onClick={() => setOrderModalRx(null)}
+                className="btn-secondary !py-2 !px-4 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={orderSubmitting}
+                onClick={handleConfirmOrderPharmacy}
+                className="btn-primary !py-2 !px-4 text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+              >
+                {orderSubmitting ? (
+                  "Placing Order…"
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-sm">shopping_cart_checkout</span>
+                    <span>Confirm &amp; Place Order</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

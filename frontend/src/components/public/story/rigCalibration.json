@@ -1,0 +1,40 @@
+{
+  "feet": [
+    {
+      "center": 0.5375,
+      "halfWidth": 0.2542,
+      "ankle": [
+        0.111,
+        0.1613
+      ],
+      "toe": [
+        0,
+        -0.1085,
+        0.0667
+      ]
+    },
+    {
+      "center": 0.05,
+      "halfWidth": 0.25,
+      "ankle": [
+        -0.0838,
+        0.1633
+      ],
+      "toe": [
+        0,
+        -0.109,
+        0.0884
+      ]
+    }
+  ],
+  "patient": {
+    "eyelids": false,
+    "fingers": false,
+    "faceMorphs": false
+  },
+  "pharmacist": {
+    "eyelids": false,
+    "fingers": false,
+    "faceMorphs": false
+  }
+}

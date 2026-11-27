@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
 from teleconsult.modules.notifications.schemas import (
@@ -230,9 +231,10 @@ async def get_patient_unread_count(
 
 @router.post("/read-all")
 async def mark_all_read(
+    session: Any | None = None,
     principal: Principal = Depends(require("notification:read")),
 ) -> dict[str, str]:
-    if not mongo_database.enabled:
+    if not get_settings().mongodb_enabled and not mongo_database.enabled:
         raise HTTPException(status_code=503, detail="Database unavailable")
     db = mongo_database.database()
     patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)

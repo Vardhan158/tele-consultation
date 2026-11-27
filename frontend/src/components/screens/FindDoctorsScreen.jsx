@@ -244,6 +244,86 @@ export default function FindDoctorsScreen({
   const [bookingError, setBookingError] = useState("");
   const [paymentConfirmationData, setPaymentConfirmationData] = useState(null);
 
+  // Family Members & Dependents State
+  const [familyMembers, setFamilyMembers] = useState([]);
+  const [bookingFor, setBookingFor] = useState("myself"); // "myself" | "family_member"
+  const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState("");
+  const [showAddFamilyModal, setShowAddFamilyModal] = useState(false);
+  const [savingFamilyMember, setSavingFamilyMember] = useState(false);
+  const [newFamilyForm, setNewFamilyForm] = useState({
+    full_name: "",
+    relationship: "spouse",
+    gender: "female",
+    date_of_birth: "",
+    blood_group: "",
+    allergies: "",
+  });
+
+  // On-Demand Urgent Care State (Phase 3.3)
+  const [showUrgentCareModal, setShowUrgentCareModal] = useState(false);
+  const [urgentCareStatus, setUrgentCareStatus] = useState(null);
+  const [urgentCareLoading, setUrgentCareLoading] = useState(false);
+  const [urgentCareComplaint, setUrgentCareComplaint] = useState("");
+  const [urgentCareUrgency, setUrgentCareUrgency] = useState("moderate");
+  const [urgentCarePhone, setUrgentCarePhone] = useState("");
+  const [urgentCareMsg, setUrgentCareMsg] = useState("");
+
+  useEffect(() => {
+    if (authenticated) {
+      patientApi
+        .getUrgentCareStatus()
+        .then((res) => {
+          if (res?.has_active_request) setUrgentCareStatus(res);
+        })
+        .catch(() => {});
+    }
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (urgentCareStatus?.status === "waiting") {
+      const interval = setInterval(() => {
+        patientApi
+          .getUrgentCareStatus()
+          .then((res) => {
+            if (res) setUrgentCareStatus(res);
+          })
+          .catch(() => {});
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [urgentCareStatus?.status]);
+
+  const handleRequestUrgentCare = async (e) => {
+    e.preventDefault();
+    if (!urgentCareComplaint.trim()) return;
+    setUrgentCareLoading(true);
+    setUrgentCareMsg("");
+    try {
+      const res = await patientApi.requestUrgentCare({
+        chief_complaint: urgentCareComplaint.trim(),
+        urgency_level: urgentCareUrgency,
+        contact_phone: urgentCarePhone.trim() || patientProfile?.phone_number || "",
+      });
+      setUrgentCareStatus(res);
+      setUrgentCareComplaint("");
+    } catch (err) {
+      setUrgentCareMsg(err.message || "Failed to request urgent care.");
+    } finally {
+      setUrgentCareLoading(false);
+    }
+  };
+
+  const handleCancelUrgentCare = async () => {
+    if (!urgentCareStatus?.ticket_id) return;
+    try {
+      await patientApi.cancelUrgentCare(urgentCareStatus.ticket_id);
+      setUrgentCareStatus(null);
+      setShowUrgentCareModal(false);
+    } catch (err) {
+      setUrgentCareMsg(err.message || "Failed to cancel urgent care.");
+    }
+  };
+
   // Dynamic filter options extracted from API data
   const specialties = useMemo(() => {
     return [...new Set(doctors.map((d) => d.specialty).filter(Boolean))].sort();
@@ -270,6 +350,31 @@ export default function FindDoctorsScreen({
   const languages = useMemo(() => {
     return [...new Set(doctors.flatMap((d) => d.languages || []).filter(Boolean))].sort();
   }, [doctors]);
+
+  const handleSaveFamilyMember = async (e) => {
+    e.preventDefault();
+    if (!newFamilyForm.full_name.trim()) return;
+    setSavingFamilyMember(true);
+    try {
+      const created = await patientApi.createFamilyMember(newFamilyForm);
+      setFamilyMembers((prev) => [created, ...prev]);
+      setSelectedFamilyMemberId(created.id);
+      setBookingFor("family_member");
+      setShowAddFamilyModal(false);
+      setNewFamilyForm({
+        full_name: "",
+        relationship: "spouse",
+        gender: "female",
+        date_of_birth: "",
+        blood_group: "",
+        allergies: "",
+      });
+    } catch (err) {
+      alert(err.message || "Failed to save family dependent");
+    } finally {
+      setSavingFamilyMember(false);
+    }
+  };
 
   const handleApplyFilters = () => {
     updateSpecialtyUrl(selectedSpecialty);
@@ -387,6 +492,13 @@ export default function FindDoctorsScreen({
     setBookingPricing(null);
     setBookingPricingError("");
     setVisitFormat(bookingOptions.visit_formats?.[0] || "");
+    setBookingFor("myself");
+    patientApi.getFamilyMembers().then((m) => {
+      if (Array.isArray(m)) {
+        setFamilyMembers(m);
+        if (m.length > 0) setSelectedFamilyMemberId(m[0].id);
+      }
+    }).catch(() => {});
 
     if (currentDoctor.nextSlot) {
       const slotDate = new Date(currentDoctor.nextSlot.starts_at);
@@ -474,6 +586,7 @@ export default function FindDoctorsScreen({
     setBookingError("");
 
     try {
+      const chosenFamily = familyMembers.find((f) => f.id === selectedFamilyMemberId);
       const orderRes = await patientApi.createOrder({
         doctor_id: bookingDoctor.id,
         appointment_type: appointmentType,
@@ -481,6 +594,10 @@ export default function FindDoctorsScreen({
         visit_format: visitFormat,
         visit_reason: visitReason,
         doctor_notes: doctorNotes,
+        booking_for: bookingFor,
+        patient_profile_id: bookingFor === "family_member" ? selectedFamilyMemberId : null,
+        family_member_name: bookingFor === "family_member" ? (chosenFamily?.full_name || "") : null,
+        family_member_relation: bookingFor === "family_member" ? (chosenFamily?.relationship || "") : null,
       });
 
       const loaded = await loadRazorpayScript();
@@ -1211,6 +1328,83 @@ export default function FindDoctorsScreen({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column: Date & Slot Picker */}
               <div className="lg:col-span-2 space-y-4">
+                {/* Consultation For: Myself or Family Dependent */}
+                <div className="space-y-2 p-3 rounded-xl bg-[#F0F5F7] border border-[#577877]/20">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#162623] flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[#25836F] text-base">diversity_1</span>
+                      Consultation Is For
+                    </label>
+                    <span className="text-[10px] font-semibold text-[#25836F] bg-white px-2 py-0.5 rounded-full border border-[#25836F]/20">
+                      Family Care
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBookingFor("myself")}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                        bookingFor === "myself"
+                          ? "bg-[#25836F] text-white border-[#25836F] shadow-xs"
+                          : "bg-white text-[#162623] border-[#577877]/20 hover:border-[#25836F]"
+                      }`}
+                    >
+                      Myself ({patientProfile?.full_name || "Patient"})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBookingFor("family_member")}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                        bookingFor === "family_member"
+                          ? "bg-[#25836F] text-white border-[#25836F] shadow-xs"
+                          : "bg-white text-[#162623] border-[#577877]/20 hover:border-[#25836F]"
+                      }`}
+                    >
+                      Family Member
+                    </button>
+                  </div>
+
+                  {bookingFor === "family_member" && (
+                    <div className="pt-2 space-y-2 border-t border-[#577877]/15">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-[#577877]">Select Dependent:</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddFamilyModal(true)}
+                          className="text-[11px] font-bold text-[#25836F] hover:underline cursor-pointer flex items-center gap-0.5"
+                        >
+                          <span className="material-symbols-outlined text-xs">add_circle</span>
+                          Add New Dependent
+                        </button>
+                      </div>
+                      {familyMembers.length > 0 ? (
+                        <select
+                          value={selectedFamilyMemberId}
+                          onChange={(e) => setSelectedFamilyMemberId(e.target.value)}
+                          className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 text-xs bg-white focus:border-[#25836F] focus:outline-none"
+                        >
+                          {familyMembers.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.full_name} ({m.relationship.toUpperCase()})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="p-3 rounded-lg bg-white border border-[#577877]/15 text-center text-xs text-[#577877] space-y-1">
+                          <p className="font-medium text-[#162623]">No family dependents registered</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowAddFamilyModal(true)}
+                            className="text-[11px] font-bold text-[#25836F] hover:underline cursor-pointer"
+                          >
+                            + Add a Spouse, Child, or Parent now
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Appointment Type */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-[#162623]">Appointment Type</label>

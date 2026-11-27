@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import DashboardScreen from "./components/screens/DashboardScreen";
@@ -72,6 +72,7 @@ const PATH_TO_TAB = {
   "/clinic/insurance-management": "clinic-insurance",
   "/clinic/insurance-providers": "clinic-insurance",
   "/clinic/reports": "clinic-reports",
+  "/clinic/audit": "clinic-audit",
   "/clinic/support-staff": "clinic-support-staff",
   "/clinic/secops": "clinic-secops",
   "/clinic/settings": "clinic-settings",
@@ -100,6 +101,10 @@ function entryModeFromLocation() {
 }
 
 export default function App() {
+  return <Suspense fallback={null}><AppContent /></Suspense>;
+}
+
+function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(() => tabFromLocation());

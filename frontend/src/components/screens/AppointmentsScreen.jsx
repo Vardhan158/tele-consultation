@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { patientApi, consultationApi, insuranceApi, API_BASE_URL } from "../../lib/api";
+import { patientApi, consultationApi, clinicalApi, insuranceApi, API_BASE_URL } from "../../lib/api";
 import { appointmentCategory, canJoinAppointment } from "../../lib/appointmentRules";
 import WebRtcConsultation from "../consultation/WebRtcConsultation";
 
@@ -884,7 +884,7 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
 
     const fetchPrescriptions = async () => {
       try {
-        const items = await patientApi.prescriptions();
+        const items = await clinicalApi.prescriptions();
         if (Array.isArray(items)) {
           const matching = items.filter(
             (rx) => String(rx.appointment_id || rx.appointmentId || "").toLowerCase() === String(aptId).toLowerCase()

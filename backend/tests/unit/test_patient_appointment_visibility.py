@@ -231,10 +231,12 @@ async def test_finalized_note_is_locked_and_amendment_is_separate(portal, monkey
     with pytest.raises(HTTPException) as error:
         await doctor_routes.update_draft_note("note-final", doctor_routes.NotePayload(content_reference="overwrite"), None, principal)
     assert error.value.status_code == 409
+    from teleconsult.services.encryption import decrypt_clinical_text
+
     result = await doctor_routes.amend_note("note-final", doctor_routes.NotePayload(content_reference="Changed diagnosis", reason="Corrected coding"), None, principal)
     assert result["version"] == 1
     assert db["clinical_notes"].rows[0]["content_reference"] == "Original"
-    assert "Corrected coding" in db["clinical_note_amendments"].rows[0]["content_reference"]
+    assert "Corrected coding" in decrypt_clinical_text(db["clinical_note_amendments"].rows[0]["content_reference"])
 
 
 async def test_patient_detail_retrieves_notes_by_authorized_appointment(portal, monkeypatch):
@@ -326,4 +328,5 @@ async def test_eligible_join_uses_existing_booking_without_payment_changes(porta
     result = await video_routes.join_waiting_room("apt-45bde4b19136", None, principal)
     assert result.room_id == "teleconsult-apt-45bde4b19136"
     videos.insert_one.assert_awaited_once()
+    before["appointments"][0]["status"] = "checked_in"
     assert rows == before

@@ -4,11 +4,49 @@ import { doctorApi } from "../../lib/api";
 export default function DoctorAvailabilityScreen() {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({ starts_at: "", ends_at: "" });
+  const [mode, setMode] = useState("single"); // "single" | "recurring"
+  const [recurringForm, setRecurringForm] = useState({
+    days_of_week: [0, 1, 2, 3, 4], // Mon to Fri
+    start_time: "09:00",
+    end_time: "13:00",
+    slot_duration_minutes: 30,
+    weeks_ahead: 4,
+  });
   const [message, setMessage] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
+
+  const toggleDay = (dayIdx) => {
+    setRecurringForm((prev) => {
+      const exists = prev.days_of_week.includes(dayIdx);
+      const nextDays = exists
+        ? prev.days_of_week.filter((d) => d !== dayIdx)
+        : [...prev.days_of_week, dayIdx].sort();
+      return { ...prev, days_of_week: nextDays };
+    });
+  };
+
+  const submitRecurring = async (e) => {
+    e.preventDefault();
+    setMessage("");
+    setErrorMsg("");
+    if (recurringForm.days_of_week.length === 0) {
+      setErrorMsg("Please select at least one day of the week.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await doctorApi.createRecurringAvailability(recurringForm);
+      setMessage(res.message || "Recurring availability slots generated successfully.");
+      load();
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to generate recurring slots.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const filteredItems = items.filter((item) => {
     if (filterStatus === "all") return true;
@@ -99,50 +137,188 @@ export default function DoctorAvailabilityScreen() {
       </div>
 
       {/* Add Slot Form Card */}
-      <div className="rounded-2xl bg-white p-6 border border-[#577877]/15 shadow-xs space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-[#185A4D] flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-base">add_circle</span>
-          Add New Availability Slot
-        </h2>
+      <div className="rounded-2xl bg-white p-6 border border-[#577877]/15 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#577877]/15 pb-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[#185A4D] flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-base">calendar_add_on</span>
+            <span>Configure Availability Hours</span>
+          </h2>
 
-        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
-          <div className="sm:col-span-5 space-y-1">
-            <label className="text-xs font-semibold text-[#577877]">
-              Start Time (Date &amp; Time)
-            </label>
-            <input
-              required
-              type="datetime-local"
-              value={form.starts_at}
-              onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
-              className="w-full rounded-xl border border-[#577877]/25 px-3.5 py-2.5 text-xs text-[#162623] bg-[#F9FBFA] focus:bg-white focus:border-[#185A4D] focus:ring-2 focus:ring-[#185A4D]/15 focus:outline-none transition"
-            />
-          </div>
-
-          <div className="sm:col-span-5 space-y-1">
-            <label className="text-xs font-semibold text-[#577877]">
-              End Time (Date &amp; Time)
-            </label>
-            <input
-              required
-              type="datetime-local"
-              value={form.ends_at}
-              onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
-              className="w-full rounded-xl border border-[#577877]/25 px-3.5 py-2.5 text-xs text-[#162623] bg-[#F9FBFA] focus:bg-white focus:border-[#185A4D] focus:ring-2 focus:ring-[#185A4D]/15 focus:outline-none transition"
-            />
-          </div>
-
-          <div className="sm:col-span-2">
+          <div className="flex items-center gap-1.5 bg-[#F0F5F7] p-1 rounded-xl text-xs font-semibold">
             <button
-              disabled={submitting}
-              type="submit"
-              className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#185A4D] hover:bg-[#124B3E] text-white text-xs font-bold shadow-xs hover:shadow-md transition cursor-pointer disabled:opacity-60"
+              type="button"
+              onClick={() => {
+                setMode("single");
+                setMessage("");
+                setErrorMsg("");
+              }}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                mode === "single"
+                  ? "bg-[#185A4D] text-white shadow-xs font-bold"
+                  : "text-[#577877] hover:text-[#162623]"
+              }`}
             >
-              <span className="material-symbols-outlined text-base">add</span>
-              <span>{submitting ? "Saving…" : "Add Slot"}</span>
+              Single Slot
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("recurring");
+                setMessage("");
+                setErrorMsg("");
+              }}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                mode === "recurring"
+                  ? "bg-[#185A4D] text-white shadow-xs font-bold"
+                  : "text-[#577877] hover:text-[#162623]"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">repeat</span>
+              <span>Recurring Shift Template</span>
             </button>
           </div>
-        </form>
+        </div>
+
+        {mode === "single" ? (
+          <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+            <div className="sm:col-span-5 space-y-1">
+              <label className="text-xs font-semibold text-[#577877]">
+                Start Time (Date &amp; Time)
+              </label>
+              <input
+                required
+                type="datetime-local"
+                value={form.starts_at}
+                onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+                className="w-full rounded-xl border border-[#577877]/25 px-3.5 py-2.5 text-xs text-[#162623] bg-[#F9FBFA] focus:bg-white focus:border-[#185A4D] focus:ring-2 focus:ring-[#185A4D]/15 focus:outline-none transition"
+              />
+            </div>
+
+            <div className="sm:col-span-5 space-y-1">
+              <label className="text-xs font-semibold text-[#577877]">
+                End Time (Date &amp; Time)
+              </label>
+              <input
+                required
+                type="datetime-local"
+                value={form.ends_at}
+                onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+                className="w-full rounded-xl border border-[#577877]/25 px-3.5 py-2.5 text-xs text-[#162623] bg-[#F9FBFA] focus:bg-white focus:border-[#185A4D] focus:ring-2 focus:ring-[#185A4D]/15 focus:outline-none transition"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <button
+                disabled={submitting}
+                type="submit"
+                className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#185A4D] hover:bg-[#124B3E] text-white text-xs font-bold shadow-xs hover:shadow-md transition cursor-pointer disabled:opacity-60"
+              >
+                <span className="material-symbols-outlined text-base">add</span>
+                <span>{submitting ? "Saving…" : "Add Slot"}</span>
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={submitRecurring} className="space-y-4 text-xs">
+            {/* Days of Week Selector */}
+            <div className="space-y-2">
+              <label className="font-bold text-[#162623] block">
+                Recurring Days of the Week
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { idx: 0, label: "Monday", short: "Mon" },
+                  { idx: 1, label: "Tuesday", short: "Tue" },
+                  { idx: 2, label: "Wednesday", short: "Wed" },
+                  { idx: 3, label: "Thursday", short: "Thu" },
+                  { idx: 4, label: "Friday", short: "Fri" },
+                  { idx: 5, label: "Saturday", short: "Sat" },
+                  { idx: 6, label: "Sunday", short: "Sun" },
+                ].map((d) => {
+                  const selected = recurringForm.days_of_week.includes(d.idx);
+                  return (
+                    <button
+                      key={d.idx}
+                      type="button"
+                      onClick={() => toggleDay(d.idx)}
+                      className={`px-3 py-1.5 rounded-xl font-semibold border transition cursor-pointer flex items-center gap-1 ${
+                        selected
+                          ? "bg-[#185A4D] text-white border-[#185A4D] shadow-xs"
+                          : "bg-white text-[#577877] border-[#577877]/25 hover:border-[#185A4D]"
+                      }`}
+                    >
+                      {selected && <span className="material-symbols-outlined text-xs">check</span>}
+                      <span>{d.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <label className="font-bold text-[#162623] block">Shift Start Time</label>
+                <input
+                  type="time"
+                  required
+                  value={recurringForm.start_time}
+                  onChange={(e) => setRecurringForm({ ...recurringForm, start_time: e.target.value })}
+                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 bg-white text-xs text-[#162623] focus:border-[#185A4D] focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-[#162623] block">Shift End Time</label>
+                <input
+                  type="time"
+                  required
+                  value={recurringForm.end_time}
+                  onChange={(e) => setRecurringForm({ ...recurringForm, end_time: e.target.value })}
+                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 bg-white text-xs text-[#162623] focus:border-[#185A4D] focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-[#162623] block">Slot Duration</label>
+                <select
+                  value={recurringForm.slot_duration_minutes}
+                  onChange={(e) => setRecurringForm({ ...recurringForm, slot_duration_minutes: Number(e.target.value) })}
+                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 bg-white text-xs text-[#162623] focus:border-[#185A4D] focus:outline-none"
+                >
+                  <option value={15}>15 Minutes</option>
+                  <option value={30}>30 Minutes</option>
+                  <option value={45}>45 Minutes</option>
+                  <option value={60}>60 Minutes</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-[#162623] block">Repeat Horizon</label>
+                <select
+                  value={recurringForm.weeks_ahead}
+                  onChange={(e) => setRecurringForm({ ...recurringForm, weeks_ahead: Number(e.target.value) })}
+                  className="w-full rounded-xl border border-[#577877]/25 px-3 py-2 bg-white text-xs text-[#162623] focus:border-[#185A4D] focus:outline-none"
+                >
+                  <option value={1}>Next 1 Week</option>
+                  <option value={2}>Next 2 Weeks</option>
+                  <option value={4}>Next 4 Weeks (1 Month)</option>
+                  <option value={8}>Next 8 Weeks (2 Months)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                disabled={submitting}
+                type="submit"
+                className="btn-primary !px-5 !py-2.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              >
+                <span className="material-symbols-outlined text-base">auto_mode</span>
+                <span>{submitting ? "Generating Shifts…" : "Generate Recurring Consultation Shifts"}</span>
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* Status Feedback Banners */}
         {message && (

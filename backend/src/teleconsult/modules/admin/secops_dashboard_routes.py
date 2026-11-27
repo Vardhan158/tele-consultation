@@ -78,6 +78,23 @@ def _clean(doc: dict[str, Any]) -> dict[str, Any]:
     return doc
 
 
+def _as_utc_datetime(value: Any, *, fallback: datetime | None = None) -> datetime:
+    """Normalize Mongo BSON and legacy ISO timestamps to aware UTC datetimes."""
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            parsed = fallback or datetime.now(UTC)
+    elif isinstance(value, datetime):
+        parsed = value
+    else:
+        parsed = fallback or datetime.now(UTC)
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def secrets_id(prefix: str = "INC") -> str:
     return f"{prefix}-{secrets.randbelow(899999) + 100000}"
 
@@ -398,19 +415,6 @@ async def update_security_event(
     })
 
     return {"status": "success", "event_id": event_id, "linked_incident_id": inc_id}
-
-    return {
-        "events": items,
-        "total": total,
-        "threat_metrics": {
-            "failed_logins_24h": failed_logins,
-            "blocked_ips_count": blocked_ips,
-            "mfa_challenge_failures": 0,
-            "active_threat_level": "LOW" if failed_logins < 10 else "MEDIUM" if failed_logins < 50 else "HIGH",
-        },
-        "offset": offset,
-        "limit": limit,
-    }
 
 
 @router.post("/security/action")

@@ -70,6 +70,27 @@ class AvailabilityResponse(BaseModel):
     timezone: str
 
 
+class FamilyMemberCreate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=160)
+    relationship: str = Field(min_length=2, max_length=50)  # spouse, child, parent, sibling, other
+    gender: str | None = Field(default=None, max_length=20)
+    date_of_birth: str | None = Field(default=None, max_length=30)
+    blood_group: str | None = Field(default=None, max_length=10)
+    allergies: str | None = Field(default=None, max_length=500)
+    medical_conditions: str | None = Field(default=None, max_length=500)
+
+
+class FamilyMemberResponse(FamilyMemberCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    patient_id: str
+    created_at: str
+
+
+class FollowUpMessageCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+
+
 class AppointmentCreate(BaseModel):
     doctor_id: UUID
     starts_at: datetime
@@ -79,6 +100,10 @@ class AppointmentCreate(BaseModel):
     notes: str = ""
     appointment_type: str = ""
     visit_format: str = ""
+    patient_profile_id: str | None = None
+    booking_for: str = "myself"
+    family_member_name: str | None = None
+    family_member_relation: str | None = None
 
 
 class AppointmentResponse(BaseModel):

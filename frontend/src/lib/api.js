@@ -140,6 +140,31 @@ export const patientApi = {
       method: "POST",
       body: JSON.stringify(typeof payload === "object" ? payload : { starts_at: payload }),
     }),
+  getFamilyMembers: () => apiRequest("/patient/family-members"),
+  createFamilyMember: (payload) =>
+    apiRequest("/patient/family-members", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  deleteFamilyMember: (memberId) =>
+    apiRequest(`/patient/family-members/${memberId}`, {
+      method: "DELETE",
+    }),
+  getFollowUpThread: (appointmentId) =>
+    apiRequest(`/patient/appointments/${appointmentId}/follow-up`),
+  sendFollowUpMessage: (appointmentId, message) =>
+    apiRequest(`/patient/appointments/${appointmentId}/follow-up`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+  requestUrgentCare: (payload) =>
+    apiRequest("/patient/urgent-care/request", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getUrgentCareStatus: () => apiRequest("/patient/urgent-care/status"),
+  cancelUrgentCare: (ticketId) =>
+    apiRequest(`/patient/urgent-care/${ticketId}/cancel`, { method: "POST" }),
 };
 
 export const doctorApi = {
@@ -190,6 +215,12 @@ export const doctorApi = {
     apiRequest(`/doctor/availability/${slotId}`, {
       method: "DELETE",
     }),
+  createRecurringAvailability: (payload) =>
+    apiRequest("/doctor/availability/recurring", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  payouts: () => apiRequest("/doctor/payouts"),
   saveNote: (appointmentId, content_reference) =>
     apiRequest(`/doctor/appointments/${appointmentId}/notes`, {
       method: "POST",
@@ -231,6 +262,21 @@ export const doctorApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  getFollowUpThread: (appointmentId) =>
+    apiRequest(`/doctor/appointments/${appointmentId}/follow-up`),
+  sendFollowUpMessage: (appointmentId, message) =>
+    apiRequest(`/doctor/appointments/${appointmentId}/follow-up`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+  toggleUrgentCareDuty: (active) =>
+    apiRequest("/doctor/urgent-care/toggle", {
+      method: "POST",
+      body: JSON.stringify({ active }),
+    }),
+  getUrgentCareQueue: () => apiRequest("/doctor/urgent-care/queue"),
+  claimUrgentCareTicket: (ticketId) =>
+    apiRequest(`/doctor/urgent-care/${ticketId}/claim`, { method: "POST" }),
 };
 
 export const authApi = {
@@ -414,6 +460,39 @@ export const clinicalApi = {
     if (!response.ok) throw new Error("Unable to download this prescription.");
     return response.blob();
   },
+  getGenericSubstitutes: (prescriptionId) =>
+    apiRequest(`/patient/clinical-outputs/prescriptions/${prescriptionId}/generic-substitutes`),
+  orderPharmacy: (prescriptionId, payload) =>
+    apiRequest(`/patient/clinical-outputs/prescriptions/${prescriptionId}/order-pharmacy`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  pharmacyOrders: () => apiRequest("/patient/clinical-outputs/pharmacy-orders"),
+  verifySignature: (prescriptionId) =>
+    apiRequest(`/patient/clinical-outputs/prescriptions/${prescriptionId}/verify-signature`),
+};
+
+export const abdmApi = {
+  generateOtp: (payload) =>
+    apiRequest("/patient/abdm/abha/generate-otp", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  verifyOtp: (payload) =>
+    apiRequest("/patient/abdm/abha/verify-otp", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  profile: () => apiRequest("/patient/abdm/abha/profile"),
+  unlink: () =>
+    apiRequest("/patient/abdm/abha/unlink", {
+      method: "DELETE",
+    }),
+  consents: () => apiRequest("/patient/abdm/consents"),
+  revokeConsent: (consentId) =>
+    apiRequest(`/patient/abdm/consents/${consentId}/revoke`, {
+      method: "POST",
+    }),
 };
 
 export const supportApi = {
@@ -538,6 +617,12 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify({ reason }),
     }),
+  reassignAppointment: (id, payload) =>
+    apiRequest(`/admin/appointments/${id}/reassign`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  payoutLedger: () => apiRequest("/admin/payout-ledger"),
   payments: (status = "all") =>
     apiRequest(`/admin/payments?${new URLSearchParams({ status_filter: status })}`),
   refundPayment: (id, reason = "Administrative refund") =>
@@ -553,6 +638,10 @@ export const adminApi = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  auditLogs: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiRequest(`/admin/audit-logs${qs ? `?${qs}` : ""}`);
+  },
 };
 
 export const supportStaffApi = {

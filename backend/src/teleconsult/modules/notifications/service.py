@@ -44,9 +44,10 @@ async def ensure_patient_notification(
     channel: str = "in_app",
 ) -> None:
     """Persist an in-app notification document for a patient in MongoDB idempotently."""
-    if not mongo_database.enabled:
+    try:
+        database = mongo_database.database()
+    except Exception:
         return
-    database = mongo_database.database()
     t_id_str = str(tenant_id)
     p_id_str = str(patient_id)
     now_dt = datetime.now(UTC)
@@ -84,12 +85,23 @@ async def ensure_patient_notification(
 
     await database["notifications"].insert_one(dict(doc))
 
+    if channel in {"whatsapp", "omnichannel"}:
+        try:
+            from teleconsult.adapters.whatsapp import whatsapp_client
+            patient_doc = await database["patients"].find_one({"tenant_id": t_id_str, "$or": [{"id": p_id_str}, {"user_id": p_id_str}]})
+            phone = (patient_doc or {}).get("phone") or (patient_doc or {}).get("mobile_number")
+            if phone:
+                await whatsapp_client.send_message(to_phone=phone, message=f"{subject}\n\n{body}")
+        except Exception:
+            pass
+
 
 async def ensure_doctor_appointment_notification(*, tenant_id: str, doctor_id: str, appointment: dict, patient_display_name: str) -> None:
     """Persist exactly one doctor notification for a confirmed appointment."""
-    if not mongo_database.enabled:
+    try:
+        database = mongo_database.database()
+    except Exception:
         return
-    database = mongo_database.database()
     raw_start = appointment.get("starts_at")
     try:
         start = raw_start if isinstance(raw_start, datetime) else datetime.fromisoformat(str(raw_start).replace("Z", "+00:00"))
