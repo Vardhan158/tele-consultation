@@ -8,7 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
-from teleconsult.modules.notifications.schemas import NotificationResponse
+from teleconsult.modules.notifications.schemas import (
+    NotificationResponse,
+    NotificationUnreadCountResponse,
+)
 from teleconsult.modules.notifications.service import ensure_patient_notification
 
 router = APIRouter(prefix="/patient/notifications", tags=["notifications"])
@@ -166,20 +169,36 @@ async def list_notifications(
                 except Exception:
                     pass
 
+            meta = doc.get("metadata") or {}
+            claim_id = doc.get("claim_id") or meta.get("claim_id")
+            claim_ref = doc.get("claim_reference") or meta.get("claim_reference")
+            policy_id = doc.get("policy_id") or meta.get("policy_id")
+            raw_event = str(doc.get("event_type") or doc.get("type", "general"))
+            target_tab = doc.get("target_tab") or ("my-insurance" if (claim_id or policy_id or "insurance" in raw_event or "claim" in raw_event) else None)
+
             results.append(NotificationResponse(
                 id=uuid_obj,
-                event_type=str(doc.get("event_type", "general")),
+                event_type=raw_event,
                 channel=str(doc.get("channel", "in_app")),
-                subject=str(doc.get("subject", "Notification")),
-                body=str(doc.get("body", "")),
-                status=str(doc.get("status", "queued")),
+                subject=str(doc.get("subject") or doc.get("title", "Notification")),
+                body=str(doc.get("body") or doc.get("message", "")),
+                status=str(doc.get("status", "delivered")),
                 read_at=read_at_dt,
                 created_at=created_at_dt,
                 doctor_id=str(doc.get("doctor_id")) if doc.get("doctor_id") else None,
-                appointment_id=str(doc.get("appointment_id")) if doc.get("appointment_id") else None,
+                appointment_id=str(doc.get("appointment_id") or meta.get("appointment_id")) if (doc.get("appointment_id") or meta.get("appointment_id")) else None,
                 patient_display_name=doc.get("patient_display_name"),
                 notification_type=doc.get("notification_type"),
                 appointment_starts_at=doc.get("appointment_starts_at"),
+                claim_id=claim_id,
+                claim_reference=claim_ref,
+                policy_id=policy_id,
+                target_tab=target_tab,
+                target_id=claim_id or policy_id,
+                delivery_status=doc.get("delivery_status", "delivered"),
+                email_delivery_status=doc.get("email_delivery_status"),
+                recipient_role="patient",
+                metadata=meta,
             ))
         except Exception as exc:
             import logging
@@ -187,6 +206,26 @@ async def list_notifications(
             continue
 
     return results
+
+
+@router.get("/unread-count", response_model=NotificationUnreadCountResponse)
+async def get_patient_unread_count(
+    principal: Principal = Depends(require("notification:read")),
+) -> dict[str, int]:
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+    count = await db["notifications"].count_documents({
+        "tenant_id": str(principal.tenant_id),
+        "$or": [
+            {"recipient_id": {"$in": patient_ids}},
+            {"patient_id": {"$in": patient_ids}},
+        ],
+        "read_at": None,
+        "read": {"$ne": True},
+    })
+    return {"unread_count": count}
 
 
 @router.post("/read-all")

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { patientApi, consultationApi } from "../../lib/api";
+import { patientApi, consultationApi, insuranceApi, API_BASE_URL } from "../../lib/api";
 import { appointmentCategory, canJoinAppointment } from "../../lib/appointmentRules";
 import WebRtcConsultation from "../consultation/WebRtcConsultation";
 
@@ -250,6 +250,413 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [cancelError, setCancelError] = useState("");
+
+  // Checkpoint 4: Completed Appointment Details & Insurance Claim States
+  const [selectedCompletedApt, setSelectedCompletedApt] = useState(null);
+  const [claimEligibility, setClaimEligibility] = useState(null);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
+  const [eligibilityError, setEligibilityError] = useState("");
+  const [patientPolicies, setPatientPolicies] = useState([]);
+  const [selectedPolicyId, setSelectedPolicyId] = useState("");
+  const [claimNotes, setClaimNotes] = useState("");
+  const [claimInitiating, setClaimInitiating] = useState(false);
+  const [claimInitiateError, setClaimInitiateError] = useState("");
+  const [showClaimForm, setShowClaimForm] = useState(false);
+  const [activeMasterProviders, setActiveMasterProviders] = useState([]);
+  const [showQuickAddPolicy, setShowQuickAddPolicy] = useState(false);
+  const [quickAddForm, setQuickAddForm] = useState({
+    provider_id: "",
+    policy_number: "",
+    member_id: "",
+    policy_holder_name: "",
+    relationship: "Self",
+    insurance_type: "Individual",
+    start_date: "",
+    expiry_date: "",
+  });
+  const [quickAddCard, setQuickAddCard] = useState(null);
+  const [quickAddSubmitting, setQuickAddSubmitting] = useState(false);
+  const [quickAddError, setQuickAddError] = useState("");
+
+  // Checkpoint 5: Claim Supporting Documents & Automatic Dossier States
+  const [claimDossier, setClaimDossier] = useState(null);
+  const [dossierLoading, setDossierLoading] = useState(false);
+  const [dossierError, setDossierError] = useState("");
+  const [supportingFile, setSupportingFile] = useState(null);
+  const [supportingTitle, setSupportingTitle] = useState("");
+  const [supportingUploading, setSupportingUploading] = useState(false);
+  const [supportingUploadError, setSupportingUploadError] = useState("");
+  const [previewDoc, setPreviewDoc] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Checkpoint 6: Insurance Data Sharing Consent States
+  const [claimConsent, setClaimConsent] = useState(null);
+  const [consentLoading, setConsentLoading] = useState(false);
+  const [consentError, setConsentError] = useState("");
+  const [consentChecked, setConsentChecked] = useState(false); // STRICT: unchecked by default
+  const [consentSubmitting, setConsentSubmitting] = useState(false);
+  const [consentActionError, setConsentActionError] = useState("");
+  const [showReviewConsentModal, setShowReviewConsentModal] = useState(false);
+  const [consentLegalDoc, setConsentLegalDoc] = useState(null);
+  const [consentLegalDocLoading, setConsentLegalDocLoading] = useState(false);
+
+  const loadDossier = async (aptId, policyId = null) => {
+    if (!aptId) return;
+    setDossierLoading(true);
+    setDossierError("");
+    try {
+      const res = await insuranceApi.getClaimDossier(aptId, policyId);
+      setClaimDossier(res);
+    } catch (err) {
+      setDossierError(err.message || "Failed to load claim document dossier.");
+    } finally {
+      setDossierLoading(false);
+    }
+  };
+
+  const loadClaimConsent = async (aptId, policyId = null) => {
+    if (!aptId) return;
+    setConsentLoading(true);
+    setConsentError("");
+    setConsentActionError("");
+    try {
+      const res = await insuranceApi.getClaimConsent(aptId, policyId);
+      setClaimConsent(res);
+      // STRICT REQUIREMENT: Checkbox must NOT be pre-selected.
+      // Only set to true if an active valid consent was already explicitly recorded and does not require renewal
+      setConsentChecked(Boolean(res?.is_granted && !res?.requires_renewal));
+    } catch (err) {
+      setConsentError(err.message || "Failed to load claim data sharing consent status.");
+    } finally {
+      setConsentLoading(false);
+    }
+  };
+
+  const handleGrantConsent = async () => {
+    if (!selectedCompletedApt) return;
+    if (!consentChecked) {
+      setConsentActionError("Please tick the authorization checkbox below before granting consent.");
+      return;
+    }
+    setConsentActionError("");
+    setConsentSubmitting(true);
+    try {
+      await insuranceApi.grantClaimConsent(selectedCompletedApt.id, {
+        policy_id: selectedPolicyId || undefined,
+        consent_accepted: true,
+      });
+      setToastMessage("Insurance data sharing consent granted successfully!");
+      await loadClaimConsent(selectedCompletedApt.id, selectedPolicyId);
+    } catch (err) {
+      setConsentActionError(err.message || "Failed to record data sharing consent.");
+    } finally {
+      setConsentSubmitting(false);
+    }
+  };
+
+  const handleWithdrawConsent = async () => {
+    if (!selectedCompletedApt) return;
+    setConsentActionError("");
+    setConsentSubmitting(true);
+    try {
+      await insuranceApi.withdrawClaimConsent(selectedCompletedApt.id);
+      setToastMessage("Insurance data sharing consent has been withdrawn.");
+      setConsentChecked(false);
+      await loadClaimConsent(selectedCompletedApt.id, selectedPolicyId);
+    } catch (err) {
+      setConsentActionError(err.message || "Failed to withdraw consent.");
+    } finally {
+      setConsentSubmitting(false);
+    }
+  };
+
+  const handleOpenReviewConsent = async () => {
+    setShowReviewConsentModal(true);
+    if (!consentLegalDoc) {
+      setConsentLegalDocLoading(true);
+      try {
+        const doc = await insuranceApi.getClaimConsentDocument();
+        setConsentLegalDoc(doc);
+      } catch (err) {
+        setToastMessage(err.message || "Failed to load complete consent document.", "error");
+      } finally {
+        setConsentLegalDocLoading(false);
+      }
+    }
+  };
+
+  const handleOpenCompletedDetails = async (apt) => {
+    setSelectedCompletedApt(apt);
+    setClaimEligibility(null);
+    setEligibilityError("");
+    setEligibilityLoading(true);
+    setShowClaimForm(false);
+    setClaimInitiateError("");
+    setSelectedPolicyId("");
+    setClaimNotes("");
+    setClaimDossier(null);
+    setDossierError("");
+    setSupportingFile(null);
+    setSupportingTitle("");
+    setSupportingUploadError("");
+    setClaimConsent(null);
+    setConsentError("");
+    setConsentChecked(false);
+    setConsentActionError("");
+
+    try {
+      const [eligibilityRes, policiesRes, providersRes] = await Promise.all([
+        insuranceApi.checkClaimEligibility(apt.id).catch((err) => {
+          setEligibilityError(err.message || "Failed to check claim eligibility");
+          return null;
+        }),
+        insuranceApi.getPatientPolicies().catch(() => []),
+        insuranceApi.getActiveProviders().catch(() => []),
+      ]);
+
+      if (eligibilityRes) {
+        setClaimEligibility(eligibilityRes);
+      }
+      const activePols = Array.isArray(policiesRes)
+        ? policiesRes.filter((p) => p.status === "Active")
+        : [];
+      setPatientPolicies(activePols);
+      let initialPolId = null;
+      if (activePols.length > 0) {
+        initialPolId = activePols[0].id;
+        setSelectedPolicyId(initialPolId);
+      }
+      setActiveMasterProviders(Array.isArray(providersRes) ? providersRes : []);
+
+      // Auto-fetch Checkpoint 5 dossier and Checkpoint 6 consent status
+      loadDossier(apt.id, initialPolId);
+      loadClaimConsent(apt.id, initialPolId);
+    } catch (err) {
+      setEligibilityError(err.message || "Failed to load claim details.");
+    } finally {
+      setEligibilityLoading(false);
+    }
+  };
+
+  const handlePolicyChange = (newPolicyId) => {
+    setSelectedPolicyId(newPolicyId);
+    if (selectedCompletedApt) {
+      loadDossier(selectedCompletedApt.id, newPolicyId);
+      loadClaimConsent(selectedCompletedApt.id, newPolicyId);
+    }
+  };
+
+  const handleSupportingUpload = async (e) => {
+    e.preventDefault();
+    if (!supportingFile) {
+      setSupportingUploadError("Please select a file to upload (PDF, JPG, or PNG up to 10 MB).");
+      return;
+    }
+    setSupportingUploadError("");
+    setSupportingUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", supportingFile);
+      formData.append("title", supportingTitle.trim() || supportingFile.name);
+
+      await insuranceApi.uploadSupportingDocument(selectedCompletedApt.id, formData);
+      setToastMessage("Supporting document uploaded and attached to claim dossier!");
+      setSupportingFile(null);
+      setSupportingTitle("");
+      await loadDossier(selectedCompletedApt.id, selectedPolicyId);
+      await loadClaimConsent(selectedCompletedApt.id, selectedPolicyId);
+    } catch (err) {
+      setSupportingUploadError(err.message || "Failed to upload supporting document.");
+    } finally {
+      setSupportingUploading(false);
+    }
+  };
+
+  const handleDeleteSupportingDoc = async (docId) => {
+    if (!docId) return;
+    try {
+      await insuranceApi.deleteDocument(docId);
+      setToastMessage("Document removed from claim dossier.");
+      await loadDossier(selectedCompletedApt.id, selectedPolicyId);
+      await loadClaimConsent(selectedCompletedApt.id, selectedPolicyId);
+    } catch (err) {
+      setToastMessage(err.message || "Failed to remove document.", "error");
+    }
+  };
+
+  const handlePreviewDossierDoc = async (docItem) => {
+    if (!docItem) return;
+    setPreviewLoading(true);
+    try {
+      let previewResult = null;
+      if (docItem.category === "consultation_invoice") {
+        previewResult = await insuranceApi.fetchInvoicePreviewBlob(selectedCompletedApt.id);
+      } else if (docItem.category === "payment_receipt") {
+        previewResult = await insuranceApi.fetchReceiptPreviewBlob(selectedCompletedApt.id);
+      } else if (docItem.category === "insurance_card" || docItem.category === "supporting_document") {
+        previewResult = await insuranceApi.fetchDocumentPreviewBlob(docItem.id);
+      } else if (docItem.preview_url) {
+        previewResult = await insuranceApi.fetchClinicalDocBlob(docItem.preview_url);
+      }
+
+      if (previewResult) {
+        setPreviewDoc({
+          name: docItem.file_name || docItem.title,
+          url: previewResult.objectUrl,
+          contentType: previewResult.contentType,
+          id: docItem.id,
+          category: docItem.category,
+        });
+      } else {
+        setToastMessage("Preview not available for this record.", "info");
+      }
+    } catch (err) {
+      setToastMessage(err.message || "Failed to load document preview.", "error");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleDownloadDossierDoc = async (docItem) => {
+    if (!docItem) return;
+    try {
+      setToastMessage(`Downloading "${docItem.file_name || docItem.title}"...`, "info");
+      if (docItem.category === "consultation_invoice") {
+        await insuranceApi.downloadClaimInvoice(selectedCompletedApt.id, docItem.file_name);
+      } else if (docItem.category === "payment_receipt") {
+        await insuranceApi.downloadClaimReceipt(selectedCompletedApt.id, docItem.file_name);
+      } else if (docItem.category === "insurance_card" || docItem.category === "supporting_document") {
+        await insuranceApi.downloadDocument(docItem.id, docItem.file_name);
+      } else if (docItem.download_url) {
+        const fullUrl = docItem.download_url.startsWith("http")
+          ? docItem.download_url
+          : `${API_BASE_URL}${docItem.download_url.replace(/^\/api/, "")}`;
+        const res = await fetch(fullUrl, { credentials: "include" });
+        if (!res.ok) throw new Error("Failed to download document");
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = docItem.file_name || "clinical_document";
+        document.body.appendChild(link);
+        link.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      setToastMessage(err.message || "Download failed. Please retry.", "error");
+    }
+  };
+
+  const handleClosePreview = () => {
+    if (previewDoc?.url) {
+      window.URL.revokeObjectURL(previewDoc.url);
+    }
+    setPreviewDoc(null);
+  };
+
+  // Checkpoint 7: Save as Draft or Submit Claim with Double-Click Protection
+  const [claimSubmittingMode, setClaimSubmittingMode] = useState(null); // 'draft' | 'submit' | null
+  const [submissionSuccessData, setSubmissionSuccessData] = useState(null); // Result modal
+
+  const handleClaimSubmitOrDraft = async (isDraft = false) => {
+    if (!selectedPolicyId) {
+      setClaimInitiateError("Please select an insurance policy to link to this claim.");
+      return;
+    }
+    if (!isDraft) {
+      if (!claimDossier?.mandatory_complete) {
+        setClaimInitiateError("All mandatory supporting documents must be collected before submitting.");
+        return;
+      }
+      if (!claimConsent?.is_granted || claimConsent?.requires_renewal) {
+        setClaimInitiateError("Explicit Insurance Data Sharing Consent must be granted in the section above.");
+        return;
+      }
+    }
+
+    setClaimInitiateError("");
+    setClaimSubmittingMode(isDraft ? "draft" : "submit");
+
+    // Double-click protection token
+    const submissionToken = `tok_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+    try {
+      const res = await insuranceApi.submitClaim(selectedCompletedApt.id, {
+        policy_id: selectedPolicyId,
+        notes: claimNotes.trim() || undefined,
+        save_as_draft: isDraft,
+        submission_token: submissionToken,
+      });
+
+      setToastMessage(res.message);
+      setClaimEligibility((prev) => ({
+        ...(prev || {}),
+        has_active_claim: !isDraft,
+        existing_claim_id: res.claim_reference,
+        existing_claim_status: res.status,
+        is_eligible: isDraft,
+      }));
+
+      if (!isDraft) {
+        setSubmissionSuccessData(res);
+      } else {
+        setShowClaimForm(false);
+      }
+    } catch (err) {
+      setClaimInitiateError(err.message || "Failed to process claim submission.");
+    } finally {
+      setClaimSubmittingMode(null);
+    }
+  };
+
+  const handleQuickAddPolicySubmit = async (e) => {
+    e.preventDefault();
+    setQuickAddError("");
+    if (!quickAddForm.provider_id || !quickAddForm.policy_number.trim() || !quickAddForm.policy_holder_name.trim() || !quickAddForm.start_date || !quickAddForm.expiry_date) {
+      setQuickAddError("Please fill out all required fields.");
+      return;
+    }
+    if (quickAddForm.expiry_date < quickAddForm.start_date) {
+      setQuickAddError("Policy Expiry Date cannot be earlier than Policy Start Date.");
+      return;
+    }
+    if (!quickAddCard) {
+      setQuickAddError("Please attach an image or PDF of your Insurance Card.");
+      return;
+    }
+
+    setQuickAddSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append("provider_id", quickAddForm.provider_id);
+      formData.append("policy_number", quickAddForm.policy_number.trim());
+      if (quickAddForm.member_id.trim()) formData.append("member_id", quickAddForm.member_id.trim());
+      formData.append("policy_holder_name", quickAddForm.policy_holder_name.trim());
+      formData.append("relationship", quickAddForm.relationship);
+      formData.append("insurance_type", quickAddForm.insurance_type);
+      formData.append("start_date", quickAddForm.start_date);
+      formData.append("expiry_date", quickAddForm.expiry_date);
+      formData.append("insurance_card", quickAddCard);
+
+      const newPolicy = await insuranceApi.registerPolicy(formData);
+      setToastMessage("Insurance policy registered successfully!");
+      const updatedPols = await insuranceApi.getPatientPolicies().catch(() => []);
+      const activePols = Array.isArray(updatedPols) ? updatedPols.filter((p) => p.status === "Active") : [];
+      setPatientPolicies(activePols);
+      setSelectedPolicyId(newPolicy.id);
+      if (selectedCompletedApt) {
+        loadDossier(selectedCompletedApt.id, newPolicy.id);
+        loadClaimConsent(selectedCompletedApt.id, newPolicy.id);
+      }
+      setShowQuickAddPolicy(false);
+      setQuickAddCard(null);
+    } catch (err) {
+      setQuickAddError(err.message || "Failed to register policy.");
+    } finally {
+      setQuickAddSubmitting(false);
+    }
+  };
 
   const handleOpenReschedule = async (apt) => {
     setRescheduleApt(apt);
@@ -1267,13 +1674,61 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
               </div>
             ) : (
               activePastList.map((apt, idx) => (
-                <div key={`${apt.id || 'apt'}-${idx}`} className="care-card p-6 space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="font-bold text-[#162623]">{apt.doctor.name}</span>
-                    <span className="text-[#577877]">{apt.dateShort}</span>
+                <div
+                  key={`${apt.id || 'apt'}-${idx}`}
+                  className="care-card p-5 sm:p-6 transition hover:border-[#185A4D]/40 space-y-4 shadow-2xs"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#185A4D] font-bold text-sm flex items-center justify-center shrink-0">
+                        {apt.doctor?.initials || "DR"}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-sm text-[#162623]">{apt.doctor?.name}</h4>
+                          <span className="font-mono text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">
+                            {apt.displayId}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#577877]">{apt.doctor?.specialty || "General Medicine"}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Completed
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+                        <span className="material-symbols-outlined text-xs">verified</span>
+                        {apt.isPaid ? "Paid (Razorpay)" : apt.paymentStatus || "Paid"}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-xs">{apt.displayId} / {apt.status} / {apt.paymentStatus}</p>
-                  <p className="text-xs text-[#577877]">{apt.reason} • {apt.fee}</p>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-1">
+                      <p className="text-zinc-700 font-medium flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-xs text-zinc-400">calendar_month</span>
+                        <span>{apt.dateShort} &bull; {apt.timeRange}</span>
+                      </p>
+                      <p className="text-zinc-500 text-[11px]">
+                        Consultation Fee: <span className="font-bold text-zinc-800">{apt.fee}</span>
+                        {apt.reason && <span className="ml-2 text-zinc-400">&bull; {apt.reason}</span>}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCompletedDetails(apt)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#185A4D] hover:bg-[#13493E] shadow-xs transition active:scale-[0.98] cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-base">shield</span>
+                        <span>View Details &amp; Insurance Claim</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))
             )}
@@ -1513,7 +1968,1318 @@ export default function AppointmentsScreen({ onNavigate, navParams }) {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* CHECKPOINT 4: COMPLETED APPOINTMENT DETAILS & INSURANCE CLAIM MODAL        */}
+      {/* ========================================================================= */}
+      {selectedCompletedApt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#162623]/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl bg-white border border-[#577877]/20 shadow-2xl my-8 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 bg-zinc-50/70 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-10 h-10 rounded-xl bg-[#F0F5F7] text-[#185A4D] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-2xl">shield</span>
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-[#162623] truncate">
+                    Completed Appointment Details
+                  </h3>
+                  <p className="text-xs text-[#577877] truncate">
+                    {selectedCompletedApt.doctor?.name} &bull; {selectedCompletedApt.displayId}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCompletedApt(null)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            {/* Modal Scrollable Content */}
+            <div className="p-6 space-y-6 overflow-y-auto text-xs sm:text-sm">
+              {/* Section 1: Encounter & Invoicing Summary */}
+              <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-800 uppercase tracking-wider">
+                    Encounter &amp; Payment Breakdown
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                    ✓ Completed Visit
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-zinc-400 block text-[11px]">Doctor</span>
+                    <span className="font-semibold text-zinc-900">{selectedCompletedApt.doctor?.name}</span>
+                    <span className="text-zinc-500 block text-[11px]">{selectedCompletedApt.doctor?.specialty}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block text-[11px]">Date &amp; Time</span>
+                    <span className="font-medium text-zinc-800">
+                      {selectedCompletedApt.dateShort} at {selectedCompletedApt.timeRange}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block text-[11px]">Actual Consultation Fee</span>
+                    <span className="text-base font-bold text-[#185A4D]">
+                      {claimEligibility?.consultation_fee || selectedCompletedApt.fee}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block text-[11px]">Payment Status</span>
+                    <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      <span className="material-symbols-outlined text-xs">verified</span>
+                      <span>Paid via Razorpay</span>
+                      {claimEligibility?.razorpay_payment_id && (
+                        <span className="font-mono text-[10px] text-zinc-500 ml-1">
+                          ({claimEligibility.razorpay_payment_id})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Clinical Documentation Badges */}
+                <div className="pt-2 border-t border-zinc-200 flex items-center justify-between flex-wrap gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-500">Summary:</span>
+                    {claimEligibility?.summary_finalized ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 text-[11px]">
+                        <span className="material-symbols-outlined text-xs">check_circle</span>
+                        Finalized by Doctor
+                      </span>
+                    ) : (
+                      <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]">
+                        Pending Clinician Sign-off
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-500">Prescription:</span>
+                    {claimEligibility?.prescription_required ? (
+                      claimEligibility.prescription_verified ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 text-[11px]">
+                          <span className="material-symbols-outlined text-xs">check_circle</span>
+                          Released
+                        </span>
+                      ) : (
+                        <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]">
+                          Pending Release
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 text-[11px]">
+                        Medically Not Required
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ================================================================= */}
+              {/* CHECKPOINT 5: CLAIM SUPPORTING DOCUMENTS SECTION                   */}
+              {/* ================================================================= */}
+              <div className="p-4 rounded-xl border border-[#25836F]/25 bg-white space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-[#F0F5F7] text-[#185A4D] flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-lg">folder_shared</span>
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#185A4D]">
+                        Claim Supporting Documents
+                      </h4>
+                      <p className="text-[11px] text-[#577877]">
+                        Auto-collected clinical records, financial receipts, and verified policy credentials
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-[#185A4D] bg-[#F0F5F7] px-2.5 py-1 rounded-lg">
+                      Paid: {claimDossier?.paid_amount || claimEligibility?.consultation_fee || selectedCompletedApt.fee}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dossier Loading State */}
+                {dossierLoading ? (
+                  <div className="p-6 text-center text-[#577877] space-y-2 bg-[#F0F5F7]/40 rounded-xl">
+                    <div className="w-5 h-5 border-2 border-[#185A4D]/20 border-t-[#185A4D] rounded-full animate-spin mx-auto" />
+                    <p className="text-xs font-semibold">Collecting verified documents from medical & financial records...</p>
+                  </div>
+                ) : dossierError ? (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex justify-between items-center">
+                    <span>{dossierError}</span>
+                    <button
+                      type="button"
+                      onClick={() => loadDossier(selectedCompletedApt.id, selectedPolicyId)}
+                      className="underline font-bold hover:text-red-900 cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : claimDossier ? (
+                  <div className="space-y-3">
+                    {/* Mandatory Documents Completeness Banner */}
+                    {claimDossier.mandatory_complete ? (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+                        <span className="material-symbols-outlined text-emerald-600 text-lg shrink-0">check_circle</span>
+                        <div className="min-w-0">
+                          <span className="font-bold block">All Mandatory Documents Collected ({claimDossier.total_documents_collected} items)</span>
+                          <span className="text-[11px] text-emerald-700">Clinical summaries, verified invoices, and policy records are ready.</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-amber-600 text-lg shrink-0">warning</span>
+                          <span className="font-bold">Missing Mandatory Documents ({claimDossier.missing_mandatory_count})</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800">
+                          The following required records must be resolved before filing for reimbursement:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {claimDossier.missing_mandatory_titles?.map((t, idx) => (
+                            <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-semibold text-[10px]">
+                              <span className="material-symbols-outlined text-xs">error</span>
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Auto-Collected Documents List */}
+                    <div className="space-y-2">
+                      {claimDossier.documents?.map((docItem) => {
+                        const isAvailable = docItem.status === "Available";
+                        const isMissing = docItem.status === "Missing";
+                        const isNA = docItem.status === "Not Applicable";
+                        const isSupporting = docItem.category === "supporting_document";
+
+                        return (
+                          <div
+                            key={docItem.id}
+                            className={`p-3 rounded-xl border transition-all ${
+                              isAvailable
+                                ? "bg-white border-zinc-200 hover:border-[#25836F]/40"
+                                : isMissing
+                                ? "bg-amber-50/40 border-amber-200/80"
+                                : "bg-zinc-50 border-zinc-200 text-zinc-500"
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              {/* Left icon and details */}
+                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                                  isAvailable
+                                    ? "bg-[#F0F5F7] text-[#185A4D]"
+                                    : isMissing
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-zinc-100 text-zinc-400"
+                                }`}>
+                                  <span className="material-symbols-outlined text-lg">
+                                    {docItem.category === "patient_profile"
+                                      ? "person"
+                                      : docItem.category === "insurance_policy"
+                                      ? "verified_user"
+                                      : docItem.category === "insurance_card"
+                                      ? "badge"
+                                      : docItem.category === "prescription"
+                                      ? "prescriptions"
+                                      : docItem.category === "consultation_summary"
+                                      ? "clinical_notes"
+                                      : docItem.category === "consultation_invoice"
+                                      ? "receipt_long"
+                                      : docItem.category === "payment_receipt"
+                                      ? "payments"
+                                      : "attach_file"}
+                                  </span>
+                                </span>
+
+                                <div className="min-w-0 space-y-0.5">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h5 className="font-bold text-xs text-zinc-900 truncate">
+                                      {docItem.title}
+                                    </h5>
+                                    {docItem.is_mandatory ? (
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-100">
+                                        Mandatory
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-zinc-100 text-zinc-600">
+                                        Optional
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-zinc-600 line-clamp-1">
+                                    {docItem.description}
+                                  </p>
+                                  {docItem.details && (
+                                    <p className="text-[10px] text-zinc-500 font-mono">
+                                      {docItem.details}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right status badge & actions */}
+                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                {/* Status Badge */}
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
+                                  isAvailable
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : isMissing
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-zinc-200 text-zinc-600"
+                                }`}>
+                                  <span className="material-symbols-outlined text-xs">
+                                    {isAvailable ? "check_circle" : isMissing ? "cancel" : "remove_circle_outline"}
+                                  </span>
+                                  <span>{docItem.status}</span>
+                                </span>
+
+                                {/* Preview Button */}
+                                {isAvailable && (docItem.preview_url || docItem.category === "consultation_invoice" || docItem.category === "payment_receipt" || docItem.category === "insurance_card" || isSupporting) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePreviewDossierDoc(docItem)}
+                                    className="px-2.5 py-1 text-[11px] font-semibold text-[#185A4D] bg-[#F0F5F7] hover:bg-[#e0ecef] rounded-lg transition inline-flex items-center gap-1 cursor-pointer"
+                                    title="Inline Preview"
+                                  >
+                                    <span className="material-symbols-outlined text-xs">visibility</span>
+                                    <span>Preview</span>
+                                  </button>
+                                )}
+
+                                {/* Download Button */}
+                                {isAvailable && (docItem.download_url || docItem.category === "consultation_invoice" || docItem.category === "payment_receipt" || docItem.category === "insurance_card" || isSupporting) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadDossierDoc(docItem)}
+                                    className="px-2.5 py-1 text-[11px] font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition inline-flex items-center gap-1 cursor-pointer"
+                                    title="Download Document"
+                                  >
+                                    <span className="material-symbols-outlined text-xs">download</span>
+                                    <span>Download</span>
+                                  </button>
+                                )}
+
+                                {/* Delete Supporting Doc Button */}
+                                {isSupporting && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSupportingDoc(docItem.id)}
+                                    className="p-1 text-zinc-400 hover:text-red-600 rounded hover:bg-red-50 transition cursor-pointer"
+                                    title="Remove supporting document"
+                                  >
+                                    <span className="material-symbols-outlined text-sm">delete</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Additional Supporting Document Upload Box */}
+                    <div className="p-3.5 rounded-xl bg-zinc-50/80 border border-dashed border-zinc-300 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[#185A4D] text-base">upload_file</span>
+                          Attach Additional Supporting Document
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-medium">
+                          PDF, JPG, PNG &bull; Max 10 MB
+                        </span>
+                      </div>
+
+                      {supportingUploadError && (
+                        <div className="p-2 rounded-lg bg-red-50 text-red-700 text-xs border border-red-100">
+                          {supportingUploadError}
+                        </div>
+                      )}
+
+                      <form onSubmit={handleSupportingUpload} className="space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            value={supportingTitle}
+                            onChange={(e) => setSupportingTitle(e.target.value)}
+                            placeholder="Document Title (e.g. Lab Report / Scan)"
+                            className="px-3 py-1.5 text-xs rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-[#185A4D]"
+                          />
+                          <input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => setSupportingFile(e.target.files?.[0] || null)}
+                            className="text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-[#185A4D] file:text-white file:cursor-pointer text-zinc-600 cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex justify-end">
+                          <button
+                            type="submit"
+                            disabled={supportingUploading || !supportingFile}
+                            className="px-3.5 py-1.5 text-xs font-bold text-white bg-[#185A4D] hover:bg-[#13493E] rounded-xl shadow-2xs transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                          >
+                            {supportingUploading && (
+                              <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            )}
+                            <span>+ Upload Document</span>
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+
+                    {/* Privacy & Regulatory Isolation Disclosure */}
+                    <div className="p-2.5 rounded-lg bg-[#F0F5F7] border border-[#25836F]/20 text-[11px] text-[#185A4D] leading-relaxed flex items-start gap-2">
+                      <span className="material-symbols-outlined text-sm mt-0.5 shrink-0 text-[#25836F]">lock</span>
+                      <div>
+                        <span className="font-semibold">Privacy &amp; Appointment Isolation: </span>
+                        All documents in this claim dossier are strictly bound to encounter {selectedCompletedApt.displayId}. Records are neither duplicated nor transmitted to insurance third parties without your final submission confirmation.
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* ================================================================= */}
+              {/* CHECKPOINT 6: INSURANCE DATA SHARING CONSENT SECTION              */}
+              {/* ================================================================= */}
+              <div className="p-4 rounded-xl border border-[#25836F]/25 bg-white space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-[#F0F5F7] text-[#185A4D] flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-lg">policy</span>
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#185A4D]">
+                        Insurance Data Sharing Consent
+                      </h4>
+                      <p className="text-[11px] text-[#577877]">
+                        Explicit patient authorization required before transmitting health &amp; financial records
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status Badge */}
+                  {claimConsent && (
+                    <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
+                        claimConsent.is_granted && !claimConsent.requires_renewal
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          : claimConsent.requires_renewal
+                          ? "bg-amber-100 text-amber-800 border border-amber-200"
+                          : claimConsent.status === "withdrawn"
+                          ? "bg-rose-100 text-rose-800 border border-rose-200"
+                          : "bg-zinc-100 text-zinc-700 border border-zinc-200"
+                      }`}>
+                        <span className="material-symbols-outlined text-xs">
+                          {claimConsent.is_granted && !claimConsent.requires_renewal
+                            ? "check_circle"
+                            : claimConsent.requires_renewal
+                            ? "sync_problem"
+                            : claimConsent.status === "withdrawn"
+                            ? "cancel"
+                            : "radio_button_unchecked"}
+                        </span>
+                        <span>
+                          {claimConsent.is_granted && !claimConsent.requires_renewal
+                            ? "Consent Granted"
+                            : claimConsent.requires_renewal
+                            ? "Renewal Required"
+                            : claimConsent.status === "withdrawn"
+                            ? "Consent Withdrawn"
+                            : "Consent Pending"}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {consentLoading ? (
+                  <div className="p-5 text-center text-[#577877] space-y-2 bg-[#F0F5F7]/40 rounded-xl">
+                    <div className="w-5 h-5 border-2 border-[#185A4D]/20 border-t-[#185A4D] rounded-full animate-spin mx-auto" />
+                    <p className="text-xs font-semibold">Verifying claim-specific consent authorization record...</p>
+                  </div>
+                ) : consentError ? (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex justify-between items-center">
+                    <span>{consentError}</span>
+                    <button
+                      type="button"
+                      onClick={() => loadClaimConsent(selectedCompletedApt.id, selectedPolicyId)}
+                      className="underline font-bold hover:text-red-900 cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5">
+                    {/* Renewal Alert if applicable */}
+                    {claimConsent?.requires_renewal && (
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
+                        <span className="material-symbols-outlined text-amber-600 text-base mt-0.5 shrink-0">warning</span>
+                        <div className="space-y-0.5">
+                          <p className="font-bold">Consent Renewal Required</p>
+                          <p className="text-[11px] text-amber-800">
+                            {claimConsent.renewal_reason || "The recipient insurance provider or authorized document dossier has changed since your last consent. Please review the updated scope and re-authorize below."}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Selected Provider & Authorized Scope Card */}
+                    <div className="p-3.5 rounded-xl bg-[#F0F5F7]/60 border border-[#25836F]/20 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                        <span className="font-semibold text-zinc-700">Designated Insurance Recipient:</span>
+                        <span className="font-bold text-[#185A4D] bg-white px-2.5 py-0.5 rounded-md border border-[#25836F]/20 shadow-2xs">
+                          {claimConsent?.provider_name || (() => {
+                            const p = patientPolicies.find((pol) => pol.id === selectedPolicyId);
+                            return p?.provider_name || "Select an active policy below";
+                          })()}
+                        </span>
+                      </div>
+
+                      {/* Documents Intended for Sharing */}
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[11px] font-semibold text-zinc-600 block">
+                          Documents Included in Data Sharing Scope ({claimConsent?.authorized_documents?.length || 0}):
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {claimConsent?.authorized_documents && claimConsent.authorized_documents.length > 0 ? (
+                            claimConsent.authorized_documents.map((doc) => (
+                              <span
+                                key={doc.id}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-zinc-200 text-[10px] text-zinc-700 font-medium"
+                              >
+                                <span className="material-symbols-outlined text-xs text-[#25836F]">description</span>
+                                {doc.title}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[11px] text-zinc-500 italic">
+                              Documents from verified dossier will be attached upon policy selection.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Purpose explanation */}
+                      <p className="text-[11px] text-[#577877] leading-relaxed pt-1 border-t border-[#25836F]/10">
+                        <strong className="text-zinc-700">Purpose of Disclosure: </strong>
+                        To facilitate verification, adjudication, and reimbursement claim settlement by your designated insurer or Third Party Administrator (TPA). Records are strictly isolated to this encounter and are never shared without explicit consent.
+                      </p>
+                    </div>
+
+                    {/* Consent Statement Box with UNCHECKED Checkbox */}
+                    <div className="p-3.5 rounded-xl border border-zinc-200 bg-white space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-zinc-900 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[#185A4D] text-base">verified</span>
+                          Patient Authorization Declaration
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleOpenReviewConsent}
+                          className="text-[11px] font-semibold text-[#185A4D] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-xs">open_in_new</span>
+                          Review Full Consent Document
+                        </button>
+                      </div>
+
+                      {consentActionError && (
+                        <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                          {consentActionError}
+                        </div>
+                      )}
+
+                      {/* Explicit Consent Checkbox (Strict: NEVER preselected) */}
+                      <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-zinc-50 transition cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={consentChecked}
+                          disabled={consentSubmitting || (claimConsent?.is_granted && !claimConsent?.requires_renewal)}
+                          onChange={(e) => {
+                            setConsentChecked(e.target.checked);
+                            if (consentActionError) setConsentActionError("");
+                          }}
+                          className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-[#185A4D] focus:ring-[#185A4D] cursor-pointer"
+                        />
+                        <span className="text-xs text-zinc-800 leading-relaxed font-normal">
+                          &ldquo;I authorize Kaizen Care to share the selected clinical records, insurance details and payment documents with my selected insurance provider or authorized TPA for processing this reimbursement claim. I understand that claim approval and reimbursement are subject to my insurance policy terms.&rdquo;
+                        </span>
+                      </label>
+
+                      {/* Acceptance status and action buttons */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-zinc-100 text-xs">
+                        {claimConsent?.is_granted && !claimConsent?.requires_renewal ? (
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <span className="text-[11px] text-emerald-800 font-medium flex items-center gap-1">
+                              <span className="material-symbols-outlined text-xs text-emerald-600">event_available</span>
+                              Accepted on: <strong className="font-mono">{claimConsent.accepted_at}</strong>
+                            </span>
+                            <span className="text-[10px] text-zinc-400 font-mono">
+                              v{claimConsent.consent_version}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-amber-800 font-medium flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs text-amber-600">lock</span>
+                            Consent must be granted prior to claim submission.
+                          </span>
+                        )}
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          {claimConsent?.is_granted && !claimConsent?.requires_renewal ? (
+                            <button
+                              type="button"
+                              onClick={handleWithdrawConsent}
+                              disabled={consentSubmitting}
+                              className="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                            >
+                              {consentSubmitting && (
+                                <span className="w-3 h-3 border-2 border-rose-700/30 border-t-rose-700 rounded-full animate-spin" />
+                              )}
+                              <span className="material-symbols-outlined text-xs">cancel</span>
+                              <span>Withdraw Consent</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleGrantConsent}
+                              disabled={!consentChecked || consentSubmitting}
+                              className="px-4 py-1.5 text-xs font-bold text-white bg-[#185A4D] hover:bg-[#13493E] rounded-xl shadow-2xs transition cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {consentSubmitting && (
+                                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              )}
+                              <span className="material-symbols-outlined text-xs">check_circle</span>
+                              <span>{claimConsent?.requires_renewal ? "Renew & Authorize Consent" : "Grant & Authorize Consent"}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Post-Consultation Insurance Claim */}
+              <div className="p-4 rounded-xl border border-[#25836F]/25 bg-white space-y-4 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#185A4D] text-lg">receipt_long</span>
+                    <h4 className="font-bold text-sm text-[#185A4D]">
+                      Post-Consultation Insurance Claim
+                    </h4>
+                  </div>
+                  <span className="text-[11px] font-semibold text-[#185A4D] bg-[#F0F5F7] px-2 py-0.5 rounded">
+                    Optional Reimbursement
+                  </span>
+                </div>
+
+                <p className="text-xs text-[#577877] leading-relaxed">
+                  Appointments are self-paid and confirmed immediately without pre-authorization delays.
+                  You can now submit an optional claim for reimbursement using your verified clinical records.
+                </p>
+
+                {/* Loading state for prerequisite checks */}
+                {eligibilityLoading ? (
+                  <div className="p-6 text-center text-[#577877] space-y-2 bg-[#F0F5F7]/50 rounded-xl">
+                    <div className="w-6 h-6 border-2 border-[#185A4D]/20 border-t-[#185A4D] rounded-full animate-spin mx-auto" />
+                    <p className="text-xs font-semibold">Evaluating claim prerequisites with backend...</p>
+                  </div>
+                ) : eligibilityError ? (
+                  <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center justify-between">
+                    <span>{eligibilityError}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCompletedDetails(selectedCompletedApt)}
+                      className="underline font-bold hover:text-red-900 cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : claimEligibility && (
+                  <div className="space-y-3">
+                    {/* Prerequisite Checklist Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {claimEligibility.prerequisites?.map((prereq) => (
+                        <div
+                          key={prereq.key}
+                          className={`p-2.5 rounded-xl border flex items-start gap-2 ${
+                            prereq.passed
+                              ? "bg-emerald-50/50 border-emerald-200 text-emerald-900"
+                              : "bg-amber-50/60 border-amber-200 text-amber-900"
+                          }`}
+                        >
+                          <span className={`material-symbols-outlined text-base shrink-0 mt-0.5 ${
+                            prereq.passed ? "text-emerald-600" : "text-amber-600"
+                          }`}>
+                            {prereq.passed ? "check_circle" : "cancel"}
+                          </span>
+                          <div className="min-w-0">
+                            <span className="font-bold block text-[11px]">{prereq.title}</span>
+                            <span className="text-[11px] text-zinc-600">{prereq.message}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Duplicate Active Claim Alert */}
+                    {claimEligibility.has_active_claim && (
+                      <div className="p-3.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 text-xs flex items-start gap-2.5">
+                        <span className="material-symbols-outlined text-sky-700 text-base mt-0.5">verified</span>
+                        <div className="space-y-0.5">
+                          <p className="font-bold">Active Claim Already Initiated</p>
+                          <p className="text-[11px] text-sky-800">
+                            Claim reference <span className="font-mono font-bold">{claimEligibility.existing_claim_id}</span> has already been initiated for this appointment. Duplicate active claims are prohibited.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Unmet Prerequisites Alert */}
+                    {!claimEligibility.is_eligible && !claimEligibility.has_active_claim && (
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                        <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                          <span className="material-symbols-outlined text-sm text-amber-600">info</span>
+                          Prerequisites Incomplete for Insurance Claim
+                        </p>
+                        <ul className="list-disc list-inside text-[11px] text-amber-800 space-y-0.5">
+                          {claimEligibility.unmet_prerequisites?.map((msg, i) => (
+                            <li key={i}>{msg}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Eligible Callout & Request Button */}
+                    {claimEligibility.is_eligible && !showClaimForm && (
+                      <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-emerald-950 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm text-emerald-600">verified</span>
+                            Consultation is Claim-Eligible
+                          </p>
+                          <p className="text-[11px] text-emerald-800">
+                            Payment verified, consultation completed, and clinical records signed.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowClaimForm(true)}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#185A4D] hover:bg-[#13493E] transition shadow-xs cursor-pointer shrink-0 self-start sm:self-auto flex items-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-base">receipt_long</span>
+                          <span>Request Insurance Claim</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Claim Preparation & Policy Selection Form */}
+                    {showClaimForm && (
+                      <div className="p-4 rounded-xl bg-zinc-50 border border-[#25836F]/30 space-y-4 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+                          <h5 className="font-bold text-xs text-zinc-900 uppercase tracking-wider">
+                            Select Health Insurance Policy
+                          </h5>
+                          <span className="font-bold text-xs text-[#185A4D]">
+                            Claim Amount: {claimEligibility.consultation_fee}
+                          </span>
+                        </div>
+
+                        {claimInitiateError && (
+                          <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                            {claimInitiateError}
+                          </div>
+                        )}
+
+                        {patientPolicies.length === 0 ? (
+                          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-2 text-center text-xs">
+                            <p className="font-semibold text-amber-900">
+                              No active health insurance policy found on your account.
+                            </p>
+                            <p className="text-[11px] text-amber-700">
+                              Please register your insurance policy and upload your card before submitting a reimbursement claim.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowQuickAddPolicy(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#185A4D] rounded-xl hover:bg-[#13493E] shadow-xs cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-sm">add_circle</span>
+                              <span>+ Add Insurance Policy</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="space-y-1">
+                              <label className="block text-xs font-semibold text-zinc-700">
+                                Choose Policy <span className="text-red-500">*</span>
+                              </label>
+                              <select
+                                value={selectedPolicyId}
+                                onChange={(e) => handlePolicyChange(e.target.value)}
+                                className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#185A4D]/20 focus:border-[#185A4D] bg-white cursor-pointer"
+                              >
+                                {patientPolicies.map((pol) => (
+                                  <option key={pol.id} value={pol.id}>
+                                    {pol.provider_name} ({pol.policy_number_masked}) &bull; Exp: {pol.expiry_date || "N/A"}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Selected Policy Card Preview */}
+                            {selectedPolicyId && (() => {
+                              const sel = patientPolicies.find((p) => p.id === selectedPolicyId);
+                              if (!sel) return null;
+                              return (
+                                <div className="p-3 rounded-lg bg-white border border-zinc-200 text-xs space-y-1">
+                                  <div className="flex justify-between font-bold text-zinc-800">
+                                    <span>{sel.provider_name}</span>
+                                    <span className="font-mono text-zinc-600">{sel.policy_number_masked}</span>
+                                  </div>
+                                  <p className="text-[11px] text-zinc-500">
+                                    Policyholder: {sel.policy_holder_name} ({sel.relationship || "Self"}) &bull; Valid to {sel.expiry_date}
+                                  </p>
+                                </div>
+                              );
+                            })()}
+
+                            <div className="space-y-1">
+                              <label className="block text-xs font-semibold text-zinc-700">
+                                Claim Remarks / Additional Notes <span className="text-zinc-400 font-normal">(Optional)</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={claimNotes}
+                                onChange={(e) => setClaimNotes(e.target.value)}
+                                placeholder="e.g. Follow-up consultation fee reimbursement request"
+                                className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#185A4D]/20 focus:border-[#185A4D]"
+                              />
+                            </div>
+
+                            {/* ======================================================= */}
+                            {/* CHECKPOINT 7: REVIEW & SUBMIT CLAIM SECTION             */}
+                            {/* ======================================================= */}
+                            <div className="p-4 rounded-xl border border-zinc-200 bg-white space-y-3">
+                              <h6 className="font-bold text-xs text-[#185A4D] uppercase tracking-wider flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-sm">fact_check</span>
+                                Review Claim Information Before Submission
+                              </h6>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] bg-zinc-50 p-3 rounded-xl border border-zinc-200">
+                                <div>
+                                  <span className="text-zinc-500 block">Patient / Policyholder:</span>
+                                  <span className="font-semibold text-zinc-800">
+                                    {selectedPolicyId ? patientPolicies.find(p => p.id === selectedPolicyId)?.policy_holder_name : "N/A"}
+                                    {" "}({selectedPolicyId ? patientPolicies.find(p => p.id === selectedPolicyId)?.relationship : "Self"})
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-zinc-500 block">Selected Insurer:</span>
+                                  <span className="font-semibold text-zinc-800">
+                                    {selectedPolicyId ? patientPolicies.find(p => p.id === selectedPolicyId)?.provider_name : "None selected"}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-zinc-500 block">Appointment Reference:</span>
+                                  <span className="font-semibold text-zinc-800 font-mono">
+                                    {selectedCompletedApt.displayId} ({selectedCompletedApt.doctor?.name})
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-zinc-500 block">Consultation Fee (Actual Paid):</span>
+                                  <span className="font-bold text-[#185A4D]">
+                                    {claimDossier?.paid_amount || claimEligibility.consultation_fee || selectedCompletedApt.fee}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-zinc-500 block">Supporting Documents:</span>
+                                  <span className="font-semibold text-zinc-800 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs text-[#185A4D]">attach_file</span>
+                                    {claimDossier?.total_documents_collected || 0} collected
+                                    {claimDossier?.mandatory_complete ? " (Mandatory Complete)" : " (Missing items)"}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-zinc-500 block">Data Sharing Consent:</span>
+                                  <span className="font-semibold text-zinc-800 flex items-center gap-1">
+                                    <span className={`material-symbols-outlined text-xs ${
+                                      claimConsent?.is_granted && !claimConsent?.requires_renewal ? "text-emerald-600" : "text-amber-600"
+                                    }`}>
+                                      {claimConsent?.is_granted && !claimConsent?.requires_renewal ? "verified" : "error"}
+                                    </span>
+                                    {claimConsent?.is_granted && !claimConsent?.requires_renewal ? "Explicitly Granted" : "Not Authorized / Renewal Needed"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="p-2.5 rounded-lg bg-sky-50 text-[11px] text-sky-900 border border-sky-100 flex items-start gap-2">
+                                <span className="material-symbols-outlined text-sm mt-0.5 shrink-0 text-sky-700">security</span>
+                                <div>
+                                  <strong>Clinic Admin Verification Workflow: </strong>
+                                  Submitting this claim queues your records for review by the Kaizen Care Clinic Administration. It is not transmitted directly to the insurer until internal clinical and financial validation is finalized.
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Checkpoint 7 Gating Alerts */}
+                            {(!claimDossier?.mandatory_complete || !claimConsent?.is_granted || claimConsent?.requires_renewal) && (
+                              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                                <span className="font-bold block text-[11px] flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-sm text-amber-600">lock</span>
+                                  Submission Disabled Until Prerequisites are Satisfied:
+                                </span>
+                                <ul className="list-disc list-inside text-[11px] text-amber-800 space-y-0.5 pl-1">
+                                  {!claimDossier?.mandatory_complete && (
+                                    <li>Mandatory clinical &amp; payment documents are incomplete ({claimDossier?.missing_mandatory_count || 0} missing).</li>
+                                  )}
+                                  {(!claimConsent?.is_granted || claimConsent?.requires_renewal) && (
+                                    <li>Explicit patient Data Sharing Consent must be granted and authorized above.</li>
+                                  )}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Action Buttons: Save as Draft & Submit Claim */}
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-zinc-200">
+                              <button
+                                type="button"
+                                onClick={() => setShowClaimForm(false)}
+                                disabled={claimSubmittingMode !== null}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 hover:bg-zinc-200/60 cursor-pointer self-start sm:self-auto"
+                              >
+                                Close Form
+                              </button>
+
+                              <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleClaimSubmitOrDraft(true)}
+                                  disabled={claimSubmittingMode !== null}
+                                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                >
+                                  {claimSubmittingMode === "draft" && (
+                                    <span className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-zinc-700 rounded-full animate-spin" />
+                                  )}
+                                  <span className="material-symbols-outlined text-xs">save</span>
+                                  <span>Save as Draft</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleClaimSubmitOrDraft(false)}
+                                  disabled={
+                                    claimSubmittingMode !== null ||
+                                    !claimDossier?.mandatory_complete ||
+                                    !claimConsent?.is_granted ||
+                                    claimConsent?.requires_renewal
+                                  }
+                                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-[#185A4D] hover:bg-[#13493E] shadow-sm transition cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  title={
+                                    !claimDossier?.mandatory_complete || !claimConsent?.is_granted || claimConsent?.requires_renewal
+                                      ? "Complete mandatory records and grant consent to enable submission"
+                                      : "Submit claim for Clinic Admin verification"
+                                  }
+                                >
+                                  {claimSubmittingMode === "submit" && (
+                                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  )}
+                                  <span className="material-symbols-outlined text-xs">send</span>
+                                  <span>Submit Claim</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end px-6 py-4 bg-zinc-50 border-t border-zinc-200 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedCompletedApt(null)}
+                className="px-5 py-2 text-xs font-semibold text-white bg-[#185A4D] hover:bg-[#13493E] rounded-xl shadow-xs transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK ADD POLICY MODAL (WHEN PATIENT HAS NO POLICY ON FILE) */}
+      {showQuickAddPolicy && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-[#162623]/70 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-zinc-200 shadow-2xl p-6 space-y-4 my-8">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#185A4D] text-xl">add_circle</span>
+                <h4 className="font-bold text-sm text-zinc-900">Add Insurance Policy</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickAddPolicy(false)}
+                className="text-zinc-400 hover:text-zinc-600 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickAddPolicySubmit} className="space-y-3 text-xs">
+              {quickAddError && (
+                <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                  {quickAddError}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="block font-semibold text-zinc-700">
+                  Insurance Provider <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={quickAddForm.provider_id}
+                  onChange={(e) => setQuickAddForm({ ...quickAddForm, provider_id: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 rounded-xl border border-zinc-300 focus:outline-none focus:border-[#185A4D] bg-white"
+                >
+                  <option value="">-- Select Active Provider --</option>
+                  {activeMasterProviders.map((prov) => (
+                    <option key={prov.id} value={prov.id}>
+                      {prov.provider_name} ({prov.provider_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="block font-semibold text-zinc-700">Policy Number *</label>
+                  <input
+                    type="text"
+                    value={quickAddForm.policy_number}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, policy_number: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 rounded-xl border border-zinc-300 focus:border-[#185A4D]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block font-semibold text-zinc-700">Policyholder Name *</label>
+                  <input
+                    type="text"
+                    value={quickAddForm.policy_holder_name}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, policy_holder_name: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 rounded-xl border border-zinc-300 focus:border-[#185A4D]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="block font-semibold text-zinc-700">Start Date *</label>
+                  <input
+                    type="date"
+                    value={quickAddForm.start_date}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, start_date: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 rounded-xl border border-zinc-300"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block font-semibold text-zinc-700">Expiry Date *</label>
+                  <input
+                    type="date"
+                    value={quickAddForm.expiry_date}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, expiry_date: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 rounded-xl border border-zinc-300"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <label className="block font-semibold text-zinc-700">Insurance Card File (PDF/JPG/PNG) *</label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setQuickAddCard(e.target.files[0] || null)}
+                  required
+                  className="w-full text-xs text-zinc-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#F0F5F7] file:text-[#185A4D]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-200">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickAddPolicy(false)}
+                  className="px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={quickAddSubmitting}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#185A4D] hover:bg-[#13493E] rounded-xl shadow-xs cursor-pointer"
+                >
+                  {quickAddSubmitting ? "Registering..." : "Save Policy"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CHECKPOINT 5: DOCUMENT PREVIEW MODAL                                      */}
+      {/* ========================================================================= */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-zinc-200 overflow-hidden my-6 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 bg-zinc-50/80 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="material-symbols-outlined text-[#185A4D] text-xl shrink-0">
+                  {previewDoc.contentType?.includes("pdf")
+                    ? "picture_as_pdf"
+                    : previewDoc.contentType?.includes("image")
+                    ? "image"
+                    : "description"}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-zinc-900 truncate">{previewDoc.name}</h3>
+                  <p className="text-[11px] text-zinc-500">
+                    Secure In-Memory Preview &bull; {previewDoc.contentType}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClosePreview}
+                  className="text-zinc-400 hover:text-zinc-600 p-1.5 rounded-lg hover:bg-zinc-100 transition cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Viewer Content */}
+            <div className="p-4 overflow-auto flex-1 bg-zinc-900/5 flex items-center justify-center min-h-[350px]">
+              {previewDoc.contentType?.includes("image") ? (
+                <img
+                  src={previewDoc.url}
+                  alt={previewDoc.name}
+                  className="max-h-[70vh] max-w-full rounded-lg object-contain shadow-md"
+                />
+              ) : previewDoc.contentType?.includes("pdf") ? (
+                <iframe
+                  src={previewDoc.url}
+                  title={previewDoc.name}
+                  className="w-full h-[65vh] rounded-lg border border-zinc-200 bg-white"
+                />
+              ) : (
+                <iframe
+                  src={previewDoc.url}
+                  title={previewDoc.name}
+                  className="w-full h-[65vh] rounded-lg border border-zinc-200 bg-white"
+                />
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end px-6 py-3 border-t border-zinc-200 bg-zinc-50/80 shrink-0">
+              <button
+                type="button"
+                onClick={handleClosePreview}
+                className="px-4 py-2 text-xs font-semibold text-zinc-700 bg-white border border-zinc-300 rounded-xl hover:bg-zinc-50 transition cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CHECKPOINT 6: REVIEW CONSENT DOCUMENT MODAL                               */}
+      {/* ========================================================================= */}
+      {showReviewConsentModal && (
+        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-zinc-200 overflow-hidden my-6 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 bg-zinc-50/80 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-8 h-8 rounded-lg bg-[#F0F5F7] text-[#185A4D] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-lg">gavel</span>
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-zinc-900 truncate">
+                    {consentLegalDoc?.document_title || "Insurance Data Sharing Consent Agreement"}
+                  </h3>
+                  <p className="text-[11px] text-zinc-500">
+                    Version {consentLegalDoc?.version || "1.0"} &bull; Legal and Regulatory Terms
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReviewConsentModal(false)}
+                className="text-zinc-400 hover:text-zinc-600 p-1.5 rounded-lg hover:bg-zinc-100 transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Document Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs text-zinc-800 leading-relaxed">
+              {consentLegalDocLoading ? (
+                <div className="p-8 text-center text-[#577877] space-y-2">
+                  <div className="w-6 h-6 border-2 border-[#185A4D]/20 border-t-[#185A4D] rounded-full animate-spin mx-auto" />
+                  <p className="text-xs font-semibold">Loading official consent agreement definition...</p>
+                </div>
+              ) : consentLegalDoc ? (
+                <div className="space-y-4">
+                  {/* Summary Statement */}
+                  <div className="p-3.5 rounded-xl bg-[#F0F5F7] border border-[#25836F]/20 text-[11px] text-[#185A4D] leading-relaxed">
+                    <p className="font-semibold mb-1">Standard Patient Authorization:</p>
+                    <p className="italic">{consentLegalDoc.standard_consent_statement}</p>
+                  </div>
+
+                  {/* Sections */}
+                  <div className="space-y-3">
+                    {consentLegalDoc.sections?.map((section) => (
+                      <div key={section.section_number} className="p-3.5 rounded-xl border border-zinc-200 bg-white space-y-1">
+                        <h5 className="font-bold text-xs text-[#185A4D] flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-[#F0F5F7] text-[#185A4D] text-[10px] flex items-center justify-center font-mono">
+                            {section.section_number}
+                          </span>
+                          {section.title}
+                        </h5>
+                        <p className="text-[11px] text-zinc-600 leading-relaxed pl-6.5">
+                          {section.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Statutory & Privacy Notice */}
+                  <div className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-[10px] text-zinc-500 space-y-1">
+                    <p><strong>Tenant Isolation: </strong>{consentLegalDoc.tenant_isolation_notice}</p>
+                    <p><strong>Statutory Compliance: </strong>{consentLegalDoc.statutory_notice}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-zinc-500 text-center">Unable to load consent agreement.</p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end px-6 py-3 border-t border-zinc-200 bg-zinc-50/80 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowReviewConsentModal(false)}
+                className="px-4 py-2 text-xs font-bold text-white bg-[#185A4D] hover:bg-[#13493E] rounded-xl shadow-xs transition cursor-pointer"
+              >
+                I Understand &amp; Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CHECKPOINT 7: CLAIM SUBMISSION SUCCESS MODAL                              */}
+      {/* ========================================================================= */}
+      {submissionSuccessData && (
+        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-zinc-200 overflow-hidden my-6 p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+              <span className="material-symbols-outlined text-3xl">task_alt</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-zinc-900">
+                Claim Submitted Successfully
+              </h3>
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                Your post-consultation reimbursement claim has been generated and dispatched to the Clinic Admin audit queue.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#F0F5F7] border border-[#25836F]/20 text-left space-y-2 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-[#25836F]/10">
+                <span className="text-zinc-500">Claim Reference:</span>
+                <span className="font-mono font-bold text-[#185A4D] text-sm">
+                  {submissionSuccessData.claim_reference}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Initial Status:</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  {submissionSuccessData.status_label || "Pending Document Verification"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Audit Workflow:</span>
+                <span className="font-semibold text-zinc-700">Internal Clinic Admin Review</span>
+              </div>
+              <div className="pt-1 text-[11px] text-zinc-500 leading-relaxed border-t border-[#25836F]/10">
+                {submissionSuccessData.next_step}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmissionSuccessData(null);
+                  setSelectedCompletedApt(null);
+                }}
+                className="w-full sm:w-auto px-5 py-2 text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmissionSuccessData(null);
+                  setSelectedCompletedApt(null);
+                  if (typeof onNavigate === "function") {
+                    onNavigate("insurance", { tab: "claims" });
+                  }
+                }}
+                className="w-full sm:w-auto px-5 py-2 text-xs font-bold text-white bg-[#185A4D] hover:bg-[#13493E] rounded-xl shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-sm">receipt_long</span>
+                <span>View in My Insurance</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+
 

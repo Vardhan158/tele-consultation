@@ -6,6 +6,7 @@ const mainNavItems = [
   { id: "prescriptions", label: "Prescriptions", icon: "medication" },
   { id: "summaries", label: "Consultation summaries", icon: "description" },
   { id: "follow-up", label: "Follow-up care", icon: "favorite" },
+  { id: "my-insurance", label: "My Insurance", icon: "health_and_safety" },
   { id: "payments", label: "Payments", icon: "credit_card" },
   { id: "consent", label: "Consent management", icon: "verified_user" },
 ];
@@ -30,6 +31,7 @@ const roleNavigation = {
     { id: "clinic-schedules", label: "Schedules", icon: "schedule" },
     { id: "clinic-appointments", label: "Appointments", icon: "calendar_month" },
     { id: "clinic-payments", label: "Payments", icon: "payments" },
+    { id: "clinic-insurance", label: "Insurance Management", icon: "health_and_safety" },
     { id: "clinic-reports", label: "Reports", icon: "analytics" },
     { id: "clinic-support-staff", label: "Support staff", icon: "support_agent" },
     { id: "clinic-secops", label: "Security & Operations", icon: "shield_person" },

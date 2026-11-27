@@ -32,6 +32,7 @@ import DoctorAvailabilityScreen from "./components/screens/DoctorAvailabilityScr
 import DoctorSettingsScreen from "./components/screens/DoctorSettingsScreen";
 import DoctorConsultationScreen from "./components/screens/DoctorConsultationScreen";
 import DoctorNotificationsScreen from "./components/screens/DoctorNotificationsScreen";
+import MyInsuranceScreen from "./components/screens/MyInsuranceScreen";
 import ClinicAdminDashboard from "./components/admin/ClinicAdminDashboard";
 import SupportDashboardScreen from "./components/support/SupportDashboardScreen";
 import SecOpsDashboardScreen from "./components/secops/SecOpsDashboardScreen";
@@ -47,6 +48,7 @@ const PATH_TO_TAB = {
   "/prescriptions": "prescriptions",
   "/consultation-summaries": "summaries",
   "/follow-up": "follow-up",
+  "/my-insurance": "my-insurance",
   "/payments": "payments",
   "/notifications": "notifications",
   "/settings": "settings",
@@ -66,6 +68,9 @@ const PATH_TO_TAB = {
   "/clinic/schedules": "clinic-schedules",
   "/clinic/appointments": "clinic-appointments",
   "/clinic/payments": "clinic-payments",
+  "/clinic/insurance": "clinic-insurance",
+  "/clinic/insurance-management": "clinic-insurance",
+  "/clinic/insurance-providers": "clinic-insurance",
   "/clinic/reports": "clinic-reports",
   "/clinic/support-staff": "clinic-support-staff",
   "/clinic/secops": "clinic-secops",
@@ -279,6 +284,7 @@ export default function App() {
         <ClinicAdminDashboard
           activeTab={routedTab}
           onSelectTab={handleNavigate}
+          navParams={navParams}
         />
       );
     }
@@ -329,6 +335,8 @@ export default function App() {
         return <ConsultationSummariesScreen onNavigate={handleNavigate} />;
       case "follow-up":
         return <FollowUpCareScreen onNavigate={handleNavigate} />;
+      case "my-insurance":
+        return <MyInsuranceScreen onNavigate={handleNavigate} patient={patient} navParams={navParams} />;
       case "payments":
         return (
           <PaymentsScreen

@@ -8,10 +8,12 @@ import PaymentOversightTab from "./tabs/PaymentOversightTab";
 import OperationalReportsTab from "./tabs/OperationalReportsTab";
 import ClinicSettingsTab from "./tabs/ClinicSettingsTab";
 import SupportStaffManagementTab from "./tabs/SupportStaffManagementTab";
+import InsuranceManagementTab from "./tabs/InsuranceManagementTab";
+import AdminNotificationsTab from "./tabs/AdminNotificationsTab";
 import SupportScreen from "../screens/SupportScreen";
 import SecOpsDashboardScreen from "../secops/SecOpsDashboardScreen";
 
-export default function ClinicAdminDashboard({ activeTab = "overview", onSelectTab }) {
+export default function ClinicAdminDashboard({ activeTab = "overview", onSelectTab, navParams }) {
   const normalizeTab = (tab) => {
     switch (tab) {
       case "overview":
@@ -33,6 +35,11 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
       case "payments":
       case "clinic-payments":
         return "payments";
+      case "insurance":
+      case "clinic-insurance":
+      case "insurance-providers":
+      case "clinic-insurance-providers":
+        return "insurance";
       case "reports":
       case "clinic-reports":
         return "reports";
@@ -45,6 +52,9 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
       case "support":
       case "clinic-support":
         return "support";
+      case "notifications":
+      case "clinic-notifications":
+        return "notifications";
       case "settings":
       case "clinic-settings":
         return "settings";
@@ -69,6 +79,19 @@ export default function ClinicAdminDashboard({ activeTab = "overview", onSelectT
         return <AppointmentManagementTab />;
       case "payments":
         return <PaymentOversightTab />;
+      case "insurance":
+        return (
+          <InsuranceManagementTab
+            defaultSubTab={
+              activeTab === "insurance-providers" || activeTab === "clinic-insurance-providers"
+                ? "providers"
+                : "claims"
+            }
+            initialClaimId={navParams?.claimId}
+          />
+        );
+      case "notifications":
+        return <AdminNotificationsTab onNavigate={onSelectTab} />;
       case "reports":
         return <OperationalReportsTab />;
       case "support-staff":

@@ -61,7 +61,7 @@ async def get_principal(request: Request) -> Principal:
                     "patient:intake:write", "appointment:read", "appointment:create", "appointment:write",
                     "records:read", "records:upload", "prescription:read", "followup:read", "support:read",
                     "support:create", "payment:read", "payment:create", "payment:verify", "payment:refund",
-                    "directory:read", "consultation:join",
+                    "directory:read", "consultation:join", "insurance:read", "insurance:write",
                 }
             return Principal(
                 user_id=user["id"], tenant_id=user["tenant_id"], roles=frozenset({role}),
@@ -76,7 +76,7 @@ async def get_principal(request: Request) -> Principal:
             user_id=user_id,
             tenant_id=tenant_id,
             roles=frozenset({"patient"}),
-            permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read"}),
+            permissions=frozenset({"patient:profile:read", "patient:profile:write", "patient:intake:write", "directory:read", "appointment:create", "appointment:read", "appointment:write", "payment:create", "payment:read", "payment:verify", "payment:refund", "notification:read", "notification:retry", "consultation:join", "records:read", "records:upload", "prescription:read", "followup:read", "support:create", "support:read", "insurance:read", "insurance:write"}),
         )
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
