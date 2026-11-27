@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { authApi, notificationApi, adminNotificationApi, patientApi } from "../../lib/api";
+import EmergencyModal from "../common/EmergencyModal";
 
 export default function Header({
   onOpenMobile,
@@ -11,6 +12,7 @@ export default function Header({
   const [currentUser, setCurrentUser] = useState(patient || null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -206,7 +208,22 @@ export default function Header({
       </div>
 
       {/* Right Header Elements */}
-      <div className="flex items-center gap-3 sm:gap-4 text-xs">
+      <div className="flex items-center gap-2 sm:gap-3 text-xs">
+        {/* Phase 1 (F-03): Emergency SOS & Paramedic Card Trigger */}
+        {!isAdmin && !isDoctor && (
+          <button
+            type="button"
+            onClick={() => setEmergencyModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition cursor-pointer font-bold text-[11px] shadow-2xs"
+            title="Emergency Medical Card & Hospital Locator"
+          >
+            <span className="material-symbols-outlined text-base text-red-600 animate-pulse">
+              emergency
+            </span>
+            <span className="hidden sm:inline">Emergency SOS</span>
+          </button>
+        )}
+
         {/* Notifications (Patient & Clinic Admin) */}
         {!isDoctor && (
           <button
@@ -324,6 +341,12 @@ export default function Header({
           )}
         </div>
       </div>
+
+      {/* Emergency First Responder & Paramedic Modal */}
+      <EmergencyModal
+        isOpen={emergencyModalOpen}
+        onClose={() => setEmergencyModalOpen(false)}
+      />
     </header>
   );
 }

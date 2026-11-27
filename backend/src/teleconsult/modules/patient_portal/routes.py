@@ -33,6 +33,8 @@ from teleconsult.modules.patient_portal.schemas import (
     ConsentHistoryItem,
     ConsentResponse,
     DoctorResponse,
+    EmergencyContactInfo,
+    EmergencyParamedicCardResponse,
     FamilyMemberCreate,
     FamilyMemberResponse,
     FollowUpMessageCreate,
@@ -400,6 +402,128 @@ async def get_profile(
             avatar_url=document.get("avatar_url"),
         )
     raise HTTPException(status_code=503, detail="No application database is configured")
+
+
+@router.get("/emergency-card", response_model=EmergencyParamedicCardResponse)
+async def get_emergency_paramedic_card(
+    principal: Principal = Depends(require("patient:profile:read")),
+) -> dict[str, Any]:
+    """Retrieve structured First Responder & Paramedic Emergency Card.
+    Aggregates blood group, emergency contact, known drug allergies,
+    chronic conditions, and active medications from the patient chart."""
+    if not get_settings().mongodb_enabled:
+        raise HTTPException(status_code=503, detail="No application database is configured")
+
+    db = mongo_database.database()
+    patient_doc = await db["patients"].find_one({
+        "tenant_id": principal.tenant_id,
+        "$or": [{"user_id": str(principal.user_id)}, {"id": str(principal.user_id)}],
+    })
+    user_doc = await db["users"].find_one({
+        "tenant_id": principal.tenant_id,
+        "$or": [{"id": str(principal.user_id)}, {"user_id": str(principal.user_id)}],
+    })
+
+    full_name = (patient_doc or {}).get("full_name") or (user_doc or {}).get("full_name") or "Patient"
+    dob = (patient_doc or {}).get("date_of_birth") or (user_doc or {}).get("date_of_birth")
+    gender = (patient_doc or {}).get("gender") or (user_doc or {}).get("gender")
+    blood_group = (patient_doc or {}).get("blood_group") or (user_doc or {}).get("blood_group") or "Not Specified"
+
+    # Normalize Emergency Contact
+    raw_contact = (patient_doc or {}).get("emergency_contact") or (user_doc or {}).get("emergency_contact")
+    contact_obj = EmergencyContactInfo()
+    if isinstance(raw_contact, dict):
+        contact_obj = EmergencyContactInfo(
+            name=raw_contact.get("name") or raw_contact.get("contact_name"),
+            phone=raw_contact.get("phone") or raw_contact.get("contact_phone") or raw_contact.get("number"),
+            relationship=raw_contact.get("relationship") or raw_contact.get("relation"),
+        )
+    elif isinstance(raw_contact, str) and raw_contact.strip():
+        parts = [p.strip() for p in raw_contact.split(" - ") if p.strip()]
+        if len(parts) >= 2:
+            contact_obj = EmergencyContactInfo(name=parts[0], phone=parts[1], relationship="Emergency Contact")
+        else:
+            contact_obj = EmergencyContactInfo(name=raw_contact.strip(), phone=None, relationship="Emergency Contact")
+
+    # Extract Allergies
+    raw_allergies = (patient_doc or {}).get("allergies")
+    allergies: list[str] = []
+    if isinstance(raw_allergies, list):
+        allergies = [str(a).strip() for a in raw_allergies if str(a).strip()]
+    elif isinstance(raw_allergies, str) and raw_allergies.strip():
+        allergies = [a.strip() for a in raw_allergies.replace(";", ",").split(",") if a.strip()]
+
+    # Check medical intake if allergies not in profile
+    if not allergies:
+        intake = await db["medical_intakes"].find_one({
+            "tenant_id": principal.tenant_id,
+            "$or": [{"patient_id": str(principal.user_id)}, {"user_id": str(principal.user_id)}],
+        })
+        if intake and intake.get("allergies"):
+            val = intake["allergies"]
+            allergies = [a.strip() for a in val.replace(";", ",").split(",") if a.strip()]
+
+    # Extract Chronic Conditions
+    chronic = []
+    med_hist = (patient_doc or {}).get("medical_history") or (patient_doc or {}).get("conditions")
+    if isinstance(med_hist, list):
+        chronic = [str(c).strip() for c in med_hist if str(c).strip()]
+    elif isinstance(med_hist, str) and med_hist.strip():
+        chronic = [c.strip() for c in med_hist.replace(";", ",").split(",") if c.strip()]
+
+    # Extract Active Medications from recent prescriptions
+    active_meds: list[str] = []
+    try:
+        presc_cursor = db["prescriptions"].find({
+            "tenant_id": principal.tenant_id,
+            "$or": [{"patient_id": str(principal.user_id)}, {"user_id": str(principal.user_id)}],
+        })
+        # If cursor is list or async cursor
+        if hasattr(presc_cursor, "sort"):
+            presc_cursor = presc_cursor.sort("created_at", -1).limit(5)
+        async for presc in presc_cursor:
+            meds = presc.get("medications") or presc.get("items") or []
+            for m in meds:
+                if isinstance(m, dict):
+                    name = m.get("name") or m.get("medication_name")
+                    dosage = m.get("dosage") or m.get("dose") or ""
+                    freq = m.get("frequency") or ""
+                    item_str = f"{name} ({dosage} - {freq})".strip(" -()")
+                    if item_str and item_str not in active_meds:
+                        active_meds.append(item_str)
+                elif isinstance(m, str) and m not in active_meds:
+                    active_meds.append(m)
+    except Exception:
+        pass
+
+    # Clinic Settings
+    clinic_doc = await db["clinic_settings"].find_one({"tenant_id": principal.tenant_id}) or {}
+    clinic_name = clinic_doc.get("clinic_name") or "Kaizen Care Telehealth Center"
+    clinic_phone = clinic_doc.get("contact_phone") or "+91 80 4567 8900"
+
+    hotlines = [
+        {"name": "National Emergency SOS", "number": "112"},
+        {"name": "Medical Emergency / Ambulance", "number": "108"},
+        {"name": "Police", "number": "100"},
+        {"name": "National Health Helpline", "number": "1075"},
+    ]
+
+    return {
+        "patient_id": str(principal.user_id),
+        "full_name": full_name,
+        "date_of_birth": str(dob) if dob else None,
+        "gender": str(gender) if gender else None,
+        "blood_group": str(blood_group),
+        "emergency_contact": contact_obj,
+        "allergies": allergies or ["No known drug allergies reported"],
+        "chronic_conditions": chronic or ["None reported"],
+        "active_medications": active_meds or ["No active prescriptions recorded"],
+        "clinic_name": clinic_name,
+        "clinic_phone": clinic_phone,
+        "emergency_hotlines": hotlines,
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+
 
 
 @router.patch("/profile", response_model=PatientResponse)

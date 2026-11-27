@@ -59,6 +59,9 @@ from teleconsult.modules.insurance.schemas import (
     PatientInsurancePolicyResponse,
     PatientSubmitAdditionalDocsRequest,
     PatientSubmitAdditionalDocsResponse,
+    PreflightCheckItem,
+    PreflightClaimValidationRequest,
+    PreflightClaimValidationResponse,
     ClaimReimbursementSummaryResponse,
     RecordReimbursementRequest,
     RecordReimbursementResponse,
@@ -5128,6 +5131,213 @@ async def get_patient_claim_reimbursements(
         "reimbursements_count": reimb_summary["reimbursements_count"],
         "last_reimbursement_date": reimb_summary["last_reimbursement_date"],
         "timeline": [ClaimTimelineEntry(**t) for t in (claim.get("timeline") or [])],
+    }
+
+
+@router.post("/patient/insurance/claims/preflight-validate", response_model=PreflightClaimValidationResponse)
+async def preflight_validate_claim(
+    payload: PreflightClaimValidationRequest,
+    principal: Principal = Depends(require("insurance:read")),
+) -> dict[str, Any]:
+    """Pre-submission verification for patient insurance reimbursement claim.
+    Validates policy coverage dates, name matching, mandatory documents presence,
+    and fee reconciliation, returning an itemized readiness checklist and 0-100% score."""
+    db = mongo_database.database()
+    patient_ids = await _resolve_patient_ids(db, principal.tenant_id, principal.user_id)
+    appointment_id = payload.appointment_id.strip()
+
+    # 1. Fetch appointment context
+    try:
+        ctx = await _fetch_claim_appointment_context(
+            db=db,
+            tenant_id=principal.tenant_id,
+            appointment_id=appointment_id,
+            patient_ids=patient_ids,
+            user_id=principal.user_id,
+        )
+    except HTTPException as e:
+        return {
+            "appointment_id": appointment_id,
+            "policy_id": payload.policy_id,
+            "readiness_score": 0,
+            "is_submission_ready": False,
+            "checks": [
+                PreflightCheckItem(
+                    key="appointment_validity",
+                    title="Appointment Verification",
+                    passed=False,
+                    severity="error",
+                    message=f"Appointment verification error: {e.detail}",
+                    action_hint="Ensure appointment ID is valid and belongs to your account",
+                )
+            ],
+            "summary_message": f"Appointment could not be verified: {e.detail}",
+        }
+
+    checks: list[PreflightCheckItem] = []
+
+    # Check 1: Consultation Status
+    is_completed = ctx.get("is_completed", False)
+    checks.append(PreflightCheckItem(
+        key="consultation_status",
+        title="Consultation Completed",
+        passed=is_completed,
+        severity="error" if not is_completed else "info",
+        message="Consultation completed by clinician" if is_completed else f"Appointment status is '{ctx.get('appointment_status')}' (must be Completed)",
+        action_hint=None if is_completed else "Reimbursement claims can only be filed after the consultation concludes",
+    ))
+
+    # Check 2: Razorpay Payment Verification
+    payment_verified = ctx.get("payment_verified", False)
+    checks.append(PreflightCheckItem(
+        key="payment_verification",
+        title="Payment Verified & Reconciled",
+        passed=payment_verified,
+        severity="error" if not payment_verified else "info",
+        message=f"Payment verified for consultation fee: {ctx.get('consultation_fee')}" if payment_verified else "Consultation payment is pending or unverified",
+        action_hint=None if payment_verified else "Verify payment status in your Payments tab",
+    ))
+
+    # Check 3: Consultation Summary Finalized
+    summary_finalized = ctx.get("summary_finalized", False)
+    checks.append(PreflightCheckItem(
+        key="summary_finalized",
+        title="Clinical Notes Finalized",
+        passed=summary_finalized,
+        severity="error" if not summary_finalized else "info",
+        message="Consultation encounter summary finalized and locked by doctor" if summary_finalized else "Clinical encounter notes have not been finalized yet",
+        action_hint=None if summary_finalized else "Doctor must finalize notes before insurance claims can proceed",
+    ))
+
+    # Check 4: Prescription Released
+    prescription_verified = ctx.get("prescription_verified", False)
+    checks.append(PreflightCheckItem(
+        key="prescription_released",
+        title="Digital Prescription Released",
+        passed=prescription_verified,
+        severity="error" if not prescription_verified else "info",
+        message="Verified digital prescription released" if prescription_verified else "Prescription has not been released yet",
+        action_hint=None if prescription_verified else "Prescription is required as part of mandatory claim package",
+    ))
+
+    # Check 5: Policy Selection & Validity
+    policy_id = payload.policy_id.strip() if payload.policy_id else None
+    policy = None
+    if policy_id:
+        policy = await db["insurance_policies"].find_one({
+            "tenant_id": principal.tenant_id,
+            "id": policy_id,
+            "$or": [{"patient_id": {"$in": patient_ids}}, {"user_id": principal.user_id}],
+        })
+        if not policy and "patient_insurance_policies" in db:
+            policy = await db["patient_insurance_policies"].find_one({
+                "tenant_id": principal.tenant_id,
+                "id": policy_id,
+            })
+
+    if not policy_id:
+        checks.append(PreflightCheckItem(
+            key="policy_selection",
+            title="Insurance Policy Selected",
+            passed=False,
+            severity="error",
+            message="No active insurance policy selected",
+            action_hint="Select a registered insurance policy from your account",
+        ))
+    elif not policy:
+        checks.append(PreflightCheckItem(
+            key="policy_selection",
+            title="Insurance Policy Selected",
+            passed=False,
+            severity="error",
+            message=f"Policy '{policy_id}' not found or belongs to another user",
+            action_hint="Verify your policy ID in My Insurance screen",
+        ))
+    else:
+        # Policy is selected and found
+        checks.append(PreflightCheckItem(
+            key="policy_selection",
+            title="Insurance Policy Selected",
+            passed=True,
+            severity="info",
+            message=f"Policy selected: {policy.get('provider_name', 'Provider')} ({mask_policy_number(policy.get('policy_number', ''))})",
+            action_hint=None,
+        ))
+
+        # Check 6: Policy Status Active
+        status = policy.get("status", "Active")
+        is_active = status.lower() == "active"
+        checks.append(PreflightCheckItem(
+            key="policy_status",
+            title="Policy Active Status",
+            passed=is_active,
+            severity="error" if not is_active else "info",
+            message=f"Policy status is '{status}'",
+            action_hint=None if is_active else "Only Active policies can be submitted for reimbursement",
+        ))
+
+        # Check 7: Policy Coverage Window
+        appt_date_str = str(ctx.get("appointment_date") or ctx.get("appointment_starts_at") or "")[:10]
+        start_date = policy.get("start_date", "")
+        expiry_date = policy.get("expiry_date", "")
+        coverage_valid = True
+        cov_msg = "Appointment date falls within valid policy coverage window"
+        if expiry_date and appt_date_str > expiry_date:
+            coverage_valid = False
+            cov_msg = f"Policy expired on {expiry_date}, but appointment occurred on {appt_date_str}"
+        elif start_date and appt_date_str < start_date:
+            coverage_valid = False
+            cov_msg = f"Policy starts on {start_date}, but appointment occurred on {appt_date_str}"
+
+        checks.append(PreflightCheckItem(
+            key="coverage_window",
+            title="Coverage Period Validity",
+            passed=coverage_valid,
+            severity="error" if not coverage_valid else "info",
+            message=cov_msg,
+            action_hint=None if coverage_valid else "Ensure consultation date falls within policy active coverage period",
+        ))
+
+        # Check 8: Name / Relationship Matching
+        patient_doc = await db["patients"].find_one({
+            "tenant_id": principal.tenant_id,
+            "$or": [{"id": {"$in": patient_ids}}, {"user_id": principal.user_id}],
+        })
+        patient_name = (patient_doc or {}).get("full_name") or "Patient"
+        holder_name = policy.get("policy_holder_name", "")
+        rel = policy.get("relationship", "Self")
+        name_matched = bool(holder_name and (rel.lower() != "self" or (patient_name.lower().split()[0] in holder_name.lower())))
+        checks.append(PreflightCheckItem(
+            key="holder_identity_match",
+            title="Policyholder Identity Alignment",
+            passed=name_matched,
+            severity="warning" if not name_matched else "info",
+            message=f"Claimant '{patient_name}' linked via '{rel}' relationship to policyholder '{holder_name}'" if name_matched else f"Policyholder name '{holder_name}' does not match patient name '{patient_name}'",
+            action_hint=None if name_matched else "Ensure relationship or policyholder details match your patient profile",
+        ))
+
+    # Calculate overall readiness score
+    mandatory_keys = {"consultation_status", "payment_verification", "summary_finalized", "prescription_released", "policy_selection", "policy_status", "coverage_window"}
+    mandatory_checks = [c for c in checks if c.key in mandatory_keys]
+    passed_mandatory = sum(1 for c in mandatory_checks if c.passed)
+    total_mandatory = len(mandatory_keys)
+    readiness_score = int(round((passed_mandatory / total_mandatory) * 100))
+    is_ready = readiness_score == 100
+
+    if is_ready:
+        summary_message = "Your claim meets 100% of reimbursement criteria and is ready for submission."
+    elif readiness_score >= 70:
+        summary_message = f"Your claim is {readiness_score}% ready. Please resolve outstanding items before submitting."
+    else:
+        summary_message = f"Claim prerequisites incomplete ({readiness_score}%). Consultation must be finalized and an active policy attached."
+
+    return {
+        "appointment_id": appointment_id,
+        "policy_id": policy_id,
+        "readiness_score": readiness_score,
+        "is_submission_ready": is_ready,
+        "checks": checks,
+        "summary_message": summary_message,
     }
 
 

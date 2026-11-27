@@ -70,6 +70,7 @@ export async function apiRequest(path, options = {}) {
 export const patientApi = {
   bookingOptions: () => apiRequest("/api/v1/patient/booking-options"),
   profile: () => apiRequest("/patient/profile"),
+  getEmergencyCard: () => apiRequest("/patient/emergency-card"),
   updateProfile: (profile) =>
     apiRequest("/patient/profile", {
       method: "PATCH",
@@ -742,6 +743,11 @@ export const insuranceApi = {
     };
   },
   // Post-Consultation Insurance Claim (Checkpoint 4 & 5)
+  preflightValidateClaim: (payload) =>
+    apiRequest("/patient/insurance/claims/preflight-validate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   checkClaimEligibility: (appointmentId) =>
     apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-eligibility`),
   initiateClaim: (appointmentId, payload) =>

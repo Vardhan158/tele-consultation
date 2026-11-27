@@ -237,3 +237,26 @@ class MedicalIntakeResponse(MedicalIntakeCreate):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     submitted_at: datetime
+
+
+class EmergencyContactInfo(BaseModel):
+    name: str | None = None
+    phone: str | None = None
+    relationship: str | None = None
+
+
+class EmergencyParamedicCardResponse(BaseModel):
+    patient_id: str
+    full_name: str
+    date_of_birth: str | None = None
+    gender: str | None = None
+    blood_group: str | None = None
+    emergency_contact: EmergencyContactInfo | None = None
+    allergies: list[str] = Field(default_factory=list)
+    chronic_conditions: list[str] = Field(default_factory=list)
+    active_medications: list[str] = Field(default_factory=list)
+    clinic_name: str = "Kaizen Care Telehealth Center"
+    clinic_phone: str = "+91 80 4567 8900"
+    emergency_hotlines: list[dict[str, str]] = Field(default_factory=list)
+    generated_at: str
+

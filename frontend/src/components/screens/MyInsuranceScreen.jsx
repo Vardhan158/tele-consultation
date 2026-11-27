@@ -82,6 +82,8 @@ export default function MyInsuranceScreen({ onNavigate, patient, navParams }) {
   const [claimDetailLoading, setClaimDetailLoading] = useState(false);
   const [resubmitNotes, setResubmitNotes] = useState("");
   const [resubmitting, setResubmitting] = useState(false);
+  const [claimPreflight, setClaimPreflight] = useState(null);
+  const [claimPreflightLoading, setClaimPreflightLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -176,11 +178,33 @@ export default function MyInsuranceScreen({ onNavigate, patient, navParams }) {
       setClaimDetailLoading(true);
       insuranceApi
         .getPatientClaimDetail(navParams.claimId)
-        .then((detail) => setViewingClaim(detail))
+        .then((detail) => {
+          setViewingClaim(detail);
+          setClaimPreflight(null);
+          if (detail?.appointment_id) {
+            handleRunPreflightAudit(detail.appointment_id, detail.policy_id);
+          }
+        })
         .catch(() => {})
         .finally(() => setClaimDetailLoading(false));
     }
   }, [navParams]);
+
+  const handleRunPreflightAudit = async (appointmentId, policyId) => {
+    if (!appointmentId) return;
+    setClaimPreflightLoading(true);
+    try {
+      const res = await insuranceApi.preflightValidateClaim({
+        appointment_id: appointmentId,
+        policy_id: policyId || null,
+      });
+      setClaimPreflight(res);
+    } catch (err) {
+      showToast(err.message || "Unable to run pre-flight claim health check.", "error");
+    } finally {
+      setClaimPreflightLoading(false);
+    }
+  };
 
   const handleResubmitClaim = async (claimId) => {
     setResubmitting(true);
@@ -949,6 +973,10 @@ export default function MyInsuranceScreen({ onNavigate, patient, navParams }) {
                             try {
                               const detail = await insuranceApi.getPatientClaimDetail(claim.id);
                               setViewingClaim(detail);
+                              setClaimPreflight(null);
+                              if (detail?.appointment_id) {
+                                handleRunPreflightAudit(detail.appointment_id, detail.policy_id);
+                              }
                             } catch (err) {
                               showToast(err.message || "Failed to load claim detail.", "error");
                             } finally {
@@ -1999,6 +2027,104 @@ export default function MyInsuranceScreen({ onNavigate, patient, navParams }) {
                     <span className="text-zinc-500 block text-[10px] uppercase font-bold tracking-wider">Policy Number</span>
                     <span className="font-mono font-semibold text-zinc-800">{viewingClaim.policy_number_masked}</span>
                   </div>
+                </div>
+
+                {/* PHASE 1 (F-01): PRE-FLIGHT CLAIM HEALTH & AUDIT CHECKER CARD */}
+                <div className="p-4 rounded-xl border border-teal-200 bg-teal-50/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-teal-700 text-lg">health_and_safety</span>
+                      <div>
+                        <h5 className="font-bold text-xs text-teal-950 uppercase tracking-wider">
+                          Pre-Flight Claim Health Audit
+                        </h5>
+                        <p className="text-[11px] text-teal-700">
+                          Live prerequisite audit validating documentation, fees, and policy alignment.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {claimPreflightLoading ? (
+                        <span className="text-[11px] text-teal-700 animate-pulse font-medium">Auditing claim...</span>
+                      ) : claimPreflight ? (
+                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                          claimPreflight.readiness_score === 100
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : claimPreflight.readiness_score >= 70
+                            ? "bg-amber-100 text-amber-800 border-amber-300"
+                            : "bg-rose-100 text-rose-800 border-rose-300"
+                        }`}>
+                          {claimPreflight.readiness_score}% Readiness
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => handleRunPreflightAudit(viewingClaim.appointment_id, viewingClaim.policy_id)}
+                        className="p-1 rounded hover:bg-teal-100 text-teal-800 cursor-pointer"
+                        title="Re-run health check"
+                      >
+                        <span className="material-symbols-outlined text-base">refresh</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {claimPreflight && (
+                    <div className="space-y-1.5">
+                      <div className="w-full bg-zinc-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-500 ${
+                            claimPreflight.readiness_score === 100
+                              ? "bg-emerald-600"
+                              : claimPreflight.readiness_score >= 70
+                              ? "bg-amber-500"
+                              : "bg-rose-500"
+                          }`}
+                          style={{ width: `${claimPreflight.readiness_score}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-zinc-700 font-medium">
+                        {claimPreflight.summary_message}
+                      </p>
+                    </div>
+                  )}
+
+                  {claimPreflight?.checks && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      {claimPreflight.checks.map((check) => (
+                        <div
+                          key={check.key}
+                          className={`p-2.5 rounded-lg border text-xs flex items-start gap-2 ${
+                            check.passed
+                              ? "bg-white border-emerald-200 text-zinc-800"
+                              : check.severity === "error"
+                              ? "bg-rose-50 border-rose-200 text-rose-900"
+                              : "bg-amber-50 border-amber-200 text-amber-900"
+                          }`}
+                        >
+                          <span
+                            className={`material-symbols-outlined text-base shrink-0 mt-0.5 ${
+                              check.passed
+                                ? "text-emerald-600"
+                                : check.severity === "error"
+                                ? "text-rose-600"
+                                : "text-amber-600"
+                            }`}
+                          >
+                            {check.passed ? "check_circle" : check.severity === "error" ? "cancel" : "warning"}
+                          </span>
+                          <div className="space-y-0.5 min-w-0">
+                            <span className="font-semibold block truncate">{check.title}</span>
+                            <p className="text-[11px] opacity-85 leading-tight">{check.message}</p>
+                            {!check.passed && check.action_hint && (
+                              <p className="text-[10px] font-medium text-teal-800 mt-1 bg-teal-100/70 px-1.5 py-0.5 rounded">
+                                Tip: {check.action_hint}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Insurer Submission Card */}
