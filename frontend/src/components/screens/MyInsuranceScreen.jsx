@@ -169,6 +169,22 @@ export default function MyInsuranceScreen({ onNavigate, patient, navParams }) {
     loadInsuranceData();
   }, []);
 
+  const handleRunPreflightAudit = async (appointmentId, policyId) => {
+    if (!appointmentId) return;
+    setClaimPreflightLoading(true);
+    try {
+      const res = await insuranceApi.preflightValidateClaim({
+        appointment_id: appointmentId,
+        policy_id: policyId || null,
+      });
+      setClaimPreflight(res);
+    } catch (err) {
+      showToast(err.message || "Unable to run pre-flight claim health check.", "error");
+    } finally {
+      setClaimPreflightLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (navParams?.tab) {
       setActiveTab(navParams.tab);
@@ -189,22 +205,6 @@ export default function MyInsuranceScreen({ onNavigate, patient, navParams }) {
         .finally(() => setClaimDetailLoading(false));
     }
   }, [navParams]);
-
-  const handleRunPreflightAudit = async (appointmentId, policyId) => {
-    if (!appointmentId) return;
-    setClaimPreflightLoading(true);
-    try {
-      const res = await insuranceApi.preflightValidateClaim({
-        appointment_id: appointmentId,
-        policy_id: policyId || null,
-      });
-      setClaimPreflight(res);
-    } catch (err) {
-      showToast(err.message || "Unable to run pre-flight claim health check.", "error");
-    } finally {
-      setClaimPreflightLoading(false);
-    }
-  };
 
   const handleResubmitClaim = async (claimId) => {
     setResubmitting(true);

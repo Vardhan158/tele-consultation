@@ -214,6 +214,8 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
   useEffect(() => {
     let active = true;
     let cleaned = false;
+    let handleWindowOffline = null;
+    let handleWindowOnline = null;
     const diagnostic = (event, value) => {
       if (import.meta.env.DEV) {
         const details = value && typeof value === "object" ? value : { value };
@@ -348,11 +350,11 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
           }
         };
 
-        const handleWindowOffline = () => {
+        handleWindowOffline = () => {
           diagnostic("window-offline");
           if (active) setStatus("reconnecting");
         };
-        const handleWindowOnline = () => {
+        handleWindowOnline = () => {
           diagnostic("window-online");
           if (active) {
             setStatus("reconnecting");
@@ -541,9 +543,11 @@ const WebRtcConsultation = forwardRef(function WebRtcConsultation({
       active = false;
       cleaned = true;
       try {
-        window.removeEventListener("offline", handleWindowOffline);
-        window.removeEventListener("online", handleWindowOnline);
-      } catch {}
+        if (handleWindowOffline) window.removeEventListener("offline", handleWindowOffline);
+        if (handleWindowOnline) window.removeEventListener("online", handleWindowOnline);
+      } catch (e) {
+        diagnostic("cleanup-listener-error", { error: e?.message });
+      }
       pendingIceRef.current = [];
       socketRef.current?.emit("leave_room");
       socketRef.current?.disconnect();

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import DoctorRegistrationScreen from "../auth/DoctorRegistrationScreen";
 import { authApi, patientApi, notificationApi, adminNotificationApi } from "../../lib/api";

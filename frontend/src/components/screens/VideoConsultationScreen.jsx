@@ -26,6 +26,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
     speaker: true,
   });
   const [cameraOff, setCameraOff] = useState(false);
+  const [hasPreviewStream, setHasPreviewStream] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
 
   const timerRef = useRef(null);
@@ -133,6 +134,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
         streamRef.current = stream;
         if (previewVideoRef.current) {
           previewVideoRef.current.srcObject = stream;
+          setHasPreviewStream(true);
         }
       }
       setDevices({
@@ -324,7 +326,7 @@ export default function VideoConsultationScreen({ onNavigate }) {
                       muted
                       className="w-full h-full object-cover"
                     />
-                    {!previewVideoRef.current?.srcObject && (
+                    {!hasPreviewStream && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white space-y-2 bg-gradient-to-tr from-[#162623] to-[#25836F]">
                         <div className="w-20 h-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center mx-auto text-2xl font-bold">
                           {patientInitials}
