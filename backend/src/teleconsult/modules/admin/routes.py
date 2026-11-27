@@ -13,6 +13,7 @@ from pymongo.errors import DuplicateKeyError
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, get_principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.kernel.timezone import get_ist_timezone, get_safe_timezone
 
 router = APIRouter(
     prefix="/admin",
@@ -66,9 +67,9 @@ def _format_activity_timestamp(dt_val: Any) -> str:
         dt = dt_val if isinstance(dt_val, datetime) else datetime.fromisoformat(str(dt_val).replace("Z", "+00:00"))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
-        ist_dt = dt.astimezone(ZoneInfo("Asia/Kolkata"))
+        ist_dt = dt.astimezone(get_ist_timezone())
         return ist_dt.strftime("%d %b %Y, %I:%M %p IST")
-    except (ValueError, TypeError):
+    except Exception:
         return str(dt_val or "Recent")
 
 

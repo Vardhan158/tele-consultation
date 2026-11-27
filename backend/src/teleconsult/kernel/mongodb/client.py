@@ -89,6 +89,13 @@ class MongoDatabase:
         if self._in_memory is not None:
             return self._in_memory
         if self._client is None:
+            settings = get_settings()
+            if settings.mongodb_uri in {"memory", "mock", "inmemory"} or (
+                settings.environment in {"dev", "local"} and not settings.mongodb_uri
+            ):
+                from teleconsult.kernel.mongodb.in_memory import InMemoryDatabase
+                self._in_memory = InMemoryDatabase()
+                return self._in_memory
             raise RuntimeError("MongoDB is not connected")
         return self._client[get_settings().mongodb_database]
 

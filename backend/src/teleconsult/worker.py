@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.kernel.timezone import get_safe_timezone
 
 logger = logging.getLogger("teleconsult.worker")
 
@@ -38,15 +39,10 @@ def parse_utc_datetime(val: Any) -> datetime | None:
     return None
 
 
-def resolve_timezone(tz_name: str | None) -> ZoneInfo:
-    """Resolve user configured timezone string into ZoneInfo with safe fallback."""
-    if not tz_name:
-        return ZoneInfo("Asia/Kolkata")
-    clean = tz_name.split(" ")[0].strip()
-    try:
-        return ZoneInfo(clean)
-    except (ZoneInfoNotFoundError, Exception):
-        return ZoneInfo("Asia/Kolkata")
+def resolve_timezone(tz_name: str | None) -> Any:
+    """Resolve user configured timezone string into safe timezone object with fallback."""
+    clean = (tz_name or "").split(" ")[0].strip()
+    return get_safe_timezone(clean)
 
 
 class ReminderWorker:

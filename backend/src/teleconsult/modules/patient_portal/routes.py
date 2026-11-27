@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from teleconsult.config.settings import get_settings
 from teleconsult.kernel.authz.policy import Principal, require
 from teleconsult.kernel.mongodb.client import mongo_database
+from teleconsult.kernel.timezone import get_safe_timezone
 from teleconsult.modules.notifications.service import queue_patient_notification
 from teleconsult.modules.patient_portal.appointment_access import (
     appointment_times,
@@ -267,10 +268,7 @@ async def public_doctor_availability(
         timezone_name = (clinic_settings or {}).get("timezone")
         if not timezone_name:
             raise HTTPException(status_code=503, detail="Clinic timezone is not configured")
-        try:
-            clinic_zone = ZoneInfo(timezone_name)
-        except ZoneInfoNotFoundError as exc:
-            raise HTTPException(status_code=422, detail="Clinic timezone is not configured correctly.") from exc
+        clinic_zone = get_safe_timezone(timezone_name)
         blocked_dates = await db["blocked_dates"].find({"tenant_id": str(tenant_id)}).to_list(500)
         for blocked_date in blocked_dates:
             blocked_day = datetime.strptime(blocked_date["date"], "%Y-%m-%d").date()
@@ -1717,10 +1715,7 @@ async def book_appointment(
         total_payable_paise = base_fee_paise + platform_fee_paise
         currency = service.get("currency", "INR")
         timezone_name = (clinic_settings or {}).get("timezone", "Asia/Kolkata")
-        try:
-            clinic_zone = ZoneInfo(timezone_name)
-        except ZoneInfoNotFoundError as exc:
-            raise HTTPException(status_code=422, detail="Clinic timezone is not configured correctly.") from exc
+        clinic_zone = get_safe_timezone(timezone_name)
         local_date = payload.starts_at.astimezone(clinic_zone).date()
         blocked = await db["blocked_dates"].find_one({"tenant_id": principal.tenant_id, "date": local_date.isoformat()})
         if blocked:
