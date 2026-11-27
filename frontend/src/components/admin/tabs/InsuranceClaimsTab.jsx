@@ -122,12 +122,6 @@ export default function InsuranceClaimsTab({ initialClaimId = null }) {
     fetchClaims(currentPage);
   }, [currentPage, selectedStatus, selectedProvider]);
 
-  useEffect(() => {
-    if (initialClaimId) {
-      handleOpenVerification(initialClaimId);
-    }
-  }, [initialClaimId]);
-
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setCurrentPage(1);
@@ -168,6 +162,12 @@ export default function InsuranceClaimsTab({ initialClaimId = null }) {
       setDetailLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (initialClaimId) {
+      handleOpenVerification(initialClaimId);
+    }
+  }, [initialClaimId]);
 
   const handleCloseVerification = () => {
     setSelectedClaimId(null);
