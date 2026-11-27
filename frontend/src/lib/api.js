@@ -70,6 +70,15 @@ export async function apiRequest(path, options = {}) {
 export const patientApi = {
   bookingOptions: () => apiRequest("/api/v1/patient/booking-options"),
   profile: () => apiRequest("/patient/profile"),
+  getProfile: () => apiRequest("/patient/profile"),
+  downloadPrescription: async (id) => {
+    const response = await fetch(
+      `${API_BASE_URL}/patient/clinical-outputs/prescriptions/${id}/download`,
+      { credentials: "include" },
+    );
+    if (!response.ok) throw new Error("Unable to download this prescription.");
+    return response.blob();
+  },
   getEmergencyCard: () => apiRequest("/patient/emergency-card"),
   getHealthTimeline: () => apiRequest("/patient/health-timeline"),
   getGranularConsents: () => apiRequest("/patient/consents/granular-ledger"),
