@@ -383,6 +383,7 @@ async def test_fastapi_http_client_integration(monkeypatch):
     from teleconsult.config.settings import get_settings
 
     test_db = InMemoryMongoDatabase()
+    monkeypatch.setattr(type(mongo_database), "enabled", property(lambda self: True))
     monkeypatch.setattr(mongo_database, "database", lambda: test_db)
     monkeypatch.setattr(get_settings(), "mongodb_enabled", True)
 
