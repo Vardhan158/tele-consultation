@@ -27,6 +27,18 @@ async def get_principal(request: Request) -> Principal:
     raw_token = request.cookies.get("teleconsult_session")
     if not raw_token or not mongo_database.enabled:
         if get_settings().environment in {"dev", "local"}:
+            if request.headers.get("X-Dev-Admin-Id"):
+                user_id = request.headers["X-Dev-Admin-Id"]
+                tenant_id = request.headers.get("X-Dev-Tenant-Id") or get_settings().default_tenant_id
+                return Principal(
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    roles=frozenset({"clinic_admin", "admin"}),
+                    permissions=frozenset({
+                        "clinic:admin", "clinic:doctor:approve", "clinic:services:write", "clinic:schedule:write",
+                        "doctor:profile:read", "doctor:payout:read", "audit:read",
+                    }),
+                )
             if request.headers.get("X-Dev-Doctor-Id"):
                 user_id = request.headers["X-Dev-Doctor-Id"]
                 tenant_id = request.headers.get("X-Dev-Tenant-Id") or get_settings().default_tenant_id

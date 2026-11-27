@@ -1534,3 +1534,376 @@ async def get_clinic_audit_logs(
     }
 
 
+# =============================================================================
+# PHASE 3 (F-07): CLINICAL SLA MONITOR & QUEUE ESCALATION PREDICTOR
+# =============================================================================
+
+class SlaQueueTicketItem(BaseModel):
+    ticket_id: str
+    patient_id: str
+    patient_name: str
+    chief_complaint: str
+    queued_at: str
+    wait_time_minutes: float
+    assigned_doctor_id: str | None = None
+    assigned_doctor_name: str | None = None
+    sla_target_minutes: int = 15
+    sla_status: str  # "normal" | "warning" | "breached"
+    breach_probability: float  # 0.0 to 1.0
+    recommended_action: str
+
+
+class SlaSummary(BaseModel):
+    total_waiting: int
+    normal_count: int
+    warning_count: int
+    breached_count: int
+    available_doctors_count: int
+    avg_wait_minutes: float
+
+
+class SlaMonitorResponse(BaseModel):
+    tickets: list[SlaQueueTicketItem]
+    summary: SlaSummary
+    last_evaluated_at: str
+
+
+class ReassignTicketRequest(BaseModel):
+    ticket_id: str
+    target_doctor_id: str
+    reason: str = "SLA Breach Mitigation & Load Balancing"
+
+
+class NudgeDoctorRequest(BaseModel):
+    ticket_id: str
+    doctor_id: str
+    message: str = "Urgent: Patient wait time approaching clinical SLA limit. Please admit consultation."
+
+
+@router.get("/sla/monitor", response_model=SlaMonitorResponse)
+async def get_clinical_sla_monitor(
+    request: Request,
+):
+    """Retrieve real-time waiting queue status, wait durations, and predictive SLA breach likelihood."""
+    principal = await _verify_admin(request)
+    settings = get_settings()
+    tenant_id = str(principal.tenant_id or settings.default_tenant_id)
+
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+
+    now = datetime.now(UTC)
+    now_iso = now.isoformat()
+
+    # 1. Count available on-duty doctors
+    available_docs_count = await db["doctors"].count_documents({
+        "tenant_id": tenant_id,
+        "active": True,
+        "urgent_care_duty": True,
+    })
+
+    # 2. Query active waiting queue tickets
+    cursor = db["urgent_care_queue"].find({
+        "tenant_id": tenant_id,
+        "status": {"$in": ["waiting", "claimed"]},
+    }).sort("created_at", 1)
+
+    tickets: list[SlaQueueTicketItem] = []
+    normal_c = 0
+    warning_c = 0
+    breached_c = 0
+    total_wait_mins = 0.0
+
+    async for doc in cursor:
+        created_at_raw = doc.get("created_at") or now_iso
+        try:
+            if isinstance(created_at_raw, str):
+                created_dt = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
+            elif isinstance(created_at_raw, datetime):
+                created_dt = created_at_raw if created_at_raw.tzinfo else created_at_raw.replace(tzinfo=UTC)
+            else:
+                created_dt = now
+            wait_mins = max(0.0, round((now - created_dt).total_seconds() / 60.0, 1))
+        except Exception:
+            wait_mins = 5.0
+
+        target_mins = 15
+        if wait_mins < 10.0:
+            sla_status = "normal"
+            normal_c += 1
+            breach_prob = round(min(0.40, (wait_mins / target_mins) * 0.40), 2)
+            recommended_action = "Routine intake: monitoring active queue."
+        elif wait_mins < 20.0:
+            sla_status = "warning"
+            warning_c += 1
+            breach_prob = round(0.50 + ((wait_mins - 10.0) / 10.0) * 0.35, 2)
+            recommended_action = "Priority Nudge: Alert attending doctor to commence consultation within 5 minutes."
+        else:
+            sla_status = "breached"
+            breached_c += 1
+            breach_prob = 0.95
+            recommended_action = "CRITICAL BREACH: Immediate re-routing to alternate on-duty clinician required."
+
+        total_wait_mins += wait_mins
+
+        tickets.append(
+            SlaQueueTicketItem(
+                ticket_id=str(doc.get("id") or doc.get("_id")),
+                patient_id=str(doc.get("patient_id") or "patient"),
+                patient_name=str(doc.get("patient_name") or "Waiting Patient"),
+                chief_complaint=str(doc.get("chief_complaint") or "Teleconsultation Queue"),
+                queued_at=str(created_at_raw),
+                wait_time_minutes=wait_mins,
+                assigned_doctor_id=str(doc.get("claimed_by_doctor_id") or "") or None,
+                assigned_doctor_name=str(doc.get("claimed_by_doctor_name") or "") or None,
+                sla_target_minutes=target_mins,
+                sla_status=sla_status,
+                breach_probability=breach_prob,
+                recommended_action=recommended_action,
+            )
+        )
+
+    # If queue is empty in dev, supply a clean summary with 0 waiting
+    total_waiting = len(tickets)
+    avg_wait = round(total_wait_mins / total_waiting, 1) if total_waiting > 0 else 0.0
+
+    summary = SlaSummary(
+        total_waiting=total_waiting,
+        normal_count=normal_c,
+        warning_count=warning_c,
+        breached_count=breached_c,
+        available_doctors_count=max(1, available_docs_count),
+        avg_wait_minutes=avg_wait,
+    )
+
+    return SlaMonitorResponse(
+        tickets=tickets,
+        summary=summary,
+        last_evaluated_at=now_iso,
+    )
+
+
+@router.post("/sla/reassign-ticket")
+async def reassign_queue_ticket(
+    payload: ReassignTicketRequest,
+    request: Request,
+):
+    """Reassign a delayed or breach-risk queue ticket to an available on-duty doctor."""
+    principal = await _verify_admin(request)
+    settings = get_settings()
+    tenant_id = str(principal.tenant_id or settings.default_tenant_id)
+
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+
+    target_doctor = await db["doctors"].find_one({
+        "tenant_id": tenant_id,
+        "$or": [{"id": payload.target_doctor_id}, {"user_id": payload.target_doctor_id}],
+    })
+    target_doc_name = target_doctor.get("full_name") if target_doctor else f"Dr. {payload.target_doctor_id}"
+
+    update_res = await db["urgent_care_queue"].update_one(
+        {
+            "tenant_id": tenant_id,
+            "$or": [{"id": payload.ticket_id}, {"_id": payload.ticket_id}],
+        },
+        {
+            "$set": {
+                "claimed_by_doctor_id": payload.target_doctor_id,
+                "claimed_by_doctor_name": target_doc_name,
+                "status": "claimed",
+                "reassigned_at": datetime.now(UTC).isoformat(),
+                "reassignment_reason": payload.reason,
+            }
+        },
+    )
+
+    if update_res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Queue ticket not found")
+
+    # Send high-priority nudge notification to target doctor
+    await db["notifications"].insert_one({
+        "id": f"notif-{secrets.token_hex(8)}",
+        "tenant_id": tenant_id,
+        "recipient_id": payload.target_doctor_id,
+        "recipient_role": "doctor",
+        "title": "URGENT: Patient Queue Reassigned (SLA Priority)",
+        "message": f"Patient ticket #{payload.ticket_id[:8]} reassigned to you. Reason: {payload.reason}.",
+        "priority": "urgent",
+        "read": False,
+        "created_at": datetime.now(UTC).isoformat(),
+    })
+
+    await _audit_log(
+        principal=principal,
+        action="sla.ticket_reassign",
+        resource_type="urgent_care_ticket",
+        resource_id=payload.ticket_id,
+        metadata={"target_doctor_id": payload.target_doctor_id, "reason": payload.reason},
+    )
+
+    return {
+        "status": "reassigned",
+        "ticket_id": payload.ticket_id,
+        "assigned_to": target_doc_name,
+        "reason": payload.reason,
+    }
+
+
+@router.post("/sla/nudge-doctor")
+async def nudge_queue_doctor(
+    payload: NudgeDoctorRequest,
+    request: Request,
+):
+    """Dispatch an immediate clinical nudge to the attending doctor to prevent an SLA breach."""
+    principal = await _verify_admin(request)
+    settings = get_settings()
+    tenant_id = str(principal.tenant_id or settings.default_tenant_id)
+
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+
+    await db["notifications"].insert_one({
+        "id": f"notif-{secrets.token_hex(8)}",
+        "tenant_id": tenant_id,
+        "recipient_id": payload.doctor_id,
+        "recipient_role": "doctor",
+        "title": "Clinical SLA Escalation Alert",
+        "message": payload.message,
+        "priority": "high",
+        "read": False,
+        "created_at": datetime.now(UTC).isoformat(),
+    })
+
+    return {
+        "status": "nudged",
+        "doctor_id": payload.doctor_id,
+        "ticket_id": payload.ticket_id,
+        "dispatched_at": datetime.now(UTC).isoformat(),
+    }
+
+
+# =============================================================================
+# PHASE 3 (F-08): CLINIC-WIDE DOCTOR PERFORMANCE & PAYOUT TIERS
+# =============================================================================
+
+class DoctorTierOverviewItem(BaseModel):
+    doctor_id: str
+    doctor_name: str
+    specialty: str
+    tier: str  # "Platinum" | "Gold" | "Silver" | "Standard"
+    multiplier: float
+    bonus_percentage: float
+    punctuality_rate: float
+    avg_rating: float
+    completed_consultations: int
+    total_payout_inr: float
+    performance_bonus_inr: float
+
+
+class ClinicDoctorTiersResponse(BaseModel):
+    total_doctors: int
+    tier_distribution: dict[str, int]
+    total_performance_bonus_paid_inr: float
+    doctors: list[DoctorTierOverviewItem]
+
+
+@router.get("/payouts/doctor-tiers", response_model=ClinicDoctorTiersResponse)
+async def get_clinic_doctor_performance_tiers(
+    request: Request,
+):
+    """Retrieve clinic-wide doctor performance tiers, multipliers, and earned bonus allocations."""
+    principal = await _verify_admin(request)
+    settings = get_settings()
+    tenant_id = str(principal.tenant_id or settings.default_tenant_id)
+
+    if not settings.mongodb_enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+
+    doctors_cursor = db["doctors"].find({"tenant_id": tenant_id, "active": True})
+    doctors_list: list[DoctorTierOverviewItem] = []
+    distribution = {"Platinum": 0, "Gold": 0, "Silver": 0, "Standard": 0}
+    total_bonus_pool = 0.0
+
+    async for doc in doctors_cursor:
+        doc_id = str(doc.get("id") or doc.get("user_id"))
+        doc_name = str(doc.get("full_name") or "Clinician")
+        specialty = str(doc.get("specialty") or "General Practice")
+
+        # Compute completed consultations & payout totals
+        completed_count = await db["appointments"].count_documents({
+            "tenant_id": tenant_id,
+            "doctor_id": doc_id,
+            "status": "completed",
+        })
+
+        # Calculate base payout from ledger
+        payouts_cursor = db["doctor_payout_ledger"].find({
+            "tenant_id": tenant_id,
+            "doctor_id": doc_id,
+        })
+        base_net_paise = 0
+        async for p in payouts_cursor:
+            base_net_paise += p.get("net_payable_paise", 0)
+        base_net_inr = base_net_paise / 100.0
+
+        # Punctuality and CSAT computation (defaults for active clinicians)
+        punctuality_rate = float(doc.get("punctuality_rate") or 0.96 if completed_count > 0 else 1.0)
+        avg_rating = float(doc.get("avg_rating") or 4.85 if completed_count > 0 else 5.0)
+
+        # Dynamic Tiering Logic
+        if punctuality_rate >= 0.95 and avg_rating >= 4.8:
+            tier = "Platinum"
+            multiplier = 1.20
+            bonus_pct = 20.0
+        elif punctuality_rate >= 0.88 and avg_rating >= 4.5:
+            tier = "Gold"
+            multiplier = 1.10
+            bonus_pct = 10.0
+        elif punctuality_rate >= 0.80 or avg_rating >= 4.0:
+            tier = "Silver"
+            multiplier = 1.05
+            bonus_pct = 5.0
+        else:
+            tier = "Standard"
+            multiplier = 1.00
+            bonus_pct = 0.0
+
+        distribution[tier] += 1
+        bonus_inr = round(base_net_inr * (bonus_pct / 100.0), 2)
+        total_payout = round(base_net_inr + bonus_inr, 2)
+        total_bonus_pool += bonus_inr
+
+        doctors_list.append(
+            DoctorTierOverviewItem(
+                doctor_id=doc_id,
+                doctor_name=doc_name,
+                specialty=specialty,
+                tier=tier,
+                multiplier=multiplier,
+                bonus_percentage=bonus_pct,
+                punctuality_rate=round(punctuality_rate * 100, 1),
+                avg_rating=round(avg_rating, 2),
+                completed_consultations=completed_count,
+                total_payout_inr=total_payout,
+                performance_bonus_inr=bonus_inr,
+            )
+        )
+
+    # Sort descending by performance tier and total payout
+    tier_ranks = {"Platinum": 4, "Gold": 3, "Silver": 2, "Standard": 1}
+    doctors_list.sort(key=lambda d: (tier_ranks.get(d.tier, 0), d.total_payout_inr), reverse=True)
+
+    return ClinicDoctorTiersResponse(
+        total_doctors=len(doctors_list),
+        tier_distribution=distribution,
+        total_performance_bonus_paid_inr=round(total_bonus_pool, 2),
+        doctors=doctors_list,
+    )
+
+
+

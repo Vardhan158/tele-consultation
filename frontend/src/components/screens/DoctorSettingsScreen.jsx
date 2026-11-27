@@ -21,13 +21,24 @@ export default function DoctorSettingsScreen() {
   const [payoutData, setPayoutData] = useState(null);
   const [loadingPayouts, setLoadingPayouts] = useState(false);
 
+  // Phase 3 (F-08): Dynamic Performance-Linked Payout Tier State
+  const [tierData, setTierData] = useState(null);
+  const [loadingTier, setLoadingTier] = useState(false);
+
   useEffect(() => {
     setLoadingPayouts(true);
+    setLoadingTier(true);
     doctorApi
       .payouts()
       .then((data) => setPayoutData(data))
       .catch(() => {})
       .finally(() => setLoadingPayouts(false));
+
+    doctorApi
+      .getPerformanceTier()
+      .then((data) => setTierData(data))
+      .catch(() => {})
+      .finally(() => setLoadingTier(false));
   }, []);
 
   const handleSupportTicketSubmit = async (e) => {
@@ -97,6 +108,105 @@ export default function DoctorSettingsScreen() {
           <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
           <span>Statutory Tax Compliance: Section 194J</span>
         </div>
+      </div>
+
+      {/* Phase 3 (F-08): Dynamic Performance-Linked Payout Tier Card */}
+      <div className="rounded-2xl bg-white border border-[#577877]/15 p-6 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#577877]/15 pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shadow-xs ${
+              tierData?.tier === "Platinum"
+                ? "bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500"
+                : tierData?.tier === "Gold"
+                ? "bg-gradient-to-tr from-amber-500 to-yellow-400 text-amber-950"
+                : tierData?.tier === "Silver"
+                ? "bg-gradient-to-tr from-slate-400 to-cyan-500 text-slate-950"
+                : "bg-slate-600"
+            }`}>
+              <span className="material-symbols-outlined text-lg">workspace_premium</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-[#162623]">
+                  Performance Payout Tier: {tierData?.tier || "Standard"}
+                </h2>
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                  tierData?.tier === "Platinum"
+                    ? "bg-purple-100 text-purple-800 border border-purple-200"
+                    : tierData?.tier === "Gold"
+                    ? "bg-amber-100 text-amber-800 border border-amber-200"
+                    : "bg-slate-100 text-slate-800"
+                }`}>
+                  {tierData?.multiplier || 1.0}x Multiplier ({tierData?.bonus_percentage ? `+${tierData.bonus_percentage}%` : "Base Rate"})
+                </span>
+              </div>
+              <p className="text-xs text-[#577877] mt-0.5">
+                {tierData?.tier_qualifications?.perks || "Statutory fee schedule with performance multiplier"}
+              </p>
+            </div>
+          </div>
+
+          <div className="text-right">
+            <span className="text-[11px] text-[#577877] block">Total Disbursable Payout</span>
+            <span className="text-lg font-bold text-emerald-800">
+              ₹{(tierData?.total_net_payout_inr || 0).toFixed(2)}
+            </span>
+          </div>
+        </div>
+
+        {/* Performance KPI Gauges */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3.5 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-1">
+            <div className="flex justify-between items-center text-[#577877]">
+              <span className="font-medium">On-Time Start KPI</span>
+              <span className="material-symbols-outlined text-sm text-[#25836F]">schedule</span>
+            </div>
+            <div className="text-xl font-bold text-[#162623]">
+              {tierData?.punctuality_rate || 96}%
+            </div>
+            <div className="text-[10px] text-[#577877]">
+              Target: ≥ 95% for Platinum (+20% bonus)
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-[#F0F5F7] border border-[#577877]/15 space-y-1">
+            <div className="flex justify-between items-center text-[#577877]">
+              <span className="font-medium">Patient CSAT Rating</span>
+              <span className="material-symbols-outlined text-sm text-amber-500">star</span>
+            </div>
+            <div className="text-xl font-bold text-[#162623]">
+              {tierData?.avg_rating || 4.9} / 5.0
+            </div>
+            <div className="text-[10px] text-[#577877]">
+              Target: ≥ 4.80 for Platinum tier
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 space-y-1">
+            <div className="flex justify-between items-center text-purple-900">
+              <span className="font-medium font-bold">Earned Tier Bonus</span>
+              <span className="material-symbols-outlined text-sm text-purple-700">trending_up</span>
+            </div>
+            <div className="text-xl font-bold text-purple-900">
+              +₹{(tierData?.earned_performance_bonus_inr || 0).toFixed(2)}
+            </div>
+            <div className="text-[10px] text-purple-700">
+              Base: ₹{(tierData?.base_net_payout_inr || 0).toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        {/* Tier Advancement Status */}
+        {tierData?.next_tier_progress && !tierData.next_tier_progress.is_max_tier && (
+          <div className="p-3 bg-[#FAFDFD] rounded-xl border border-[#25836F]/20 text-xs text-[#577877] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm text-[#25836F]">military_tech</span>
+              <span>
+                To unlock <strong>{tierData.next_tier_progress.next_tier}</strong>: Maintain {tierData.next_tier_progress.required_punctuality} and {tierData.next_tier_progress.required_rating}.
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* SECTION 194J PAYOUT & EARNINGS LEDGER */}

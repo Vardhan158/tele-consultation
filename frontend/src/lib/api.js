@@ -295,6 +295,21 @@ export const doctorApi = {
   getUrgentCareQueue: () => apiRequest("/doctor/urgent-care/queue"),
   claimUrgentCareTicket: (ticketId) =>
     apiRequest(`/doctor/urgent-care/${ticketId}/claim`, { method: "POST" }),
+  getPerformanceTier: () => apiRequest("/doctor/payouts/performance-tier"),
+  inviteBoardSpecialist: (appointmentId, payload) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/invite-specialist`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getBoardMembers: (appointmentId) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/board-members`),
+  addBoardNote: (appointmentId, payload) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/board-notes`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getBoardNotes: (appointmentId) =>
+    apiRequest(`/doctor/consultations/${appointmentId}/board-notes`),
 };
 
 export const authApi = {
@@ -665,6 +680,18 @@ export const adminApi = {
     const qs = new URLSearchParams(params).toString();
     return apiRequest(`/admin/audit-logs${qs ? `?${qs}` : ""}`);
   },
+  getSlaMonitor: () => apiRequest("/admin/sla/monitor"),
+  reassignSlaTicket: (payload) =>
+    apiRequest("/admin/sla/reassign-ticket", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  nudgeSlaDoctor: (payload) =>
+    apiRequest("/admin/sla/nudge-doctor", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getDoctorTiers: () => apiRequest("/admin/payouts/doctor-tiers"),
 };
 
 export const supportStaffApi = {

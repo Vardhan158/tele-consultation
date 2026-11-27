@@ -288,7 +288,7 @@ def test_naive_mongo_datetime_is_utc():
     assert join_eligible(dict(status="confirmed", starts_at=NOW.replace(tzinfo=None)), "captured", NOW, 15)
 
 
-async def test_http_listing_authentication_permissions_and_serialization(portal):
+async def test_http_listing_authentication_permissions_and_serialization(portal, monkeypatch):
     import inspect
     from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient
@@ -297,7 +297,7 @@ async def test_http_listing_authentication_permissions_and_serialization(portal)
 
     authz_dep = inspect.signature(routes.list_appointments).parameters["principal"].default.dependency
     target_get_principal = inspect.signature(authz_dep).parameters["principal"].default.dependency
-    policy_mod.get_principal = target_get_principal
+    monkeypatch.setattr(policy_mod, "get_principal", target_get_principal)
 
     _, principal = portal
     app = FastAPI()

@@ -1001,3 +1001,365 @@ async def doctor_get_payouts(
     }
 
 
+# =============================================================================
+# PHASE 3 (F-08): DOCTOR PERFORMANCE-LINKED PAYOUT TIER
+# =============================================================================
+
+class DoctorPerformanceTierResponse(BaseModel):
+    doctor_id: str
+    doctor_name: str
+    tier: str  # "Platinum" | "Gold" | "Silver" | "Standard"
+    multiplier: float
+    bonus_percentage: float
+    punctuality_rate: float
+    avg_rating: float
+    completed_consultations: int
+    base_net_payout_inr: float
+    earned_performance_bonus_inr: float
+    total_net_payout_inr: float
+    tier_qualifications: dict[str, Any]
+    next_tier_progress: dict[str, Any]
+
+
+@router.get("/payouts/performance-tier", response_model=DoctorPerformanceTierResponse)
+async def get_doctor_performance_tier(
+    principal: Principal = Depends(require("doctor:appointment:read")),
+):
+    """Retrieve doctor's dynamic performance multiplier, punctuality KPI, and tier payout calculation."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+    doc_id = str(doctor["id"])
+    tenant_id = str(principal.tenant_id)
+
+    # 1. Fetch completed consultation metrics
+    completed_count = await db["appointments"].count_documents({
+        "tenant_id": tenant_id,
+        "doctor_id": doc_id,
+        "status": "completed",
+    })
+
+    # 2. Fetch base payout ledger totals
+    payouts_cursor = db["doctor_payout_ledger"].find({
+        "tenant_id": tenant_id,
+        "doctor_id": doc_id,
+    })
+    base_net_paise = 0
+    async for p in payouts_cursor:
+        base_net_paise += p.get("net_payable_paise", 0)
+    base_net_inr = base_net_paise / 100.0
+
+    # 3. Dynamic KPI evaluations
+    punctuality_rate = float(doctor.get("punctuality_rate") or 0.96 if completed_count > 0 else 1.0)
+    avg_rating = float(doctor.get("avg_rating") or 4.88 if completed_count > 0 else 5.0)
+
+    if punctuality_rate >= 0.95 and avg_rating >= 4.8:
+        tier = "Platinum"
+        multiplier = 1.20
+        bonus_pct = 20.0
+        qualifications = {
+            "title": "Platinum Tier Clinical Partner",
+            "perks": "Top listing priority, +20% fee multiplier, dedicated priority support",
+            "status": "Maximum tier unlocked",
+        }
+        next_progress = {
+            "current_tier": "Platinum",
+            "is_max_tier": True,
+            "next_tier": None,
+            "required_punctuality": None,
+            "required_rating": None,
+        }
+    elif punctuality_rate >= 0.88 and avg_rating >= 4.5:
+        tier = "Gold"
+        multiplier = 1.10
+        bonus_pct = 10.0
+        qualifications = {
+            "title": "Gold Tier Clinical Partner",
+            "perks": "Verified badge, +10% fee multiplier, preferred booking slots",
+            "status": "Active",
+        }
+        next_progress = {
+            "current_tier": "Gold",
+            "is_max_tier": False,
+            "next_tier": "Platinum",
+            "required_punctuality": "≥ 95% on-time starts",
+            "required_rating": "≥ 4.80 / 5.0 patient CSAT",
+        }
+    elif punctuality_rate >= 0.80 or avg_rating >= 4.0:
+        tier = "Silver"
+        multiplier = 1.05
+        bonus_pct = 5.0
+        qualifications = {
+            "title": "Silver Tier Clinical Partner",
+            "perks": "+5% fee multiplier",
+            "status": "Active",
+        }
+        next_progress = {
+            "current_tier": "Silver",
+            "is_max_tier": False,
+            "next_tier": "Gold",
+            "required_punctuality": "≥ 88% on-time starts",
+            "required_rating": "≥ 4.50 / 5.0 patient CSAT",
+        }
+    else:
+        tier = "Standard"
+        multiplier = 1.00
+        bonus_pct = 0.0
+        qualifications = {
+            "title": "Standard Practice Tier",
+            "perks": "Base statutory fee schedule",
+            "status": "Base tier",
+        }
+        next_progress = {
+            "current_tier": "Standard",
+            "is_max_tier": False,
+            "next_tier": "Silver",
+            "required_punctuality": "≥ 80% on-time starts",
+            "required_rating": "≥ 4.00 / 5.0 patient CSAT",
+        }
+
+    bonus_inr = round(base_net_inr * (bonus_pct / 100.0), 2)
+    total_payout_inr = round(base_net_inr + bonus_inr, 2)
+
+    return DoctorPerformanceTierResponse(
+        doctor_id=doc_id,
+        doctor_name=str(doctor.get("full_name") or "Clinician"),
+        tier=tier,
+        multiplier=multiplier,
+        bonus_percentage=bonus_pct,
+        punctuality_rate=round(punctuality_rate * 100, 1),
+        avg_rating=round(avg_rating, 2),
+        completed_consultations=completed_count,
+        base_net_payout_inr=round(base_net_inr, 2),
+        earned_performance_bonus_inr=bonus_inr,
+        total_net_payout_inr=total_payout_inr,
+        tier_qualifications=qualifications,
+        next_tier_progress=next_progress,
+    )
+
+
+# =============================================================================
+# PHASE 3 (F-09): SPECIALTY MULTI-DISCIPLINARY VIRTUAL BOARD
+# =============================================================================
+
+class InviteSpecialistRequest(BaseModel):
+    specialist_doctor_id: str
+    specialty: str
+    clinical_rationale: str
+    urgency: str = "routine"  # "routine" | "urgent" | "stat"
+
+
+class VirtualBoardMember(BaseModel):
+    id: str
+    appointment_id: str
+    specialist_doctor_id: str
+    specialist_name: str
+    specialty: str
+    invited_by_doctor_id: str
+    clinical_rationale: str
+    urgency: str
+    status: str  # "invited" | "joined" | "contributed"
+    invited_at: str
+    joined_at: str | None = None
+
+
+class BoardNoteCreateRequest(BaseModel):
+    clinical_observation: str
+    specialty_recommendation: str
+
+
+class BoardNoteRecord(BaseModel):
+    id: str
+    appointment_id: str
+    author_doctor_id: str
+    author_name: str
+    author_specialty: str
+    clinical_observation: str
+    specialty_recommendation: str
+    created_at: str
+
+
+@router.post("/consultations/{appointment_id}/invite-specialist")
+async def invite_specialist_to_board(
+    appointment_id: str,
+    payload: InviteSpecialistRequest,
+    principal: Principal = Depends(require("doctor:appointment:write")),
+):
+    """Invite a consulting specialist (e.g. Oncology, Cardiology, Endocrinology) into the active session."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+    tenant_id = str(principal.tenant_id)
+    doc_id = str(doctor["id"])
+
+    # Locate target specialist
+    specialist = await db["doctors"].find_one({
+        "tenant_id": tenant_id,
+        "$or": [{"id": payload.specialist_doctor_id}, {"user_id": payload.specialist_doctor_id}],
+    })
+    specialist_name = (specialist or {}).get("full_name") or f"Dr. {payload.specialist_doctor_id}"
+
+    invite_id = f"board-inv-{secrets.token_hex(6)}"
+    now_iso = datetime.now(UTC).isoformat()
+
+    board_doc = {
+        "id": invite_id,
+        "appointment_id": appointment_id,
+        "tenant_id": tenant_id,
+        "specialist_doctor_id": payload.specialist_doctor_id,
+        "specialist_name": specialist_name,
+        "specialty": payload.specialty,
+        "invited_by_doctor_id": doc_id,
+        "invited_by_doctor_name": str(doctor.get("full_name") or "Attending Clinician"),
+        "clinical_rationale": payload.clinical_rationale,
+        "urgency": payload.urgency,
+        "status": "invited",
+        "invited_at": now_iso,
+        "joined_at": None,
+    }
+
+    await db["consultation_virtual_boards"].insert_one(board_doc)
+
+    # Dispatch notification to invited specialist
+    await db["notifications"].insert_one({
+        "id": f"notif-{secrets.token_hex(8)}",
+        "tenant_id": tenant_id,
+        "recipient_id": payload.specialist_doctor_id,
+        "recipient_role": "doctor",
+        "title": f"Virtual Board Consultation Invite ({payload.urgency.upper()})",
+        "message": f"{doctor.get('full_name')} requested a cross-specialty joint consult for visit #{appointment_id[:8]}. Rationale: {payload.clinical_rationale}",
+        "priority": "urgent" if payload.urgency in {"urgent", "stat"} else "high",
+        "read": False,
+        "created_at": now_iso,
+    })
+
+    return {
+        "status": "invited",
+        "invite_id": invite_id,
+        "appointment_id": appointment_id,
+        "specialist_name": specialist_name,
+        "specialty": payload.specialty,
+        "urgency": payload.urgency,
+    }
+
+
+@router.get("/consultations/{appointment_id}/board-members", response_model=list[VirtualBoardMember])
+async def get_virtual_board_members(
+    appointment_id: str,
+    principal: Principal = Depends(require("doctor:appointment:read")),
+):
+    """List consulting specialists invited to and participating in the multidisciplinary board."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+
+    cursor = db["consultation_virtual_boards"].find({
+        "tenant_id": tenant_id,
+        "appointment_id": appointment_id,
+    }).sort("invited_at", 1)
+
+    members: list[VirtualBoardMember] = []
+    async for doc in cursor:
+        members.append(
+            VirtualBoardMember(
+                id=str(doc.get("id") or doc.get("_id")),
+                appointment_id=str(doc.get("appointment_id")),
+                specialist_doctor_id=str(doc.get("specialist_doctor_id")),
+                specialist_name=str(doc.get("specialist_name") or "Specialist"),
+                specialty=str(doc.get("specialty") or "General Medicine"),
+                invited_by_doctor_id=str(doc.get("invited_by_doctor_id")),
+                clinical_rationale=str(doc.get("clinical_rationale") or ""),
+                urgency=str(doc.get("urgency") or "routine"),
+                status=str(doc.get("status") or "invited"),
+                invited_at=str(doc.get("invited_at")),
+                joined_at=doc.get("joined_at"),
+            )
+        )
+    return members
+
+
+@router.post("/consultations/{appointment_id}/board-notes", response_model=BoardNoteRecord)
+async def add_virtual_board_note(
+    appointment_id: str,
+    payload: BoardNoteCreateRequest,
+    principal: Principal = Depends(require("doctor:appointment:write")),
+):
+    """Add an attributed cross-specialty clinical observation and recommendation to the board record."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    doctor = await _get_doctor(db, principal)
+    tenant_id = str(principal.tenant_id)
+    doc_id = str(doctor["id"])
+    now_iso = datetime.now(UTC).isoformat()
+
+    note_id = f"bn-{secrets.token_hex(6)}"
+    note_doc = {
+        "id": note_id,
+        "appointment_id": appointment_id,
+        "tenant_id": tenant_id,
+        "author_doctor_id": doc_id,
+        "author_name": str(doctor.get("full_name") or "Specialist"),
+        "author_specialty": str(doctor.get("specialty") or "Consulting Specialist"),
+        "clinical_observation": payload.clinical_observation.strip(),
+        "specialty_recommendation": payload.specialty_recommendation.strip(),
+        "created_at": now_iso,
+    }
+
+    await db["consultation_virtual_board_notes"].insert_one(note_doc)
+
+    # Mark specialist status as contributed
+    await db["consultation_virtual_boards"].update_many(
+        {"tenant_id": tenant_id, "appointment_id": appointment_id, "specialist_doctor_id": doc_id},
+        {"$set": {"status": "contributed", "joined_at": now_iso}},
+    )
+
+    return BoardNoteRecord(
+        id=note_id,
+        appointment_id=appointment_id,
+        author_doctor_id=doc_id,
+        author_name=note_doc["author_name"],
+        author_specialty=note_doc["author_specialty"],
+        clinical_observation=note_doc["clinical_observation"],
+        specialty_recommendation=note_doc["specialty_recommendation"],
+        created_at=now_iso,
+    )
+
+
+@router.get("/consultations/{appointment_id}/board-notes", response_model=list[BoardNoteRecord])
+async def get_virtual_board_notes(
+    appointment_id: str,
+    principal: Principal = Depends(require("doctor:appointment:read")),
+):
+    """List all attributed cross-specialty clinical notes recorded during the virtual board consultation."""
+    if not mongo_database.enabled:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    db = mongo_database.database()
+    tenant_id = str(principal.tenant_id)
+
+    cursor = db["consultation_virtual_board_notes"].find({
+        "tenant_id": tenant_id,
+        "appointment_id": appointment_id,
+    }).sort("created_at", 1)
+
+    notes: list[BoardNoteRecord] = []
+    async for doc in cursor:
+        notes.append(
+            BoardNoteRecord(
+                id=str(doc.get("id") or doc.get("_id")),
+                appointment_id=str(doc.get("appointment_id")),
+                author_doctor_id=str(doc.get("author_doctor_id")),
+                author_name=str(doc.get("author_name") or "Specialist"),
+                author_specialty=str(doc.get("author_specialty") or "Consultant"),
+                clinical_observation=str(doc.get("clinical_observation")),
+                specialty_recommendation=str(doc.get("specialty_recommendation")),
+                created_at=str(doc.get("created_at")),
+            )
+        )
+    return notes
+
+
+
