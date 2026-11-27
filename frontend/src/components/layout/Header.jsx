@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { authApi, notificationApi, patientApi } from "../../lib/api";
+import { authApi, notificationApi, adminNotificationApi, patientApi } from "../../lib/api";
 
 export default function Header({
   onOpenMobile,
@@ -57,8 +57,17 @@ export default function Header({
       .toUpperCase() || "A";
 
   useEffect(() => {
-    if (isAdmin || isDoctor) {
+    if (isDoctor) {
       setUnreadCount(0);
+      return;
+    }
+    if (isAdmin) {
+      adminNotificationApi
+        .unreadCount()
+        .then((res) => {
+          setUnreadCount(res?.unread_count || 0);
+        })
+        .catch(() => {});
       return;
     }
     notificationApi
@@ -112,6 +121,10 @@ export default function Header({
         return "Appointments";
       case "clinic-payments":
         return "Payments";
+      case "clinic-insurance":
+      case "insurance":
+      case "insurance-providers":
+        return "Insurance Providers";
       case "clinic-reports":
       case "reports":
         return "Reports";
@@ -143,6 +156,8 @@ export default function Header({
         return "Consultation summaries";
       case "follow-up":
         return "Follow-up care";
+      case "my-insurance":
+        return "My Insurance";
       case "support":
         return "Help & support";
       case "payments":
@@ -192,11 +207,11 @@ export default function Header({
 
       {/* Right Header Elements */}
       <div className="flex items-center gap-3 sm:gap-4 text-xs">
-        {/* Notifications (Patient only) */}
-        {!isAdmin && !isDoctor && (
+        {/* Notifications (Patient & Clinic Admin) */}
+        {!isDoctor && (
           <button
             type="button"
-            onClick={() => onSelectTab("notifications")}
+            onClick={() => onSelectTab(isAdmin ? "clinic-notifications" : "notifications")}
             className="flex items-center gap-1.5 p-1.5 rounded-xl hover:bg-white transition cursor-pointer"
             title="Notifications"
           >

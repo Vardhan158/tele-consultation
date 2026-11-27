@@ -366,12 +366,40 @@ export const paymentApi = {
 
 export const notificationApi = {
   list: () => apiRequest("/patient/notifications"),
+  unreadCount: () => apiRequest("/patient/notifications/unread-count"),
   markRead: (id) =>
     apiRequest(`/patient/notifications/${id}/read`, { method: "POST" }),
   markAllRead: () =>
     apiRequest("/patient/notifications/read-all", { method: "POST" }),
   retry: (id) =>
     apiRequest(`/patient/notifications/${id}/retry`, { method: "POST" }),
+};
+
+export const adminNotificationApi = {
+  list: (params) => {
+    const q = new URLSearchParams();
+    if (params?.unread_only) q.append("unread_only", "true");
+    if (params?.limit) q.append("limit", params.limit);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return apiRequest(`/clinic-admin/notifications${qs}`);
+  },
+  unreadCount: () => apiRequest("/clinic-admin/notifications/unread-count"),
+  markRead: (id) =>
+    apiRequest(`/clinic-admin/notifications/${id}/read`, { method: "POST" }),
+  markAllRead: () =>
+    apiRequest("/clinic-admin/notifications/read-all", { method: "POST" }),
+  retry: (id) =>
+    apiRequest(`/clinic-admin/notifications/${id}/retry`, { method: "POST" }),
+  getConfig: () => apiRequest("/clinic-admin/notifications/config"),
+  updateConfig: (data) =>
+    apiRequest("/clinic-admin/notifications/config", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  checkExpiringPolicies: () =>
+    apiRequest("/clinic-admin/notifications/check-expiring-policies", { method: "POST" }),
+  checkPendingClaims: () =>
+    apiRequest("/clinic-admin/notifications/check-pending-claims", { method: "POST" }),
 };
 
 export const consultationApi = {
@@ -632,6 +660,272 @@ export const supportStaffApi = {
     apiRequest(`/clinic-admin/support-staff/${id}`, {
       method: "DELETE",
     }),
+};
+
+export const insuranceApi = {
+  listProviders: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.set("search", params.search);
+    if (params.status && params.status !== "all") query.set("status", params.status);
+    if (params.provider_type && params.provider_type !== "all") query.set("provider_type", params.provider_type);
+    if (params.page) query.set("page", params.page);
+    if (params.limit) query.set("limit", params.limit);
+    const qs = query.toString();
+    return apiRequest(`/clinic-admin/insurance/providers${qs ? `?${qs}` : ""}`);
+  },
+  getProvider: (id) => apiRequest(`/clinic-admin/insurance/providers/${id}`),
+  createProvider: (payload) =>
+    apiRequest("/clinic-admin/insurance/providers", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateProvider: (id, payload) =>
+    apiRequest(`/clinic-admin/insurance/providers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  toggleStatus: (id, status) =>
+    apiRequest(`/clinic-admin/insurance/providers/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  // Patient Portal Insurance methods (Checkpoint 2 & 3)
+  getPatientPolicies: () => apiRequest("/patient/insurance/policies"),
+  getPatientPolicy: (policyId) => apiRequest(`/patient/insurance/policies/${policyId}`),
+  getActiveProviders: () => apiRequest("/patient/insurance/providers"),
+  registerPolicy: (formData) =>
+    apiRequest("/patient/insurance/policies", {
+      method: "POST",
+      body: formData,
+    }),
+  updatePolicy: (policyId, formData) =>
+    apiRequest(`/patient/insurance/policies/${policyId}`, {
+      method: "PUT",
+      body: formData,
+    }),
+  togglePolicyStatus: (policyId, status) =>
+    apiRequest(`/patient/insurance/policies/${policyId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  downloadDocument: async (docId, fileName) => {
+    const res = await fetch(`${API_BASE_URL}/patient/insurance/documents/${docId}/download`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Failed to download document");
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName || "document";
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+  },
+  fetchDocumentPreviewBlob: async (docId) => {
+    const res = await fetch(`${API_BASE_URL}/patient/insurance/documents/${docId}/preview`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Failed to preview document");
+    }
+    const blob = await res.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    return {
+      objectUrl,
+      contentType: res.headers.get("content-type") || "application/octet-stream",
+    };
+  },
+  // Post-Consultation Insurance Claim (Checkpoint 4 & 5)
+  checkClaimEligibility: (appointmentId) =>
+    apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-eligibility`),
+  initiateClaim: (appointmentId, payload) =>
+    apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-initiate`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getClaimDossier: (appointmentId, policyId = null) => {
+    const qs = policyId ? `?policy_id=${encodeURIComponent(policyId)}` : "";
+    return apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-dossier${qs}`);
+  },
+  uploadSupportingDocument: (appointmentId, formData) =>
+    apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-documents`, {
+      method: "POST",
+      body: formData,
+    }),
+  deleteDocument: (docId) =>
+    apiRequest(`/patient/insurance/documents/${docId}`, {
+      method: "DELETE",
+    }),
+  downloadClaimInvoice: async (appointmentId, fileName) => {
+    const res = await fetch(`${API_BASE_URL}/patient/insurance/appointments/${appointmentId}/invoice/download`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Failed to download consultation invoice");
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName || `Invoice-${appointmentId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+  },
+  fetchInvoicePreviewBlob: async (appointmentId) => {
+    const res = await fetch(`${API_BASE_URL}/patient/insurance/appointments/${appointmentId}/invoice/preview`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Failed to preview invoice");
+    }
+    const blob = await res.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    return {
+      objectUrl,
+      contentType: res.headers.get("content-type") || "application/pdf",
+    };
+  },
+  downloadClaimReceipt: async (appointmentId, fileName) => {
+    const res = await fetch(`${API_BASE_URL}/patient/insurance/appointments/${appointmentId}/receipt/download`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Failed to download payment receipt");
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName || `Receipt-${appointmentId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+  },
+  fetchReceiptPreviewBlob: async (appointmentId) => {
+    const res = await fetch(`${API_BASE_URL}/patient/insurance/appointments/${appointmentId}/receipt/preview`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Failed to preview payment receipt");
+    }
+    const blob = await res.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    return {
+      objectUrl,
+      contentType: res.headers.get("content-type") || "application/pdf",
+    };
+  },
+  fetchClinicalDocBlob: async (downloadUrl) => {
+    const fullUrl = downloadUrl.startsWith("http") ? downloadUrl : `${API_BASE_URL}${downloadUrl.replace(/^\/api/, "")}`;
+    const res = await fetch(fullUrl, { credentials: "include" });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || "Failed to preview clinical document");
+    }
+    const blob = await res.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    return {
+      objectUrl,
+      contentType: res.headers.get("content-type") || "text/plain",
+    };
+  },
+  // Checkpoint 6: Insurance Data Sharing Consent methods
+  getClaimConsent: (appointmentId, policyId = null) => {
+    const qs = policyId ? `?policy_id=${encodeURIComponent(policyId)}` : "";
+    return apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-consent${qs}`);
+  },
+  grantClaimConsent: (appointmentId, payload) =>
+    apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-consent`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  withdrawClaimConsent: (appointmentId) =>
+    apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-consent/withdraw`, {
+      method: "POST",
+    }),
+  getClaimConsentDocument: () =>
+    apiRequest("/patient/insurance/claim-consent/document"),
+  // Checkpoint 7: Patient Insurance Claim Submission & Details
+  submitClaim: (appointmentId, payload) =>
+    apiRequest(`/patient/insurance/appointments/${appointmentId}/claim-submit`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getPatientClaims: () => apiRequest("/patient/insurance/claims"),
+  getPatientClaimDetail: (claimId) => apiRequest(`/patient/insurance/claims/${claimId}`),
+  resubmitPatientClaim: (claimId, payload) =>
+    apiRequest(`/patient/insurance/claims/${claimId}/resubmit`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // Checkpoint 8: Clinic Admin Insurance Claim Verification & Audit
+  listClinicAdminClaims: (params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.search) qs.append("search", params.search);
+    if (params.status && params.status !== "all") qs.append("status", params.status);
+    if (params.provider_id && params.provider_id !== "all") qs.append("provider_id", params.provider_id);
+    if (params.page) qs.append("page", params.page);
+    if (params.limit) qs.append("limit", params.limit);
+    const q = qs.toString();
+    return apiRequest(`/clinic-admin/insurance/claims${q ? `?${q}` : ""}`);
+  },
+  getClinicAdminClaimDetail: (claimId) => apiRequest(`/clinic-admin/insurance/claims/${claimId}`),
+  verifyClinicAdminClaim: (claimId, payload) =>
+    apiRequest(`/clinic-admin/insurance/claims/${claimId}/verify`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // Checkpoint 9: Insurer Submission & Claim Status Tracking
+  getClaimDocumentPackage: (claimId) =>
+    apiRequest(`/clinic-admin/insurance/claims/${claimId}/document-package`),
+  submitClaimToInsurer: (claimId, payload) =>
+    apiRequest(`/clinic-admin/insurance/claims/${claimId}/submit-to-insurer`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateInsurerClaimStatus: (claimId, payload) =>
+    apiRequest(`/clinic-admin/insurance/claims/${claimId}/insurer-status`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  uploadPatientAdditionalDoc: (claimId, formData) =>
+    apiRequest(`/patient/insurance/claims/${claimId}/additional-documents`, {
+      method: "POST",
+      body: formData,
+    }),
+  submitPatientAdditionalDocs: (claimId, payload) =>
+    apiRequest(`/patient/insurance/claims/${claimId}/submit-additional-docs`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // Checkpoint 10: Patient Reimbursement Tracking
+  uploadReimbursementEvidence: (claimId, formData) =>
+    apiRequest(`/clinic-admin/insurance/claims/${claimId}/reimbursement-evidence`, {
+      method: "POST",
+      body: formData,
+    }),
+  recordClaimReimbursement: (claimId, payload) =>
+    apiRequest(`/clinic-admin/insurance/claims/${claimId}/reimbursements`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getClaimReimbursements: (claimId) =>
+    apiRequest(`/clinic-admin/insurance/claims/${claimId}/reimbursements`),
+  getPatientClaimReimbursements: (claimId) =>
+    apiRequest(`/patient/insurance/claims/${claimId}/reimbursements`),
 };
 
 export const supportDashboardApi = {

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import DoctorRegistrationScreen from "../auth/DoctorRegistrationScreen";
-import { authApi, patientApi, notificationApi } from "../../lib/api";
+import { authApi, patientApi, notificationApi, adminNotificationApi } from "../../lib/api";
 
 const PUBLIC_NAV_LINKS = [
   { label: "Home", path: "/" },
@@ -63,8 +63,17 @@ export default function Navbar() {
 
   // Sync unread notification count when authenticated
   useEffect(() => {
-    if (!currentUser || currentUser.role === "doctor" || currentUser.role === "clinic_admin") {
+    if (!currentUser || currentUser.role === "doctor") {
       setUnreadCount(0);
+      return;
+    }
+    if (currentUser.role === "clinic_admin") {
+      adminNotificationApi
+        .unreadCount()
+        .then((res: any) => {
+          setUnreadCount(res?.unread_count || 0);
+        })
+        .catch(() => {});
       return;
     }
     notificationApi

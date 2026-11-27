@@ -23,23 +23,45 @@ export default function NotificationsScreen({ onNavigate }) {
           setNotifications(
             items.map((n) => {
               const isUnread = !n.read_at && n.status !== "read";
-              const cat = n.event_type?.includes("appointment")
-                ? "appointments"
-                : n.event_type?.includes("payment")
-                  ? "billing"
-                  : "care";
-              const icon =
-                cat === "appointments"
-                  ? "calendar_month"
-                  : cat === "billing"
-                    ? "credit_card"
-                    : n.event_type?.includes("lab")
-                      ? "science"
-                      : n.event_type?.includes("prescription")
-                        ? "medication"
-                        : "favorite";
-              const targetTab =
-                cat === "appointments"
+              const isInsurance =
+                n.target_tab === "my-insurance" ||
+                n.claim_id ||
+                n.policy_id ||
+                n.event_type?.includes("insurance") ||
+                n.event_type?.includes("claim") ||
+                n.event_type?.includes("reimbursement") ||
+                n.event_type?.includes("policy");
+
+              const cat = isInsurance
+                ? "insurance"
+                : n.event_type?.includes("appointment")
+                  ? "appointments"
+                  : n.event_type?.includes("payment")
+                    ? "billing"
+                    : "care";
+
+              let icon = "notifications";
+              if (cat === "insurance") {
+                if (n.event_type?.includes("reimbursement")) icon = "payments";
+                else if (n.event_type?.includes("approved")) icon = "verified";
+                else if (n.event_type?.includes("correction") || n.event_type?.includes("additional_docs")) icon = "rule";
+                else if (n.event_type?.includes("policy")) icon = "health_and_safety";
+                else icon = "receipt_long";
+              } else if (cat === "appointments") {
+                icon = "calendar_month";
+              } else if (cat === "billing") {
+                icon = "credit_card";
+              } else {
+                icon = n.event_type?.includes("lab")
+                  ? "science"
+                  : n.event_type?.includes("prescription")
+                    ? "medication"
+                    : "favorite";
+              }
+
+              const targetTab = isInsurance
+                ? "my-insurance"
+                : cat === "appointments"
                   ? "appointments"
                   : cat === "billing"
                     ? "payments"
@@ -48,6 +70,14 @@ export default function NotificationsScreen({ onNavigate }) {
                       : n.event_type?.includes("prescription")
                         ? "prescriptions"
                         : "follow-up";
+
+              const targetParams = isInsurance
+                ? { claimId: n.claim_id, policyId: n.policy_id, tab: n.policy_id ? "policies" : "claims" }
+                : null;
+
+              const linkText = isInsurance
+                ? (n.claim_id ? "View Claim Details →" : "View Insurance Policy →")
+                : `View ${cat} →`;
 
               return {
                 id: n.id,
@@ -62,9 +92,10 @@ export default function NotificationsScreen({ onNavigate }) {
                     })
                   : "Today",
                 message: n.body,
-                linkText: `View ${cat} →`,
+                linkText,
                 targetTab,
-                targetParams: null,
+                targetParams,
+                emailDeliveryStatus: n.email_delivery_status,
               };
             }),
           );
@@ -107,6 +138,7 @@ export default function NotificationsScreen({ onNavigate }) {
     if (activeFilter === "appointments") return n.category === "appointments";
     if (activeFilter === "care") return n.category === "care";
     if (activeFilter === "billing") return n.category === "billing";
+    if (activeFilter === "insurance") return n.category === "insurance";
     return true;
   });
 
@@ -216,6 +248,19 @@ export default function NotificationsScreen({ onNavigate }) {
               >
                 Billing
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveFilter("insurance")}
+                className={`pb-3 -mb-px font-semibold transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  activeFilter === "insurance"
+                    ? "text-[#25836F] border-b-2 border-[#25836F]"
+                    : "text-[#577877] hover:text-[#162623]"
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">health_and_safety</span>
+                <span>Insurance &amp; Claims</span>
+              </button>
             </div>
 
             {/* Notification items list matching Screenshot */}
@@ -271,8 +316,8 @@ export default function NotificationsScreen({ onNavigate }) {
                           {item.message}
                         </p>
 
-                        {/* Action link */}
-                        <div className="mt-2">
+                        {/* Action link & Email Status */}
+                        <div className="mt-2.5 flex items-center justify-between gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() => handleNotificationClick(item)}
@@ -280,6 +325,23 @@ export default function NotificationsScreen({ onNavigate }) {
                           >
                             <span>{item.linkText}</span>
                           </button>
+
+                          {item.emailDeliveryStatus && (
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                                item.emailDeliveryStatus === "sent"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : item.emailDeliveryStatus === "sandboxed"
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : "bg-rose-50 text-rose-700 border border-rose-200"
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[12px]">
+                                {item.emailDeliveryStatus === "sent" ? "mail" : item.emailDeliveryStatus === "sandboxed" ? "mark_email_read" : "error"}
+                              </span>
+                              <span className="capitalize">Email: {item.emailDeliveryStatus}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
